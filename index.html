@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    
     :root {
       --dark: #0f1419;
       --card: #1a1f2e;
@@ -20,245 +19,95 @@
       --windmill-glow: rgba(59,130,246,0.15);
       --eightbells: #a855f7;
       --eightbells-glow: rgba(168,85,247,0.15);
-      --accent-invoice: #10b981;
-      --accent-paper: #f59e0b;
     }
+    html, body { height: 100%; font-family: 'DM Sans', system-ui, sans-serif; background: var(--dark); color: var(--text); overflow-x: hidden; }
 
-    html, body {
-      height: 100%;
-      font-family: 'DM Sans', system-ui, sans-serif;
-      background: var(--dark);
-      color: var(--text);
-      overflow-x: hidden;
-    }
+    /* ── Login ── */
+    .login-overlay{position:fixed;inset:0;z-index:300;background:var(--dark);display:flex;align-items:center;justify-content:center;transition:opacity .5s}
+    .login-overlay.hidden{opacity:0;pointer-events:none}
+    .login-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px 32px;width:90%;max-width:360px;text-align:center}
+    .login-card .icon{font-size:48px;margin-bottom:12px}
+    .login-card h1{font-family:'DM Serif Display',serif;font-size:28px;color:#fff;margin-bottom:4px}
+    .login-card h2{font-size:12px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);margin-bottom:28px}
+    .login-card input{width:100%;padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:#151a25;color:#fff;font-size:16px;text-align:center;letter-spacing:4px;outline:none;transition:border-color .2s}
+    .login-card input:focus{border-color:#a855f7}
+    .login-card input::placeholder{letter-spacing:1px;color:#4a5568}
+    .login-btn{width:100%;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:opacity .2s}
+    .login-btn:hover{opacity:.9}
+    .error{color:#fc8181;font-size:13px;margin-top:12px;display:none}
+    .error.show{display:block}
 
     /* ── Landing page ── */
-    .landing {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 20px;
-      position: relative;
-    }
-
-    /* Subtle background texture */
-    .landing::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: 
-        radial-gradient(ellipse at 20% 50%, var(--windmill-glow) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 50%, var(--eightbells-glow) 0%, transparent 50%);
-      pointer-events: none;
-    }
-
-    .brand {
-      text-align: center;
-      margin-bottom: 48px;
-      position: relative;
-    }
+    .landing { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; }
+    .landing::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 20% 50%, var(--windmill-glow) 0%, transparent 50%), radial-gradient(ellipse at 80% 50%, var(--eightbells-glow) 0%, transparent 50%); pointer-events: none; }
+    .brand { text-align: center; margin-bottom: 48px; position: relative; }
     .brand-icon { font-size: 56px; margin-bottom: 12px; }
-    .brand h1 {
-      font-family: 'DM Serif Display', serif;
-      font-size: 42px;
-      font-weight: 400;
-      letter-spacing: 1px;
-      color: #fff;
-      margin-bottom: 6px;
-    }
-    .brand p {
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: var(--text-dim);
-    }
-
-    /* Pub selector */
-    .pub-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      max-width: 800px;
-      width: 100%;
-      position: relative;
-    }
-
-    .pub-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px 28px;
-      transition: all 0.3s;
-    }
-
-    .pub-card:hover {
-      background: var(--card-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.3);
-    }
-
-    .pub-card.windmill:hover { border-color: var(--windmill); box-shadow: 0 12px 40px rgba(59,130,246,0.15); }
-    .pub-card.eightbells:hover { border-color: var(--eightbells); box-shadow: 0 12px 40px rgba(168,85,247,0.15); }
-
+    .brand h1 { font-family: 'DM Serif Display', serif; font-size: 42px; font-weight: 400; letter-spacing: 1px; color: #fff; margin-bottom: 6px; }
+    .brand p { font-size: 14px; font-weight: 500; letter-spacing: 4px; text-transform: uppercase; color: var(--text-dim); }
+    .pub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 800px; width: 100%; position: relative; }
+    .pub-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; transition: all 0.3s; }
+    .pub-card:hover { background: var(--card-hover); transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+    .pub-card.windmill:hover { border-color: var(--windmill); }
+    .pub-card.eightbells:hover { border-color: var(--eightbells); }
     .pub-icon { font-size: 36px; margin-bottom: 12px; }
-    .pub-name {
-      font-family: 'DM Serif Display', serif;
-      font-size: 22px;
-      color: #fff;
-      margin-bottom: 4px;
-    }
-    .pub-location {
-      font-size: 12px;
-      color: var(--text-dim);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 24px;
-    }
-
-    .pub-links {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .pub-link {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 18px;
-      border-radius: 10px;
-      text-decoration: none;
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 600;
-      transition: all 0.2s;
-      border: 1px solid var(--border);
-      background: transparent;
-    }
-
-    .pub-link:hover {
-      background: rgba(255,255,255,0.05);
-      border-color: rgba(255,255,255,0.15);
-    }
-
-    .pub-link .link-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-
+    .pub-name { font-family: 'DM Serif Display', serif; font-size: 22px; color: #fff; margin-bottom: 4px; }
+    .pub-location { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 24px; }
+    .pub-links { display: flex; flex-direction: column; gap: 10px; }
+    .pub-link { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 10px; text-decoration: none; color: var(--text); font-size: 14px; font-weight: 600; transition: all 0.2s; border: 1px solid var(--border); background: transparent; cursor: pointer; }
+    .pub-link:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
+    .pub-link .link-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
     .pub-link.invoicing .link-icon { background: rgba(16,185,129,0.15); }
     .pub-link.paperwork .link-icon { background: rgba(245,158,11,0.15); }
-
     .link-label { flex: 1; }
     .link-label small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
-    
     .link-arrow { color: var(--text-dim); font-size: 18px; }
+    .footer { text-align: center; padding: 32px; font-size: 12px; color: var(--text-dim); position: relative; }
 
-    /* ── App view (iframe) ── */
-    .app-view {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 50;
-      background: var(--dark);
-      flex-direction: column;
-    }
+    /* ── App view ── */
+    .app-view { display: none; position: fixed; inset: 0; z-index: 50; background: var(--dark); flex-direction: column; }
     .app-view.active { display: flex; }
-
-    .app-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 16px;
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .app-bar-back {
-      background: none;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: inherit;
-      transition: all 0.2s;
-    }
-    .app-bar-back:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
-    .app-bar-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .app-bar-pub {
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-left: auto;
-    }
-
+    .app-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .app-bar-back { background: none; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: all 0.2s; }
+    .app-bar-back:hover { background: rgba(255,255,255,0.05); }
+    .app-bar-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .app-bar-pub { font-size: 12px; color: var(--text-dim); margin-left: auto; }
     .app-frame { flex: 1; width: 100%; border: none; }
-
-    /* Loading overlay */
-    .app-loader {
-      position: absolute;
-      inset: 0;
-      top: 48px;
-      background: var(--dark);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 10;
-      transition: opacity 0.5s;
-    }
+    .app-loader { position: absolute; inset: 0; top: 48px; background: var(--dark); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: opacity 0.5s; }
     .app-loader.hidden { opacity: 0; pointer-events: none; }
     .spinner { border: 3px solid var(--border); border-top: 3px solid var(--windmill); border-radius: 50%; width: 32px; height: 32px; animation: sp 0.8s linear infinite; margin-bottom: 12px; }
     @keyframes sp { to { transform: rotate(360deg); } }
     .app-loader p { color: var(--text-dim); font-size: 13px; }
 
-    /* Footer */
-    .footer {
-      text-align: center;
-      padding: 32px;
-      font-size: 12px;
-      color: var(--text-dim);
-      position: relative;
-    }
-    .footer a { color: var(--text-dim); text-decoration: none; }
-
-    /* Responsive */
     @media (max-width: 640px) {
       .pub-grid { grid-template-columns: 1fr; gap: 16px; }
       .brand h1 { font-size: 32px; }
       .pub-card { padding: 24px 20px; }
-      .pub-name { font-size: 20px; }
       .landing { padding: 32px 16px; justify-content: flex-start; padding-top: 60px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- LANDING PAGE -->
-  <div class="landing" id="landing">
+  <!-- PIN Login -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div class="icon">🏠</div>
+      <h1>Kinfold Inns</h1>
+      <h2>Owner Portal</h2>
+      <input type="password" id="pw" placeholder="Enter PIN" maxlength="6" inputmode="numeric" autocomplete="off">
+      <button class="login-btn" onclick="checkPw()">Sign In</button>
+      <div class="error" id="err">Incorrect PIN</div>
+    </div>
+  </div>
+
+  <!-- Landing Page -->
+  <div class="landing" id="landing" style="display:none">
     <div class="brand">
       <div class="brand-icon">🏠</div>
       <h1>Kinfold Inns</h1>
       <p>Owner Portal</p>
     </div>
-
     <div class="pub-grid">
-      <!-- WINDMILL INN -->
       <div class="pub-card windmill">
         <div class="pub-icon">🍺</div>
         <div class="pub-name">The Windmill Inn</div>
@@ -276,8 +125,6 @@
           </a>
         </div>
       </div>
-
-      <!-- EIGHT BELLS -->
       <div class="pub-card eightbells">
         <div class="pub-icon">🔔</div>
         <div class="pub-name">The Eight Bells</div>
@@ -296,13 +143,10 @@
         </div>
       </div>
     </div>
-
-    <div class="footer">
-      Kinfold Inns Ltd
-    </div>
+    <div class="footer">Kinfold Inns Ltd</div>
   </div>
 
-  <!-- APP VIEW (iframe container) -->
+  <!-- App View -->
   <div class="app-view" id="appView">
     <div class="app-bar">
       <button class="app-bar-back" onclick="closeApp()">← Back</button>
@@ -317,45 +161,50 @@
   </div>
 
   <script>
-    // ═══════════════════════════════════════════════
-    //  CONFIGURE YOUR URLS HERE
-    // ═══════════════════════════════════════════════
-    const URLS = {
-      // The invoice processing system
+    // ═══════════════════════════════════
+    //  SET YOUR PIN HERE
+    // ═══════════════════════════════════
+    var PIN = '1232';
+    // ═══════════════════════════════════
+
+    var URLS = {
       'invoicing': 'https://script.google.com/macros/s/AKfycbw_o2Xb6kidks5eKUyT-C2XoQyQ0QlpVKt895FwUNlulh9q0YLFuO7VYVMImULi3SrE/exec',
-      
-      // Windmill weekly paperwork system (owner view)
       'paperwork-windmill': 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec?page=owner',
-      
-      // Eight Bells weekly paperwork system (owner view)
       'paperwork-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=owner'
     };
-    // ═══════════════════════════════════════════════
+    var TITLES = { 'invoicing': '📊 Invoicing', 'paperwork-windmill': '📋 Paperwork', 'paperwork-eightbells': '📋 Paperwork' };
 
-    const TITLES = {
-      'invoicing': '📊 Invoicing',
-      'paperwork-windmill': '📋 Paperwork',
-      'paperwork-eightbells': '📋 Paperwork'
-    };
+    // Check session
+    if (sessionStorage.getItem('kinfold_owner_auth') === 'yes') {
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('landing').style.display = '';
+    }
+
+    document.getElementById('pw').addEventListener('keydown', function(e) { if (e.key === 'Enter') checkPw(); });
+    document.getElementById('pw').focus();
+
+    function checkPw() {
+      if (document.getElementById('pw').value.trim() === PIN) {
+        sessionStorage.setItem('kinfold_owner_auth', 'yes');
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('landing').style.display = '';
+      } else {
+        document.getElementById('err').classList.add('show');
+        document.getElementById('pw').value = '';
+        document.getElementById('pw').focus();
+      }
+    }
 
     function openApp(system, pubName) {
-      const url = URLS[system];
-      if (!url || url.includes('_HERE')) {
-        alert('URL not configured for: ' + system + '\n\nEdit the URLS object in index.html');
-        return;
-      }
-
+      var url = URLS[system];
+      if (!url) return;
       document.getElementById('appTitle').textContent = TITLES[system] || system;
       document.getElementById('appPub').textContent = pubName;
       document.getElementById('appLoader').classList.remove('hidden');
-      
-      const frame = document.getElementById('appFrame');
+      var frame = document.getElementById('appFrame');
       frame.src = url;
-      frame.onload = () => setTimeout(() => document.getElementById('appLoader').classList.add('hidden'), 600);
-      
-      // Fallback: hide loader after 15s
-      setTimeout(() => document.getElementById('appLoader').classList.add('hidden'), 15000);
-
+      frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
+      setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
       document.getElementById('landing').style.display = 'none';
       document.getElementById('appView').classList.add('active');
     }
