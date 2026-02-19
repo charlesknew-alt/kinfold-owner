@@ -157,14 +157,14 @@
       <div class="spinner"></div>
       <p>Loading...</p>
     </div>
-    <iframe class="app-frame" id="appFrame" src="about:blank" allow="clipboard-write" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"></iframe>
+    <iframe class="app-frame" id="appFrame" src="about:blank" allow="clipboard-write"></iframe>
   </div>
 
   <script>
     // ═══════════════════════════════════
     //  SET YOUR PIN HERE
     // ═══════════════════════════════════
-    var PIN = '1232';
+    var PIN = '1234';
     // ═══════════════════════════════════
 
     var URLS = {
@@ -214,6 +214,17 @@
       document.getElementById('landing').style.display = '';
       document.getElementById('appFrame').src = 'about:blank';
     }
+
+    // Listen for navigation messages from the iframe (Apps Script pages)
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'navigate' && e.data.url) {
+        var frame = document.getElementById('appFrame');
+        document.getElementById('appLoader').classList.remove('hidden');
+        frame.src = e.data.url;
+        frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
+        setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
+      }
+    });
   </script>
 </body>
 </html>
