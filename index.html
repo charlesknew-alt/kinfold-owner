@@ -174,6 +174,10 @@
     };
     var TITLES = { 'invoicing': '📊 Invoicing', 'paperwork-windmill': '📋 Paperwork', 'paperwork-eightbells': '📋 Paperwork' };
 
+    // Track current app for history
+    var currentSystem = null;
+    var currentPub = null;
+
     // Check session
     if (sessionStorage.getItem('kinfold_owner_auth') === 'yes') {
       document.getElementById('loginOverlay').classList.add('hidden');
@@ -198,6 +202,8 @@
     function openApp(system, pubName) {
       var url = URLS[system];
       if (!url) return;
+      currentSystem = system;
+      currentPub = pubName;
       document.getElementById('appTitle').textContent = TITLES[system] || system;
       document.getElementById('appPub').textContent = pubName;
       document.getElementById('appLoader').classList.remove('hidden');
@@ -207,24 +213,83 @@
       setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
       document.getElementById('landing').style.display = 'none';
       document.getElementById('appView').classList.add('active');
+
+      // Push history state for the app entry
+      history.pushState({ view: 'app', system: system, pub: pubName, url: url }, '', '#' + system);
     }
 
     function closeApp() {
+      currentSystem = null;
+      currentPub = null;
       document.getElementById('appView').classList.remove('active');
       document.getElementById('landing').style.display = '';
       document.getElementById('appFrame').src = 'about:blank';
+
+      // Push landing state
+      history.pushState({ view: 'landing' }, '', '#');
     }
 
-    // Listen for navigation messages from the iframe (Apps Script pages)
+    // Listen for messages from the iframe (Apps Script pages)
     window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'navigate' && e.data.url) {
+      if (!e.data || typeof e.data !== 'object') return;
+
+      // Handle navigation requests from GAS pages
+      if (e.data.type === 'navigate' && e.data.url) {
         var frame = document.getElementById('appFrame');
         document.getElementById('appLoader').classList.remove('hidden');
         frame.src = e.data.url;
         frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
         setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
+
+        // Push history state for in-app navigation
+        var page = getPageFromUrl(e.data.url);
+        history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: e.data.url, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
+      }
+
+      // Handle page title updates from GAS pages
+      if (e.data.type === 'kinfold-page-change' && e.data.page) {
+        document.getElementById('appTitle').textContent = e.data.page;
       }
     });
+
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', function(event) {
+      var state = event.state;
+
+      if (!state || state.view === 'landing') {
+        // Go back to landing page
+        currentSystem = null;
+        currentPub = null;
+        document.getElementById('appView').classList.remove('active');
+        document.getElementById('landing').style.display = '';
+        document.getElementById('appFrame').src = 'about:blank';
+        return;
+      }
+
+      if (state.view === 'app' && state.url) {
+        // Navigate within app view
+        currentSystem = state.system;
+        currentPub = state.pub;
+        document.getElementById('appTitle').textContent = TITLES[state.system] || state.system || '-';
+        document.getElementById('appPub').textContent = state.pub || '-';
+        document.getElementById('appLoader').classList.remove('hidden');
+        var frame = document.getElementById('appFrame');
+        frame.src = state.url;
+        frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
+        setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
+        document.getElementById('landing').style.display = 'none';
+        document.getElementById('appView').classList.add('active');
+      }
+    });
+
+    // Extract page name from URL query string
+    function getPageFromUrl(url) {
+      var match = url.match(/[?&]page=([^&]*)/);
+      return match ? match[1] : '';
+    }
+
+    // Set initial history state (landing page)
+    history.replaceState({ view: 'landing' }, '', '#');
   </script>
 </body>
 </html>
