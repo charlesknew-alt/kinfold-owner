@@ -58,6 +58,7 @@
     .pub-link .link-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
     .pub-link.invoicing .link-icon { background: rgba(16,185,129,0.15); }
     .pub-link.paperwork .link-icon { background: rgba(245,158,11,0.15); }
+    .pub-link.rooms .link-icon { background: rgba(45,212,168,0.15); }
     .link-label { flex: 1; }
     .link-label small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
     .link-arrow { color: var(--text-dim); font-size: 18px; }
@@ -123,6 +124,11 @@
             <span class="link-label">Paperwork<small>Weekly data, cash & expenses</small></span>
             <span class="link-arrow">›</span>
           </a>
+          <a class="pub-link rooms" href="#" onclick="openApp('rooms-windmill','Windmill Inn');return false;">
+            <span class="link-icon">🛏️</span>
+            <span class="link-label">Rooms<small>Occupancy & 14-day calendar</small></span>
+            <span class="link-arrow">›</span>
+          </a>
         </div>
       </div>
       <div class="pub-card eightbells">
@@ -146,7 +152,7 @@
     <div class="footer">Kinfold Inns Ltd</div>
   </div>
 
-  <!-- App View -->
+  <!-- App View (iframe container) -->
   <div class="app-view" id="appView">
     <div class="app-bar">
       <button class="app-bar-back" onclick="closeApp()">← Back</button>
@@ -170,9 +176,15 @@
     var URLS = {
       'invoicing': 'https://script.google.com/macros/s/AKfycbw_o2Xb6kidks5eKUyT-C2XoQyQ0QlpVKt895FwUNlulh9q0YLFuO7VYVMImULi3SrE/exec',
       'paperwork-windmill': 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec?page=owner',
-      'paperwork-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=owner'
+      'paperwork-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=owner',
+      'rooms-windmill': 'PASTE_YOUR_WINDMILL_DASHBOARD_URL_HERE'
     };
-    var TITLES = { 'invoicing': '📊 Invoicing', 'paperwork-windmill': '📋 Paperwork', 'paperwork-eightbells': '📋 Paperwork' };
+    var TITLES = {
+      'invoicing': '📊 Invoicing',
+      'paperwork-windmill': '📋 Paperwork',
+      'paperwork-eightbells': '📋 Paperwork',
+      'rooms-windmill': '🛏️ Rooms'
+    };
 
     // Track current app for history
     var currentSystem = null;
