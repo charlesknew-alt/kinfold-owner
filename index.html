@@ -234,6 +234,11 @@
       document.getElementById('appLoader').classList.remove('hidden');
       var frame = document.getElementById('appFrame');
       frame.src = url;
+      // Pass entity to payroll page
+      if (system === 'payroll') {
+        var entity = pubName === 'Eight Bells' ? 'eightbells' : 'windmill';
+        frame.src = url + '?entity=' + entity;
+      }
       frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
       setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
       document.getElementById('landing').style.display = 'none';
