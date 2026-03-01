@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Windmill Inn — Rooms</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f2f4f7;
+    --white: #ffffff;
+    --border: #e5e8ee;
+    --text: #1e2a3a;
+    --text-mid: #5a6680;
+    --text-light: #98a2b3;
+    --teal: #0d9b76;
+    --teal-bg: rgba(13,155,118,0.08);
+    --blue: #2563eb;
+    --blue-bg: rgba(37,99,235,0.08);
+    --amber: #d97706;
+    --amber-bg: rgba(217,119,6,0.08);
+    --gray-bg: #f2f4f7;
+    --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+    --radius: 14px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html {
+    height: 100%;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+  body {
+    font-family:'DM Sans',system-ui,sans-serif;
+    background:var(--bg); color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    min-height:100%;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Hero Banner ── */
+  .hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a7b 100%);
+    color:#fff; padding:28px 20px 24px; text-align:center;
+    position:relative; overflow:hidden;
+  }
+  .hero::after {
+    content:''; position:absolute; inset:0;
+    background: radial-gradient(circle at 80% 20%, rgba(13,155,118,0.2) 0%, transparent 60%);
+  }
+  .hero * { position:relative; z-index:1; }
+  .hero-name { font-family:'DM Serif Display',serif; font-size:22px; font-weight:400; }
+  .hero-loc { font-size:11px; letter-spacing:2px; text-transform:uppercase; opacity:0.7; margin-top:2px; }
+
+  /* Pie in hero */
+  .hero-pie { margin:16px auto 0; width:120px; height:120px; position:relative; }
+  .hero-pie svg { transform:rotate(-90deg); }
+  .hero-pie .bg { fill:none; stroke:rgba(255,255,255,0.15); stroke-width:10; }
+  .hero-pie .fill { fill:none; stroke:#2dd4a8; stroke-width:10; stroke-linecap:round; transition:stroke-dashoffset 0.8s ease; }
+  .hero-pie-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .hero-pie-pct { font-size:28px; font-weight:700; line-height:1; }
+  .hero-pie-lbl { font-size:10px; opacity:0.7; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
+  /* ── Date Nav ── */
+  .date-bar {
+    display:flex; align-items:center; justify-content:center;
+    gap:12px; padding:16px; background:var(--white);
+    border-bottom:1px solid var(--border);
+  }
+  .date-btn {
+    width:40px; height:40px; border-radius:10px; border:1px solid var(--border);
+    background:var(--white); color:var(--text-mid); font-size:18px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all 0.15s; -webkit-tap-highlight-color:transparent;
+  }
+  .date-btn:active { background:var(--teal-bg); color:var(--teal); border-color:var(--teal); }
+  .date-btn.disabled { opacity:0.25; pointer-events:none; }
+  .date-info { text-align:center; min-width:130px; }
+  .date-main { font-size:16px; font-weight:700; }
+  .date-sub { font-size:11px; color:var(--teal); font-weight:600; margin-top:1px; }
+  .date-sub.dim { color:var(--text-light); }
+  .today-pill {
+    display:none; font-size:10px; color:var(--teal); background:var(--teal-bg);
+    padding:2px 10px; border-radius:10px; margin-top:4px; cursor:pointer;
+    border:1px solid rgba(13,155,118,0.15); font-weight:600;
+  }
+  .today-pill.show { display:inline-block; }
+
+  /* ── Activity Card ── */
+  .card { background:var(--white); border-radius:var(--radius); margin:12px 16px; box-shadow:var(--shadow); overflow:hidden; }
+  .card-head { padding:14px 18px 0; font-size:13px; font-weight:700; color:var(--text-mid); text-transform:uppercase; letter-spacing:1px; }
+  .activity-row {
+    display:flex; align-items:center; padding:14px 18px;
+    border-bottom:1px solid var(--border);
+  }
+  .activity-row:last-child { border-bottom:none; }
+  .activity-num { font-size:24px; font-weight:700; width:40px; }
+  .activity-label { flex:1; font-size:14px; font-weight:500; color:var(--text); }
+  .activity-badge {
+    width:28px; height:28px; border-radius:50%; display:flex;
+    align-items:center; justify-content:center; font-size:12px; font-weight:700;
+  }
+  .act-arr .activity-num { color:var(--blue); }
+  .act-arr .activity-badge { background:var(--blue-bg); color:var(--blue); }
+  .act-dep .activity-num { color:var(--amber); }
+  .act-dep .activity-badge { background:var(--amber-bg); color:var(--amber); }
+  .act-inh .activity-num { color:var(--teal); }
+  .act-inh .activity-badge { background:var(--teal-bg); color:var(--teal); }
+  .act-vac .activity-num { color:var(--text-light); }
+  .act-vac .activity-badge { background:var(--gray-bg); color:var(--text-light); }
+
+  /* ── Revenue ── */
+  .revenue-row {
+    display:none; padding:12px 18px; background:var(--teal-bg);
+    border-top:1px solid rgba(13,155,118,0.1);
+  }
+  .revenue-row.show { display:flex; align-items:center; justify-content:space-between; }
+  .revenue-label { font-size:12px; color:var(--teal); font-weight:500; }
+  .revenue-val { font-size:18px; font-weight:700; color:var(--teal); }
+
+  /* ── Room Cards 2-col ── */
+  .rooms-grid {
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:8px; padding:0 16px; margin:0 auto; max-width:540px;
+  }
+  .room-card { background:var(--white); border-radius:12px; padding:14px; box-shadow:var(--shadow); }
+  .rc-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .rc-num {
+    width:30px; height:30px; border-radius:8px; font-size:14px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .rc-num.arriving { background:var(--blue-bg); color:var(--blue); }
+  .rc-num.occupied { background:var(--teal-bg); color:var(--teal); }
+  .rc-num.departing { background:var(--amber-bg); color:var(--amber); }
+  .rc-num.vacant { background:var(--gray-bg); color:var(--text-light); }
+  .rc-badge {
+    font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+    padding:3px 8px; border-radius:8px;
+  }
+  .rc-badge.arriving { background:var(--blue-bg); color:var(--blue); }
+  .rc-badge.occupied { background:var(--teal-bg); color:var(--teal); }
+  .rc-badge.departing { background:var(--amber-bg); color:var(--amber); }
+  .rc-badge.vacant { background:var(--gray-bg); color:var(--text-light); }
+  .rc-guest { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rc-guest.empty { color:var(--text-light); font-weight:400; }
+  .rc-dates { font-size:10px; color:var(--text-mid); margin-top:2px; }
+  .rc-rate { font-size:11px; font-weight:700; color:var(--teal); margin-top:3px; }
+
+  /* ── Calendar ── */
+  .cal-bar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 18px;
+  }
+  .cal-nav { display:flex; align-items:center; gap:6px; }
+  .cal-btn {
+    width:28px; height:28px; border-radius:7px; border:1px solid var(--border);
+    background:var(--white); color:var(--text-mid); font-size:14px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .cal-btn.disabled { opacity:0.25; pointer-events:none; }
+  .cal-range { font-size:11px; color:var(--text-mid); }
+  .cal-grid { display:grid; gap:3px; padding:10px 18px 14px; font-size:11px; }
+  .ch { text-align:center; padding:5px 0; font-weight:700; color:var(--text-mid); font-size:10px; text-transform:uppercase; line-height:1.3; }
+  .ch.today-c { color:var(--teal); }
+  .ch.sel-c { color:var(--blue); }
+  .ch.we { color:var(--amber); }
+  .crl { display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:var(--text-mid); }
+  .cc {
+    height:34px; border-radius:5px; display:flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px;
+  }
+  .cc.occupied { background:#d1fae5; color:#047857; border:1px solid #a7f3d0; }
+  .cc.arriving { background:#dbeafe; color:#1d4ed8; border:1px solid #bfdbfe; }
+  .cc.vacant { background:#f9fafb; color:transparent; border:1px solid var(--border); }
+  .cc.departing { background:#f9fafb; color:transparent; border:1px solid var(--border); }
+  .cc.today-c { box-shadow:inset 0 0 0 2px rgba(13,155,118,0.5); }
+  .cc.sel-c { box-shadow:inset 0 0 0 2px rgba(37,99,235,0.5); }
+  .legend { display:flex; gap:14px; justify-content:center; padding:6px 18px 14px; }
+  .legend-i { display:flex; align-items:center; gap:4px; font-size:10px; color:var(--text-mid); }
+  .legend-d { width:10px; height:10px; border-radius:3px; }
+  .legend-d.arr { background:#dbeafe; border:1px solid #bfdbfe; }
+  .legend-d.occ { background:#d1fae5; border:1px solid #a7f3d0; }
+  .legend-d.vac { background:#f9fafb; border:1px solid var(--border); }
+
+  /* ── Recent Bookings ── */
+  .recent-row {
+    display:flex; align-items:center; padding:12px 18px; gap:12px;
+    border-bottom:1px solid var(--border); font-size:13px;
+  }
+  .recent-row:last-child { border-bottom:none; }
+  .recent-room {
+    width:30px; height:30px; border-radius:8px; font-size:13px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--blue-bg); color:var(--blue); flex-shrink:0;
+  }
+  .recent-guest { font-weight:600; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .recent-dates { font-size:12px; color:var(--text-mid); flex-shrink:0; }
+  .recent-rate { font-size:12px; font-weight:700; color:var(--teal); flex-shrink:0; min-width:40px; text-align:right; }
+  .recent-eta {
+    font-size:10px; font-weight:600; color:var(--amber); background:var(--amber-bg);
+    padding:2px 7px; border-radius:6px; flex-shrink:0; white-space:nowrap;
+  }
+  .recent-eta.today { color:var(--teal); background:var(--teal-bg); }
+  .recent-eta.past { color:var(--text-light); background:var(--gray-bg); }
+
+  /* ── Footer ── */
+  .footer { text-align:center; padding:20px 16px 40px; }
+  .back-link {
+    display:inline-flex; align-items:center; gap:6px; color:var(--text-mid);
+    text-decoration:none; font-size:13px; font-weight:500; padding:10px 20px;
+    border:1px solid var(--border); border-radius:20px; background:var(--white);
+    box-shadow:var(--shadow);
+  }
+  .footer-brand { font-size:11px; color:var(--text-light); margin-top:10px; }
+  .refresh-info { font-size:10px; color:var(--text-light); margin-top:6px; }
+
+  /* ── Loading ── */
+  .loading { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:80px 20px; gap:16px; }
+  .spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--teal); border-radius:50%; animation:sp 0.8s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  .loading-text { font-size:13px; color:var(--text-light); }
+
+  @media (max-width:420px) {
+    .rooms-grid { gap:6px; padding:0 12px; }
+    .room-card { padding:12px; }
+    .card { margin:12px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero" id="hero">
+  <div class="hero-name" id="heroName">The Windmill Inn</div>
+  <div class="hero-loc">Littleworth</div>
+  <div class="hero-pie">
+    <svg viewBox="0 0 120 120" width="100%" height="100%">
+      <circle class="bg" cx="60" cy="60" r="50"/>
+      <circle class="fill" id="pieFill" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16"/>
+    </svg>
+    <div class="hero-pie-center">
+      <div class="hero-pie-pct" id="piePct">0%</div>
+      <div class="hero-pie-lbl">Occupancy</div>
+    </div>
+  </div>
+</div>
+
+<div class="loading" id="loadingState">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading room data...</div>
+</div>
+
+<div id="dash" style="display:none">
+
+  <!-- Date Nav -->
+  <div class="date-bar">
+    <div class="date-btn" id="dPrev" onclick="changeDay(-1)">&#8249;</div>
+    <div class="date-info">
+      <div class="date-main" id="dMain">Today</div>
+      <div class="date-sub" id="dSub"></div>
+      <div class="today-pill" id="dToday" onclick="goToday()">Back to Today</div>
+    </div>
+    <div class="date-btn" id="dNext" onclick="changeDay(1)">&#8250;</div>
+  </div>
+
+  <!-- Activity -->
+  <div class="card">
+    <div class="card-head">Reservation Activity</div>
+    <div class="activity-row act-arr">
+      <div class="activity-num" id="sArr">0</div>
+      <div class="activity-label">Arrivals</div>
+      <div class="activity-badge" id="bArr">0</div>
+    </div>
+    <div class="activity-row act-dep">
+      <div class="activity-num" id="sDep">0</div>
+      <div class="activity-label">Departures</div>
+      <div class="activity-badge" id="bDep">0</div>
+    </div>
+    <div class="activity-row act-inh">
+      <div class="activity-num" id="sInh">0</div>
+      <div class="activity-label">In-House</div>
+      <div class="activity-badge" id="bInh">0</div>
+    </div>
+    <div class="activity-row act-vac">
+      <div class="activity-num" id="sVac">0</div>
+      <div class="activity-label">Vacant</div>
+      <div class="activity-badge" id="bVac">0</div>
+    </div>
+    <div class="revenue-row" id="revRow">
+      <div class="revenue-label">Room Revenue</div>
+      <div class="revenue-val" id="revVal">&pound;0</div>
+    </div>
+  </div>
+
+  <!-- Rooms -->
+  <div class="card">
+    <div class="card-head" style="padding-bottom:12px;">Rooms</div>
+    <div style="padding:0 12px 14px;">
+      <div class="rooms-grid" id="roomsGrid"></div>
+    </div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="card">
+    <div style="padding:14px 18px 0; display:flex; justify-content:space-between; align-items:center;">
+      <div class="card-head" style="padding:0">14-Day Overview</div>
+      <div class="cal-nav">
+        <div class="cal-btn disabled" id="cPrev" onclick="calPage(-1)">&#8249;</div>
+        <div class="cal-range" id="cRange"></div>
+        <div class="cal-btn" id="cNext" onclick="calPage(1)">&#8250;</div>
+      </div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="legend">
+      <div class="legend-i"><div class="legend-d arr"></div>Arriving</div>
+      <div class="legend-i"><div class="legend-d occ"></div>Staying Over</div>
+      <div class="legend-i"><div class="legend-d vac"></div>Vacant</div>
+    </div>
+  </div>
+
+  <!-- Recent Bookings -->
+  <div class="card" id="recentCard" style="display:none">
+    <div class="card-head">Recent Bookings</div>
+    <div id="recentList"></div>
+  </div>
+
+  <div class="footer">
+    <a href="https://owner.kinfoldinns.co.uk" class="back-link">&larr; Owner Portal</a>
+    <div class="refresh-info" id="refreshInfo"></div>
+    <div class="footer-brand">Kinfold Inns Ltd</div>
+  </div>
+</div>
+
+<script>
+var MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var D=null, si=0, cp=0, dpp=7, PC=314.16;
+
+document.addEventListener('DOMContentLoaded',function(){
+  // Fetch data from Apps Script JSON API
+  var API_URL = 'https://script.google.com/macros/s/AKfycbzPYH_2DajHe5P8dpcFiLFyQvfv3WLiE2bDXv5wM90iBM_IAkFG-a227qsibPR8Cr4q/exec?json=1';
+  fetch(API_URL)
+    .then(function(r){return r.json();})
+    .then(init)
+    .catch(function(e){err({message:e.message||'Failed to load data'});});
+});
+
+function err(e){
+  document.getElementById('loadingState').innerHTML=
+    '<div style="color:#d97706;font-size:14px;">\u26A0 Error</div><div style="color:#98a2b3;font-size:12px;margin-top:8px;">'+(e.message||'Unknown')+'</div>'+
+    '<div style="margin-top:16px"><button onclick="location.reload()" style="background:var(--teal-bg);color:var(--teal);border:1px solid rgba(13,155,118,0.2);padding:8px 20px;border-radius:20px;font-size:13px;cursor:pointer">Retry</button></div>';
+}
+
+function init(data){
+  if(!data||data.error){err({message:data?data.error:'No data'});return;}
+  D=data;
+  document.getElementById('loadingState').style.display='none';
+  document.getElementById('dash').style.display='block';
+  document.getElementById('heroName').textContent=data.propertyName;
+  si=0; renderDay(); cp=0; renderCal();
+  renderRecent();
+  document.getElementById('refreshInfo').textContent='Updated '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  setTimeout(resizeFrame, 500);
+}
+
+function changeDay(d){si+=d;if(si<0)si=0;if(si>13)si=13;renderDay();renderCal();}
+function goToday(){si=0;renderDay();renderCal();}
+
+function renderDay(){
+  if(!D)return;
+  var cd=D.calendarDates[si], isT=si===0;
+  document.getElementById('dPrev').className='date-btn'+(si===0?' disabled':'');
+  document.getElementById('dNext').className='date-btn'+(si>=13?' disabled':'');
+  document.getElementById('dMain').textContent=isT?'Today':cd.day+' '+cd.date;
+  var sub=document.getElementById('dSub');
+  sub.textContent=isT?cd.day+' '+cd.date:(si===1?'Tomorrow':'In '+si+' days');
+  sub.className='date-sub'+(isT?'':' dim');
+  document.getElementById('dToday').className='today-pill'+(isT?'':' show');
+
+  var ih=0,ar=0,dp=0,vc=0,ds=D.calendarDates[si].iso;
+  for(var i=0;i<D.rooms.length;i++){
+    var s=D.rooms[i].calendar[si];
+    if(s==='occupied')ih++;else if(s==='arriving')ar++;else if(s==='departing')dp++;else vc++;
+  }
+  document.getElementById('sArr').textContent=ar;document.getElementById('bArr').textContent=ar;
+  document.getElementById('sDep').textContent=dp;document.getElementById('bDep').textContent=dp;
+  document.getElementById('sInh').textContent=ih;document.getElementById('bInh').textContent=ih;
+  document.getElementById('sVac').textContent=vc;document.getElementById('bVac').textContent=vc;
+
+  var pct=Math.round(((ih+ar)/D.totalRooms)*100);
+  document.getElementById('piePct').textContent=pct+'%';
+  document.getElementById('pieFill').style.strokeDashoffset=PC-(PC*pct/100);
+
+  // Revenue
+  var rr=document.getElementById('revRow');
+  if(D.dailyRevenue&&D.dailyRevenue[ds]){
+    rr.classList.add('show');
+    document.getElementById('revVal').textContent='\u00A3'+D.dailyRevenue[ds].toFixed(0);
+  } else { rr.classList.remove('show'); }
+
+  // Room cards
+  var h='';
+  for(var i=0;i<D.rooms.length;i++){
+    var rm=D.rooms[i],st=rm.calendar[si],sl=sLbl(st),gn='',dt='',rate='';
+    if(st!=='vacant'){
+      for(var b=0;b<(rm.bookings||[]).length;b++){
+        var bk=rm.bookings[b];
+        if(ds>=bk.checkin&&ds<bk.checkout){gn=bk.guest||'';dt=fD(bk.checkin)+' \u2192 '+fD(bk.checkout);break;}
+        if(ds===bk.checkout){gn=bk.guest||'';dt='Checkout today';break;}
+      }
+      if(!dt&&rm.checkin&&rm.checkout)dt=fD(rm.checkin)+' \u2192 '+fD(rm.checkout);
+    } else {
+      var nx=null;
+      for(var b=0;b<(rm.bookings||[]).length;b++){var bk=rm.bookings[b];if(bk.checkin>ds&&(!nx||bk.checkin<nx.checkin))nx=bk;}
+      if(nx)dt='Next: '+fD(nx.checkin);
+    }
+    if(rm.nightRates&&rm.nightRates[ds])rate='\u00A3'+rm.nightRates[ds].toFixed(0);
+    h+='<div class="room-card"><div class="rc-top"><div class="rc-num '+st+'">'+rm.room+'</div><div class="rc-badge '+st+'">'+sl+'</div></div>'+
+      '<div class="rc-guest'+(gn?'':' empty')+'">'+(gn||(st==='vacant'?'Available':'\u2014'))+'</div>'+
+      '<div class="rc-dates">'+(dt||'\u00A0')+'</div>'+
+      (rate?'<div class="rc-rate">'+rate+'/night</div>':'')+'</div>';
+  }
+  document.getElementById('roomsGrid').innerHTML=h;
+}
+
+// Calendar
+function calPage(d){cp+=d;var tp=Math.ceil(D.calendarDates.length/dpp);if(cp<0)cp=0;if(cp>=tp)cp=tp-1;renderCal();}
+
+function renderCal(){
+  if(!D)return;
+  var tp=Math.ceil(D.calendarDates.length/dpp),s=cp*dpp,e=Math.min(s+dpp,D.calendarDates.length),v=e-s;
+  document.getElementById('cPrev').className='cal-btn'+(cp===0?' disabled':'');
+  document.getElementById('cNext').className='cal-btn'+(cp>=tp-1?' disabled':'');
+  document.getElementById('cRange').textContent=D.calendarDates[s].date+' \u2013 '+D.calendarDates[e-1].date;
+  var g=document.getElementById('calGrid');
+  g.style.gridTemplateColumns='36px repeat('+v+',1fr)';
+  var h='<div class="ch"></div>';
+  for(var d=s;d<e;d++){
+    var cd=D.calendarDates[d],cls='ch';
+    if(d===0)cls+=' today-c';else if(d===si)cls+=' sel-c';else if(cd.day==='Sat'||cd.day==='Sun')cls+=' we';
+    h+='<div class="'+cls+'">'+(d===0?'Today':cd.day)+'<br><span style="font-weight:400;font-size:8px">'+cd.date+'</span></div>';
+  }
+  for(var i=0;i<D.rooms.length;i++){
+    var rm=D.rooms[i];h+='<div class="crl">'+rm.room+'</div>';
+    for(var d=s;d<e;d++){
+      var st=rm.calendar[d],lb='';
+      if(st==='arriving')lb='ARR';else if(st==='occupied')lb='S/O';
+      var dst=(st==='departing')?'departing':st;
+      var cls='cc '+dst;
+      if(d===0)cls+=' today-c';else if(d===si)cls+=' sel-c';
+      h+='<div class="'+cls+'">'+lb+'</div>';
+    }
+  }
+  g.innerHTML=h;
+}
+
+// Recent Bookings
+function renderRecent(){
+  if(!D||!D.rooms)return;
+  var all=[];
+  for(var i=0;i<D.rooms.length;i++){
+    var rm=D.rooms[i];
+    for(var b=0;b<(rm.bookings||[]).length;b++){
+      var bk=rm.bookings[b];
+      var rate='';
+      if(rm.nightRates&&rm.nightRates[bk.checkin])rate='\u00A3'+rm.nightRates[bk.checkin].toFixed(0);
+      all.push({room:rm.room, guest:bk.guest, checkin:bk.checkin, checkout:bk.checkout, rate:rate});
+    }
+  }
+  all.sort(function(a,b){return a.checkin<b.checkin?1:a.checkin>b.checkin?-1:0;});
+  var recent=all.slice(0,5);
+  if(recent.length===0)return;
+
+  document.getElementById('recentCard').style.display='block';
+  var todayStr=D.calendarDates[0].iso;
+  var h='';
+  for(var i=0;i<recent.length;i++){
+    var r=recent[i];
+    var nights=Math.round((new Date(r.checkout)-new Date(r.checkin))/86400000);
+    // Days to arrival
+    var daysTo=Math.round((new Date(r.checkin)-new Date(todayStr))/86400000);
+    var etaText='', etaCls='recent-eta';
+    if(daysTo<0){etaText='In-house';etaCls+=' past';}
+    else if(daysTo===0){etaText='Today';etaCls+=' today';}
+    else if(daysTo===1){etaText='Tomorrow';etaCls+='';}
+    else{etaText='In '+daysTo+'d';etaCls+='';}
+
+    h+='<div class="recent-row">'+
+      '<div class="recent-room">'+r.room+'</div>'+
+      '<div class="recent-guest">'+(r.guest||'Guest')+'</div>'+
+      '<div class="recent-dates">'+fD(r.checkin)+' \u2192 '+fD(r.checkout)+'</div>'+
+      '<div class="recent-rate">'+(r.rate||'')+'</div>'+
+      '<div class="'+etaCls+'">'+etaText+'</div></div>';
+  }
+  document.getElementById('recentList').innerHTML=h;
+}
+
+function sLbl(s){return s==='occupied'?'In-house':s==='arriving'?'Arriving':s==='departing'?'Departing':'Vacant';}
+function fD(iso){if(!iso)return '';var p=iso.split('-');return parseInt(p[2])+' '+MONTHS[parseInt(p[1])-1];}
+
+// Resize not needed when hosted on GitHub
+function resizeFrame(){}
+// Call after render and on window resize
+window.addEventListener('resize', resizeFrame);
+</script>
+</body>
+</html>
