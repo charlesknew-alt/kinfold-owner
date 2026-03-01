@@ -7,328 +7,170 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f1419;
-    --surface: #1a1f2e;
-    --surface-2: #222838;
-    --border: #2a3040;
-    --text: #e8eaed;
-    --text-muted: #8b92a5;
-    --accent: #4a6cf7;
-    --accent-hover: #5d7df9;
-    --green: #34d399;
-    --green-bg: rgba(52, 211, 153, 0.1);
-    --red: #f87171;
-    --red-bg: rgba(248, 113, 113, 0.1);
-    --amber: #fbbf24;
-    --amber-bg: rgba(251, 191, 36, 0.1);
+    --bg: #0f1419; --surface: #1a1f2e; --surface-2: #222838; --border: #2a3040;
+    --text: #e8eaed; --text-muted: #8b92a5; --accent: #4a6cf7; --accent-hover: #5d7df9;
+    --green: #34d399; --green-bg: rgba(52,211,153,0.1);
+    --red: #f87171; --red-bg: rgba(248,113,113,0.1);
+    --amber: #fbbf24; --amber-bg: rgba(251,191,36,0.1);
     --radius: 10px;
   }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:20px; }
+  .container { max-width:1100px; margin:0 auto; }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+  .page-header h1 { font-size:18px; font-weight:700; }
+  .page-header h1 span { color:var(--text-muted); font-weight:400; font-size:13px; display:block; margin-top:2px; }
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 20px;
-  }
+  .entity-tabs { display:flex; gap:8px; }
+  .entity-tab { padding:7px 16px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-muted); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; }
+  .entity-tab:hover { border-color:var(--text-muted); color:var(--text); }
+  .entity-tab.active { background:var(--accent); border-color:var(--accent); color:white; }
 
-  .container { max-width: 1100px; margin: 0 auto; }
+  .workflow-steps { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+  .step-indicator { display:flex; align-items:center; gap:8px; padding:7px 12px; border-radius:20px; font-size:11px; font-weight:500; color:var(--text-muted); background:var(--surface); border:1px solid var(--border); }
+  .step-indicator.active { color:var(--accent); border-color:var(--accent); background:rgba(74,108,247,.08); }
+  .step-indicator.done { color:var(--green); border-color:var(--green); background:var(--green-bg); }
+  .step-num { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; background:var(--border); color:var(--text-muted); }
+  .step-indicator.active .step-num { background:var(--accent); color:white; }
+  .step-indicator.done .step-num { background:var(--green); color:white; }
+  .step-arrow { color:var(--border); font-size:14px; line-height:32px; }
 
-  .page-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
-  }
-  .page-header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-  .page-header h1 span { color: var(--text-muted); font-weight: 400; font-size: 13px; display: block; margin-top: 2px; }
+  .drop-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:40px 24px; text-align:center; cursor:pointer; transition:all .2s; background:var(--surface); margin-bottom:16px; }
+  .drop-zone:hover,.drop-zone.drag-over { border-color:var(--accent); background:rgba(74,108,247,.04); }
+  .drop-zone-icon { font-size:32px; margin-bottom:10px; opacity:.5; }
+  .drop-zone-text { font-size:14px; font-weight:500; margin-bottom:4px; }
+  .drop-zone-hint { font-size:12px; color:var(--text-muted); }
 
-  .entity-tabs { display: flex; gap: 8px; }
+  .loaded-files { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  .file-chip { display:flex; align-items:center; gap:8px; padding:5px 10px; background:var(--green-bg); border:1px solid rgba(52,211,153,.2); border-radius:6px; font-size:11px; color:var(--green); font-family:'JetBrains Mono',monospace; }
+  .file-chip .remove-file { cursor:pointer; opacity:.6; transition:opacity .15s; }
+  .file-chip .remove-file:hover { opacity:1; }
 
-  .entity-tab {
-    padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border);
-    background: transparent; color: var(--text-muted); font-family: inherit;
-    font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;
-  }
-  .entity-tab:hover { border-color: var(--text-muted); color: var(--text); }
-  .entity-tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .table-wrapper { background:var(--surface); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; margin-bottom:16px; }
+  .table-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); }
+  .table-title { font-size:14px; font-weight:600; }
+  .table-count { font-size:11px; color:var(--text-muted); background:var(--surface-2); padding:3px 10px; border-radius:12px; }
 
-  .workflow-steps { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  thead th { text-align:left; padding:9px 16px; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); background:var(--surface-2); border-bottom:1px solid var(--border); }
+  tbody td { padding:9px 16px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:12px; }
+  tbody td.name-col { font-family:'DM Sans',sans-serif; font-weight:500; font-size:13px; }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr:hover { background:rgba(74,108,247,.03); }
+  tbody tr.manual-row { background:var(--amber-bg); }
 
-  .step-indicator {
-    display: flex; align-items: center; gap: 8px; padding: 7px 12px;
-    border-radius: 20px; font-size: 11px; font-weight: 500;
-    color: var(--text-muted); background: var(--surface); border: 1px solid var(--border);
-  }
-  .step-indicator.active { color: var(--accent); border-color: var(--accent); background: rgba(74, 108, 247, 0.08); }
-  .step-indicator.done { color: var(--green); border-color: var(--green); background: var(--green-bg); }
+  .amount-cell { text-align:right; cursor:pointer; position:relative; transition:background .15s; border-radius:4px; font-weight:500; }
+  .amount-cell:hover { background:rgba(74,108,247,.08); }
+  .amount-cell .edit-hint { display:none; font-size:9px; color:var(--accent); position:absolute; top:1px; right:3px; font-family:'DM Sans',sans-serif; }
+  .amount-cell:hover .edit-hint { display:block; }
+  .amount-edit-input { width:100px; padding:3px 6px; border-radius:4px; border:1px solid var(--accent); background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; text-align:right; outline:none; }
+  thead th.actions-head { text-align:center; width:44px; }
+  .row-remove { background:none; border:none; color:var(--red); cursor:pointer; font-size:13px; opacity:.5; transition:opacity .15s; padding:3px; }
+  .row-remove:hover { opacity:1; }
 
-  .step-num {
-    width: 18px; height: 18px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 600; background: var(--border); color: var(--text-muted);
-  }
-  .step-indicator.active .step-num { background: var(--accent); color: white; }
-  .step-indicator.done .step-num { background: var(--green); color: white; }
+  .total-row { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--surface-2); border-top:2px solid var(--border); font-weight:600; font-size:14px; }
+  .total-amount { font-family:'JetBrains Mono',monospace; color:var(--green); font-size:16px; }
+  .total-label { font-size:13px; }
 
-  .step-arrow { color: var(--border); font-size: 14px; line-height: 32px; }
+  .validation-bar { display:flex; align-items:center; gap:12px; padding:12px 16px; background:var(--surface-2); border-top:1px solid var(--border); }
+  .validation-bar label { font-size:11px; color:var(--text-muted); white-space:nowrap; font-weight:500; }
+  .validation-bar input { padding:5px 8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; outline:none; width:120px; text-align:right; }
+  .validation-bar input:focus { border-color:var(--accent); }
+  .validation-result { font-size:11px; font-weight:600; padding:3px 10px; border-radius:12px; display:none; }
+  .validation-result.match { display:inline-block; background:var(--green-bg); color:var(--green); }
+  .validation-result.mismatch { display:inline-block; background:var(--red-bg); color:var(--red); }
 
-  .drop-zone {
-    border: 2px dashed var(--border); border-radius: var(--radius);
-    padding: 40px 24px; text-align: center; cursor: pointer;
-    transition: all 0.2s; background: var(--surface); margin-bottom: 16px;
-  }
-  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(74, 108, 247, 0.04); }
-  .drop-zone-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.5; }
-  .drop-zone-text { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
-  .drop-zone-hint { font-size: 12px; color: var(--text-muted); }
+  .add-manual-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:16px; }
+  .section-tabs { display:flex; gap:0; margin-bottom:14px; border-bottom:1px solid var(--border); }
+  .section-tab { padding:7px 16px; font-size:12px; font-weight:500; color:var(--text-muted); background:none; border:none; border-bottom:2px solid transparent; cursor:pointer; font-family:inherit; transition:all .15s; }
+  .section-tab:hover { color:var(--text); }
+  .section-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
 
-  .loaded-files { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .manual-form { display:grid; grid-template-columns:2fr 1fr 1.2fr 1fr auto; gap:8px; align-items:end; }
+  .saved-add-form { display:grid; grid-template-columns:2fr 1fr auto; gap:8px; align-items:end; }
 
-  .file-chip {
-    display: flex; align-items: center; gap: 8px; padding: 5px 10px;
-    background: var(--green-bg); border: 1px solid rgba(52, 211, 153, 0.2);
-    border-radius: 6px; font-size: 11px; color: var(--green);
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .file-chip .remove-file { cursor: pointer; opacity: 0.6; transition: opacity 0.15s; }
-  .file-chip .remove-file:hover { opacity: 1; }
+  .field label { display:block; font-size:10px; font-weight:500; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:4px; }
+  .field input,.field select { width:100%; padding:7px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12px; outline:none; transition:border-color .15s; }
+  .field select { font-family:'DM Sans',sans-serif; cursor:pointer; }
+  .field select option { background:var(--bg); color:var(--text); }
+  .field input:focus,.field select:focus { border-color:var(--accent); }
+  .field input::placeholder { color:var(--text-muted); opacity:.5; }
+  .field input.name-input { font-family:'DM Sans',sans-serif; }
 
-  .table-wrapper {
-    background: var(--surface); border-radius: var(--radius);
-    border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px;
-  }
+  .btn { padding:7px 16px; border-radius:8px; border:none; font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  .btn-primary { background:var(--accent); color:white; }
+  .btn-primary:hover { background:var(--accent-hover); }
+  .btn-secondary { background:var(--surface-2); color:var(--text); border:1px solid var(--border); }
+  .btn-secondary:hover { border-color:var(--text-muted); }
+  .btn-success { background:var(--green); color:var(--bg); }
+  .btn-success:hover { background:#4ade80; }
+  .btn-danger { background:transparent; color:var(--red); border:1px solid rgba(248,113,113,.3); }
+  .btn-danger:hover { background:var(--red-bg); }
+  .btn-sm { padding:4px 10px; font-size:11px; }
 
-  .table-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid var(--border);
-  }
-  .table-title { font-size: 14px; font-weight: 600; }
-  .table-count {
-    font-size: 11px; color: var(--text-muted); background: var(--surface-2);
-    padding: 3px 10px; border-radius: 12px;
-  }
+  .save-checkbox { margin-top:8px; }
+  .save-checkbox label { font-size:11px; color:var(--text-muted); display:flex; align-items:center; gap:6px; cursor:pointer; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .actions-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .actions-left { display:flex; gap:10px; align-items:center; }
+  .payment-ref-field { display:flex; align-items:center; gap:8px; }
+  .payment-ref-field label { font-size:11px; color:var(--text-muted); white-space:nowrap; }
+  .payment-ref-field input { padding:7px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-size:12px; outline:none; width:200px; }
+  .payment-ref-field input:focus { border-color:var(--accent); }
 
-  thead th {
-    text-align: left; padding: 9px 16px; font-weight: 600; font-size: 10px;
-    text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);
-    background: var(--surface-2); border-bottom: 1px solid var(--border);
-  }
+  .directory-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; overflow:hidden; }
+  .directory-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; transition:background .15s; }
+  .directory-header:hover { background:var(--surface-2); }
+  .directory-title { font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px; }
+  .directory-toggle { color:var(--text-muted); font-size:11px; transition:transform .2s; }
+  .directory-toggle.open { transform:rotate(180deg); }
+  .directory-body { display:none; border-top:1px solid var(--border); }
+  .directory-body.open { display:block; }
+  .directory-list { padding:10px 16px; }
+  .directory-item { display:flex; align-items:center; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .directory-item:last-child { border-bottom:none; }
+  .directory-item-info { display:flex; gap:16px; align-items:center; }
+  .directory-item-name { font-weight:500; min-width:140px; }
+  .directory-item-details { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-muted); }
+  .directory-item-entity { font-size:9px; padding:2px 7px; border-radius:10px; background:var(--surface-2); color:var(--text-muted); font-weight:500; }
+  .directory-empty { padding:20px; text-align:center; color:var(--text-muted); font-size:12px; }
+  .directory-add-form { display:grid; grid-template-columns:2fr 1fr 1.2fr 1fr auto; gap:8px; align-items:end; padding:12px 16px; border-top:1px solid var(--border); background:var(--surface-2); }
 
-  tbody td {
-    padding: 9px 16px; border-bottom: 1px solid var(--border);
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-  }
-  tbody td.name-col { font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 13px; }
-  tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: rgba(74, 108, 247, 0.03); }
-  tbody tr.manual-row { background: var(--amber-bg); }
+  .sync-status { font-size:10px; color:var(--text-muted); padding:4px 10px; border-radius:10px; background:var(--surface-2); display:inline-flex; align-items:center; gap:5px; }
+  .sync-status.syncing { color:var(--amber); }
+  .sync-status.synced { color:var(--green); }
+  .sync-status.error { color:var(--red); }
+  .sync-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
 
-  .amount-cell {
-    text-align: right; cursor: pointer; position: relative;
-    transition: background 0.15s; border-radius: 4px; font-weight: 500;
-  }
-  .amount-cell:hover { background: rgba(74, 108, 247, 0.08); }
-  .amount-cell .edit-hint {
-    display: none; font-size: 9px; color: var(--accent);
-    position: absolute; top: 1px; right: 3px; font-family: 'DM Sans', sans-serif;
-  }
-  .amount-cell:hover .edit-hint { display: block; }
+  .toast { position:fixed; bottom:20px; right:20px; padding:10px 18px; border-radius:8px; font-size:12px; font-weight:500; display:flex; align-items:center; gap:8px; transform:translateY(100px); opacity:0; transition:all .3s; z-index:100; }
+  .toast.show { transform:translateY(0); opacity:1; }
+  .toast.success { background:var(--green); color:var(--bg); }
+  .toast.error { background:var(--red); color:white; }
 
-  .amount-edit-input {
-    width: 100px; padding: 3px 6px; border-radius: 4px;
-    border: 1px solid var(--accent); background: var(--bg); color: var(--text);
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    text-align: right; outline: none;
-  }
-
-  thead th.actions-head { text-align: center; width: 44px; }
-
-  .row-remove {
-    background: none; border: none; color: var(--red); cursor: pointer;
-    font-size: 13px; opacity: 0.5; transition: opacity 0.15s; padding: 3px;
-  }
-  .row-remove:hover { opacity: 1; }
-
-  .total-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 16px; background: var(--surface-2);
-    border-top: 2px solid var(--border); font-weight: 600; font-size: 14px;
-  }
-  .total-amount { font-family: 'JetBrains Mono', monospace; color: var(--green); font-size: 16px; }
-  .total-label { font-size: 13px; }
-
-  .validation-bar {
-    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    background: var(--surface-2); border-top: 1px solid var(--border);
-  }
-  .validation-bar label { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-weight: 500; }
-  .validation-bar input {
-    padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', monospace;
-    font-size: 12px; outline: none; width: 120px; text-align: right;
-  }
-  .validation-bar input:focus { border-color: var(--accent); }
-
-  .validation-result {
-    font-size: 11px; font-weight: 600; padding: 3px 10px;
-    border-radius: 12px; display: none;
-  }
-  .validation-result.match { display: inline-block; background: var(--green-bg); color: var(--green); }
-  .validation-result.mismatch { display: inline-block; background: var(--red-bg); color: var(--red); }
-
-  .add-manual-section {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
-  }
-
-  .section-tabs {
-    display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid var(--border);
-  }
-  .section-tab {
-    padding: 7px 16px; font-size: 12px; font-weight: 500; color: var(--text-muted);
-    background: none; border: none; border-bottom: 2px solid transparent;
-    cursor: pointer; font-family: inherit; transition: all 0.15s;
-  }
-  .section-tab:hover { color: var(--text); }
-  .section-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  .manual-form {
-    display: grid; grid-template-columns: 2fr 1fr 1.2fr 1fr auto;
-    gap: 8px; align-items: end;
-  }
-
-  .saved-add-form {
-    display: grid; grid-template-columns: 2fr 1fr auto;
-    gap: 8px; align-items: end;
-  }
-
-  .field label {
-    display: block; font-size: 10px; font-weight: 500; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px;
-  }
-
-  .field input, .field select {
-    width: 100%; padding: 7px 10px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--bg); color: var(--text);
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    outline: none; transition: border-color 0.15s;
-  }
-  .field select { font-family: 'DM Sans', sans-serif; cursor: pointer; }
-  .field select option { background: var(--bg); color: var(--text); }
-  .field input:focus, .field select:focus { border-color: var(--accent); }
-  .field input::placeholder { color: var(--text-muted); opacity: 0.5; }
-  .field input.name-input { font-family: 'DM Sans', sans-serif; }
-
-  .btn {
-    padding: 7px 16px; border-radius: 8px; border: none; font-family: inherit;
-    font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
-    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-  }
-  .btn-primary { background: var(--accent); color: white; }
-  .btn-primary:hover { background: var(--accent-hover); }
-  .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
-  .btn-secondary:hover { border-color: var(--text-muted); }
-  .btn-success { background: var(--green); color: var(--bg); }
-  .btn-success:hover { background: #4ade80; }
-  .btn-danger { background: transparent; color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
-  .btn-danger:hover { background: var(--red-bg); }
-  .btn-sm { padding: 4px 10px; font-size: 11px; }
-
-  .save-checkbox { margin-top: 8px; }
-  .save-checkbox label {
-    font-size: 11px; color: var(--text-muted);
-    display: flex; align-items: center; gap: 6px; cursor: pointer;
-  }
-
-  .actions-bar {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  }
-  .actions-left { display: flex; gap: 10px; align-items: center; }
-
-  .payment-ref-field { display: flex; align-items: center; gap: 8px; }
-  .payment-ref-field label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
-  .payment-ref-field input {
-    padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif;
-    font-size: 12px; outline: none; width: 200px;
-  }
-  .payment-ref-field input:focus { border-color: var(--accent); }
-
-  .directory-section {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); margin-bottom: 16px; overflow: hidden;
-  }
-  .directory-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; cursor: pointer; transition: background 0.15s;
-  }
-  .directory-header:hover { background: var(--surface-2); }
-  .directory-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .directory-toggle { color: var(--text-muted); font-size: 11px; transition: transform 0.2s; }
-  .directory-toggle.open { transform: rotate(180deg); }
-
-  .directory-body { display: none; border-top: 1px solid var(--border); }
-  .directory-body.open { display: block; }
-
-  .directory-list { padding: 10px 16px; }
-  .directory-item {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px;
-  }
-  .directory-item:last-child { border-bottom: none; }
-  .directory-item-info { display: flex; gap: 16px; align-items: center; }
-  .directory-item-name { font-weight: 500; min-width: 140px; }
-  .directory-item-details { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); }
-  .directory-item-entity {
-    font-size: 9px; padding: 2px 7px; border-radius: 10px;
-    background: var(--surface-2); color: var(--text-muted); font-weight: 500;
-  }
-
-  .directory-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px; }
-
-  .directory-add-form {
-    display: grid; grid-template-columns: 2fr 1fr 1.2fr 1fr auto;
-    gap: 8px; align-items: end; padding: 12px 16px;
-    border-top: 1px solid var(--border); background: var(--surface-2);
-  }
-
-  .toast {
-    position: fixed; bottom: 20px; right: 20px; padding: 10px 18px;
-    border-radius: 8px; font-size: 12px; font-weight: 500;
-    display: flex; align-items: center; gap: 8px;
-    transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 100;
-  }
-  .toast.show { transform: translateY(0); opacity: 1; }
-  .toast.success { background: var(--green); color: var(--bg); }
-  .toast.error { background: var(--red); color: white; }
-
-  @media (max-width: 768px) {
-    body { padding: 12px; }
-    .manual-form, .saved-add-form, .directory-add-form { grid-template-columns: 1fr 1fr; }
-    .workflow-steps { flex-wrap: wrap; }
-    .entity-tabs { flex-wrap: wrap; }
-    .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .actions-bar { flex-direction: column; align-items: stretch; }
-    .payment-ref-field { flex-direction: column; align-items: stretch; }
-    .payment-ref-field input { width: 100%; }
-    .validation-bar { flex-wrap: wrap; }
+  @media(max-width:768px) {
+    body { padding:12px; }
+    .manual-form,.saved-add-form,.directory-add-form { grid-template-columns:1fr 1fr; }
+    .page-header { flex-direction:column; align-items:flex-start; gap:12px; }
+    .actions-bar { flex-direction:column; align-items:stretch; }
+    .payment-ref-field { flex-direction:column; align-items:stretch; }
+    .payment-ref-field input { width:100%; }
+    .validation-bar { flex-wrap:wrap; }
   }
 </style>
 </head>
 <body>
-
 <div class="container">
   <div class="page-header">
-    <h1>Payroll → Wise<span>BACS file parser & Wise CSV generator</span></h1>
-    <div class="entity-tabs">
-      <button class="entity-tab active" data-entity="windmill">The Windmill</button>
-      <button class="entity-tab" data-entity="eightbells">The Eight Bells</button>
+    <div><h1>Payroll → Wise<span>BACS file parser & Wise CSV generator</span></h1></div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="sync-status" id="syncStatus"><span class="sync-dot"></span> Loading...</span>
+      <div class="entity-tabs">
+        <button class="entity-tab active" data-entity="windmill">The Windmill</button>
+        <button class="entity-tab" data-entity="eightbells">The Eight Bells</button>
+      </div>
     </div>
   </div>
 
@@ -348,7 +190,6 @@
     <div class="drop-zone-hint">or click to browse — accepts .txt BACS files from Xero Payroll</div>
     <input type="file" id="fileInput" multiple accept=".txt" style="display:none">
   </div>
-
   <div class="loaded-files" id="loadedFiles"></div>
 
   <div class="table-wrapper" id="tableWrapper" style="display:none">
@@ -356,17 +197,13 @@
       <div class="table-title" id="tableTitle">Payments</div>
       <div class="table-count" id="tableCount">0 employees</div>
     </div>
-    <div style="overflow-x: auto;">
+    <div style="overflow-x:auto;">
       <table>
-        <thead>
-          <tr>
-            <th>Employee</th>
-            <th>Sort Code</th>
-            <th>Account No.</th>
-            <th style="text-align:right">Amount (£) <span style="font-weight:400;text-transform:none;font-size:9px;opacity:0.5">click to edit</span></th>
-            <th class="actions-head"></th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>Employee</th><th>Sort Code</th><th>Account No.</th>
+          <th style="text-align:right">Amount (£) <span style="font-weight:400;text-transform:none;font-size:9px;opacity:.5">click to edit</span></th>
+          <th class="actions-head"></th>
+        </tr></thead>
         <tbody id="tableBody"></tbody>
       </table>
     </div>
@@ -386,48 +223,26 @@
       <button class="section-tab active" data-tab="saved">Add from saved staff</button>
       <button class="section-tab" data-tab="new">Add new (manual entry)</button>
     </div>
-
     <div class="tab-content active" id="tab-saved">
       <div class="saved-add-form">
-        <div class="field">
-          <label>Saved Staff Member</label>
-          <select id="savedStaffSelect"><option value="">— Select staff member —</option></select>
-        </div>
-        <div class="field">
-          <label>Amount (£)</label>
-          <input type="text" id="savedAmount" placeholder="1,438.49">
-        </div>
+        <div class="field"><label>Saved Staff Member</label><select id="savedStaffSelect"><option value="">— Select staff member —</option></select></div>
+        <div class="field"><label>Amount (£)</label><input type="text" id="savedAmount" placeholder="1,438.49"></div>
         <button class="btn btn-primary" id="addSavedBtn">Add</button>
       </div>
     </div>
-
     <div class="tab-content" id="tab-new">
       <div class="manual-form">
-        <div class="field">
-          <label>Name</label>
-          <input type="text" id="manName" class="name-input" placeholder="James Jordan">
-        </div>
-        <div class="field">
-          <label>Sort Code</label>
-          <input type="text" id="manSort" placeholder="20-00-00" maxlength="8">
-        </div>
-        <div class="field">
-          <label>Account Number</label>
-          <input type="text" id="manAccount" placeholder="12345678" maxlength="8">
-        </div>
-        <div class="field">
-          <label>Amount (£)</label>
-          <input type="text" id="manAmount" placeholder="1,438.49">
-        </div>
+        <div class="field"><label>Name</label><input type="text" id="manName" class="name-input" placeholder="James Jordan"></div>
+        <div class="field"><label>Sort Code</label><input type="text" id="manSort" placeholder="20-00-00" maxlength="8"></div>
+        <div class="field"><label>Account Number</label><input type="text" id="manAccount" placeholder="12345678" maxlength="8"></div>
+        <div class="field"><label>Amount (£)</label><input type="text" id="manAmount" placeholder="1,438.49"></div>
         <button class="btn btn-primary" id="addManualBtn">Add</button>
       </div>
-      <div class="save-checkbox">
-        <label><input type="checkbox" id="saveToDirectory" checked> Save to staff directory for next time</label>
-      </div>
+      <div class="save-checkbox"><label><input type="checkbox" id="saveToDirectory" checked> Save to staff directory for next time</label></div>
     </div>
   </div>
 
-  <div class="directory-section" id="directorySection">
+  <div class="directory-section">
     <div class="directory-header" id="directoryToggle">
       <div class="directory-title">👥 Staff Directory <span style="font-size:10px;color:var(--text-muted);font-weight:400" id="directoryCount">(0 saved)</span></div>
       <span class="directory-toggle" id="directoryArrow">▼</span>
@@ -438,9 +253,7 @@
         <div class="field"><label>Name</label><input type="text" id="dirName" class="name-input" placeholder="New staff member"></div>
         <div class="field"><label>Sort Code</label><input type="text" id="dirSort" placeholder="20-00-00" maxlength="8"></div>
         <div class="field"><label>Account Number</label><input type="text" id="dirAccount" placeholder="12345678" maxlength="8"></div>
-        <div class="field"><label>Entity</label>
-          <select id="dirEntity"><option value="both">Both</option><option value="windmill">Windmill</option><option value="eightbells">Eight Bells</option></select>
-        </div>
+        <div class="field"><label>Entity</label><select id="dirEntity"><option value="both">Both</option><option value="windmill">Windmill</option><option value="eightbells">Eight Bells</option></select></div>
         <button class="btn btn-primary btn-sm" id="addDirBtn">Save</button>
       </div>
     </div>
@@ -453,51 +266,50 @@
         <input type="text" id="paymentRef" placeholder="e.g. Windmill Mar Payroll">
       </div>
     </div>
-    <div style="display:flex; gap:8px;">
+    <div style="display:flex;gap:8px;">
       <button class="btn btn-secondary" id="clearBtn">Clear all</button>
       <button class="btn btn-success" id="downloadBtn">⬇ Download Wise CSV</button>
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
 
 <script>
-let employees = [];
-let loadedFileNames = [];
-let currentEntity = 'windmill';
-const STORAGE_KEY = 'kinfold_staff_directory';
+// ══════════════════════════════════════════════════════════
+const API_URL = 'https://script.google.com/macros/s/AKfycbyPc3fWNKaGp3IAtrxz3P8340T8TxgMyErKi9PMYDs-9OcsBAaN2YoYotwdZ7pFZYtwpA/exec';
+// ══════════════════════════════════════════════════════════
 
-// Auto-select entity from parent iframe context
-(function() {
-  try {
-    const hash = window.location.hash || '';
-    if (hash.includes('eightbells')) currentEntity = 'eightbells';
-  } catch(e) {}
-  // Also check referrer / parent message
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.entity) {
-      currentEntity = e.data.entity;
-      document.querySelectorAll('.entity-tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.entity === currentEntity);
-      });
-      populateSavedStaffSelect();
-      renderDirectoryList();
-    }
-  });
-})();
-
-function loadDirectory() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } }
-function saveDirectory(dir) { localStorage.setItem(STORAGE_KEY, JSON.stringify(dir)); }
-
+let employees = [], loadedFileNames = [], currentEntity = 'windmill', staffDirectory = [];
 const $ = id => document.getElementById(id);
-const dropZone = $('dropZone'), fileInput = $('fileInput'), tableWrapper = $('tableWrapper');
-const tableBody = $('tableBody'), tableCount = $('tableCount'), tableTitle = $('tableTitle');
-const totalAmountEl = $('totalAmount'), manualSection = $('manualSection'), actionsBar = $('actionsBar');
-const expectedTotalInput = $('expectedTotal'), validationResult = $('validationResult');
-const savedStaffSelect = $('savedStaffSelect'), toast = $('toast');
 
-// Entity tabs
+// ── API ──
+function setSyncStatus(s, t) { const el = $('syncStatus'); el.className = 'sync-status ' + s; el.innerHTML = '<span class="sync-dot"></span> ' + t; }
+
+async function apiGet() {
+  setSyncStatus('syncing', 'Syncing...');
+  try {
+    const r = await fetch(API_URL + '?action=list');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    staffDirectory = d.staff || [];
+    setSyncStatus('synced', 'Synced');
+    renderDirectoryList(); populateSavedStaffSelect();
+  } catch (e) { console.error(e); setSyncStatus('error', 'Offline'); }
+}
+
+async function apiPost(body) {
+  setSyncStatus('syncing', 'Saving...');
+  try {
+    const r = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error && !d.duplicate) throw new Error(d.error);
+    setSyncStatus('synced', 'Saved');
+    await apiGet();
+    return d;
+  } catch (e) { console.error(e); setSyncStatus('error', 'Save failed'); return { error: e.message }; }
+}
+
+// ── Entity tabs ──
 document.querySelectorAll('.entity-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.entity-tab').forEach(t => t.classList.remove('active'));
@@ -507,8 +319,6 @@ document.querySelectorAll('.entity-tab').forEach(tab => {
     populateSavedStaffSelect(); renderDirectoryList();
   });
 });
-
-// Section tabs
 document.querySelectorAll('.section-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
@@ -517,18 +327,15 @@ document.querySelectorAll('.section-tab').forEach(tab => {
     $('tab-' + tab.dataset.tab).classList.add('active');
   });
 });
+$('directoryToggle').addEventListener('click', () => { $('directoryBody').classList.toggle('open'); $('directoryArrow').classList.toggle('open'); });
 
-$('directoryToggle').addEventListener('click', () => {
-  $('directoryBody').classList.toggle('open');
-  $('directoryArrow').classList.toggle('open');
-});
-
-// Drop zone
-dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
-fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
+// ── Drop zone ──
+const dz = $('dropZone'), fi = $('fileInput');
+dz.addEventListener('click', () => fi.click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+fi.addEventListener('change', () => { handleFiles(fi.files); fi.value = ''; });
 
 function handleFiles(files) {
   for (const file of files) {
@@ -536,13 +343,10 @@ function handleFiles(files) {
     const reader = new FileReader();
     reader.onload = e => {
       const parsed = parseBACS(e.target.result);
-      if (parsed.length === 0) { showToast('No payments found in ' + file.name, 'error'); return; }
+      if (!parsed.length) { showToast('No payments found in ' + file.name, 'error'); return; }
       loadedFileNames.push(file.name);
-      parsed.forEach(emp => {
-        if (!employees.some(e => e.name === emp.name && e.sortCode === emp.sortCode && e.accountNumber === emp.accountNumber))
-          employees.push(emp);
-      });
-      autoSaveToDirectory(parsed);
+      parsed.forEach(emp => { if (!employees.some(e => e.name === emp.name && e.sortCode === emp.sortCode && e.accountNumber === emp.accountNumber)) employees.push(emp); });
+      autoSaveToSheet(parsed);
       renderFileChips(); renderTable();
       showToast(`Loaded ${parsed.length} payments from ${file.name}`, 'success');
       updateSteps(2);
@@ -551,28 +355,17 @@ function handleFiles(files) {
   }
 }
 
+// ── BACS Parser (Standard 18 — 100 char lines) ──
 function parseBACS(content) {
-  // BACS Standard 18 format (100 chars per line, no leading record type byte):
-  // [0:6]   Dest sort code (6 digits)
-  // [6:14]  Dest account number (8 digits)
-  // [14]    Type indicator
-  // [15:17] Transaction code (99=credit, 17=contra)
-  // [17:23] Originating sort code
-  // [23:31] Originating account number
-  // [31:35] Free format
-  // [35:46] Amount in pence (11 digits)
-  // [46:64] Originating name (18 chars)
-  // [64:82] Reference (18 chars)
-  // [82:100] Destination name / employee name (18 chars)
   const lines = content.split('\n'), payments = [];
   for (const line of lines) {
     const t = line.trimEnd();
     if (!t || t.length < 82) continue;
     if (/^(VOL1|HDR1|HDR2|UHL1|EOF1|EOF2|UTL1)/.test(t)) continue;
-    const ds = t.substring(0, 6), da = t.substring(6, 14), tc = t.substring(15, 17);
+    const ds = t.substring(0,6), da = t.substring(6,14), tc = t.substring(15,17);
     if (!/^\d{6}$/.test(ds) || !/^\d{8}$/.test(da)) continue;
-    if (tc === '17') continue; // skip contra
-    const amt = parseInt(t.substring(35, 46).trim(), 10) / 100;
+    if (tc === '17') continue;
+    const amt = parseInt(t.substring(35,46).trim(), 10) / 100;
     if (amt <= 0 || isNaN(amt)) continue;
     const name = toTitleCase(t.substring(82).trim());
     if (!name || name.length < 2) continue;
@@ -582,227 +375,165 @@ function parseBACS(content) {
   return payments;
 }
 
-function autoSaveToDirectory(parsed) {
-  const dir = loadDirectory(); let added = 0;
-  parsed.forEach(emp => {
-    if (!dir.some(d => d.sortCode === emp.sortCode && d.accountNumber === emp.accountNumber)) {
-      dir.push({ name: emp.name, sortCode: emp.sortCode, accountNumber: emp.accountNumber, entity: currentEntity });
-      added++;
-    }
-  });
-  if (added) { saveDirectory(dir); renderDirectoryList(); populateSavedStaffSelect(); }
+async function autoSaveToSheet(parsed) {
+  const newStaff = parsed.filter(e => !staffDirectory.some(d => d.sortCode === e.sortCode && d.accountNumber === e.accountNumber))
+    .map(e => ({ name: e.name, sortCode: e.sortCode, accountNumber: e.accountNumber, entity: currentEntity }));
+  if (newStaff.length) await apiPost({ action: 'addBatch', staff: newStaff });
 }
 
+// ── Render ──
 function toTitleCase(s) { return s.toLowerCase().replace(/(?:^|\s|-)\S/g, a => a.toUpperCase()); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function fmtSort(s) { s = s.replace(/[^0-9-]/g,''); if (/^\d{6}$/.test(s)) s = s.substring(0,2)+'-'+s.substring(2,4)+'-'+s.substring(4,6); return s; }
-function fmtMoney(n) { return n.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtMoney(n) { return n.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
-function renderFileChips() {
-  $('loadedFiles').innerHTML = loadedFileNames.map((n,i) =>
-    `<div class="file-chip">📄 ${n} <span class="remove-file" onclick="removeFile(${i})">✕</span></div>`
-  ).join('');
-}
+function renderFileChips() { $('loadedFiles').innerHTML = loadedFileNames.map((n,i) => `<div class="file-chip">📄 ${n} <span class="remove-file" onclick="removeFile(${i})">✕</span></div>`).join(''); }
 function removeFile(i) { loadedFileNames.splice(i,1); renderFileChips(); }
 
 function renderTable() {
-  if (!employees.length) {
-    tableWrapper.style.display = 'none'; manualSection.style.display = 'none'; actionsBar.style.display = 'none';
-    updateSteps(1); return;
-  }
-  tableWrapper.style.display = 'block'; manualSection.style.display = 'block'; actionsBar.style.display = 'flex';
+  if (!employees.length) { $('tableWrapper').style.display='none'; $('manualSection').style.display='none'; $('actionsBar').style.display='none'; updateSteps(1); return; }
+  $('tableWrapper').style.display='block'; $('manualSection').style.display='block'; $('actionsBar').style.display='flex';
   const label = currentEntity === 'windmill' ? 'Windmill' : 'Eight Bells';
-  tableTitle.textContent = `${label} — Payments`;
-  tableCount.textContent = `${employees.length} employee${employees.length !== 1 ? 's' : ''}`;
-  tableBody.innerHTML = employees.map((emp,i) =>
-    `<tr class="${emp.manual ? 'manual-row' : ''}">
-      <td class="name-col">${esc(emp.name)}</td><td>${esc(emp.sortCode)}</td><td>${esc(emp.accountNumber)}</td>
-      <td class="amount-cell" onclick="editAmount(${i}, this)">£${fmtMoney(emp.amount)}<span class="edit-hint">edit</span></td>
-      <td style="text-align:center"><button class="row-remove" onclick="removeRow(${i})" title="Remove">✕</button></td>
-    </tr>`
+  $('tableTitle').textContent = `${label} — Payments`;
+  $('tableCount').textContent = `${employees.length} employee${employees.length!==1?'s':''}`;
+  $('tableBody').innerHTML = employees.map((e,i) =>
+    `<tr class="${e.manual?'manual-row':''}"><td class="name-col">${esc(e.name)}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td>
+    <td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td>
+    <td style="text-align:center"><button class="row-remove" onclick="removeRow(${i})">✕</button></td></tr>`
   ).join('');
   updateTotal();
 }
 
-function updateTotal() {
-  const total = employees.reduce((s,e) => s + e.amount, 0);
-  totalAmountEl.textContent = `£${fmtMoney(total)}`;
-  validateTotal();
-}
-
+function updateTotal() { const t = employees.reduce((s,e) => s+e.amount, 0); $('totalAmount').textContent = `£${fmtMoney(t)}`; validateTotal(); }
 function removeRow(i) { employees.splice(i,1); renderTable(); }
 
 function editAmount(i, cell) {
-  const val = employees[i].amount.toFixed(2);
-  cell.onclick = null;
-  cell.innerHTML = `<input class="amount-edit-input" type="text" value="${val}" autofocus>`;
-  const input = cell.querySelector('input');
-  input.focus(); input.select();
-  function commit() {
-    const v = parseFloat(input.value.replace(/[£,\s]/g,''));
-    if (!isNaN(v) && v >= 0) employees[i].amount = v;
-    renderTable();
-  }
-  input.addEventListener('blur', commit);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } if (e.key === 'Escape') renderTable(); });
+  const v = employees[i].amount.toFixed(2); cell.onclick = null;
+  cell.innerHTML = `<input class="amount-edit-input" type="text" value="${v}" autofocus>`;
+  const inp = cell.querySelector('input'); inp.focus(); inp.select();
+  function commit() { const n = parseFloat(inp.value.replace(/[£,\s]/g,'')); if (!isNaN(n)&&n>=0) employees[i].amount = n; renderTable(); }
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => { if (e.key==='Enter'){e.preventDefault();commit();} if (e.key==='Escape') renderTable(); });
 }
 
-expectedTotalInput.addEventListener('input', validateTotal);
+$('expectedTotal').addEventListener('input', validateTotal);
 function validateTotal() {
-  const raw = expectedTotalInput.value.replace(/[£,\s]/g,'');
-  const expected = parseFloat(raw);
-  const actual = employees.reduce((s,e) => s + e.amount, 0);
-  if (!raw || isNaN(expected)) { validationResult.style.display = 'none'; return; }
-  const diff = Math.abs(actual - expected);
-  if (diff < 0.02) {
-    validationResult.className = 'validation-result match'; validationResult.textContent = '✓ Totals match';
-    validationResult.style.display = 'inline-block'; updateSteps(3);
-  } else {
-    const sign = actual > expected ? '+' : '-';
-    validationResult.className = 'validation-result mismatch';
-    validationResult.textContent = `✕ Diff: ${sign}£${diff.toFixed(2)}`;
-    validationResult.style.display = 'inline-block';
-  }
+  const raw = $('expectedTotal').value.replace(/[£,\s]/g,''), exp = parseFloat(raw), act = employees.reduce((s,e)=>s+e.amount,0);
+  if (!raw||isNaN(exp)) { $('validationResult').style.display='none'; return; }
+  const diff = Math.abs(act-exp);
+  if (diff < 0.02) { $('validationResult').className='validation-result match'; $('validationResult').textContent='✓ Totals match'; $('validationResult').style.display='inline-block'; updateSteps(3); }
+  else { $('validationResult').className='validation-result mismatch'; $('validationResult').textContent=`✕ Diff: ${act>exp?'+':'-'}£${diff.toFixed(2)}`; $('validationResult').style.display='inline-block'; }
 }
 
-// Manual add
+// ── Manual add ──
 $('addManualBtn').addEventListener('click', addManual);
-document.querySelectorAll('#tab-new input').forEach(el => { el.addEventListener('keydown', e => { if (e.key === 'Enter') addManual(); }); });
-
-function addManual() {
-  const name = $('manName').value.trim();
-  let sc = $('manSort').value.trim();
-  const acct = $('manAccount').value.trim();
+document.querySelectorAll('#tab-new input').forEach(el => { el.addEventListener('keydown', e => { if (e.key==='Enter') addManual(); }); });
+async function addManual() {
+  const name=$('manName').value.trim(); let sc=$('manSort').value.trim(); const acct=$('manAccount').value.trim();
   const amt = parseFloat($('manAmount').value.trim().replace(/[£,]/g,''));
-  if (!name) { showToast('Enter name', 'error'); return; }
-  if (!sc || !acct) { showToast('Enter sort code & account', 'error'); return; }
-  if (isNaN(amt) || amt <= 0) { showToast('Enter valid amount', 'error'); return; }
+  if (!name){showToast('Enter name','error');return;} if(!sc||!acct){showToast('Enter sort code & account','error');return;} if(isNaN(amt)||amt<=0){showToast('Enter valid amount','error');return;}
   sc = fmtSort(sc);
-  employees.push({ name: toTitleCase(name), sortCode: sc, accountNumber: acct, amount: amt, manual: true });
-  if ($('saveToDirectory').checked) {
-    const dir = loadDirectory();
-    if (!dir.some(d => d.sortCode === sc && d.accountNumber === acct)) {
-      dir.push({ name: toTitleCase(name), sortCode: sc, accountNumber: acct, entity: currentEntity });
-      saveDirectory(dir); renderDirectoryList(); populateSavedStaffSelect();
-    }
-  }
-  $('manName').value = ''; $('manSort').value = ''; $('manAccount').value = ''; $('manAmount').value = '';
-  $('manName').focus(); renderTable(); showToast(`Added ${toTitleCase(name)}`, 'success');
+  employees.push({name:toTitleCase(name),sortCode:sc,accountNumber:acct,amount:amt,manual:true});
+  if ($('saveToDirectory').checked) await apiPost({action:'add',name:toTitleCase(name),sortCode:sc,accountNumber:acct,entity:currentEntity});
+  $('manName').value=''; $('manSort').value=''; $('manAccount').value=''; $('manAmount').value=''; $('manName').focus();
+  renderTable(); showToast(`Added ${toTitleCase(name)}`,'success');
 }
 
-// Saved staff add
+// ── Saved staff add ──
 $('addSavedBtn').addEventListener('click', addSaved);
-$('savedAmount').addEventListener('keydown', e => { if (e.key === 'Enter') addSaved(); });
-
+$('savedAmount').addEventListener('keydown', e => { if (e.key==='Enter') addSaved(); });
 function addSaved() {
-  const idx = savedStaffSelect.value;
-  if (idx === '') { showToast('Select staff member', 'error'); return; }
-  const dir = loadDirectory(), staff = dir[parseInt(idx)];
-  if (!staff) return;
+  const idx = $('savedStaffSelect').value; if (idx===''){showToast('Select staff member','error');return;}
+  const staff = staffDirectory[parseInt(idx)]; if (!staff) return;
   const amt = parseFloat($('savedAmount').value.trim().replace(/[£,]/g,''));
-  if (isNaN(amt) || amt <= 0) { showToast('Enter valid amount', 'error'); return; }
-  if (employees.some(e => e.sortCode === staff.sortCode && e.accountNumber === staff.accountNumber)) {
-    showToast(`${staff.name} already in batch`, 'error'); return;
-  }
-  employees.push({ name: staff.name, sortCode: staff.sortCode, accountNumber: staff.accountNumber, amount: amt, manual: true });
-  $('savedAmount').value = ''; savedStaffSelect.value = '';
-  renderTable(); showToast(`Added ${staff.name}`, 'success');
+  if (isNaN(amt)||amt<=0){showToast('Enter valid amount','error');return;}
+  if (employees.some(e=>e.sortCode===staff.sortCode&&e.accountNumber===staff.accountNumber)){showToast(`${staff.name} already in batch`,'error');return;}
+  employees.push({name:staff.name,sortCode:staff.sortCode,accountNumber:staff.accountNumber,amount:amt,manual:true});
+  $('savedAmount').value=''; $('savedStaffSelect').value='';
+  renderTable(); showToast(`Added ${staff.name}`,'success');
 }
-
 function populateSavedStaffSelect() {
-  const dir = loadDirectory();
-  const filtered = dir.filter(d => d.entity === currentEntity || d.entity === 'both');
-  savedStaffSelect.innerHTML = '<option value="">— Select staff member —</option>' +
-    filtered.map(d => { const oi = dir.indexOf(d); return `<option value="${oi}">${d.name} — ${d.sortCode} / ${d.accountNumber}</option>`; }).join('');
+  const f = staffDirectory.filter(d=>d.entity===currentEntity||d.entity==='both');
+  $('savedStaffSelect').innerHTML = '<option value="">— Select staff member —</option>' + f.map(d=>{const oi=staffDirectory.indexOf(d);return`<option value="${oi}">${d.name} — ${d.sortCode} / ${d.accountNumber}</option>`;}).join('');
 }
 
-// Directory
+// ── Directory ──
 function renderDirectoryList() {
-  const dir = loadDirectory();
-  $('directoryCount').textContent = `(${dir.length} saved)`;
+  $('directoryCount').textContent = `(${staffDirectory.length} saved)`;
   const list = $('directoryList');
-  if (!dir.length) { list.innerHTML = '<div class="directory-empty">No saved staff yet. Auto-saved when you load BACS files.</div>'; return; }
-  list.innerHTML = dir.map((d,i) => {
-    const el = d.entity === 'windmill' ? 'Windmill' : d.entity === 'eightbells' ? 'Eight Bells' : 'Both';
-    return `<div class="directory-item"><div class="directory-item-info">
-      <span class="directory-item-name">${esc(d.name)}</span>
-      <span class="directory-item-details">${esc(d.sortCode)} / ${esc(d.accountNumber)}</span>
-      <span class="directory-item-entity">${el}</span>
-    </div><button class="btn btn-danger btn-sm" onclick="removeDirItem(${i})">Remove</button></div>`;
+  if (!staffDirectory.length) { list.innerHTML = '<div class="directory-empty">No saved staff yet. Auto-saved when you load BACS files.</div>'; return; }
+  list.innerHTML = staffDirectory.map((d,i) => {
+    const el = d.entity==='windmill'?'Windmill':d.entity==='eightbells'?'Eight Bells':'Both';
+    return `<div class="directory-item"><div class="directory-item-info"><span class="directory-item-name">${esc(d.name)}</span><span class="directory-item-details">${esc(d.sortCode)} / ${esc(d.accountNumber)}</span><span class="directory-item-entity">${el}</span></div><button class="btn btn-danger btn-sm" onclick="removeDirItem(${i})">Remove</button></div>`;
   }).join('');
 }
+async function removeDirItem(i) { const s=staffDirectory[i]; if(!s) return; await apiPost({action:'remove',sortCode:s.sortCode,accountNumber:s.accountNumber}); showToast('Removed','success'); }
 
-function removeDirItem(i) {
-  const dir = loadDirectory(); dir.splice(i,1); saveDirectory(dir);
-  renderDirectoryList(); populateSavedStaffSelect(); showToast('Removed', 'success');
-}
-
-$('addDirBtn').addEventListener('click', () => {
-  const name = $('dirName').value.trim();
-  let sc = $('dirSort').value.trim();
-  const acct = $('dirAccount').value.trim();
-  const entity = $('dirEntity').value;
-  if (!name || !sc || !acct) { showToast('Fill all fields', 'error'); return; }
-  sc = fmtSort(sc);
-  const dir = loadDirectory();
-  if (dir.some(d => d.sortCode === sc && d.accountNumber === acct)) { showToast('Already saved', 'error'); return; }
-  dir.push({ name: toTitleCase(name), sortCode: sc, accountNumber: acct, entity });
-  saveDirectory(dir); $('dirName').value = ''; $('dirSort').value = ''; $('dirAccount').value = '';
-  renderDirectoryList(); populateSavedStaffSelect(); showToast(`Saved ${toTitleCase(name)}`, 'success');
+$('addDirBtn').addEventListener('click', async()=>{
+  const name=$('dirName').value.trim(); let sc=$('dirSort').value.trim(); const acct=$('dirAccount').value.trim(); const entity=$('dirEntity').value;
+  if(!name||!sc||!acct){showToast('Fill all fields','error');return;}
+  sc=fmtSort(sc);
+  const r=await apiPost({action:'add',name:toTitleCase(name),sortCode:sc,accountNumber:acct,entity});
+  if(r.duplicate){showToast('Already saved','error');return;}
+  $('dirName').value='';$('dirSort').value='';$('dirAccount').value='';
+  showToast(`Saved ${toTitleCase(name)}`,'success');
 });
 
-// Download
-$('downloadBtn').addEventListener('click', () => {
+// ── Download & Log ──
+$('downloadBtn').addEventListener('click', async () => {
   if (!employees.length) return;
-  const raw = expectedTotalInput.value.replace(/[£,\s]/g,'');
-  const expected = parseFloat(raw), actual = employees.reduce((s,e) => s + e.amount, 0);
-  if (!isNaN(expected) && Math.abs(actual - expected) >= 0.02) {
-    if (!confirm(`⚠ Batch total (£${actual.toFixed(2)}) doesn't match expected (£${expected}).\nDiff: £${Math.abs(actual-expected).toFixed(2)}\n\nDownload anyway?`)) return;
-  }
+  const raw=$('expectedTotal').value.replace(/[£,\s]/g,''), exp=parseFloat(raw), act=employees.reduce((s,e)=>s+e.amount,0);
+  if (!isNaN(exp)&&Math.abs(act-exp)>=0.02) { if(!confirm(`⚠ Batch total (£${act.toFixed(2)}) doesn't match expected (£${exp}).\nDiff: £${Math.abs(act-exp).toFixed(2)}\n\nDownload anyway?`)) return; }
+
   const ref = $('paymentRef').value.trim() || 'Payroll';
+  const entityLabel = currentEntity === 'windmill' ? 'Windmill' : 'Eight Bells';
+
+  // Generate CSV
   const hdrs = ['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
-  const rows = employees.map(e => [e.name,'',ref,'PERSON','GBP',e.amount.toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber]);
+  const rows = employees.map(e=>[e.name,'',ref,'PERSON','GBP',e.amount.toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber]);
   let csv = hdrs.join(',') + '\n';
-  rows.forEach(r => { csv += r.map(c => (typeof c === 'string' && (c.includes(',') || c.includes('"'))) ? '"'+c.replace(/"/g,'""')+'"' : c).join(',') + '\n'; });
-  const el = currentEntity === 'windmill' ? 'Windmill' : 'EightBells';
-  const fn = `Wise_${el}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
-  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fn; a.click();
-  URL.revokeObjectURL(a.href); updateSteps(4); showToast(`Downloaded ${fn}`, 'success');
-});
+  rows.forEach(r => { csv += r.map(c=>(typeof c==='string'&&(c.includes(',')||c.includes('"')))?'"'+c.replace(/"/g,'""')+'"':c).join(',')+'\n'; });
 
-$('clearBtn').addEventListener('click', () => {
-  employees = []; loadedFileNames = []; expectedTotalInput.value = '';
-  validationResult.style.display = 'none'; renderFileChips(); renderTable(); updateSteps(1); showToast('Cleared', 'success');
-});
+  const fn = `Wise_${currentEntity==='windmill'?'Windmill':'EightBells'}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fn; a.click(); URL.revokeObjectURL(a.href);
 
-function updateSteps(c) {
-  for (let i = 1; i <= 4; i++) { const el = $('step'+i); el.classList.remove('active','done'); if (i < c) el.classList.add('done'); else if (i === c) el.classList.add('active'); }
-}
-function showToast(msg, type = 'success') {
-  toast.textContent = (type === 'success' ? '✓ ' : '⚠ ') + msg;
-  toast.className = 'toast ' + type + ' show';
-  clearTimeout(toast._t); toast._t = setTimeout(() => toast.classList.remove('show'), 3000);
-}
+  // Log payments to Google Sheet history
+  const now = new Date();
+  const monthStr = now.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  const payments = employees.map(e => ({
+    name: e.name, sortCode: e.sortCode, accountNumber: e.accountNumber, amount: e.amount
+  }));
 
-document.querySelectorAll('#manSort, #dirSort').forEach(el => {
-  el.addEventListener('input', e => {
-    let v = e.target.value.replace(/[^0-9]/g,'');
-    if (v.length > 6) v = v.substring(0,6);
-    if (v.length > 4) v = v.substring(0,2)+'-'+v.substring(2,4)+'-'+v.substring(4);
-    else if (v.length > 2) v = v.substring(0,2)+'-'+v.substring(2);
-    e.target.value = v;
+  apiPost({
+    action: 'logPayments',
+    entity: entityLabel,
+    month: monthStr,
+    reference: ref,
+    payments: payments
+  }).then(r => {
+    if (r.success) showToast(`Logged ${r.logged} payments to history`, 'success');
   });
-});
-document.querySelectorAll('#manAccount, #dirAccount').forEach(el => {
-  el.addEventListener('input', e => { e.target.value = e.target.value.replace(/[^0-9]/g,'').substring(0,8); });
+
+  updateSteps(4);
+  showToast(`Downloaded ${fn}`, 'success');
 });
 
-// Init
-renderDirectoryList(); populateSavedStaffSelect();
+// ── Clear ──
+$('clearBtn').addEventListener('click', ()=>{
+  employees=[]; loadedFileNames=[]; $('expectedTotal').value=''; $('validationResult').style.display='none';
+  renderFileChips(); renderTable(); updateSteps(1); showToast('Cleared','success');
+});
 
-// Set active entity tab from URL or default
-document.querySelectorAll('.entity-tab').forEach(t => t.classList.toggle('active', t.dataset.entity === currentEntity));
+// ── Utils ──
+function updateSteps(c) { for(let i=1;i<=4;i++){const el=$('step'+i);el.classList.remove('active','done');if(i<c)el.classList.add('done');else if(i===c)el.classList.add('active');} }
+function showToast(m,t='success') { const el=$('toast'); el.textContent=(t==='success'?'✓ ':'⚠ ')+m; el.className='toast '+t+' show'; clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),3000); }
+
+document.querySelectorAll('#manSort, #dirSort').forEach(el=>{el.addEventListener('input',e=>{let v=e.target.value.replace(/[^0-9]/g,'');if(v.length>6)v=v.substring(0,6);if(v.length>4)v=v.substring(0,2)+'-'+v.substring(2,4)+'-'+v.substring(4);else if(v.length>2)v=v.substring(0,2)+'-'+v.substring(2);e.target.value=v;});});
+document.querySelectorAll('#manAccount, #dirAccount').forEach(el=>{el.addEventListener('input',e=>{e.target.value=e.target.value.replace(/[^0-9]/g,'').substring(0,8);});});
+
+// ── Init ──
+apiGet();
 </script>
 </body>
 </html>
