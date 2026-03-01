@@ -401,10 +401,17 @@ function renderDay(){
   for(var i=0;i<D.rooms.length;i++){
     var rm=D.rooms[i],st=rm.calendar[si],sl=sLbl(st),gn='',dt='',rate='';
     if(st!=='vacant'){
+      // First try to find an arriving or in-house booking for this date
       for(var b=0;b<(rm.bookings||[]).length;b++){
         var bk=rm.bookings[b];
         if(ds>=bk.checkin&&ds<bk.checkout){gn=bk.guest||'';dt=fD(bk.checkin)+' \u2192 '+fD(bk.checkout);break;}
-        if(ds===bk.checkout){gn=bk.guest||'';dt='Checkout today';break;}
+      }
+      // If nothing found (must be departing only), find the checkout booking
+      if(!dt){
+        for(var b=0;b<(rm.bookings||[]).length;b++){
+          var bk=rm.bookings[b];
+          if(ds===bk.checkout){gn=bk.guest||'';dt='Checkout today';break;}
+        }
       }
       if(!dt&&rm.checkin&&rm.checkout)dt=fD(rm.checkin)+' \u2192 '+fD(rm.checkout);
     } else {
