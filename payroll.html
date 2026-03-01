@@ -426,6 +426,16 @@ document.querySelectorAll('#manSort, #dirSort').forEach(el=>{el.addEventListener
 document.querySelectorAll('#manAccount, #dirAccount').forEach(el=>{el.addEventListener('input',e=>{e.target.value=e.target.value.replace(/[^0-9]/g,'').substring(0,8);});});
 
 // ── Wise Corrections Import ──
+// Auto-select entity from URL param (passed by portal iframe)
+const urlEntity = new URLSearchParams(window.location.search).get('entity');
+if (urlEntity === 'eightbells' || urlEntity === 'windmill') {
+  currentEntity = urlEntity;
+  document.querySelectorAll('.entity-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.entity === urlEntity);
+  });
+  $('paymentRef').placeholder = `e.g. ${urlEntity === 'windmill' ? 'Windmill' : 'Eight Bells'} Mar Payroll`;
+}
+
 const wdz=$('wiseDropZone'),wfi=$('wiseFileInput');
 wdz.addEventListener('click',()=>wfi.click());
 wdz.addEventListener('dragover',e=>{e.preventDefault();wdz.classList.add('drag-over');});
