@@ -144,6 +144,8 @@
   .rc-guest { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .rc-guest.empty { color:var(--text-light); font-weight:400; }
   .rc-dates { font-size:10px; color:var(--text-mid); margin-top:2px; }
+  .rc-dep { font-size:10px; color:var(--amber); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rc-dep span { font-size:9px; opacity:0.7; }
   .rc-rate { font-size:11px; font-weight:700; color:var(--teal); margin-top:3px; }
 
   /* ── Calendar ── */
@@ -399,19 +401,35 @@ function renderDay(){
   // Room cards
   var h='';
   for(var i=0;i<D.rooms.length;i++){
-    var rm=D.rooms[i],st=rm.calendar[si],sl=sLbl(st),gn='',dt='',rate='';
+    var rm=D.rooms[i],st=rm.calendar[si],sl=sLbl(st),gn='',dt='',rate='',depName='';
     if(st!=='vacant'){
-      // First try to find an arriving or in-house booking for this date
+      var arrBk=null, depBk=null, inhBk=null;
       for(var b=0;b<(rm.bookings||[]).length;b++){
         var bk=rm.bookings[b];
-        if(ds>=bk.checkin&&ds<bk.checkout){gn=bk.guest||'';dt=fD(bk.checkin)+' \u2192 '+fD(bk.checkout);break;}
+        if(ds===bk.checkin) arrBk=bk;
+        if(ds===bk.checkout) depBk=bk;
+        if(ds>bk.checkin&&ds<bk.checkout) inhBk=bk;
       }
-      // If nothing found (must be departing only), find the checkout booking
-      if(!dt){
-        for(var b=0;b<(rm.bookings||[]).length;b++){
-          var bk=rm.bookings[b];
-          if(ds===bk.checkout){gn=bk.guest||'';dt='Checkout today';break;}
-        }
+      // Changeover day: both departure and arrival
+      if(arrBk&&depBk){
+        gn=arrBk.guest||'Guest';
+        dt=fD(arrBk.checkin)+' \u2192 '+fD(arrBk.checkout);
+        depName=depBk.guest||'Guest';
+      }
+      // Arrival only
+      else if(arrBk){
+        gn=arrBk.guest||'Guest';
+        dt=fD(arrBk.checkin)+' \u2192 '+fD(arrBk.checkout);
+      }
+      // In-house (staying over)
+      else if(inhBk){
+        gn=inhBk.guest||'Guest';
+        dt=fD(inhBk.checkin)+' \u2192 '+fD(inhBk.checkout);
+      }
+      // Departure only
+      else if(depBk){
+        gn=depBk.guest||'Guest';
+        dt='Checkout today';
       }
       if(!dt&&rm.checkin&&rm.checkout)dt=fD(rm.checkin)+' \u2192 '+fD(rm.checkout);
     } else {
@@ -421,7 +439,8 @@ function renderDay(){
     }
     if(rm.nightRates&&rm.nightRates[ds])rate='\u00A3'+rm.nightRates[ds].toFixed(0);
     h+='<div class="room-card"><div class="rc-top"><div class="rc-num '+st+'">'+rm.room+'</div><div class="rc-badge '+st+'">'+sl+'</div></div>'+
-      '<div class="rc-guest'+(gn?'':' empty')+'">'+(gn||(st==='vacant'?'Available':'\u2014'))+'</div>'+
+      (depName?'<div class="rc-dep">\u2191 '+depName+' <span>out</span></div>':'')+
+      '<div class="rc-guest'+(gn?'':' empty')+'">'+(depName?'\u2193 ':'')+''+(gn||(st==='vacant'?'Available':'\u2014'))+'</div>'+
       '<div class="rc-dates">'+(dt||'\u00A0')+'</div>'+
       (rate?'<div class="rc-rate">'+rate+'/night</div>':'')+'</div>';
   }
