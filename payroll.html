@@ -552,20 +552,32 @@ function handleFiles(files) {
 }
 
 function parseBACS(content) {
+  // BACS Standard 18 format (100 chars per line, no leading record type byte):
+  // [0:6]   Dest sort code (6 digits)
+  // [6:14]  Dest account number (8 digits)
+  // [14]    Type indicator
+  // [15:17] Transaction code (99=credit, 17=contra)
+  // [17:23] Originating sort code
+  // [23:31] Originating account number
+  // [31:35] Free format
+  // [35:46] Amount in pence (11 digits)
+  // [46:64] Originating name (18 chars)
+  // [64:82] Reference (18 chars)
+  // [82:100] Destination name / employee name (18 chars)
   const lines = content.split('\n'), payments = [];
   for (const line of lines) {
-    const t = line.trim();
-    if (!t || t.length < 40) continue;
+    const t = line.trimEnd();
+    if (!t || t.length < 82) continue;
     if (/^(VOL1|HDR1|HDR2|UHL1|EOF1|EOF2|UTL1)/.test(t)) continue;
-    if (t.length >= 65 && /^\d/.test(t)) {
-      const ds = t.substring(1,7), da = t.substring(7,15), tc = t.substring(16,18);
-      if (!/^\d{6}$/.test(ds) || !/^\d{8}$/.test(da) || tc === '17') continue;
-      const amt = parseInt(t.substring(36,47).trim(), 10) / 100;
-      if (amt <= 0 || isNaN(amt)) continue;
-      const name = toTitleCase(t.substring(47,65).trim());
-      const sortCode = ds.substring(0,2)+'-'+ds.substring(2,4)+'-'+ds.substring(4,6);
-      payments.push({ name, sortCode, accountNumber: da, amount: amt, manual: false });
-    }
+    const ds = t.substring(0, 6), da = t.substring(6, 14), tc = t.substring(15, 17);
+    if (!/^\d{6}$/.test(ds) || !/^\d{8}$/.test(da)) continue;
+    if (tc === '17') continue; // skip contra
+    const amt = parseInt(t.substring(35, 46).trim(), 10) / 100;
+    if (amt <= 0 || isNaN(amt)) continue;
+    const name = toTitleCase(t.substring(82).trim());
+    if (!name || name.length < 2) continue;
+    const sortCode = ds.substring(0,2)+'-'+ds.substring(2,4)+'-'+ds.substring(4,6);
+    payments.push({ name, sortCode, accountNumber: da, amount: amt, manual: false });
   }
   return payments;
 }
