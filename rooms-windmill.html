@@ -421,6 +421,12 @@ function renderDay(){
   for(var i=0;i<D.rooms.length;i++){
     var s=D.rooms[i].calendar[si];
     if(s==='occupied')ih++;else if(s==='arriving')ar++;else if(s==='departing')dp++;else vc++;
+    // Count departures for changeover rooms too
+    if(s==='arriving'){
+      for(var b=0;b<(D.rooms[i].bookings||[]).length;b++){
+        if(D.rooms[i].bookings[b].checkout===ds){dp++;break;}
+      }
+    }
   }
   document.getElementById('sArr').textContent=ar;document.getElementById('bArr').textContent=ar;
   document.getElementById('sDep').textContent=dp;document.getElementById('bDep').textContent=dp;
