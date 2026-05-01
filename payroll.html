@@ -178,6 +178,33 @@ thead th.actions-head{text-align:center;width:44px}
     <div class="step-indicator" id="step4"><div class="step-num">4</div> Download CSV</div>
   </div>
   <div class="drop-zone" id="dropZone"><div class="drop-zone-icon">📂</div><div class="drop-zone-text">Drop Xero BACS bank files here</div><div class="drop-zone-hint">or click to browse — accepts .txt BACS files from Xero Payroll</div><input type="file" id="fileInput" multiple accept=".txt" style="display:none"></div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin:-8px 0 14px;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+    <span>or</span>
+    <div style="flex:1;height:1px;background:var(--border);"></div>
+  </div>
+
+  <div style="display:flex;justify-content:center;margin-bottom:16px;">
+    <button class="btn btn-secondary" id="pullXeroBtn" style="padding:10px 18px;font-size:13px;">⬇ Pull directly from Xero (skip the BACS export)</button>
+  </div>
+
+  <!-- Xero Pull Modal -->
+  <div id="xeroModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:1000;align-items:flex-start;justify-content:center;padding-top:60px;">
+    <div style="background:var(--surface,#1a1f2e);border:1px solid var(--border);border-radius:var(--radius);max-width:640px;width:92%;overflow:hidden;color:var(--text);">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:15px;font-weight:600;">⬇ Pull from Xero</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;" id="xeroModalSubtitle">Select a posted pay run to import</div>
+        </div>
+        <button onclick="closeXeroModal()" style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;">×</button>
+      </div>
+      <div style="padding:18px 20px;max-height:65vh;overflow-y:auto;" id="xeroModalBody">
+        <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Loading…</div>
+      </div>
+    </div>
+  </div>
+
   <div class="loaded-files" id="loadedFiles"></div>
   <div class="excluded-notice" id="excludedNotice" style="display:none">⚠ <strong><span id="excludedCount">0</span> excluded staff</strong> removed from batch (weekly-paid etc.) — see Excluded section below</div>
   <div class="table-wrapper" id="tableWrapper" style="display:none">
@@ -580,6 +607,191 @@ async function applyWiseChanges(){
   const updates=changes.map(c=>({oldSortCode:c.oldSortCode,oldAccountNumber:c.oldAccountNumber,newName:c.newName,newSortCode:c.newSortCode,newAccountNumber:c.newAccountNumber}));
   const r=await apiPost({action:'updateStaff',updates});
   if(r.success){showToast(`Updated ${r.updated} staff record${r.updated!==1?'s':''}`,'success');$('wiseChanges').innerHTML='<div style="padding:12px;text-align:center;color:var(--green);font-size:12px;font-weight:500">✓ Staff directory updated</div>';window._pendingWiseChanges=null;}
+}
+
+// ── XERO DIRECT PULL ──
+// Calls the Staff Hub Apps Script (which has the Xero OAuth token) to pull
+// pay run data directly. Bank details come from the existing Directory by
+// matching name — no need to also pull payment methods from Xero.
+const STAFF_HUB_API = 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec';
+
+$('pullXeroBtn').addEventListener('click', openXeroModal);
+
+async function openXeroModal() {
+  $('xeroModal').style.display = 'flex';
+  $('xeroModalSubtitle').textContent = 'Select a posted pay run to import';
+  $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Loading recent pay runs from Xero…</div>';
+  try {
+    const r = await fetch(STAFF_HUB_API + '?action=listPayRuns&venue=' + encodeURIComponent(currentEntity));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    if (!data.payRuns || !data.payRuns.length) {
+      $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No pay runs found for this venue.</div>';
+      return;
+    }
+    renderPayRunList(data.payRuns);
+  } catch (err) {
+    $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--red,#f87171);font-size:13px;">Failed to load pay runs: ' + esc(err.message) + '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">If this is a CORS error, the Staff Hub Apps Script may need redeploying with "Anyone" access.</div></div>';
+  }
+}
+
+function closeXeroModal() {
+  $('xeroModal').style.display = 'none';
+}
+
+function renderPayRunList(payRuns) {
+  let html = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Choose a pay run. Posted pay runs are finalised and ready to import.</div>';
+  payRuns.forEach(pr => {
+    const isPosted = (pr.status || '').toUpperCase() === 'POSTED';
+    const statusColor = isPosted ? 'var(--green,#34d399)' : 'var(--amber,#fbbf24)';
+    html += `<div onclick="selectPayRun('${pr.payRunID}','${esc(pr.periodEnd)}','${esc(pr.paymentDate)}')" style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.borderColor='var(--accent,#4a6cf7)';this.style.background='rgba(74,108,247,0.04)';" onmouseout="this.style.borderColor='var(--border)';this.style.background='transparent';">
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px;">${esc(pr.periodStart)} → ${esc(pr.periodEnd)}</div>
+        <div style="font-size:11px;color:var(--text-muted);">Pay date: ${esc(pr.paymentDate)} · Net: £${fmtMoney(pr.netPay || 0)}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:10px;font-weight:600;color:${statusColor};text-transform:uppercase;letter-spacing:0.5px;">${esc(pr.status)}</span>
+        <span style="color:var(--text-muted);font-size:14px;">→</span>
+      </div>
+    </div>`;
+  });
+  $('xeroModalBody').innerHTML = html;
+}
+
+let xeroPullState = null;
+
+async function selectPayRun(payRunId, periodEnd, paymentDate) {
+  $('xeroModalSubtitle').textContent = 'Pay run ending ' + periodEnd;
+  $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Fetching payslip list…</div>';
+  try {
+    const r = await fetch(STAFF_HUB_API + '?action=listPayslips&venue=' + encodeURIComponent(currentEntity) + '&payRunId=' + encodeURIComponent(payRunId));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    const payslips = data.payslips || [];
+    if (!payslips.length) {
+      $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No payslips in this pay run.</div>';
+      return;
+    }
+    xeroPullState = { payRunId, payslips, paymentDate, periodEnd, results: [], unmatched: [], errors: [], idx: 0 };
+    pullNextPayslip();
+  } catch (err) {
+    $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--red,#f87171);font-size:13px;">Failed: ' + esc(err.message) + '</div>';
+  }
+}
+
+async function pullNextPayslip() {
+  if (!xeroPullState) return;
+  const total = xeroPullState.payslips.length;
+  if (xeroPullState.idx >= total) { finishXeroPull(); return; }
+  const ps = xeroPullState.payslips[xeroPullState.idx];
+  const fullName = ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim();
+  const pct = Math.round((xeroPullState.idx / total) * 100);
+
+  $('xeroModalBody').innerHTML = `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Fetching payslip ${xeroPullState.idx + 1} of ${total}</div>
+      <div style="font-size:11px;color:var(--text-muted);">${esc(fullName)}</div>
+    </div>
+    <div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden;">
+      <div style="width:${pct}%;height:100%;background:var(--accent,#4a6cf7);transition:width 0.3s;"></div>
+    </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right;">${pct}%</div>`;
+
+  try {
+    const r = await fetch(STAFF_HUB_API + '?action=getPayslip&venue=' + encodeURIComponent(currentEntity) + '&payslipId=' + encodeURIComponent(ps.payslipID));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    const xeroName = ((data.firstName || ps.firstName || '') + ' ' + (data.lastName || ps.lastName || '')).trim();
+    const dirMatch = staffDirectory.find(d => (d.name || '').toLowerCase() === xeroName.toLowerCase());
+
+    if (dirMatch && data.netPay > 0) {
+      xeroPullState.results.push({
+        name: dirMatch.name,
+        sortCode: dirMatch.sortCode,
+        accountNumber: dirMatch.accountNumber,
+        amount: data.netPay,
+        manual: false,
+        deductions: [],
+        _xeroId: data.employeeID,
+        _correctedFrom: xeroName.toLowerCase() !== dirMatch.name.toLowerCase() ? 'Name from directory: was "' + xeroName + '" in Xero' : null
+      });
+    } else if (data.netPay > 0) {
+      xeroPullState.unmatched.push({ name: xeroName, netPay: data.netPay, employeeID: data.employeeID });
+    }
+  } catch (err) {
+    xeroPullState.errors.push({ name: ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim(), error: err.message });
+  }
+
+  xeroPullState.idx++;
+  setTimeout(pullNextPayslip, 200);
+}
+
+function finishXeroPull() {
+  const s = xeroPullState;
+  let html = '<div style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--green,#34d399);">✓ Pull complete</div>';
+  html += `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;">
+    <div>Matched to directory: <strong>${s.results.length}</strong></div>
+    <div>Unmatched (no directory entry): <strong style="color:${s.unmatched.length ? 'var(--amber,#fbbf24)' : 'inherit'};">${s.unmatched.length}</strong></div>
+    <div>Errors: <strong style="color:${s.errors.length ? 'var(--red,#f87171)' : 'inherit'};">${s.errors.length}</strong></div>
+  </div>`;
+
+  if (s.unmatched.length) {
+    html += '<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.5;">';
+    html += '<div style="font-weight:600;color:var(--amber,#fbbf24);margin-bottom:6px;">⚠ Unmatched payslips — no directory entry</div>';
+    s.unmatched.forEach(u => { html += `<div>• ${esc(u.name)} — £${fmtMoney(u.netPay)}</div>`; });
+    html += '<div style="margin-top:6px;color:var(--text-muted);">Add these manually after import, or do one BACS upload to populate directory then re-pull.</div>';
+    html += '</div>';
+  }
+
+  if (s.errors.length) {
+    html += '<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.5;">';
+    html += '<div style="font-weight:600;color:var(--red,#f87171);margin-bottom:6px;">Errors</div>';
+    s.errors.slice(0, 5).forEach(e => { html += `<div>• ${esc(e.name)}: ${esc(e.error)}</div>`; });
+    html += '</div>';
+  }
+
+  html += `<div style="display:flex;gap:8px;margin-top:14px;">
+    <button class="btn btn-success" onclick="commitXeroPull()" style="flex:1;">Import ${s.results.length} payment${s.results.length===1?'':'s'} into table</button>
+    <button class="btn btn-secondary" onclick="closeXeroModal()">Cancel</button>
+  </div>`;
+
+  $('xeroModalBody').innerHTML = html;
+}
+
+function commitXeroPull() {
+  if (!xeroPullState) return;
+  const exKeys = new Set(excludedStaff.map(s => s.sortCode + '|' + s.accountNumber));
+  let added = 0, excludedCount = 0;
+
+  xeroPullState.results.forEach(emp => {
+    const key = emp.sortCode + '|' + emp.accountNumber;
+    if (exKeys.has(key)) { excludedCount++; return; }
+    if (!employees.some(e => e.sortCode === emp.sortCode && e.accountNumber === emp.accountNumber)) {
+      employees.push(emp);
+      added++;
+    }
+  });
+
+  if (excludedCount > 0) {
+    $('excludedNotice').style.display = 'flex';
+    $('excludedCount').textContent = excludedCount;
+  }
+
+  const label = 'Xero pay run ' + (xeroPullState.periodEnd || '');
+  if (!loadedFileNames.includes(label)) loadedFileNames.push(label);
+
+  if ($('paymentRef') && !$('paymentRef').value) {
+    $('paymentRef').value = (currentEntity === 'windmill' ? 'Windmill' : 'Eight Bells') + ' ' +
+      (xeroPullState.periodEnd ? xeroPullState.periodEnd.substring(0, 7) : '') + ' Payroll';
+  }
+
+  renderFileChips();
+  renderTable();
+  updateSteps(2);
+  closeXeroModal();
+  showToast(`✓ Imported ${added} payment${added===1?'':'s'} from Xero${excludedCount?' ('+excludedCount+' excluded)':''}`, 'success');
+  xeroPullState = null;
 }
 
 apiGet();
