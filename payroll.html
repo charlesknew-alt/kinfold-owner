@@ -63,6 +63,7 @@ thead th.actions-head{text-align:center;width:44px}
 .deduction-tag .ded-amount{font-family:'JetBrains Mono',monospace;font-weight:600}
 .deduction-tag .ded-remove{cursor:pointer;opacity:.6;margin-left:2px}
 .deduction-tag .ded-remove:hover{opacity:1}
+.corrected-tag{display:inline-block;margin-left:4px;padding:1px 5px;border-radius:3px;background:var(--green-bg,rgba(52,211,153,0.12));color:var(--green,#34d399);font-size:10px;font-weight:600;cursor:help;vertical-align:middle}
 .deduction-edit{display:flex;gap:4px;align-items:center;margin-top:4px}
 .deduction-edit input{padding:3px 6px;border-radius:4px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-size:11px;outline:none}
 .deduction-edit .ded-reason{width:80px;font-family:'DM Sans',sans-serif}
@@ -298,20 +299,67 @@ function handleFiles(files){
       loadedFileNames.push(file.name);
       // Filter out excluded staff
       const exKeys=new Set(excludedStaff.map(s=>s.sortCode+'|'+s.accountNumber));
-      let excludedCount=0;
+      let excludedCount=0, correctedCount=0;
       parsed.forEach(emp=>{
-        const key=emp.sortCode+'|'+emp.accountNumber;
-        if(exKeys.has(key)){excludedCount++;return;}
-        if(!employees.some(e=>e.name===emp.name&&e.sortCode===emp.sortCode&&e.accountNumber===emp.accountNumber))employees.push(emp);
+        // Apply Directory overlay — if this person is in the saved Directory,
+        // use the Directory's (corrected) name and/or bank details. This stops
+        // Wise corrections being silently overwritten on every new BACS upload.
+        const corrected = applyDirectoryOverlay(emp);
+        const key = corrected.sortCode + '|' + corrected.accountNumber;
+        if (exKeys.has(key)) { excludedCount++; return; }
+        // Dedupe by overlaid sort+account so the same person across multiple BACS
+        // files only appears once
+        if (!employees.some(e => e.sortCode === corrected.sortCode && e.accountNumber === corrected.accountNumber)) {
+          if (corrected._correctedFrom) correctedCount++;
+          employees.push(corrected);
+        }
       });
       if(excludedCount>0){$('excludedNotice').style.display='flex';$('excludedCount').textContent=excludedCount;}
       autoSaveToSheet(parsed.filter(emp=>!exKeys.has(emp.sortCode+'|'+emp.accountNumber)));
       renderFileChips();renderTable();
-      showToast(`Loaded ${parsed.length-excludedCount} payments from ${file.name}${excludedCount?' ('+excludedCount+' excluded)':''}`,'success');
+      const correctedMsg = correctedCount > 0 ? ' (' + correctedCount + ' name/bank corrected from directory)' : '';
+      showToast(`Loaded ${parsed.length-excludedCount} payments from ${file.name}${excludedCount?' ('+excludedCount+' excluded)':''}${correctedMsg}`,'success');
       updateSteps(2);
     };
     reader.readAsText(file);
   }
+}
+
+// Apply saved Directory corrections to a freshly-parsed BACS entry.
+// Match priority:
+//   1. sort code + account number — name corrections only (most common case)
+//   2. name match — bank detail corrections (Xero still has old bank, Directory has new)
+//   3. no match — new starter, returned as-is (autoSaveToSheet adds to Directory)
+function applyDirectoryOverlay(bacsEntry) {
+  if (!staffDirectory || !staffDirectory.length) return bacsEntry;
+
+  // Priority 1: exact bank match — name correction only
+  let match = staffDirectory.find(d =>
+    d.sortCode === bacsEntry.sortCode &&
+    d.accountNumber === bacsEntry.accountNumber
+  );
+  if (match) {
+    if (match.name === bacsEntry.name) return bacsEntry; // already correct
+    return Object.assign({}, bacsEntry, {
+      name: match.name,
+      _correctedFrom: 'Name corrected from "' + bacsEntry.name + '"'
+    });
+  }
+
+  // Priority 2: name match — Xero still has old bank details, Directory has corrected
+  match = staffDirectory.find(d =>
+    d.name.toLowerCase() === bacsEntry.name.toLowerCase()
+  );
+  if (match) {
+    return Object.assign({}, bacsEntry, {
+      sortCode: match.sortCode,
+      accountNumber: match.accountNumber,
+      _correctedFrom: 'Bank corrected from ' + bacsEntry.sortCode + ' / ' + bacsEntry.accountNumber
+    });
+  }
+
+  // No match — new starter
+  return bacsEntry;
 }
 
 // ── BACS Parser ──
@@ -323,7 +371,18 @@ function parseBACS(content){
 
 async function autoSaveToSheet(parsed){
   const exKeys=new Set(excludedStaff.map(s=>s.sortCode+'|'+s.accountNumber));
-  const newStaff=parsed.filter(e=>!staffDirectory.some(d=>d.sortCode===e.sortCode&&d.accountNumber===e.accountNumber)&&!exKeys.has(e.sortCode+'|'+e.accountNumber)).map(e=>({name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity}));
+  const dirSorts=new Set(staffDirectory.map(d=>d.sortCode+'|'+d.accountNumber));
+  const dirNames=new Set(staffDirectory.map(d=>(d.name||'').toLowerCase()));
+  // Skip entries already in Directory — by sort+account match (normal case)
+  // OR by name match (case where Wise corrected someone's bank details, so the
+  // BACS sort+account differs from Directory but the name still matches)
+  const newStaff=parsed.filter(e=>{
+    const key=e.sortCode+'|'+e.accountNumber;
+    if(dirSorts.has(key))return false;
+    if(dirNames.has((e.name||'').toLowerCase()))return false;
+    if(exKeys.has(key))return false;
+    return true;
+  }).map(e=>({name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity}));
   if(newStaff.length)await apiPost({action:'addBatch',staff:newStaff});
 }
 
@@ -346,7 +405,8 @@ function renderTable(){
   $('tableBody').innerHTML=employees.map((e,i)=>{
     const dedTotal=getDeductionTotal(e),net=getNetPay(e),hasDed=dedTotal>0;
     const dedHTML=e.deductions&&e.deductions.length?e.deductions.map((d,di)=>`<span class="deduction-tag"><span class="ded-amount">-£${fmtMoney(d.amount)}</span> ${esc(d.reason)} <span class="ded-remove" onclick="event.stopPropagation();removeDeduction(${i},${di})">✕</span></span>`).join(' '):'';
-    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col">${esc(e.name)}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center"><button class="row-remove" onclick="removeRow(${i})">✕</button></td></tr>`;
+    const correctedTag=e._correctedFrom?` <span class="corrected-tag" title="${esc(e._correctedFrom)}">↺</span>`:'';
+    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col">${esc(e.name)}${correctedTag}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center"><button class="row-remove" onclick="removeRow(${i})">✕</button></td></tr>`;
   }).join('');
   updateTotal();
 }
