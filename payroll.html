@@ -261,6 +261,9 @@ thead th.actions-head{text-align:center;width:44px}
   <div class="collapsible-section">
     <div class="collapsible-header" onclick="toggle('wiseBody','wiseArrow')">
       <div class="collapsible-title">🔄 Import Wise Corrections <span style="font-size:10px;color:var(--text-muted);font-weight:400">update names & bank details</span></div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" onclick="syncPayrollIdsFromXero()" style="font-size:11px;">⟲ Sync Payroll IDs from Xero</button>
+        </div>
       <span class="collapsible-toggle" id="wiseArrow">▼</span>
     </div>
     <div class="collapsible-body" id="wiseBody">
@@ -461,6 +464,13 @@ function openEditModal(i){
   $('editModalName').value = e.name || '';
   $('editModalSort').value = e.sortCode || '';
   $('editModalAccount').value = e.accountNumber || '';
+  // Look up Payroll ID — row's own first, then Directory by bank match
+  var rowPid = e.payrollId || '';
+  if (!rowPid) {
+    var dirEntry = staffDirectory.find(d => d.sortCode === e.sortCode && d.accountNumber === e.accountNumber);
+    if (dirEntry) rowPid = dirEntry.payrollId || '';
+  }
+  $('editModalPayrollId').value = rowPid;
   $('editModalAmount').textContent = `£${fmtMoney(e.amount)}`;
   // Show banner if this row has been corrected from a BACS original
   const banner = $('editModalBacsBanner');
@@ -489,12 +499,13 @@ function _applyModalValuesToRow(){
   const newName = $('editModalName').value.trim();
   let newSort = $('editModalSort').value.trim();
   let newAcct = $('editModalAccount').value.replace(/\D/g,'');
+  const newPayrollId = $('editModalPayrollId').value.trim();
   if (newSort) newSort = fmtSort(newSort);
-  // Only mark as edited if anything actually changed
-  if (newName !== e.name || newSort !== e.sortCode || newAcct !== e.accountNumber) {
+  if (newName !== e.name || newSort !== e.sortCode || newAcct !== e.accountNumber || newPayrollId !== (e.payrollId || '')) {
     e.name = newName;
     e.sortCode = newSort;
     e.accountNumber = newAcct;
+    e.payrollId = newPayrollId;
     e._editedInRow = true;
   }
   return _editingRowIndex;
@@ -546,12 +557,13 @@ async function saveRowToDirectory(i){
       oldAccountNumber:existing.accountNumber,
       newName:e.name,
       newSortCode:e.sortCode,
-      newAccountNumber:e.accountNumber
+      newAccountNumber:e.accountNumber,
+      newPayrollId:e.payrollId||''
     }]});
     if(r.success){showToast(`Updated ${e.name} in Directory`,'success');e._editedInRow=false;renderTable();}
     else showToast(r.error||'Update failed','error');
   }else{
-    const r=await apiPost({action:'add',name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity});
+    const r=await apiPost({action:'add',name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity,payrollId:e.payrollId||''});
     if(r.success){showToast(`Saved ${e.name} to Directory`,'success');e._editedInRow=false;renderTable();}
     else showToast(r.error||'Save failed','error');
   }
@@ -621,9 +633,9 @@ async function saveRowToDirectoryQuiet(i){
   let existing=staffDirectory.find(d=>d.sortCode===e.sortCode&&d.accountNumber===e.accountNumber);
   if(!existing)existing=staffDirectory.find(d=>d.name.toLowerCase()===e.name.toLowerCase());
   if(existing){
-    await apiPost({action:'updateStaff',updates:[{oldSortCode:existing.sortCode,oldAccountNumber:existing.accountNumber,newName:e.name,newSortCode:e.sortCode,newAccountNumber:e.accountNumber}]});
+    await apiPost({action:'updateStaff',updates:[{oldSortCode:existing.sortCode,oldAccountNumber:existing.accountNumber,newName:e.name,newSortCode:e.sortCode,newAccountNumber:e.accountNumber,newPayrollId:e.payrollId||''}]});
   }else{
-    await apiPost({action:'add',name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity});
+    await apiPost({action:'add',name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity,payrollId:e.payrollId||''});
   }
 }
 
@@ -694,7 +706,7 @@ $('downloadBtn').addEventListener('click',async()=>{
   const neg=employees.filter(e=>getNetPay(e)<=0);if(neg.length){showToast(`${neg[0].name} has zero/negative net pay`,'error');return;}
   const ref=$('paymentRef').value.trim()||'Payroll',entityLabel=currentEntity==='windmill'?'Windmill':'Eight Bells';
   const hdrs=['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
-  const rows=employees.map(e=>[e.name,'',ref,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber]);
+  const rows=employees.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:(ref+' '+e.name.replace(/[^A-Za-z0-9 ]/g,'').substring(0,20).trim());return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
   let csv=hdrs.join(',')+'\n';rows.forEach(r=>{csv+=r.map(c=>(typeof c==='string'&&(c.includes(',')||c.includes('"')))?'"'+c.replace(/"/g,'""')+'"':c).join(',')+'\n';});
   const fn=`Wise_${currentEntity==='windmill'?'Windmill':'EightBells'}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
@@ -933,6 +945,7 @@ function finishXeroPull() {
     <div>Matched to directory: <strong>${s.results.length}</strong></div>
     <div>Unmatched (no directory entry): <strong style="color:${s.unmatched.length ? 'var(--amber,#fbbf24)' : 'inherit'};">${s.unmatched.length}</strong></div>
     <div>Errors: <strong style="color:${s.errors.length ? 'var(--red,#f87171)' : 'inherit'};">${s.errors.length}</strong></div>
+    <div>Skipped (£0 net): <strong style="color:${s.skipped && s.skipped.length ? 'var(--text-muted)' : 'inherit'};">${(s.skipped || []).length}</strong></div>
   </div>`;
 
   if (s.unmatched.length) {
@@ -994,6 +1007,59 @@ function commitXeroPull() {
 }
 
 apiGet();
+
+// ── Sync Payroll IDs from Xero into the Directory ──
+async function syncPayrollIdsFromXero(silent){
+  silent = silent === true;
+  let xeroEmployees = [];
+  try {
+    const r = await fetch(STAFF_HUB_API + '?action=listEmployeePayrollIds&venue=' + encodeURIComponent(currentEntity));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    xeroEmployees = data.employees || [];
+  } catch (err) {
+    if (!silent) showToast('Xero fetch failed: ' + err.message, 'error');
+    return;
+  }
+  const updates = [];
+  let alreadyOk = 0, noMatch = 0, noPayrollId = 0;
+  xeroEmployees.forEach(function(emp){
+    if (!emp.payrollId) { noPayrollId++; return; }
+    const fullName = ((emp.firstName || '') + ' ' + (emp.lastName || '')).trim();
+    const dirEntry = staffDirectory.find(d => (d.name || '').toLowerCase() === fullName.toLowerCase());
+    if (!dirEntry) { noMatch++; return; }
+    if ((dirEntry.payrollId || '') === emp.payrollId) { alreadyOk++; return; }
+    updates.push({
+      oldSortCode: dirEntry.sortCode,
+      oldAccountNumber: dirEntry.accountNumber,
+      matchByName: fullName,
+      newPayrollId: emp.payrollId
+    });
+  });
+  if (!updates.length) {
+    if (!silent) showToast('No updates needed (' + alreadyOk + ' correct, ' + noMatch + ' not in Directory, ' + noPayrollId + ' missing Xero Payroll ID)', 'info');
+    return;
+  }
+  try {
+    const r = await apiPost({ action: 'updateStaff', updates });
+    if (r && r.success) {
+      if (!silent) showToast('Synced Payroll IDs: ' + (r.updated || updates.length) + ' updated', 'success');
+      // Reload directory so local cache reflects new payroll IDs
+      try {
+        const dr = await fetch(API + '?action=getStaff');
+        const dd = await dr.json();
+        if (Array.isArray(dd.staff)) staffDirectory = dd.staff;
+      } catch(_) {}
+      if (typeof renderTable === 'function') renderTable();
+    } else {
+      if (!silent) showToast((r && r.error) || 'Sync failed', 'error');
+    }
+  } catch (err) {
+    if (!silent) showToast('Sync failed: ' + err.message, 'error');
+  }
+}
+window.syncPayrollIdsFromXero = syncPayrollIdsFromXero;
+
 </script>
 
 <!-- Edit Row Modal -->
@@ -1018,6 +1084,10 @@ apiGet();
           <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Account Number</label>
           <input id="editModalAccount" type="text" placeholder="00000000" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
         </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Xero Payroll ID <span style="color:var(--text-muted);">(used as Wise payment reference)</span></label>
+        <input id="editModalPayrollId" type="text" placeholder="BELLS30" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
       </div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Amount: <span id="editModalAmount" style="color:var(--text,#fff);font-weight:600;"></span></div>
     </div>
