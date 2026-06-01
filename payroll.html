@@ -707,7 +707,7 @@ $('downloadBtn').addEventListener('click',async()=>{
   const neg=employees.filter(e=>getNetPay(e)<=0);if(neg.length){showToast(`${neg[0].name} has zero/negative net pay`,'error');return;}
   const ref=$('paymentRef').value.trim()||'Payroll',entityLabel=currentEntity==='windmill'?'Windmill':'Eight Bells';
   const hdrs=['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
-  const rows=employees.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:(ref+' '+e.name.replace(/[^A-Za-z0-9 ]/g,'').substring(0,20).trim());return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
+  const rows=employees.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
   let csv=hdrs.join(',')+'\n';rows.forEach(r=>{csv+=r.map(c=>(typeof c==='string'&&(c.includes(',')||c.includes('"')))?'"'+c.replace(/"/g,'""')+'"':c).join(',')+'\n';});
   const fn=`Wise_${currentEntity==='windmill'?'Windmill':'EightBells'}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
@@ -1012,6 +1012,16 @@ apiGet();
 // ── Sync Payroll IDs from Xero into the Directory ──
 async function syncPayrollIdsFromXero(silent){
   silent = silent === true;
+  var btn = document.querySelector('button[onclick="syncPayrollIdsFromXero()"]');
+  var origLabel = '';
+  if (btn) {
+    origLabel = btn.innerHTML;
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'wait';
+    btn.innerHTML = '⟳ Fetching from Xero… (10–15 sec)';
+  }
+  if (!silent) showToast('Fetching ' + (currentEntity === 'windmill' ? 'Windmill' : 'Eight Bells') + ' Payroll IDs from Xero — this takes 10–15 seconds…', 'info');
   let xeroEmployees = [];
   try {
     const r = await fetch(STAFF_HUB_API + '?action=listEmployeePayrollIds&venue=' + encodeURIComponent(currentEntity));
@@ -1019,9 +1029,11 @@ async function syncPayrollIdsFromXero(silent){
     if (data.error) throw new Error(data.error);
     xeroEmployees = data.employees || [];
   } catch (err) {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.innerHTML = origLabel; }
     if (!silent) showToast('Xero fetch failed: ' + err.message, 'error');
     return;
   }
+  if (btn) btn.innerHTML = '⟳ Matching ' + xeroEmployees.length + ' employees to Directory…';
   const updates = [];
   let alreadyOk = 0, noMatch = 0, noPayrollId = 0;
   xeroEmployees.forEach(function(emp){
@@ -1038,9 +1050,11 @@ async function syncPayrollIdsFromXero(silent){
     });
   });
   if (!updates.length) {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.innerHTML = origLabel; }
     if (!silent) showToast('No updates needed (' + alreadyOk + ' correct, ' + noMatch + ' not in Directory, ' + noPayrollId + ' missing Xero Payroll ID)', 'info');
     return;
   }
+  if (btn) btn.innerHTML = '⟳ Writing ' + updates.length + ' Payroll IDs to Directory…';
   try {
     const r = await apiPost({ action: 'updateStaff', updates });
     if (r && r.success) {
@@ -1058,6 +1072,7 @@ async function syncPayrollIdsFromXero(silent){
   } catch (err) {
     if (!silent) showToast('Sync failed: ' + err.message, 'error');
   }
+  if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.innerHTML = origLabel; }
 }
 window.syncPayrollIdsFromXero = syncPayrollIdsFromXero;
 
