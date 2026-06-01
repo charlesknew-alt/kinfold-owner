@@ -234,6 +234,10 @@ thead th.actions-head{text-align:center;width:44px}
       <span class="collapsible-toggle" id="dirArrow">▼</span>
     </div>
     <div class="collapsible-body" id="dirBody">
+      <div style="padding:12px 16px;background:var(--surface-2,#0f1428);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="font-size:12px;color:var(--text-muted);">Pull Payroll IDs from Xero so they're used as Wise payment references.</div>
+        <button class="btn btn-secondary btn-sm" onclick="syncPayrollIdsFromXero()" style="font-size:12px;white-space:nowrap;">⟲ Sync Payroll IDs from Xero</button>
+      </div>
       <div class="dir-list" id="dirList"></div>
       <div class="dir-add-form">
         <div class="field"><label>Name</label><input type="text" id="dirName" class="name-input" placeholder="New staff member"></div>
@@ -261,9 +265,6 @@ thead th.actions-head{text-align:center;width:44px}
   <div class="collapsible-section">
     <div class="collapsible-header" onclick="toggle('wiseBody','wiseArrow')">
       <div class="collapsible-title">🔄 Import Wise Corrections <span style="font-size:10px;color:var(--text-muted);font-weight:400">update names & bank details</span></div>
-        <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" onclick="syncPayrollIdsFromXero()" style="font-size:11px;">⟲ Sync Payroll IDs from Xero</button>
-        </div>
       <span class="collapsible-toggle" id="wiseArrow">▼</span>
     </div>
     <div class="collapsible-body" id="wiseBody">
