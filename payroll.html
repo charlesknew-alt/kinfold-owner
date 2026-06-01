@@ -48,8 +48,9 @@ tbody tr.manual-row{background:var(--amber-bg)}
 tbody tr.has-deduction{background:rgba(248,113,113,.04)}
 .amount-cell{text-align:right;cursor:pointer;position:relative;transition:background .15s;border-radius:4px;font-weight:500}
 .amount-cell:hover{background:rgba(74,108,247,.08)}
-.amount-cell .edit-hint{display:none;font-size:9px;color:var(--accent);position:absolute;top:1px;right:3px;font-family:'DM Sans',sans-serif}
-.amount-cell:hover .edit-hint{display:block}
+.edit-hint{display:none;font-size:9px;color:var(--accent);position:absolute;top:1px;right:3px;font-family:'DM Sans',sans-serif;pointer-events:none}
+td:hover > .edit-hint, td:hover .edit-hint{display:block}
+.name-col, #tableBody td[onclick*="editField"], .amount-cell{position:relative}
 .inline-edit{width:90px;padding:3px 6px;border-radius:4px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;outline:none}
 thead th.actions-head{text-align:center;width:44px}
 .row-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;opacity:.5;transition:opacity .15s;padding:3px}
