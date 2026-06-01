@@ -884,105 +884,143 @@ async function selectPayRun(payRunId, periodEnd, paymentDate) {
       $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No payslips in this pay run.</div>';
       return;
     }
-    xeroPullState = { payRunId, payslips, paymentDate, periodEnd, results: [], unmatched: [], errors: [], idx: 0 };
-    pullNextPayslip();
+    xeroPullState = { payRunId, payslips, paymentDate, periodEnd, items: [] };
+    // Build the per-payslip rows, annotated with directory match status
+    xeroPullState.items = payslips.map(function(ps) {
+      const xeroName = ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim();
+      const dirMatch = staffDirectory.find(d => (d.name || '').toLowerCase() === xeroName.toLowerCase());
+      const hasNet = (ps.netPay || 0) > 0;
+      return {
+        ps: ps,
+        xeroName: xeroName,
+        dirMatch: dirMatch || null,
+        hasNet: hasNet,
+        selected: hasNet && !!dirMatch    // default: pre-check rows that are matched AND have pay
+      };
+    });
+    renderPayslipSelector();
   } catch (err) {
     $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--red,#f87171);font-size:13px;">Failed: ' + esc(err.message) + '</div>';
   }
 }
 
-async function pullNextPayslip() {
-  if (!xeroPullState) return;
-  const total = xeroPullState.payslips.length;
-  if (xeroPullState.idx >= total) { finishXeroPull(); return; }
-  const ps = xeroPullState.payslips[xeroPullState.idx];
-  const fullName = ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim();
-  const pct = Math.round((xeroPullState.idx / total) * 100);
-
-  $('xeroModalBody').innerHTML = `
-    <div style="margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Fetching payslip ${xeroPullState.idx + 1} of ${total}</div>
-      <div style="font-size:11px;color:var(--text-muted);">${esc(fullName)}</div>
-    </div>
-    <div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden;">
-      <div style="width:${pct}%;height:100%;background:var(--accent,#4a6cf7);transition:width 0.3s;"></div>
-    </div>
-    <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right;">${pct}%</div>`;
-
-  try {
-    const r = await fetch(STAFF_HUB_API + '?action=getPayslip&venue=' + encodeURIComponent(currentEntity) + '&payslipId=' + encodeURIComponent(ps.payslipID));
-    const data = await r.json();
-    if (data.error) throw new Error(data.error);
-
-    const xeroName = ((data.firstName || ps.firstName || '') + ' ' + (data.lastName || ps.lastName || '')).trim();
-    const dirMatch = staffDirectory.find(d => (d.name || '').toLowerCase() === xeroName.toLowerCase());
-
-    if (dirMatch && data.netPay > 0) {
-      xeroPullState.results.push({
-        name: dirMatch.name,
-        sortCode: dirMatch.sortCode,
-        accountNumber: dirMatch.accountNumber,
-        amount: data.netPay,
-        manual: false,
-        deductions: [],
-        _xeroId: data.employeeID,
-        _correctedFrom: xeroName.toLowerCase() !== dirMatch.name.toLowerCase() ? 'Name from directory: was "' + xeroName + '" in Xero' : null
-      });
-    } else if (data.netPay > 0) {
-      xeroPullState.unmatched.push({ name: xeroName, netPay: data.netPay, employeeID: data.employeeID });
-    }
-  } catch (err) {
-    xeroPullState.errors.push({ name: ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim(), error: err.message });
-  }
-
-  xeroPullState.idx++;
-  setTimeout(pullNextPayslip, 200);
-}
-
-function finishXeroPull() {
+function renderPayslipSelector() {
   const s = xeroPullState;
-  let html = '<div style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--green,#34d399);">✓ Pull complete</div>';
-  html += `<div style="font-size:12px;line-height:1.7;margin-bottom:14px;">
-    <div>Matched to directory: <strong>${s.results.length}</strong></div>
-    <div>Unmatched (no directory entry): <strong style="color:${s.unmatched.length ? 'var(--amber,#fbbf24)' : 'inherit'};">${s.unmatched.length}</strong></div>
-    <div>Errors: <strong style="color:${s.errors.length ? 'var(--red,#f87171)' : 'inherit'};">${s.errors.length}</strong></div>
-    <div>Skipped (£0 net): <strong style="color:${s.skipped && s.skipped.length ? 'var(--text-muted)' : 'inherit'};">${(s.skipped || []).length}</strong></div>
-  </div>`;
+  if (!s) return;
+  const items = s.items;
+  const totalWithPay = items.filter(i => i.hasNet).length;
+  const matched = items.filter(i => i.hasNet && i.dirMatch).length;
+  const unmatched = items.filter(i => i.hasNet && !i.dirMatch).length;
+  const noPay = items.filter(i => !i.hasNet).length;
 
-  if (s.unmatched.length) {
-    html += '<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.5;">';
-    html += '<div style="font-weight:600;color:var(--amber,#fbbf24);margin-bottom:6px;">⚠ Unmatched payslips — no directory entry</div>';
-    s.unmatched.forEach(u => { html += `<div>• ${esc(u.name)} — £${fmtMoney(u.netPay)}</div>`; });
-    html += '<div style="margin-top:6px;color:var(--text-muted);">Add these manually after import, or do one BACS upload to populate directory then re-pull.</div>';
-    html += '</div>';
-  }
+  let html = '<div style="margin-bottom:10px;font-size:11px;color:var(--text-muted);">';
+  html += `${items.length} payslips · ${matched} in Directory · ${unmatched} need adding · ${noPay} with £0 net`;
+  html += '</div>';
 
-  if (s.errors.length) {
-    html += '<div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;line-height:1.5;">';
-    html += '<div style="font-weight:600;color:var(--red,#f87171);margin-bottom:6px;">Errors</div>';
-    s.errors.slice(0, 5).forEach(e => { html += `<div>• ${esc(e.name)}: ${esc(e.error)}</div>`; });
-    html += '</div>';
-  }
+  html += '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">';
+  html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'all\')" style="font-size:11px;padding:4px 10px;">Select all</button>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'paid\')" style="font-size:11px;padding:4px 10px;">With pay &gt; £0</button>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'matched\')" style="font-size:11px;padding:4px 10px;">In Directory</button>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'none\')" style="font-size:11px;padding:4px 10px;">Deselect all</button>';
+  html += '</div>';
 
-  html += `<div style="display:flex;gap:8px;margin-top:14px;">
-    <button class="btn btn-success" onclick="commitXeroPull()" style="flex:1;">Import ${s.results.length} payment${s.results.length===1?'':'s'} into table</button>
-    <button class="btn btn-secondary" onclick="closeXeroModal()">Cancel</button>
-  </div>`;
+  html += '<div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">';
+  items.forEach((item, i) => {
+    const matchTag = item.dirMatch
+      ? '<span style="color:var(--green,#34d399);">✓ in Directory</span>'
+      : '<span style="color:var(--amber,#fbbf24);">⚠ not in Directory</span>';
+    const payTag = item.hasNet
+      ? ('£' + fmtMoney(item.ps.netPay))
+      : '<span style="color:var(--text-muted);">£0.00 (no payment)</span>';
+    const rowBg = item.selected ? 'background:rgba(74,108,247,0.06);' : '';
+    html += `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;${rowBg}">
+      <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleXeroPayslip(${i})" style="margin:0;cursor:pointer;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:500;">${esc(item.xeroName)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${payTag} · ${matchTag}</div>
+      </div>
+    </label>`;
+  });
+  html += '</div>';
+
+  html += '<div id="xeroImportButtons" style="margin-top:14px;">' + renderXeroImportButtonsInner() + '</div>';
 
   $('xeroModalBody').innerHTML = html;
+}
+
+function renderXeroImportButtonsInner() {
+  const s = xeroPullState;
+  if (!s) return '';
+  const count = s.items.filter(i => i.selected).length;
+  return `<div style="display:flex;gap:8px;">
+    <button class="btn btn-success" onclick="commitXeroPull()" style="flex:1;" ${count===0?'disabled':''}>
+      Import ${count} payment${count===1?'':'s'} into table
+    </button>
+    <button class="btn btn-secondary" onclick="closeXeroModal()">Cancel</button>
+  </div>`;
+}
+
+function updateXeroImportButtonsUI() {
+  const el = $('xeroImportButtons');
+  if (el) el.innerHTML = renderXeroImportButtonsInner();
+}
+
+function setPayslipSelection(mode) {
+  if (!xeroPullState) return;
+  xeroPullState.items.forEach(item => {
+    if (mode === 'all') item.selected = true;
+    else if (mode === 'none') item.selected = false;
+    else if (mode === 'paid') item.selected = item.hasNet;
+    else if (mode === 'matched') item.selected = item.hasNet && !!item.dirMatch;
+  });
+  renderPayslipSelector();
+}
+
+function toggleXeroPayslip(i) {
+  if (!xeroPullState || !xeroPullState.items[i]) return;
+  xeroPullState.items[i].selected = !xeroPullState.items[i].selected;
+  updateXeroImportButtonsUI();
 }
 
 function commitXeroPull() {
   if (!xeroPullState) return;
   const exKeys = new Set(excludedStaff.map(s => s.sortCode + '|' + s.accountNumber));
-  let added = 0, excludedCount = 0;
+  let added = 0, excludedCount = 0, manualCount = 0;
 
-  xeroPullState.results.forEach(emp => {
-    const key = emp.sortCode + '|' + emp.accountNumber;
-    if (exKeys.has(key)) { excludedCount++; return; }
-    if (!employees.some(e => e.sortCode === emp.sortCode && e.accountNumber === emp.accountNumber)) {
-      employees.push(emp);
+  xeroPullState.items.forEach(item => {
+    if (!item.selected) return;
+    if (item.dirMatch) {
+      const key = item.dirMatch.sortCode + '|' + item.dirMatch.accountNumber;
+      if (exKeys.has(key)) { excludedCount++; return; }
+      if (!employees.some(e => e.sortCode === item.dirMatch.sortCode && e.accountNumber === item.dirMatch.accountNumber)) {
+        employees.push({
+          name: item.dirMatch.name,
+          sortCode: item.dirMatch.sortCode,
+          accountNumber: item.dirMatch.accountNumber,
+          amount: item.ps.netPay,
+          manual: false,
+          deductions: [],
+          payrollId: item.dirMatch.payrollId || '',
+          _xeroId: item.ps.employeeID,
+          _correctedFrom: item.xeroName.toLowerCase() !== item.dirMatch.name.toLowerCase() ? ('Name from directory: was "' + item.xeroName + '" in Xero') : null
+        });
+        added++;
+      }
+    } else {
+      // Unmatched — add as a manual row with empty bank details so user can fill them in
+      employees.push({
+        name: item.xeroName,
+        sortCode: '',
+        accountNumber: '',
+        amount: item.ps.netPay,
+        manual: true,
+        deductions: [],
+        payrollId: '',
+        _xeroId: item.ps.employeeID,
+        _editedInRow: true
+      });
       added++;
+      manualCount++;
     }
   });
 
@@ -1003,9 +1041,14 @@ function commitXeroPull() {
   renderTable();
   updateSteps(2);
   closeXeroModal();
-  showToast(`✓ Imported ${added} payment${added===1?'':'s'} from Xero${excludedCount?' ('+excludedCount+' excluded)':''}`, 'success');
+
+  let msg = '✓ Imported ' + added + ' payment' + (added===1?'':'s') + ' from Xero';
+  if (excludedCount) msg += ' (' + excludedCount + ' excluded)';
+  if (manualCount) msg += '. ' + manualCount + ' need bank details — click ✏️ to add';
+  showToast(msg, 'success');
   xeroPullState = null;
 }
+
 
 apiGet();
 
