@@ -438,9 +438,9 @@ function renderTable(){
     const dedTotal=getDeductionTotal(e),net=getNetPay(e),hasDed=dedTotal>0;
     const dedHTML=e.deductions&&e.deductions.length?e.deductions.map((d,di)=>`<span class="deduction-tag"><span class="ded-amount">-£${fmtMoney(d.amount)}</span> ${esc(d.reason)} <span class="ded-remove" onclick="event.stopPropagation();removeDeduction(${i},${di})">✕</span></span>`).join(' '):'';
     const correctedTag=e._correctedFrom?` <span class="corrected-tag" title="${esc(e._correctedFrom)}">↺</span>`:'';
-    const editedTag=e._editedInRow?` <span class="edited-tag" title="Edited in row — not yet pushed to Xero/Directory">✎</span>`:'';
-    const actionButtons=`<button class="row-act" title="Save name + bank to Directory" onclick="saveRowToDirectory(${i})">💾</button><button class="row-act" title="Push name + bank to Xero (also updates Directory)" onclick="pushRowToXero(${i})">🔄</button>${e._originalBacs?`<button class="row-act" title="Revert to original BACS values" onclick="revertRowToBacs(${i})">↩</button>`:''}<button class="row-remove" title="Remove from this batch" onclick="removeRow(${i})">✕</button>`;
-    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col" onclick="editField(${i},'name',this)">${esc(e.name)}${correctedTag}${editedTag}<span class="edit-hint">edit</span></td><td onclick="editField(${i},'sortCode',this)">${esc(e.sortCode)}<span class="edit-hint">edit</span></td><td onclick="editField(${i},'accountNumber',this)">${esc(e.accountNumber)}<span class="edit-hint">edit</span></td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
+    const editedTag=e._editedInRow?` <span class="edited-tag" title="Edited — not yet pushed to Xero/Directory">✎</span>`:'';
+    const actionButtons=`<button class="row-act" title="Edit details / push to Xero or Directory" onclick="openEditModal(${i})">✏️</button><button class="row-remove" title="Remove from this batch" onclick="removeRow(${i})">✕</button>`;
+    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col">${esc(e.name)}${correctedTag}${editedTag}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
   }).join('');
   updateTotal();
 }
@@ -448,27 +448,89 @@ function renderTable(){
 function updateTotal(){const g=employees.reduce((s,e)=>s+e.amount,0),d=employees.reduce((s,e)=>s+getDeductionTotal(e),0),n=g-d;$('totalAmount').textContent=`£${fmtMoney(n)}`;$('totalDetails').textContent=d>0?` (gross £${fmtMoney(g)} − £${fmtMoney(d)} deductions)`:'';validateTotal();}
 function removeRow(i){employees.splice(i,1);renderTable();}
 
-// ── Inline field editor for name/sortCode/accountNumber ──
-function editField(i,field,cell){
-  if(cell.querySelector('.inline-edit'))return;
-  const cur=employees[i][field]||'';
-  if(!employees[i]._originalBacs){
-    employees[i]._originalBacs={name:employees[i].name,sortCode:employees[i].sortCode,accountNumber:employees[i].accountNumber};
+// ── Edit modal: opens with row's current values, lets you push to Directory / Xero / Revert ──
+let _editingRowIndex = null;
+
+function openEditModal(i){
+  _editingRowIndex = i;
+  const e = employees[i];
+  if (!e._originalBacs) {
+    e._originalBacs = {name: e.name, sortCode: e.sortCode, accountNumber: e.accountNumber};
   }
-  cell.innerHTML=`<input class="inline-edit" type="text" value="${esc(cur)}" autofocus style="width:100%;padding:4px 6px;font-size:12px;">`;
-  const inp=cell.querySelector('input');inp.focus();inp.select();
-  function commit(){
-    let v=inp.value.trim();
-    if(field==='sortCode')v=fmtSort(v);
-    if(field==='accountNumber')v=v.replace(/\D/g,'');
-    if(v&&v!==cur){
-      employees[i][field]=v;
-      employees[i]._editedInRow=true;
-    }
-    renderTable();
+  $('editModalTitle').textContent = `Edit: ${e.name}`;
+  $('editModalName').value = e.name || '';
+  $('editModalSort').value = e.sortCode || '';
+  $('editModalAccount').value = e.accountNumber || '';
+  $('editModalAmount').textContent = `£${fmtMoney(e.amount)}`;
+  // Show banner if this row has been corrected from a BACS original
+  const banner = $('editModalBacsBanner');
+  if (e._correctedFrom) {
+    banner.textContent = '⚠ ' + e._correctedFrom;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
   }
-  inp.addEventListener('blur',commit);
-  inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();commit();}if(ev.key==='Escape')renderTable();});
+  // Disable revert if there's nothing to revert to
+  $('modalRevertBtn').disabled = !e._originalBacs;
+  $('modalRevertBtn').style.opacity = e._originalBacs ? '1' : '0.4';
+  $('editRowModal').style.display = 'flex';
+  setTimeout(()=>$('editModalName').focus(), 50);
+}
+
+function closeEditModal(){
+  $('editRowModal').style.display = 'none';
+  _editingRowIndex = null;
+}
+
+// Apply the modal's current input values back into the row before pushing
+function _applyModalValuesToRow(){
+  if (_editingRowIndex === null) return null;
+  const e = employees[_editingRowIndex];
+  const newName = $('editModalName').value.trim();
+  let newSort = $('editModalSort').value.trim();
+  let newAcct = $('editModalAccount').value.replace(/\D/g,'');
+  if (newSort) newSort = fmtSort(newSort);
+  // Only mark as edited if anything actually changed
+  if (newName !== e.name || newSort !== e.sortCode || newAcct !== e.accountNumber) {
+    e.name = newName;
+    e.sortCode = newSort;
+    e.accountNumber = newAcct;
+    e._editedInRow = true;
+  }
+  return _editingRowIndex;
+}
+
+async function modalSaveToDirectory(){
+  const i = _applyModalValuesToRow();
+  if (i === null) return;
+  await saveRowToDirectory(i);
+  closeEditModal();
+}
+
+async function modalPushToXero(){
+  const i = _applyModalValuesToRow();
+  if (i === null) return;
+  await pushRowToXero(i);
+  // Don't close the modal — the user may want to inspect the toast result
+  // before closing. They can click Close manually.
+  // But re-sync the modal display with current row state in case it changed
+  if (_editingRowIndex !== null) {
+    const e = employees[_editingRowIndex];
+    $('editModalName').value = e.name || '';
+    $('editModalSort').value = e.sortCode || '';
+    $('editModalAccount').value = e.accountNumber || '';
+  }
+}
+
+function modalRevertToBacs(){
+  const i = _editingRowIndex;
+  if (i === null) return;
+  revertRowToBacs(i);
+  const e = employees[i];
+  $('editModalName').value = e.name || '';
+  $('editModalSort').value = e.sortCode || '';
+  $('editModalAccount').value = e.accountNumber || '';
+  $('editModalBacsBanner').style.display = 'none';
 }
 
 // ── Save name + bank to the Directory sheet ──
@@ -933,5 +995,42 @@ function commitXeroPull() {
 
 apiGet();
 </script>
+
+<!-- Edit Row Modal -->
+<div id="editRowModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--card,#1a1f3a);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h2 id="editModalTitle" style="font-size:16px;font-weight:700;margin:0;">Edit employee</h2>
+      <button onclick="closeEditModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:0;line-height:1;">×</button>
+    </div>
+    <div id="editModalBacsBanner" style="display:none;font-size:11px;background:var(--amber-bg,rgba(245,158,11,0.1));color:var(--amber,#f59e0b);padding:8px 10px;border-radius:6px;margin-bottom:14px;"></div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Name</label>
+        <input id="editModalName" type="text" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Sort Code</label>
+          <input id="editModalSort" type="text" placeholder="00-00-00" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Account Number</label>
+          <input id="editModalAccount" type="text" placeholder="00000000" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Amount: <span id="editModalAmount" style="color:var(--text,#fff);font-weight:600;"></span></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;">
+      <button class="btn btn-success btn-sm" onclick="modalSaveToDirectory()" style="flex:1;min-width:130px;">💾 Save to Directory</button>
+      <button class="btn btn-primary btn-sm" onclick="modalPushToXero()" style="flex:1;min-width:130px;">🔄 Push to Xero</button>
+      <button class="btn btn-amber btn-sm" id="modalRevertBtn" onclick="modalRevertToBacs()" style="flex:1;min-width:130px;">↩ Revert to BACS</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+      <button class="btn btn-secondary btn-sm" onclick="closeEditModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
