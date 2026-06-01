@@ -53,6 +53,9 @@ tbody tr.has-deduction{background:rgba(248,113,113,.04)}
 .inline-edit{width:90px;padding:3px 6px;border-radius:4px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;outline:none}
 thead th.actions-head{text-align:center;width:44px}
 .row-remove{background:none;border:none;color:var(--red);cursor:pointer;font-size:13px;opacity:.5;transition:opacity .15s;padding:3px}
+.row-act{background:none;border:none;cursor:pointer;font-size:13px;opacity:.55;transition:opacity .15s;padding:3px;margin-right:2px}
+.row-act:hover{opacity:1}
+.edited-tag{display:inline-block;margin-left:4px;color:var(--amber,#f59e0b);font-size:11px;cursor:default}
 .row-remove:hover{opacity:1}
 .deduction-cell{position:relative;min-width:140px}
 .deduction-display{display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 4px;border-radius:4px;transition:background .15s;min-height:24px;flex-wrap:wrap}
@@ -338,6 +341,7 @@ function handleFiles(files){
         // files only appears once
         if (!employees.some(e => e.sortCode === corrected.sortCode && e.accountNumber === corrected.accountNumber)) {
           if (corrected._correctedFrom) correctedCount++;
+          corrected._originalBacs={name:emp.name,sortCode:emp.sortCode,accountNumber:emp.accountNumber};
           employees.push(corrected);
         }
       });
@@ -433,13 +437,145 @@ function renderTable(){
     const dedTotal=getDeductionTotal(e),net=getNetPay(e),hasDed=dedTotal>0;
     const dedHTML=e.deductions&&e.deductions.length?e.deductions.map((d,di)=>`<span class="deduction-tag"><span class="ded-amount">-£${fmtMoney(d.amount)}</span> ${esc(d.reason)} <span class="ded-remove" onclick="event.stopPropagation();removeDeduction(${i},${di})">✕</span></span>`).join(' '):'';
     const correctedTag=e._correctedFrom?` <span class="corrected-tag" title="${esc(e._correctedFrom)}">↺</span>`:'';
-    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col">${esc(e.name)}${correctedTag}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center"><button class="row-remove" onclick="removeRow(${i})">✕</button></td></tr>`;
+    const editedTag=e._editedInRow?` <span class="edited-tag" title="Edited in row — not yet pushed to Xero/Directory">✎</span>`:'';
+    const actionButtons=`<button class="row-act" title="Save name + bank to Directory" onclick="saveRowToDirectory(${i})">💾</button><button class="row-act" title="Push name + bank to Xero (also updates Directory)" onclick="pushRowToXero(${i})">🔄</button>${e._originalBacs?`<button class="row-act" title="Revert to original BACS values" onclick="revertRowToBacs(${i})">↩</button>`:''}<button class="row-remove" title="Remove from this batch" onclick="removeRow(${i})">✕</button>`;
+    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col" onclick="editField(${i},'name',this)">${esc(e.name)}${correctedTag}${editedTag}<span class="edit-hint">edit</span></td><td onclick="editField(${i},'sortCode',this)">${esc(e.sortCode)}<span class="edit-hint">edit</span></td><td onclick="editField(${i},'accountNumber',this)">${esc(e.accountNumber)}<span class="edit-hint">edit</span></td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
   }).join('');
   updateTotal();
 }
 
 function updateTotal(){const g=employees.reduce((s,e)=>s+e.amount,0),d=employees.reduce((s,e)=>s+getDeductionTotal(e),0),n=g-d;$('totalAmount').textContent=`£${fmtMoney(n)}`;$('totalDetails').textContent=d>0?` (gross £${fmtMoney(g)} − £${fmtMoney(d)} deductions)`:'';validateTotal();}
 function removeRow(i){employees.splice(i,1);renderTable();}
+
+// ── Inline field editor for name/sortCode/accountNumber ──
+function editField(i,field,cell){
+  if(cell.querySelector('.inline-edit'))return;
+  const cur=employees[i][field]||'';
+  if(!employees[i]._originalBacs){
+    employees[i]._originalBacs={name:employees[i].name,sortCode:employees[i].sortCode,accountNumber:employees[i].accountNumber};
+  }
+  cell.innerHTML=`<input class="inline-edit" type="text" value="${esc(cur)}" autofocus style="width:100%;padding:4px 6px;font-size:12px;">`;
+  const inp=cell.querySelector('input');inp.focus();inp.select();
+  function commit(){
+    let v=inp.value.trim();
+    if(field==='sortCode')v=fmtSort(v);
+    if(field==='accountNumber')v=v.replace(/\D/g,'');
+    if(v&&v!==cur){
+      employees[i][field]=v;
+      employees[i]._editedInRow=true;
+    }
+    renderTable();
+  }
+  inp.addEventListener('blur',commit);
+  inp.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();commit();}if(ev.key==='Escape')renderTable();});
+}
+
+// ── Save name + bank to the Directory sheet ──
+async function saveRowToDirectory(i){
+  const e=employees[i];
+  if(!e.name||!e.sortCode||!e.accountNumber){showToast('Missing name / sort / account','error');return;}
+  let existing=staffDirectory.find(d=>d.sortCode===e.sortCode&&d.accountNumber===e.accountNumber);
+  if(!existing)existing=staffDirectory.find(d=>d.name.toLowerCase()===e.name.toLowerCase());
+
+  if(existing){
+    const r=await apiPost({action:'updateStaff',updates:[{
+      oldSortCode:existing.sortCode,
+      oldAccountNumber:existing.accountNumber,
+      newName:e.name,
+      newSortCode:e.sortCode,
+      newAccountNumber:e.accountNumber
+    }]});
+    if(r.success){showToast(`Updated ${e.name} in Directory`,'success');e._editedInRow=false;renderTable();}
+    else showToast(r.error||'Update failed','error');
+  }else{
+    const r=await apiPost({action:'add',name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity});
+    if(r.success){showToast(`Saved ${e.name} to Directory`,'success');e._editedInRow=false;renderTable();}
+    else showToast(r.error||'Save failed','error');
+  }
+}
+
+// ── Push name + bank to Xero (and mirror to Directory) ──
+async function pushRowToXero(i){
+  const e=employees[i];
+  if(!e.name||!e.sortCode||!e.accountNumber){showToast('Missing name / sort / account','error');return;}
+
+  setSyncStatus('syncing','Finding employee in Xero…');
+  let found;
+  try{
+    const url=STAFF_HUB_API+'?action=findEmployee&venue='+encodeURIComponent(currentEntity)+'&name='+encodeURIComponent(e.name);
+    const r=await fetch(url);found=await r.json();
+  }catch(err){showToast('Xero lookup failed: '+err.message,'error');setSyncStatus('error','Lookup failed');return;}
+
+  if(found.error==='not_found'){showToast(`Not found in Xero: "${e.name}". Check the name spelling.`,'error');setSyncStatus('error','Not found');return;}
+  if(found.error==='ambiguous'){showToast(`Multiple Xero employees match "${e.name}". Edit name to be unique first.`,'error');setSyncStatus('error','Ambiguous');return;}
+  if(found.error){showToast('Xero error: '+found.error,'error');setSyncStatus('error','Lookup failed');return;}
+
+  const xeroSort=String(found.sortCode||'').replace(/\D/g,'');
+  const xeroAcct=String(found.accountNumber||'').replace(/\D/g,'');
+  const rowSort=String(e.sortCode).replace(/\D/g,'');
+  const rowAcct=String(e.accountNumber).replace(/\D/g,'');
+  const bankChanged=(xeroSort!==rowSort)||(xeroAcct!==rowAcct);
+  const xeroFullName=((found.firstName||'')+' '+(found.lastName||'')).trim();
+  const nameChanged=xeroFullName.toLowerCase()!==e.name.toLowerCase();
+
+  if(!bankChanged&&!nameChanged){showToast('Already matches Xero — nothing to push','info');setSyncStatus('synced','Up to date');e._editedInRow=false;renderTable();return;}
+
+  if(bankChanged){
+    const ok=confirm(`Push these bank details to Xero for ${e.name}?\n\nFrom: ${found.sortCode||'(empty)'} / ${found.accountNumber||'(empty)'}\nTo:   ${e.sortCode} / ${e.accountNumber}\n\nClick OK to proceed.`);
+    if(!ok){setSyncStatus('synced','Cancelled');return;}
+  }
+
+  if(nameChanged){
+    const parts=e.name.trim().split(/\s+/);
+    const newFirst=parts[0]||'';
+    const newLast=parts.slice(1).join(' ')||'';
+    try{
+      const url=STAFF_HUB_API+'?action=updateEmployeeName&venue='+encodeURIComponent(currentEntity)+'&name='+encodeURIComponent(xeroFullName)+'&firstName='+encodeURIComponent(newFirst)+'&lastName='+encodeURIComponent(newLast);
+      const r=await fetch(url);const j=await r.json();
+      if(j.error){showToast('Xero name update failed: '+(j.message||j.error),'error');setSyncStatus('error','Name push failed');return;}
+    }catch(err){showToast('Xero name update failed: '+err.message,'error');setSyncStatus('error','Name push failed');return;}
+  }
+
+  if(bankChanged){
+    try{
+      const url=STAFF_HUB_API+'?action=updateEmployeeBank&venue='+encodeURIComponent(currentEntity)+'&name='+encodeURIComponent(e.name)+'&sortCode='+encodeURIComponent(e.sortCode)+'&accountNumber='+encodeURIComponent(e.accountNumber);
+      const r=await fetch(url);const j=await r.json();
+      if(j.error){showToast('Xero bank update failed: '+(j.message||j.error),'error');setSyncStatus('error','Bank push failed');return;}
+    }catch(err){showToast('Xero bank update failed: '+err.message,'error');setSyncStatus('error','Bank push failed');return;}
+  }
+
+  await saveRowToDirectoryQuiet(i);
+
+  e._editedInRow=false;
+  e._correctedFrom=null;
+  showToast(`Pushed ${e.name} to Xero${bankChanged?' (bank + name)':' (name only)'}`,'success');
+  setSyncStatus('synced','Synced');
+  renderTable();
+}
+
+async function saveRowToDirectoryQuiet(i){
+  const e=employees[i];
+  let existing=staffDirectory.find(d=>d.sortCode===e.sortCode&&d.accountNumber===e.accountNumber);
+  if(!existing)existing=staffDirectory.find(d=>d.name.toLowerCase()===e.name.toLowerCase());
+  if(existing){
+    await apiPost({action:'updateStaff',updates:[{oldSortCode:existing.sortCode,oldAccountNumber:existing.accountNumber,newName:e.name,newSortCode:e.sortCode,newAccountNumber:e.accountNumber}]});
+  }else{
+    await apiPost({action:'add',name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity});
+  }
+}
+
+// ── Revert row to original BACS-parsed values ──
+function revertRowToBacs(i){
+  const e=employees[i];
+  if(!e._originalBacs){showToast('No original BACS values stored for this row','info');return;}
+  e.name=e._originalBacs.name;
+  e.sortCode=e._originalBacs.sortCode;
+  e.accountNumber=e._originalBacs.accountNumber;
+  e._editedInRow=false;
+  e._correctedFrom=null;
+  renderTable();
+  showToast('Reverted to BACS values','success');
+}
 function editAmount(i,cell){const v=employees[i].amount.toFixed(2);cell.onclick=null;cell.innerHTML=`<input class="inline-edit" type="text" value="${v}" autofocus>`;const inp=cell.querySelector('input');inp.focus();inp.select();function commit(){const n=parseFloat(inp.value.replace(/[£,\s]/g,''));if(!isNaN(n)&&n>=0)employees[i].amount=n;renderTable();}inp.addEventListener('blur',commit);inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commit();}if(e.key==='Escape')renderTable();});}
 
 // Deductions
