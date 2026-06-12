@@ -10,45 +10,29 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     /* ── Kinfold Owner Portal — high-contrast dark theme ── */
     :root {
-      /* Background surfaces. Page bg gets a slight blue cast so cards lift off it.
-         Each level of nesting bumps lighter for visible separation. */
-      --dark: #0b1020;
-      --bg: #0b1020;
-      --card: #1a2236;
-      --card-hover: #28324a;
-      --card-strong: #2f3b58;
-
-      /* Borders — used to be barely visible (#2a3040). Now ~50% brighter. */
-      --border: #3d4866;
-      --border-strong: #4a577a;
-
-      /* Text — significantly brighter for legibility on dark surfaces. */
-      --text: #f3f5fb;
-      --text-muted: #b6c0d6;
-      --text-dim: #7f8aa3;
-
-      /* Brand colours. Gold = Staff Hub & primary brand accent. */
-      --gold: #d4a866;
-      --gold-glow: rgba(212, 168, 102, 0.16);
-      --gold-bg: rgba(212, 168, 102, 0.16);
-
-      /* Per-venue accent colours. Windmill = blue-purple, Eight Bells = warm purple. */
-      --windmill: #8b9eff;
-      --windmill-glow: rgba(139, 158, 255, 0.14);
-      --eightbells: #c084fc;
-      --eightbells-glow: rgba(192, 132, 252, 0.14);
-
-      /* Status colours — slightly brighter for better contrast on the new dark bg. */
-      --green: #4ade80;
-      --green-bg: rgba(74, 222, 128, 0.14);
-      --red: #fb7185;
-      --red-bg: rgba(251, 113, 133, 0.14);
-      --amber: #fcd34d;
-      --amber-bg: rgba(252, 211, 77, 0.14);
-      --blue: #7dd3fc;
-      --blue-bg: rgba(125, 211, 252, 0.14);
-      --purple: #c4b5fd;
-      --purple-bg: rgba(196, 181, 253, 0.14);
+      /* Aggressive high-contrast dark — slate spectrum, not pure black. */
+      --dark: #0f172a;
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-hover: #334155;
+      --card-strong: #475569;
+      --border: #475569;
+      --border-strong: #64748b;
+      --text: #ffffff;
+      --text-muted: #cbd5e1;
+      --text-dim: #94a3b8;
+      --gold: #e3b97a;
+      --gold-glow: rgba(227, 185, 122, 0.18);
+      --gold-bg: rgba(227, 185, 122, 0.18);
+      --windmill: #93c5fd;
+      --windmill-glow: rgba(147, 197, 253, 0.18);
+      --eightbells: #d8b4fe;
+      --eightbells-glow: rgba(216, 180, 254, 0.18);
+      --green: #4ade80; --green-bg: rgba(74,222,128,0.16);
+      --red: #fb7185; --red-bg: rgba(251,113,133,0.16);
+      --amber: #fcd34d; --amber-bg: rgba(252,211,77,0.16);
+      --blue: #93c5fd; --blue-bg: rgba(147,197,253,0.16);
+      --purple: #d8b4fe; --purple-bg: rgba(216,180,254,0.16);
     }
 
     /* Card hover gets a clear lift rather than a barely-noticeable change. */
