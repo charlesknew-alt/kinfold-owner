@@ -6,7 +6,7 @@
 <title>Payroll → Wise</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0f1419;--surface:#1a1f2e;--surface-2:#222838;--border:#2a3040;--text:#e8eaed;--text-muted:#8b92a5;--accent:#4a6cf7;--accent-hover:#5d7df9;--green:#34d399;--green-bg:rgba(52,211,153,.1);--red:#f87171;--red-bg:rgba(248,113,113,.1);--amber:#fbbf24;--amber-bg:rgba(251,191,36,.1);--radius:10px}
+:root{--bg:#0b1020;--surface:#1a2236;--surface-2:#28324a;--border:#3d4866;--text:#f3f5fb;--text-muted:#b6c0d6;--accent:#7c93ff;--accent-hover:#94a8ff;--green:#4ade80;--green-bg:rgba(74,222,128,.14);--red:#fb7185;--red-bg:rgba(251,113,133,.14);--amber:#fcd34d;--amber-bg:rgba(252,211,77,.14);--row-stripe:rgba(255,255,255,.025);--row-hover:rgba(255,255,255,.05);--radius:10px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
 .container{max-width:1200px;margin:0 auto}
@@ -43,7 +43,8 @@ thead th{text-align:left;padding:9px 12px;font-weight:600;font-size:10px;text-tr
 tbody td{padding:9px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:12px}
 tbody td.name-col{font-family:'DM Sans',sans-serif;font-weight:500;font-size:13px}
 tbody tr:last-child td{border-bottom:none}
-tbody tr:hover{background:rgba(74,108,247,.03)}
+tbody tr:nth-child(odd) td{background:var(--row-stripe)}
+tbody tr:hover{background:var(--row-hover) !important}
 tbody tr.manual-row{background:var(--amber-bg)}
 tbody tr.has-deduction{background:rgba(248,113,113,.04)}
 .amount-cell{text-align:right;cursor:pointer;position:relative;transition:background .15s;border-radius:4px;font-weight:500}
