@@ -8,20 +8,50 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    :root {
-      --dark: #0f1419;
-      --card: #1a1f2e;
-      --card-hover: #222838;
-      --border: #2a3040;
-      --text: #e8eaed;
-      --text-dim: #8b92a5;
-      --windmill: #3b82f6;
-      --windmill-glow: rgba(59,130,246,0.15);
-      --eightbells: #a855f7;
-      --eightbells-glow: rgba(168,85,247,0.15);
-      --gold: #B9924E;
-      --gold-glow: rgba(185,146,78,0.15);
-    }
+    /* ── Kinfold Owner Portal: high-contrast dark theme ──
+   Paste these CSS variables at the top of <style> in owner portal index.html,
+   replacing the existing :root block (or merging on top of it). */
+:root {
+  /* Page → card → nested card surfaces, with clear separation */
+  --bg: #0b1020;
+  --card: #1a2236;
+  --card-hover: #243054;
+  --border: #3d4866;
+  --border-strong: #4a577a;
+
+  /* Text — brighter than before */
+  --text: #f3f5fb;
+  --text-muted: #b6c0d6;
+  --text-dim: #7f8aa3;
+
+  /* Brand & status colours — slightly brighter for better contrast on dark */
+  --gold: #d4a866;
+  --gold-bg: rgba(212, 168, 102, 0.16);
+  --green: #4ade80;
+  --green-bg: rgba(74, 222, 128, 0.14);
+  --red: #fb7185;
+  --red-bg: rgba(251, 113, 133, 0.14);
+  --amber: #fcd34d;
+  --amber-bg: rgba(252, 211, 77, 0.14);
+  --purple: #c4b5fd;
+  --purple-bg: rgba(196, 181, 253, 0.14);
+  --blue: #7dd3fc;
+  --blue-bg: rgba(125, 211, 252, 0.14);
+}
+
+/* Card hover gets a clear lift instead of barely-noticeable change */
+a.card:hover,
+.card:hover {
+  background: var(--card-hover) !important;
+  border-color: var(--border-strong) !important;
+}
+
+/* Stronger borders everywhere */
+.card,
+.section,
+.tile {
+  border: 1px solid var(--border) !important;
+}
     html, body { height: 100%; font-family: 'DM Sans', system-ui, sans-serif; background: var(--dark); color: var(--text); overflow-x: hidden; }
 
     /* ── Login ── */
