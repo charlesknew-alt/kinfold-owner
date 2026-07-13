@@ -145,6 +145,7 @@
     .pub-link.paperwork .link-icon { background: rgba(245,158,11,0.15); }
     .pub-link.rooms .link-icon { background: rgba(45,212,168,0.15); }
     .pub-link.payroll .link-icon { background: rgba(74,108,247,0.15); }
+    .pub-link.cardtakings .link-icon { background: rgba(223,194,175,0.18); }
     .link-label { flex: 1; }
     .link-label small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
     .link-arrow { color: var(--text-dim); font-size: 18px; }
@@ -256,6 +257,11 @@
             <span class="link-label">Paperwork<small>Weekly data, cash & expenses</small></span>
             <span class="link-arrow">›</span>
           </a>
+          <a class="pub-link cardtakings" href="#" onclick="openApp('cardtakings-eightbells','Eight Bells');return false;">
+            <span class="link-icon">💳</span>
+            <span class="link-label">Card Takings<small>First & last sale, by machine</small></span>
+            <span class="link-arrow">›</span>
+          </a>
           <a class="pub-link payroll" href="#" onclick="openApp('payroll','Eight Bells');return false;">
             <span class="link-icon">💷</span>
             <span class="link-label">Payroll → Wise<small>BACS to Wise CSV for pay runs</small></span>
@@ -292,6 +298,7 @@
       'invoicing': 'https://script.google.com/macros/s/AKfycbw_o2Xb6kidks5eKUyT-C2XoQyQ0QlpVKt895FwUNlulh9q0YLFuO7VYVMImULi3SrE/exec',
       'paperwork-windmill': 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec?page=owner',
       'paperwork-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=owner',
+      'cardtakings-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=cardday',
       'rooms-windmill': 'https://rooms.windmilllittleworth.com',
       'payroll': 'https://owner.kinfoldinns.co.uk/payroll.html',
       'staffhub': 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec'
@@ -300,6 +307,7 @@
       'invoicing': '📊 Invoicing',
       'paperwork-windmill': '📋 Paperwork',
       'paperwork-eightbells': '📋 Paperwork',
+      'cardtakings-eightbells': '💳 Card Takings',
       'rooms-windmill': '🛏️ Rooms',
       'payroll': '💷 Payroll → Wise',
       'staffhub': '👥 Staff Hub'
