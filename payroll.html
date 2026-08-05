@@ -706,6 +706,21 @@ $('downloadBtn').addEventListener('click',async()=>{
   const g=employees.reduce((s,e)=>s+e.amount,0),raw=$('expectedTotal').value.replace(/[£,\s]/g,''),exp=parseFloat(raw);
   if(!isNaN(exp)&&Math.abs(g-exp)>=0.02){if(!confirm(`⚠ Gross (£${g.toFixed(2)}) ≠ expected (£${exp}).\nDiff: £${Math.abs(g-exp).toFixed(2)}\n\nDownload anyway?`))return;}
   const neg=employees.filter(e=>getNetPay(e)<=0);if(neg.length){showToast(`${neg[0].name} has zero/negative net pay`,'error');return;}
+  // Owed-but-unpayable backstop: any row missing sort code OR account number would
+  // be silently dropped/rejected by Wise. List them by name+amount and require an
+  // explicit acknowledgement before allowing the download. This is the guard that
+  // would have caught Jude (processed, owed, no bank details) instead of him
+  // vanishing from the file unnoticed.
+  const noBank=employees.filter(e=>{
+    const sc=String(e.sortCode||'').replace(/\D/g,'');
+    const ac=String(e.accountNumber||'').replace(/\D/g,'');
+    return sc.length<6 || ac.length<6;
+  });
+  if(noBank.length){
+    const list=noBank.map(e=>`\u2022 ${e.name} \u2014 \u00a3${getNetPay(e).toFixed(2)} (no bank details)`).join('\n');
+    const tot=noBank.reduce((s,e)=>s+getNetPay(e),0);
+    if(!confirm(`\u26a0 ${noBank.length} ${noBank.length===1?'person is':'people are'} owed money but ${noBank.length===1?'has':'have'} NO bank details \u2014 Wise will NOT pay ${noBank.length===1?'them':'them'}:\n\n${list}\n\nTotal unpayable: \u00a3${tot.toFixed(2)}\n\nRecommended: Cancel, add their bank details in Xero AND the Staff Directory, then regenerate.\n\nDownload anyway (they will be silently left out)?`)){return;}
+  }
   const ref=$('paymentRef').value.trim()||'Payroll',entityLabel=currentEntity==='windmill'?'Windmill':'Eight Bells';
   const hdrs=['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
   const rows=employees.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
@@ -917,6 +932,19 @@ function renderPayslipSelector() {
   let html = '<div style="margin-bottom:10px;font-size:11px;color:var(--text-muted);">';
   html += `${items.length} payslips · ${matched} in Directory · ${unmatched} need adding · ${noPay} with £0 net`;
   html += '</div>';
+
+  // Loud, itemised warning for people who are OWED money but have no bank details
+  // available (not in the Directory) — these are the silent-drop cases. Replaces
+  // reliance on the easy-to-miss amber "not in Directory" tag further down.
+  const owedNoBank = items.filter(i => i.hasNet && !i.dirMatch);
+  if (owedNoBank.length) {
+    const oList = owedNoBank.map(i => esc(i.xeroName) + ' \u00a3' + fmtMoney(i.ps.netPay)).join(', ');
+    const oTot = owedNoBank.reduce((a, i) => a + i.ps.netPay, 0);
+    html += '<div style="background:rgba(248,113,113,0.12);border:1px solid var(--red,#f87171);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--red,#f87171);">' +
+      '<strong>\u26a0 ' + owedNoBank.length + ' owed but NOT payable \u2014 no bank details:</strong> ' + oList + '.' +
+      '<div style="margin-top:4px;color:var(--text-muted);">Total \u00a3' + fmtMoney(oTot) + '. These will NOT appear in the Wise file until bank details are added (in Xero + the Directory). Tick them to import as blank rows and fill details in, or fix in Xero first.</div>' +
+    '</div>';
+  }
 
   html += '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">';
   html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'all\')" style="font-size:11px;padding:4px 10px;">Select all</button>';
