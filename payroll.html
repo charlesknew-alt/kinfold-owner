@@ -161,6 +161,12 @@ thead th.actions-head{text-align:center;width:44px}
 .toast.show{transform:translateY(0);opacity:1}
 .toast.success{background:var(--green);color:var(--bg)}
 .toast.error{background:var(--red);color:white}
+.toast.info{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+tbody tr.no-bank-row td{background:rgba(251,113,133,.08)!important}
+.no-bank-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;vertical-align:middle;font-family:'DM Sans',sans-serif}
+.no-bank-banner{display:none;align-items:flex-start;gap:10px;padding:12px 14px;margin-bottom:12px;border-radius:8px;background:rgba(251,113,133,.12);border:1px solid var(--red);color:var(--red);font-size:12px;line-height:1.45}
+.no-bank-banner strong{display:block;margin-bottom:4px}
+.no-bank-banner .nb-muted{color:var(--text-muted);margin-top:4px}
 @media(max-width:768px){body{padding:12px}.manual-form,.saved-add-form,.dir-add-form{grid-template-columns:1fr 1fr}.page-header{flex-direction:column;align-items:flex-start;gap:12px}.actions-bar{flex-direction:column;align-items:stretch}.payment-ref-field{flex-direction:column;align-items:stretch}.payment-ref-field input{width:100%}.validation-bar{flex-wrap:wrap}}
 </style>
 </head>
@@ -212,6 +218,7 @@ thead th.actions-head{text-align:center;width:44px}
 
   <div class="loaded-files" id="loadedFiles"></div>
   <div class="excluded-notice" id="excludedNotice" style="display:none">⚠ <strong><span id="excludedCount">0</span> excluded staff</strong> removed from batch (weekly-paid etc.) — see Excluded section below</div>
+  <div class="no-bank-banner" id="noBankBanner"></div>
   <div class="table-wrapper" id="tableWrapper" style="display:none">
     <div class="table-header"><div class="table-title" id="tableTitle">Payments</div><div class="table-count" id="tableCount">0</div></div>
     <div style="overflow-x:auto;"><table><thead><tr>
@@ -430,23 +437,45 @@ function fmtSort(s){s=s.replace(/[^0-9-]/g,'');if(/^\d{6}$/.test(s))s=s.substrin
 function fmtMoney(n){return n.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function getDeductionTotal(emp){return(emp.deductions||[]).reduce((s,d)=>s+d.amount,0);}
 function getNetPay(emp){return emp.amount-getDeductionTotal(emp);}
+// UK BACS: 6-digit sort code + 8-digit account. Missing either → Wise rejects/drops the row.
+function hasValidBankDetails(e){
+  const sc=String(e&&e.sortCode||'').replace(/\D/g,'');
+  const ac=String(e&&e.accountNumber||'').replace(/\D/g,'');
+  return sc.length===6 && ac.length===8;
+}
 
 function renderFileChips(){$('loadedFiles').innerHTML=loadedFileNames.map((n,i)=>`<div class="file-chip">📄 ${n} <span class="remove-file" onclick="removeFile(${i})">✕</span></div>`).join('');}
 function removeFile(i){loadedFileNames.splice(i,1);renderFileChips();}
 
+function updateNoBankBanner(){
+  const banner=$('noBankBanner');
+  if(!banner)return;
+  const noBank=employees.filter(e=>getNetPay(e)>0&&!hasValidBankDetails(e));
+  if(!noBank.length){banner.style.display='none';banner.innerHTML='';return;}
+  const tot=noBank.reduce((s,e)=>s+getNetPay(e),0);
+  const list=noBank.map(e=>`${esc(e.name)} £${fmtMoney(getNetPay(e))}`).join(', ');
+  banner.style.display='flex';
+  banner.innerHTML=`<div><strong>⚠ ${noBank.length} owed but NOT payable — missing bank details</strong>${list}<div class="nb-muted">Total £${fmtMoney(tot)}. These will be left out of the Wise CSV until you add sort code + account (✏️ Edit → Save to Directory). Fix them before downloading.</div></div>`;
+}
+
 function renderTable(){
-  if(!employees.length){$('tableWrapper').style.display='none';$('manualSection').style.display='none';$('actionsBar').style.display='none';updateSteps(1);return;}
+  if(!employees.length){$('tableWrapper').style.display='none';$('manualSection').style.display='none';$('actionsBar').style.display='none';updateNoBankBanner();updateSteps(1);return;}
   $('tableWrapper').style.display='block';$('manualSection').style.display='block';$('actionsBar').style.display='flex';
   $('tableTitle').textContent=`${currentEntity==='windmill'?'Windmill':'Eight Bells'} — Payments`;
   $('tableCount').textContent=`${employees.length} employee${employees.length!==1?'s':''}`;
   $('tableBody').innerHTML=employees.map((e,i)=>{
     const dedTotal=getDeductionTotal(e),net=getNetPay(e),hasDed=dedTotal>0;
+    const missingBank=!hasValidBankDetails(e);
     const dedHTML=e.deductions&&e.deductions.length?e.deductions.map((d,di)=>`<span class="deduction-tag"><span class="ded-amount">-£${fmtMoney(d.amount)}</span> ${esc(d.reason)} <span class="ded-remove" onclick="event.stopPropagation();removeDeduction(${i},${di})">✕</span></span>`).join(' '):'';
     const correctedTag=e._correctedFrom?` <span class="corrected-tag" title="${esc(e._correctedFrom)}">↺</span>`:'';
     const editedTag=e._editedInRow?` <span class="edited-tag" title="Edited — not yet pushed to Xero/Directory">✎</span>`:'';
+    const noBankTag=missingBank?` <span class="no-bank-tag" title="Missing sort code or account number — Wise cannot pay this person">NO BANK</span>`:'';
     const actionButtons=`<button class="row-act" title="Edit details / push to Xero or Directory" onclick="openEditModal(${i})">✏️</button><button class="row-remove" title="Remove from this batch" onclick="removeRow(${i})">✕</button>`;
-    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col">${esc(e.name)}${correctedTag}${editedTag}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
+    const sortDisplay=e.sortCode?esc(e.sortCode):'<span style="color:var(--red)">—</span>';
+    const acctDisplay=e.accountNumber?esc(e.accountNumber):'<span style="color:var(--red)">—</span>';
+    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''} ${missingBank?'no-bank-row':''}"><td class="name-col">${esc(e.name)}${correctedTag}${editedTag}${noBankTag}</td><td>${sortDisplay}</td><td>${acctDisplay}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
   }).join('');
+  updateNoBankBanner();
   updateTotal();
 }
 
@@ -706,31 +735,31 @@ $('downloadBtn').addEventListener('click',async()=>{
   const g=employees.reduce((s,e)=>s+e.amount,0),raw=$('expectedTotal').value.replace(/[£,\s]/g,''),exp=parseFloat(raw);
   if(!isNaN(exp)&&Math.abs(g-exp)>=0.02){if(!confirm(`⚠ Gross (£${g.toFixed(2)}) ≠ expected (£${exp}).\nDiff: £${Math.abs(g-exp).toFixed(2)}\n\nDownload anyway?`))return;}
   const neg=employees.filter(e=>getNetPay(e)<=0);if(neg.length){showToast(`${neg[0].name} has zero/negative net pay`,'error');return;}
-  // Owed-but-unpayable backstop: any row missing sort code OR account number would
-  // be silently dropped/rejected by Wise. List them by name+amount and require an
-  // explicit acknowledgement before allowing the download. This is the guard that
-  // would have caught Jude (processed, owed, no bank details) instead of him
-  // vanishing from the file unnoticed.
-  const noBank=employees.filter(e=>{
-    const sc=String(e.sortCode||'').replace(/\D/g,'');
-    const ac=String(e.accountNumber||'').replace(/\D/g,'');
-    return sc.length<6 || ac.length<6;
-  });
+  // Owed-but-unpayable backstop: rows missing a valid UK sort code (6) or
+  // account number (8) would be rejected/dropped by Wise. List them, require
+  // acknowledgement, then EXCLUDE them from the CSV so they cannot vanish
+  // unnoticed (the Jude incident).
+  const noBank=employees.filter(e=>!hasValidBankDetails(e));
+  const payable=employees.filter(e=>hasValidBankDetails(e));
   if(noBank.length){
     const list=noBank.map(e=>`\u2022 ${e.name} \u2014 \u00a3${getNetPay(e).toFixed(2)} (no bank details)`).join('\n');
     const tot=noBank.reduce((s,e)=>s+getNetPay(e),0);
-    if(!confirm(`\u26a0 ${noBank.length} ${noBank.length===1?'person is':'people are'} owed money but ${noBank.length===1?'has':'have'} NO bank details \u2014 Wise will NOT pay ${noBank.length===1?'them':'them'}:\n\n${list}\n\nTotal unpayable: \u00a3${tot.toFixed(2)}\n\nRecommended: Cancel, add their bank details in Xero AND the Staff Directory, then regenerate.\n\nDownload anyway (they will be silently left out)?`)){return;}
+    if(!confirm(`\u26a0 ${noBank.length} ${noBank.length===1?'person is':'people are'} owed money but ${noBank.length===1?'has':'have'} NO bank details \u2014 Wise will NOT pay ${noBank.length===1?'them':'them'}:\n\n${list}\n\nTotal unpayable: \u00a3${tot.toFixed(2)}\n\nRecommended: Cancel, add their bank details (✏️ Edit → Save to Directory / Push to Xero), then regenerate.\n\nDownload anyway? They will be LEFT OUT of the Wise CSV.`)){return;}
   }
+  if(!payable.length){showToast('No payable rows — every employee is missing bank details','error');return;}
   const ref=$('paymentRef').value.trim()||'Payroll',entityLabel=currentEntity==='windmill'?'Windmill':'Eight Bells';
   const hdrs=['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
-  const rows=employees.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
+  const rows=payable.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
   let csv=hdrs.join(',')+'\n';rows.forEach(r=>{csv+=r.map(c=>(typeof c==='string'&&(c.includes(',')||c.includes('"')))?'"'+c.replace(/"/g,'""')+'"':c).join(',')+'\n';});
   const fn=`Wise_${currentEntity==='windmill'?'Windmill':'EightBells'}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
   const now=new Date(),monthStr=now.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
-  const payments=employees.map(e=>{const dt=getDeductionTotal(e),dr=(e.deductions||[]).map(d=>`${d.reason}: £${d.amount.toFixed(2)}`).join('; ');return{name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,grossAmount:e.amount,deductions:dt,deductionDetails:dr,amount:getNetPay(e)};});
+  const payments=payable.map(e=>{const dt=getDeductionTotal(e),dr=(e.deductions||[]).map(d=>`${d.reason}: £${d.amount.toFixed(2)}`).join('; ');return{name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,grossAmount:e.amount,deductions:dt,deductionDetails:dr,amount:getNetPay(e)};});
   apiPost({action:'logPayments',entity:entityLabel,month:monthStr,reference:ref,payments}).then(r=>{if(r.success)showToast(`Logged ${r.logged} payments to history`,'success');});
-  updateSteps(4);showToast(`Downloaded ${fn}`,'success');
+  updateSteps(4);
+  let dlMsg=`Downloaded ${fn} (${payable.length} payment${payable.length===1?'':'s'})`;
+  if(noBank.length)dlMsg+=` — left out ${noBank.length} with no bank details`;
+  showToast(dlMsg,noBank.length?'error':'success');
 });
 
 $('clearBtn').addEventListener('click',()=>{employees=[];loadedFileNames=[];$('expectedTotal').value='';$('validationResult').style.display='none';$('excludedNotice').style.display='none';renderFileChips();renderTable();updateSteps(1);showToast('Cleared','success');});
@@ -906,12 +935,13 @@ async function selectPayRun(payRunId, periodEnd, paymentDate) {
       const xeroName = ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim();
       const dirMatch = staffDirectory.find(d => (d.name || '').toLowerCase() === xeroName.toLowerCase());
       const hasNet = (ps.netPay || 0) > 0;
+      const payable = !!dirMatch && hasValidBankDetails(dirMatch);
       return {
         ps: ps,
         xeroName: xeroName,
         dirMatch: dirMatch || null,
         hasNet: hasNet,
-        selected: hasNet && !!dirMatch    // default: pre-check rows that are matched AND have pay
+        selected: hasNet && payable    // default: pre-check rows that are matched, payable, AND have pay
       };
     });
     renderPayslipSelector();
@@ -925,24 +955,23 @@ function renderPayslipSelector() {
   if (!s) return;
   const items = s.items;
   const totalWithPay = items.filter(i => i.hasNet).length;
-  const matched = items.filter(i => i.hasNet && i.dirMatch).length;
-  const unmatched = items.filter(i => i.hasNet && !i.dirMatch).length;
+  const matched = items.filter(i => i.hasNet && i.dirMatch && hasValidBankDetails(i.dirMatch)).length;
+  const unmatched = items.filter(i => i.hasNet && (!i.dirMatch || !hasValidBankDetails(i.dirMatch))).length;
   const noPay = items.filter(i => !i.hasNet).length;
 
   let html = '<div style="margin-bottom:10px;font-size:11px;color:var(--text-muted);">';
-  html += `${items.length} payslips · ${matched} in Directory · ${unmatched} need adding · ${noPay} with £0 net`;
+  html += `${items.length} payslips · ${matched} payable via Directory · ${unmatched} need bank details · ${noPay} with £0 net`;
   html += '</div>';
 
-  // Loud, itemised warning for people who are OWED money but have no bank details
-  // available (not in the Directory) — these are the silent-drop cases. Replaces
-  // reliance on the easy-to-miss amber "not in Directory" tag further down.
-  const owedNoBank = items.filter(i => i.hasNet && !i.dirMatch);
+  // Loud, itemised warning for people who are OWED money but have no usable bank
+  // details (not in Directory, or Directory entry itself is incomplete).
+  const owedNoBank = items.filter(i => i.hasNet && (!i.dirMatch || !hasValidBankDetails(i.dirMatch)));
   if (owedNoBank.length) {
     const oList = owedNoBank.map(i => esc(i.xeroName) + ' \u00a3' + fmtMoney(i.ps.netPay)).join(', ');
     const oTot = owedNoBank.reduce((a, i) => a + i.ps.netPay, 0);
     html += '<div style="background:rgba(248,113,113,0.12);border:1px solid var(--red,#f87171);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--red,#f87171);">' +
       '<strong>\u26a0 ' + owedNoBank.length + ' owed but NOT payable \u2014 no bank details:</strong> ' + oList + '.' +
-      '<div style="margin-top:4px;color:var(--text-muted);">Total \u00a3' + fmtMoney(oTot) + '. These will NOT appear in the Wise file until bank details are added (in Xero + the Directory). Tick them to import as blank rows and fill details in, or fix in Xero first.</div>' +
+      '<div style="margin-top:4px;color:var(--text-muted);">Total \u00a3' + fmtMoney(oTot) + '. These will be LEFT OUT of the Wise CSV until bank details are added. Tick them to import as blank rows and fill details in (✏️), or fix in Xero + Directory first.</div>' +
     '</div>';
   }
 
@@ -956,7 +985,9 @@ function renderPayslipSelector() {
   html += '<div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">';
   items.forEach((item, i) => {
     const matchTag = item.dirMatch
-      ? '<span style="color:var(--green,#34d399);">✓ in Directory</span>'
+      ? (hasValidBankDetails(item.dirMatch)
+          ? '<span style="color:var(--green,#34d399);">✓ in Directory</span>'
+          : '<span style="color:var(--red,#f87171);">⚠ Directory — no bank details</span>')
       : '<span style="color:var(--amber,#fbbf24);">⚠ not in Directory</span>';
     const payTag = item.hasNet
       ? ('£' + fmtMoney(item.ps.netPay))
@@ -1000,7 +1031,7 @@ function setPayslipSelection(mode) {
     if (mode === 'all') item.selected = true;
     else if (mode === 'none') item.selected = false;
     else if (mode === 'paid') item.selected = item.hasNet;
-    else if (mode === 'matched') item.selected = item.hasNet && !!item.dirMatch;
+    else if (mode === 'matched') item.selected = item.hasNet && !!item.dirMatch && hasValidBankDetails(item.dirMatch);
   });
   renderPayslipSelector();
 }
@@ -1133,9 +1164,11 @@ async function syncPayrollIdsFromXero(silent){
       if (!silent) showToast('Synced Payroll IDs: ' + (r.updated || updates.length) + ' updated', 'success');
       // Reload directory so local cache reflects new payroll IDs
       try {
-        const dr = await fetch(API + '?action=getStaff');
+        const dr = await fetch(API_URL + '?action=list');
         const dd = await dr.json();
         if (Array.isArray(dd.staff)) staffDirectory = dd.staff;
+        if (typeof renderDirList === 'function') renderDirList();
+        if (typeof populateSavedStaffSelect === 'function') populateSavedStaffSelect();
       } catch(_) {}
       if (typeof renderTable === 'function') renderTable();
     } else {
