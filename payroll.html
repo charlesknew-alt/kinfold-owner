@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Varlo · Payroll → Wise</title>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0b1020;--surface:#1a2236;--surface-2:#28324a;--border:#3d4866;--text:#f3f5fb;--text-muted:#b6c0d6;--accent:#7c93ff;--accent-hover:#94a8ff;--green:#4ade80;--green-bg:rgba(74,222,128,.14);--red:#fb7185;--red-bg:rgba(251,113,133,.14);--amber:#fcd34d;--amber-bg:rgba(252,211,77,.14);--row-stripe:rgba(255,255,255,.025);--row-hover:rgba(255,255,255,.05);--radius:10px}
+:root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+body{font-family:'Source Sans 3','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
 .container{max-width:1200px;margin:0 auto}
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 .page-header h1{font-size:18px;font-weight:700}
 .page-header h1 span{color:var(--text-muted);font-weight:400;font-size:13px;display:block;margin-top:2px}
-.varlo-lockup{display:flex;align-items:center;gap:10px;margin-bottom:8px;color:#C9A36A}
-.varlo-lockup svg{width:22px;height:22px;display:block}
-.varlo-lockup strong{font-family:'Cormorant Garamond',Georgia,serif;font-weight:600;letter-spacing:.18em;text-transform:uppercase;font-size:13px;color:#F3EDE3}
+.varlo-lockup{display:flex;align-items:center;gap:10px;margin-bottom:8px;color:#b68a3a}
+.varlo-lockup svg{width:28px;height:28px;display:block}
+.varlo-lockup strong{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.025em;text-transform:none;font-size:22px;color:#1c1610}
 .entity-tabs{display:flex;gap:8px}
 .entity-tab{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
 .entity-tab:hover{border-color:var(--text-muted);color:var(--text)}
@@ -172,9 +172,10 @@ thead th.actions-head{text-align:center;width:44px}
   <div class="page-header">
     <div>
       <div class="varlo-lockup" aria-hidden="true">
-        <svg viewBox="0 0 48 48">
-          <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
-          <path d="M14 13 L24 36 L34 13" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg viewBox="0 0 48 48" fill="none">
+          <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="#24362c"/>
+          <path d="M11.2 12.5 24 38.2 36.8 12.5h-6.4L24 29.1 17.6 12.5H11.2Z" fill="#e6c27a"/>
+          <path d="M17.6 12.5 24 29.1 30.4 12.5" stroke="#b68a3a" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>
         </svg>
         <strong>Varlo</strong>
       </div>

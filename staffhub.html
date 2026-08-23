@@ -4,21 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Varlo Staff Hub</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface-2: #242836;
-      --surface-3: #2e3344;
-      --border: #353a4a;
-      --text: #e8eaf0;
-      --text-muted: #8b92a8;
-      --text-dim: #5c6378;
-      --gold: #C9A36A;
-      --gold-dim: rgba(201, 163, 106, 0.16);
+      --bg: #fbf7f0;
+      --surface: #ffffff;
+      --surface-2: #f6f0e6;
+      --surface-3: #ece6da;
+      --border: #d8cfc0;
+      --text: #1c1610;
+      --text-muted: #3d3429;
+      --text-dim: #6f6574;
+      --gold: #b68a3a;
+      --gold-dim: rgba(182, 138, 58, 0.14);
       --green: #34d399;
       --green-dim: rgba(52, 211, 153, 0.12);
       --red: #f87171;
@@ -32,7 +32,7 @@
     }
 
     body {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -61,28 +61,27 @@
     .topbar-logo {
       width: 32px;
       height: 32px;
-      border: 1px solid rgba(201, 163, 106, 0.45);
+      border: none;
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--gold);
-      background: var(--gold-dim);
+      background: transparent;
     }
-    .topbar-logo svg { width: 18px; height: 18px; display: block; }
+    .topbar-logo svg { width: 32px; height: 32px; display: block; }
 
     .topbar-title {
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 600;
       letter-spacing: -0.3px;
     }
 
     .topbar-title span {
-      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-family: 'Fraunces', Georgia, serif;
       font-weight: 600;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--gold);
+      letter-spacing: -0.025em;
+      text-transform: none;
+      color: var(--text);
     }
 
     .topbar-nav {
@@ -244,8 +243,8 @@
     }
 
     .btn-primary {
-      background: var(--gold);
-      color: var(--bg);
+      background: #24362c;
+      color: #f6f0e6;
     }
     .btn-primary:hover { filter: brightness(1.1); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -576,8 +575,10 @@
   <div class="topbar">
     <div class="topbar-brand">
       <div class="topbar-logo" aria-hidden="true">
-        <svg viewBox="0 0 48 48">
-          <path d="M14 13 L24 36 L34 13" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg viewBox="0 0 48 48" fill="none">
+          <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="#24362c"/>
+          <path d="M11.2 12.5 24 38.2 36.8 12.5h-6.4L24 29.1 17.6 12.5H11.2Z" fill="#e6c27a"/>
+          <path d="M17.6 12.5 24 29.1 30.4 12.5" stroke="#b68a3a" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>
         </svg>
       </div>
       <div class="topbar-title"><span>Varlo</span> Staff Hub</div>
