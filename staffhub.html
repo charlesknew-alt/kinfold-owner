@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Kinfolk Staff Hub</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <title>Varlo Staff Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -17,8 +17,8 @@
       --text: #e8eaf0;
       --text-muted: #8b92a8;
       --text-dim: #5c6378;
-      --gold: #B9924E;
-      --gold-dim: rgba(185, 146, 78, 0.15);
+      --gold: #C9A36A;
+      --gold-dim: rgba(201, 163, 106, 0.16);
       --green: #34d399;
       --green-dim: rgba(52, 211, 153, 0.12);
       --red: #f87171;
@@ -61,15 +61,15 @@
     .topbar-logo {
       width: 32px;
       height: 32px;
-      background: var(--gold);
+      border: 1px solid rgba(201, 163, 106, 0.45);
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 14px;
-      color: var(--bg);
+      color: var(--gold);
+      background: var(--gold-dim);
     }
+    .topbar-logo svg { width: 18px; height: 18px; display: block; }
 
     .topbar-title {
       font-size: 16px;
@@ -78,6 +78,10 @@
     }
 
     .topbar-title span {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
       color: var(--gold);
     }
 
@@ -571,8 +575,12 @@
   <!-- Top Bar -->
   <div class="topbar">
     <div class="topbar-brand">
-      <div class="topbar-logo">KI</div>
-      <div class="topbar-title"><span>Kinfolk</span> Staff Hub</div>
+      <div class="topbar-logo" aria-hidden="true">
+        <svg viewBox="0 0 48 48">
+          <path d="M14 13 L24 36 L34 13" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="topbar-title"><span>Varlo</span> Staff Hub</div>
     </div>
     <div class="topbar-nav">
       <button class="nav-tab active" onclick="showSection('timesheets')">Timesheets</button>
