@@ -369,9 +369,39 @@
       }
     }
 
+    // Paperwork / Card Takings use the same Apps Scripts as the manager hubs.
+    // Keep shell=owner on every load of those scripts, including iframe
+    // postMessage navigations, so the manager hub can stay link-free.
+    var OWNER_SCRIPT_IDS = [
+      'AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP',
+      'AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww'
+    ];
+
+    function withOwnerShell(url) {
+      if (!url || typeof url !== 'string') return url;
+      var isOwnerScript = false;
+      for (var i = 0; i < OWNER_SCRIPT_IDS.length; i++) {
+        if (url.indexOf(OWNER_SCRIPT_IDS[i]) !== -1) { isOwnerScript = true; break; }
+      }
+      if (!isOwnerScript) return url;
+      if (/[?&]shell=owner(?:&|$|#)/.test(url)) return url;
+      var hash = '';
+      var hashAt = url.indexOf('#');
+      if (hashAt !== -1) {
+        hash = url.slice(hashAt);
+        url = url.slice(0, hashAt);
+      }
+      return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'shell=owner' + hash;
+    }
+
     function openApp(system, pubName) {
       var url = URLS[system];
       if (!url) return;
+      if (system === 'payroll') {
+        var entity = pubName === 'Eight Bells' ? 'eightbells' : 'windmill';
+        url = url + '?entity=' + entity;
+      }
+      url = withOwnerShell(url);
       currentSystem = system;
       currentPub = pubName;
       document.getElementById('appTitle').textContent = TITLES[system] || system;
@@ -379,10 +409,6 @@
       document.getElementById('appLoader').classList.remove('hidden');
       var frame = document.getElementById('appFrame');
       frame.src = url;
-      if (system === 'payroll') {
-        var entity = pubName === 'Eight Bells' ? 'eightbells' : 'windmill';
-        frame.src = url + '?entity=' + entity;
-      }
       frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
       setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
       document.getElementById('landing').style.display = 'none';
@@ -402,13 +428,14 @@
     window.addEventListener('message', function(e) {
       if (!e.data || typeof e.data !== 'object') return;
       if (e.data.type === 'navigate' && e.data.url) {
+        var nextUrl = withOwnerShell(e.data.url);
         var frame = document.getElementById('appFrame');
         document.getElementById('appLoader').classList.remove('hidden');
-        frame.src = e.data.url;
+        frame.src = nextUrl;
         frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
         setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
-        var page = getPageFromUrl(e.data.url);
-        history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: e.data.url, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
+        var page = getPageFromUrl(nextUrl);
+        history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: nextUrl, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
       }
       if (e.data.type === 'kinfold-page-change' && e.data.page) {
         document.getElementById('appTitle').textContent = e.data.page;
@@ -432,7 +459,7 @@
         document.getElementById('appPub').textContent = state.pub || '-';
         document.getElementById('appLoader').classList.remove('hidden');
         var frame = document.getElementById('appFrame');
-        frame.src = state.url;
+        frame.src = withOwnerShell(state.url);
         frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
         setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
         document.getElementById('landing').style.display = 'none';
