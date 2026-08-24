@@ -445,7 +445,13 @@
       return match ? match[1] : '';
     }
 
-    history.replaceState({ view: 'landing' }, '', '#');
+    // The Apps Script NA page links "Back to manager hub" with target=_top
+    // to ?page=menu. That must not replace the owner portal. Strip it.
+    if (/(?:^|[?&])page=menu(?:&|$)/.test(location.search)) {
+      history.replaceState({ view: 'landing' }, '', location.pathname + location.hash);
+    }
+
+    history.replaceState({ view: 'landing' }, '', location.hash || '#');
   </script>
 </body>
 </html>
