@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#24362c">
-  <title>Varlo – Owner Portal</title>
+  <title>Varlo</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none'%3E%3Crect x='1.5' y='1.5' width='45' height='45' rx='12' fill='%2324362c'/%3E%3Cpath d='M11.2 12.5 24 38.2 36.8 12.5h-6.4L24 29.1 17.6 12.5H11.2Z' fill='%23e6c27a'/%3E%3Cpath d='M17.6 12.5 24 29.1 30.4 12.5' stroke='%23b68a3a' stroke-width='1.6' stroke-linejoin='round' opacity='0.9'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -58,21 +58,26 @@
     .login-overlay{position:fixed;inset:0;z-index:300;background:var(--forest);display:flex;align-items:center;justify-content:center;transition:opacity .5s}
     .login-overlay.hidden{opacity:0;pointer-events:none}
     .login-overlay::before{content:'';position:absolute;inset:0;opacity:.3;background:radial-gradient(circle at 80% 10%, #b68a3a, transparent 35%), radial-gradient(circle at 10% 90%, #2f4a3b, transparent 40%);pointer-events:none}
-    .login-card{position:relative;background:var(--paper);border:1px solid rgba(246,240,230,0.18);border-radius:24px;padding:40px 32px;width:90%;max-width:360px;text-align:center;box-shadow:0 24px 60px rgba(12,16,12,0.35)}
+    .login-card{position:relative;background:var(--paper);border:1px solid rgba(246,240,230,0.18);border-radius:24px;padding:40px 32px;width:90%;max-width:400px;text-align:center;box-shadow:0 24px 60px rgba(12,16,12,0.35)}
     .login-card h1{font-family:'Fraunces',Georgia,serif;font-size:36px;font-weight:600;letter-spacing:-0.025em;color:var(--ink);margin-bottom:6px}
-    .login-card h2{font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass-deep);margin-bottom:28px}
-    .login-card input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--rule);background:#fff;color:var(--ink);font-size:16px;text-align:center;letter-spacing:4px;outline:none;transition:border-color .2s;font-family:inherit}
+    .login-card h2{font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--brass-deep);margin-bottom:20px}
+    .role-picks{display:flex;gap:8px;margin-bottom:16px}
+    .role-pick{flex:1;padding:10px 8px;border:1px solid var(--rule);border-radius:12px;background:#fff;color:var(--ink-soft);font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;font-family:inherit;transition:all .15s}
+    .role-pick:hover{border-color:var(--brass)}
+    .role-pick.active{background:var(--forest);color:var(--cream);border-color:var(--forest)}
+    .login-card input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--rule);background:#fff;color:var(--ink);font-size:16px;text-align:center;letter-spacing:3px;outline:none;transition:border-color .2s;font-family:inherit}
     .login-card input:focus{border-color:var(--brass)}
     .login-card input::placeholder{letter-spacing:1px;color:#8a8074}
     .login-btn{width:100%;padding:14px 20px;border:none;border-radius:999px;background:var(--forest);color:var(--cream);font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;transition:background .15s;font-family:inherit}
     .login-btn:hover{background:var(--forest-mid)}
+    .login-btn:disabled{opacity:.6;cursor:wait}
     .error{color:var(--rust);font-size:13px;margin-top:12px;display:none}
     .error.show{display:block}
 
     /* ── Landing page ── */
     .landing { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; background: var(--cream); }
     .landing::before { content: ''; position: absolute; inset: 0; background: radial-gradient(900px 420px at 100% 0%, #b68a3a24, transparent 55%), radial-gradient(700px 380px at 0% 80%, #24362c14, transparent 50%); pointer-events: none; }
-    .brand { text-align: center; margin-bottom: 48px; position: relative; }
+    .brand { text-align: center; margin-bottom: 36px; position: relative; }
     .brand h1 { font-family: 'Fraunces', Georgia, serif; font-size: 52px; font-weight: 600; letter-spacing: -0.025em; color: var(--ink); margin-bottom: 8px; }
     .brand p { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass-deep); }
 
@@ -160,7 +165,27 @@
     .link-label { flex: 1; }
     .link-label small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
     .link-arrow { color: var(--text-dim); font-size: 18px; }
-    .footer { text-align: center; padding: 32px; font-size: 12px; color: var(--text-dim); position: relative; }
+    .footer { text-align: center; padding: 32px; font-size: 12px; color: var(--text-dim); position: relative; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .sign-out { background:none; border:1px solid var(--rule); color:var(--ink); padding:8px 16px; border-radius:999px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; }
+    .sign-out:hover { border-color:var(--brass); }
+
+    .pw-panel { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px 28px; }
+    .pw-panel h3 { font-family:'Fraunces',Georgia,serif; font-size:22px; font-weight:600; letter-spacing:-0.02em; margin-bottom:6px; }
+    .pw-panel .lede { font-size:13px; color:var(--text-dim); line-height:1.5; margin-bottom:18px; }
+    .pw-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .pw-box { border:1px solid var(--rule); background:var(--paper); border-radius:12px; padding:16px; text-align:left; }
+    .pw-box h4 { font-size:13px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:10px; }
+    .pw-box.eightbells h4 { color:var(--eightbells); }
+    .pw-box.windmill h4 { color:var(--windmill); }
+    .pw-box input { width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--rule); background:#fff; color:var(--ink); font-size:14px; margin-bottom:8px; font-family:inherit; }
+    .pw-box input:focus { outline:none; border-color:var(--brass); }
+    .pw-save { width:100%; padding:10px 14px; border:none; border-radius:999px; background:var(--forest); color:var(--cream); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .pw-save:hover { background:var(--forest-mid); }
+    .pw-save:disabled { opacity:.6; cursor:wait; }
+    .pw-note { font-size:12px; margin-top:8px; color:var(--text-dim); min-height:16px; }
+    .pw-note.ok { color:var(--money); }
+    .pw-note.bad { color:var(--rust); }
+    .pw-status { font-size:12px; color:var(--text-dim); margin-top:14px; }
 
     /* ── App view ── */
     .app-view { display: none; position: fixed; inset: 0; z-index: 50; background: var(--cream); flex-direction: column; overflow: hidden; }
@@ -179,19 +204,30 @@
     @keyframes sp { to { transform: rotate(360deg); } }
     .app-loader p { color: var(--ink-soft); font-size: 13px; }
 
+    .rooms-fab{
+      position:fixed; bottom:20px; right:20px; z-index:80;
+      display:none; align-items:center; gap:8px;
+      background:var(--forest); color:var(--cream);
+      padding:12px 18px; border-radius:28px; border:none;
+      font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;
+      box-shadow:0 8px 24px rgba(28,22,16,0.18);
+    }
+    .rooms-fab.show{display:flex;}
+
     @media (max-width: 640px) {
-      .pub-grid { grid-template-columns: 1fr; gap: 16px; }
+      .pub-grid, .pw-grid { grid-template-columns: 1fr; gap: 16px; }
       .brand h1 { font-size: 40px; }
       .pub-card { padding: 24px 20px; }
       .landing { padding: 32px 16px; justify-content: flex-start; padding-top: 60px; }
       .shared-card { flex-direction: column; text-align: center; }
       .shared-card-badges { justify-content: center; }
+      .role-picks { flex-direction: column; }
     }
   </style>
 </head>
 <body>
 
-  <!-- PIN Login -->
+  <!-- Unified Varlo login -->
   <div class="login-overlay" id="loginOverlay">
     <div class="login-card">
       <svg class="varlo-mark varlo-mark-md" viewBox="0 0 48 48" fill="none" aria-hidden="true">
@@ -200,14 +236,19 @@
         <path d="M17.6 12.5 24 29.1 30.4 12.5" stroke="#b68a3a" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>
       </svg>
       <h1>Varlo</h1>
-      <h2>Owner Portal</h2>
-      <input type="password" id="pw" placeholder="Enter PIN" maxlength="6" inputmode="numeric" autocomplete="off">
-      <button class="login-btn" onclick="checkPw()">Sign In</button>
-      <div class="error" id="err">Incorrect PIN</div>
+      <h2 id="loginSub">Sign in</h2>
+      <div class="role-picks" role="tablist" aria-label="Sign in as">
+        <button type="button" class="role-pick active" data-role="owner" onclick="setRole('owner')">Owner</button>
+        <button type="button" class="role-pick" data-role="eightbells" onclick="setRole('eightbells')">Eight Bells</button>
+        <button type="button" class="role-pick" data-role="windmill" onclick="setRole('windmill')">Windmill</button>
+      </div>
+      <input type="password" id="pw" placeholder="Password" maxlength="64" autocomplete="current-password">
+      <button class="login-btn" id="loginBtn" onclick="checkPw()">Sign In</button>
+      <div class="error" id="err">Incorrect password</div>
     </div>
   </div>
 
-  <!-- Landing Page -->
+  <!-- Owner landing -->
   <div class="landing" id="landing" style="display:none">
     <div class="brand">
       <svg class="varlo-mark varlo-mark-lg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
@@ -219,7 +260,6 @@
       <p>Owner Portal</p>
     </div>
 
-    <!-- Staff Hub — shared across both venues -->
     <div class="shared-section">
       <div class="shared-card" onclick="openApp('staffhub','Both Venues')">
         <div class="shared-card-icon">👥</div>
@@ -291,10 +331,42 @@
         </div>
       </div>
     </div>
-    <div class="footer">Varlo</div>
+
+    <div class="shared-section" style="margin-top:8px">
+      <div class="pw-panel">
+        <h3>Manager passwords</h3>
+        <p class="lede">Change the Eight Bells and Windmill manager sign-in passwords. They are stored in Apps Script (Script Properties), not in this page.</p>
+        <div class="pw-box" style="margin-bottom:16px">
+          <h4 style="color:var(--ink-soft)">Confirm owner password</h4>
+          <input type="password" id="pwOwnerConfirm" placeholder="Your owner password" maxlength="64" autocomplete="current-password">
+        </div>
+        <div class="pw-grid">
+          <div class="pw-box eightbells">
+            <h4>Eight Bells manager</h4>
+            <input type="password" id="pwEb" placeholder="New password" maxlength="64" autocomplete="new-password">
+            <input type="password" id="pwEb2" placeholder="Confirm" maxlength="64" autocomplete="new-password">
+            <button class="pw-save" id="saveEb" onclick="saveManagerPassword('eightbells')">Save password</button>
+            <div class="pw-note" id="noteEb"></div>
+          </div>
+          <div class="pw-box windmill">
+            <h4>Windmill manager</h4>
+            <input type="password" id="pwWm" placeholder="New password" maxlength="64" autocomplete="new-password">
+            <input type="password" id="pwWm2" placeholder="Confirm" maxlength="64" autocomplete="new-password">
+            <button class="pw-save" id="saveWm" onclick="saveManagerPassword('windmill')">Save password</button>
+            <div class="pw-note" id="noteWm"></div>
+          </div>
+        </div>
+        <div class="pw-status" id="pwServiceStatus"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button class="sign-out" onclick="signOut()">Sign out</button>
+      <div>Varlo</div>
+    </div>
   </div>
 
-  <!-- App View (iframe container) -->
+  <!-- Owner app view (iframe container) -->
   <div class="app-view" id="appView">
     <div class="app-bar">
       <div class="app-bar-brand" aria-hidden="true">
@@ -316,12 +388,42 @@
     <iframe class="app-frame" id="appFrame" src="about:blank" allow="clipboard-write"></iframe>
   </div>
 
+  <!-- Manager hub view — never sends shell=owner -->
+  <div class="app-view" id="managerView">
+    <div class="app-bar">
+      <div class="app-bar-brand" aria-hidden="true">
+        <svg class="varlo-mark varlo-mark-sm" viewBox="0 0 48 48" fill="none">
+          <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="#24362c"/>
+          <path d="M11.2 12.5 24 38.2 36.8 12.5h-6.4L24 29.1 17.6 12.5H11.2Z" fill="#e6c27a"/>
+          <path d="M17.6 12.5 24 29.1 30.4 12.5" stroke="#b68a3a" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>
+        </svg>
+        <span class="app-bar-wordmark">Varlo</span>
+      </div>
+      <span class="app-bar-title" id="managerTitle">Manager</span>
+      <span class="app-bar-pub" id="managerPub"></span>
+      <button class="app-bar-back" onclick="signOut()">Sign out</button>
+    </div>
+    <div class="app-loader" id="managerLoader">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+    <iframe class="app-frame" id="managerFrame" src="about:blank" allow="clipboard-write"></iframe>
+  </div>
+
+  <button type="button" class="rooms-fab" id="roomsFab" onclick="openApp('rooms-windmill','Windmill Inn')">🛏️ Rooms</button>
+
   <script>
-    // ═══════════════════════════════════
-    //  SET YOUR PIN HERE
-    // ═══════════════════════════════════
-    var PIN = '1232';
-    // ═══════════════════════════════════
+    // Owner PIN is a last-resort fallback if the auth web app is unreachable.
+    // Manager passwords are NOT stored here — they live in Apps Script.
+    var OWNER_PIN_FALLBACK = '1232';
+
+    // Standalone Varlo Auth /exec (not a venue paperwork router).
+    var AUTH_URL = 'https://script.google.com/macros/s/AKfycbyghJc5aFAK7pqBo5_ih5IGILWungoJnhwWxy_9MImlcH13sKmpfGU6a4NIt0CjLgvN/exec';
+
+    var MANAGER_URLS = {
+      eightbells: 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec',
+      windmill: 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec'
+    };
 
     var URLS = {
       'invoicing': 'https://script.google.com/macros/s/AKfycbw_o2Xb6kidks5eKUyT-C2XoQyQ0QlpVKt895FwUNlulh9q0YLFuO7VYVMImULi3SrE/exec',
@@ -347,27 +449,299 @@
 
     var currentSystem = null;
     var currentPub = null;
+    var selectedRole = 'owner';
+    var lastOwnerPassword = '';
+    var sessionRole = null;
 
-    if (sessionStorage.getItem('varlo_owner_auth') === 'yes' || sessionStorage.getItem('kinfold_owner_auth') === 'yes') {
+    var ROLE_LABELS = {
+      owner: 'Owner',
+      eightbells: 'Eight Bells manager',
+      windmill: 'Windmill manager'
+    };
+
+    function setRole(role) {
+      selectedRole = role;
+      var buttons = document.querySelectorAll('.role-pick');
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].classList.toggle('active', buttons[i].getAttribute('data-role') === role);
+      }
+      document.getElementById('loginSub').textContent = ROLE_LABELS[role] || 'Sign in';
+      document.getElementById('err').classList.remove('show');
+      document.getElementById('pw').focus();
+    }
+
+    function showLogin() {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      document.getElementById('landing').style.display = 'none';
+      document.getElementById('appView').classList.remove('active');
+      document.getElementById('managerView').classList.remove('active');
+      document.getElementById('roomsFab').classList.remove('show');
+      document.getElementById('pw').focus();
+    }
+
+    function showOwnerHome() {
+      sessionRole = 'owner';
       document.getElementById('loginOverlay').classList.add('hidden');
       document.getElementById('landing').style.display = '';
+      document.getElementById('appView').classList.remove('active');
+      document.getElementById('managerView').classList.remove('active');
+      document.getElementById('roomsFab').classList.remove('show');
+      refreshPasswordStatus();
+    }
+
+    function showManager(role) {
+      sessionRole = role;
+      document.getElementById('loginOverlay').classList.add('hidden');
+      document.getElementById('landing').style.display = 'none';
+      document.getElementById('appView').classList.remove('active');
+      document.getElementById('managerView').classList.add('active');
+      document.getElementById('managerTitle').textContent = role === 'windmill' ? 'Windmill manager' : 'Eight Bells manager';
+      document.getElementById('managerPub').textContent = role === 'windmill' ? 'Littleworth' : 'Bolney';
+      document.getElementById('roomsFab').classList.toggle('show', role === 'windmill');
+      loadManagerHub(role);
+    }
+
+    function restoreSession() {
+      var role = sessionStorage.getItem('varlo_app_role');
+      if (role === 'eightbells' && sessionStorage.getItem('eightbells_auth') === 'yes') {
+        showManager('eightbells');
+        return;
+      }
+      if (role === 'windmill' && sessionStorage.getItem('windmill_auth') === 'yes') {
+        showManager('windmill');
+        return;
+      }
+      if (sessionStorage.getItem('varlo_owner_auth') === 'yes' || sessionStorage.getItem('kinfold_owner_auth') === 'yes') {
+        showOwnerHome();
+        return;
+      }
+      showLogin();
+    }
+
+    function rememberRole(role, password) {
+      sessionStorage.setItem('varlo_app_role', role);
+      if (role === 'owner') {
+        sessionStorage.setItem('varlo_owner_auth', 'yes');
+        sessionStorage.setItem('kinfold_owner_auth', 'yes');
+        lastOwnerPassword = password || lastOwnerPassword;
+      } else if (role === 'eightbells') {
+        sessionStorage.setItem('eightbells_auth', 'yes');
+      } else if (role === 'windmill') {
+        sessionStorage.setItem('windmill_auth', 'yes');
+      }
+    }
+
+    function signOut() {
+      sessionStorage.removeItem('varlo_app_role');
+      sessionStorage.removeItem('varlo_owner_auth');
+      sessionStorage.removeItem('kinfold_owner_auth');
+      sessionStorage.removeItem('eightbells_auth');
+      sessionStorage.removeItem('windmill_auth');
+      lastOwnerPassword = '';
+      sessionRole = null;
+      document.getElementById('appFrame').src = 'about:blank';
+      document.getElementById('managerFrame').src = 'about:blank';
+      history.replaceState({ view: 'login' }, '', '#');
+      showLogin();
+    }
+
+    function ownerPassword() {
+      var typed = (document.getElementById('pwOwnerConfirm') || {}).value;
+      return String(typed || lastOwnerPassword || '').trim();
+    }
+
+    function authRequest(params) {
+      return new Promise(function(resolve, reject) {
+        if (!AUTH_URL || AUTH_URL.indexOf('PLACEHOLDER') !== -1) {
+          reject(new Error('not_deployed'));
+          return;
+        }
+        var name = 'varloAuthCb' + String(Date.now()) + String(Math.floor(Math.random() * 10000));
+        var settled = false;
+        var script = document.createElement('script');
+        var timer = setTimeout(function() {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error('timeout'));
+        }, 12000);
+        function cleanup() {
+          clearTimeout(timer);
+          try { delete window[name]; } catch (err) { window[name] = undefined; }
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+        window[name] = function(data) {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(data || {});
+        };
+        var qs = [];
+        Object.keys(params).forEach(function(key) {
+          if (params[key] == null || params[key] === '') return;
+          qs.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]));
+        });
+        qs.push('callback=' + encodeURIComponent(name));
+        script.src = AUTH_URL + '?' + qs.join('&');
+        script.onerror = function() {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(new Error('network'));
+        };
+        document.body.appendChild(script);
+      });
+    }
+
+    function setLoginError(message) {
+      var el = document.getElementById('err');
+      el.textContent = message;
+      el.classList.add('show');
+    }
+
+    function checkPw() {
+      var password = document.getElementById('pw').value.trim();
+      var btn = document.getElementById('loginBtn');
+      document.getElementById('err').classList.remove('show');
+      if (!password) {
+        setLoginError('Enter a password');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+      authRequest({ action: 'login', role: selectedRole, password: password })
+        .then(function(data) {
+          if (data && data.ok && data.role === selectedRole) {
+            rememberRole(selectedRole, password);
+            enterRole(selectedRole);
+            return;
+          }
+          if (data && data.error === 'not_configured' && selectedRole === 'owner' && password === OWNER_PIN_FALLBACK) {
+            rememberRole('owner', password);
+            enterRole('owner');
+            return;
+          }
+          setLoginError(data && data.error === 'not_configured'
+            ? 'This sign-in is not set up yet'
+            : 'Incorrect password');
+          document.getElementById('pw').value = '';
+          document.getElementById('pw').focus();
+        })
+        .catch(function() {
+          if (selectedRole === 'owner' && password === OWNER_PIN_FALLBACK) {
+            rememberRole('owner', password);
+            enterRole('owner');
+            return;
+          }
+          setLoginError(selectedRole === 'owner'
+            ? 'Incorrect password'
+            : 'Cannot reach the password service. Try again in a moment.');
+          document.getElementById('pw').value = '';
+          document.getElementById('pw').focus();
+        })
+        .then(function() {
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+        });
+    }
+
+    function enterRole(role) {
+      document.getElementById('pw').value = '';
+      if (role === 'owner') {
+        showOwnerHome();
+        history.replaceState({ view: 'landing' }, '', '#owner');
+      } else {
+        showManager(role);
+        history.replaceState({ view: 'manager', role: role }, '', '#' + role);
+      }
+    }
+
+    function saveManagerPassword(role) {
+      var isEb = role === 'eightbells';
+      var a = document.getElementById(isEb ? 'pwEb' : 'pwWm').value;
+      var b = document.getElementById(isEb ? 'pwEb2' : 'pwWm2').value;
+      var note = document.getElementById(isEb ? 'noteEb' : 'noteWm');
+      var btn = document.getElementById(isEb ? 'saveEb' : 'saveWm');
+      note.className = 'pw-note';
+      if (a.length < 4) {
+        note.textContent = 'Use at least 4 characters.';
+        note.classList.add('bad');
+        return;
+      }
+      if (a !== b) {
+        note.textContent = 'Passwords do not match.';
+        note.classList.add('bad');
+        return;
+      }
+      var ownerPw = ownerPassword();
+      if (!ownerPw) {
+        note.textContent = 'Sign in again as owner, then save.';
+        note.classList.add('bad');
+        return;
+      }
+      btn.disabled = true;
+      note.textContent = 'Saving…';
+      authRequest({ action: 'set', role: role, ownerPassword: ownerPw, newPassword: a })
+        .then(function(data) {
+          if (data && data.ok) {
+            note.textContent = 'Saved. The new password works on the next sign-in.';
+            note.classList.add('ok');
+            document.getElementById(isEb ? 'pwEb' : 'pwWm').value = '';
+            document.getElementById(isEb ? 'pwEb2' : 'pwWm2').value = '';
+            refreshPasswordStatus();
+            return;
+          }
+          note.textContent = data && data.error === 'not_configured'
+            ? 'Owner password is not in Apps Script yet. Ask for the auth script to be seeded.'
+            : 'Could not save. Check you are signed in as owner.';
+          note.classList.add('bad');
+        })
+        .catch(function() {
+          note.textContent = 'Password service is unreachable. The Varlo Auth Apps Script must be deployed.';
+          note.classList.add('bad');
+        })
+        .then(function() { btn.disabled = false; });
+    }
+
+    function refreshPasswordStatus() {
+      var el = document.getElementById('pwServiceStatus');
+      var ownerPw = ownerPassword();
+      if (!ownerPw) {
+        el.textContent = 'Sign in as owner to manage manager passwords.';
+        return;
+      }
+      authRequest({ action: 'status', ownerPassword: ownerPw })
+        .then(function(data) {
+          if (!data || !data.ok) {
+            el.textContent = 'Password service reachable, but status could not be read.';
+            return;
+          }
+          var r = data.roles || {};
+          el.textContent = 'Password service connected. Eight Bells ' + (r.eightbells ? 'is set' : 'is not set yet') +
+            '. Windmill ' + (r.windmill ? 'is set' : 'is not set yet') + '.';
+        })
+        .catch(function() {
+          el.textContent = 'Password service is not reachable yet. Manager passwords cannot be changed until Varlo Auth is deployed.';
+        });
+    }
+
+    function loadManagerHub(role) {
+      var url = MANAGER_URLS[role];
+      if (!url) return;
+      url = stripOwnerShell(url);
+      document.getElementById('managerLoader').classList.remove('hidden');
+      var frame = document.getElementById('managerFrame');
+      frame.src = url;
+      frame.onload = function() { setTimeout(function() { document.getElementById('managerLoader').classList.add('hidden'); }, 800); };
+      setTimeout(function() { document.getElementById('managerLoader').classList.add('hidden'); }, 15000);
     }
 
     document.getElementById('pw').addEventListener('keydown', function(e) { if (e.key === 'Enter') checkPw(); });
-    document.getElementById('pw').focus();
 
-    function checkPw() {
-      if (document.getElementById('pw').value.trim() === PIN) {
-        sessionStorage.setItem('varlo_owner_auth', 'yes');
-        sessionStorage.setItem('kinfold_owner_auth', 'yes');
-        document.getElementById('loginOverlay').classList.add('hidden');
-        document.getElementById('landing').style.display = '';
-      } else {
-        document.getElementById('err').classList.add('show');
-        document.getElementById('pw').value = '';
-        document.getElementById('pw').focus();
-      }
-    }
+    var qRole = (location.search.match(/[?&]role=([^&]+)/) || [])[1];
+    if (qRole) setRole(decodeURIComponent(qRole).toLowerCase());
+
+    restoreSession();
 
     // Paperwork / Card Takings use the same Apps Scripts as the manager hubs.
     // Keep shell=owner on every load of those scripts, including iframe
@@ -394,14 +768,27 @@
       return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'shell=owner' + hash;
     }
 
+    function stripOwnerShell(url) {
+      if (!url || typeof url !== 'string') return url;
+      return url
+        .replace(/([?&])shell=owner(&)?/g, function(_, sep, more) {
+          return more ? sep : '';
+        })
+        .replace(/[?&]$/, '');
+    }
+
     function openApp(system, pubName) {
+      if (sessionRole && sessionRole !== 'owner') {
+        // Managers may open Rooms (Windmill). Do not send shell=owner.
+        if (system !== 'rooms-windmill') return;
+      }
       var url = URLS[system];
       if (!url) return;
       if (system === 'payroll') {
         var entity = pubName === 'Eight Bells' ? 'eightbells' : 'windmill';
         url = url + '?entity=' + entity;
       }
-      url = withOwnerShell(url);
+      if (sessionRole === 'owner') url = withOwnerShell(url);
       currentSystem = system;
       currentPub = pubName;
       document.getElementById('appTitle').textContent = TITLES[system] || system;
@@ -412,6 +799,7 @@
       frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
       setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
       document.getElementById('landing').style.display = 'none';
+      document.getElementById('managerView').classList.remove('active');
       document.getElementById('appView').classList.add('active');
       history.pushState({ view: 'app', system: system, pub: pubName, url: url }, '', '#' + system);
     }
@@ -420,22 +808,34 @@
       currentSystem = null;
       currentPub = null;
       document.getElementById('appView').classList.remove('active');
-      document.getElementById('landing').style.display = '';
       document.getElementById('appFrame').src = 'about:blank';
-      history.pushState({ view: 'landing' }, '', '#');
+      if (sessionRole === 'windmill' || sessionRole === 'eightbells') {
+        document.getElementById('managerView').classList.add('active');
+        document.getElementById('roomsFab').classList.toggle('show', sessionRole === 'windmill');
+        history.pushState({ view: 'manager', role: sessionRole }, '', '#' + sessionRole);
+        return;
+      }
+      document.getElementById('landing').style.display = '';
+      history.pushState({ view: 'landing' }, '', '#owner');
     }
 
     window.addEventListener('message', function(e) {
       if (!e.data || typeof e.data !== 'object') return;
       if (e.data.type === 'navigate' && e.data.url) {
-        var nextUrl = withOwnerShell(e.data.url);
-        var frame = document.getElementById('appFrame');
-        document.getElementById('appLoader').classList.remove('hidden');
+        var nextUrl = e.data.url;
+        if (sessionRole === 'owner') nextUrl = withOwnerShell(nextUrl);
+        else nextUrl = stripOwnerShell(nextUrl);
+        var usingManager = sessionRole === 'eightbells' || sessionRole === 'windmill';
+        var frame = document.getElementById(usingManager ? 'managerFrame' : 'appFrame');
+        var loader = document.getElementById(usingManager ? 'managerLoader' : 'appLoader');
+        loader.classList.remove('hidden');
         frame.src = nextUrl;
-        frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
-        setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
-        var page = getPageFromUrl(nextUrl);
-        history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: nextUrl, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
+        frame.onload = function() { setTimeout(function() { loader.classList.add('hidden'); }, 600); };
+        setTimeout(function() { loader.classList.add('hidden'); }, 15000);
+        if (!usingManager) {
+          var page = getPageFromUrl(nextUrl);
+          history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: nextUrl, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
+        }
       }
       if (e.data.type === 'kinfold-page-change' && e.data.page) {
         document.getElementById('appTitle').textContent = e.data.page;
@@ -444,12 +844,24 @@
 
     window.addEventListener('popstate', function(event) {
       var state = event.state;
-      if (!state || state.view === 'landing') {
+      if (state && state.view === 'manager' && (sessionRole === 'eightbells' || sessionRole === 'windmill')) {
+        document.getElementById('appView').classList.remove('active');
+        document.getElementById('landing').style.display = 'none';
+        document.getElementById('managerView').classList.add('active');
+        return;
+      }
+      if (!state || state.view === 'landing' || state.view === 'login') {
         currentSystem = null;
         currentPub = null;
         document.getElementById('appView').classList.remove('active');
-        document.getElementById('landing').style.display = '';
         document.getElementById('appFrame').src = 'about:blank';
+        if (sessionRole === 'owner') {
+          document.getElementById('landing').style.display = '';
+        } else if (sessionRole === 'eightbells' || sessionRole === 'windmill') {
+          document.getElementById('managerView').classList.add('active');
+        } else {
+          showLogin();
+        }
         return;
       }
       if (state.view === 'app' && state.url) {
@@ -459,10 +871,12 @@
         document.getElementById('appPub').textContent = state.pub || '-';
         document.getElementById('appLoader').classList.remove('hidden');
         var frame = document.getElementById('appFrame');
-        frame.src = withOwnerShell(state.url);
+        var url = sessionRole === 'owner' ? withOwnerShell(state.url) : stripOwnerShell(state.url);
+        frame.src = url;
         frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
         setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
         document.getElementById('landing').style.display = 'none';
+        document.getElementById('managerView').classList.remove('active');
         document.getElementById('appView').classList.add('active');
       }
     });
@@ -478,7 +892,9 @@
       history.replaceState({ view: 'landing' }, '', location.pathname + location.hash);
     }
 
-    history.replaceState({ view: 'landing' }, '', location.hash || '#');
+    if (!sessionRole) {
+      history.replaceState({ view: 'login' }, '', location.hash || '#');
+    }
   </script>
 </body>
 </html>
