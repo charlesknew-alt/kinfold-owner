@@ -28,7 +28,17 @@
  * - Change the manager GitHub shells (they have no page= param)
  * - Touch openOwnerReview() (spreadsheet menu "Owner Week Review")
  *
- * How to apply (Charles, in Google Apps Script)
+ * FOUND 2026-08-25 — not a separate paperwork project.
+ * Live /exec IDs match the takings bound scripts (clasp deployments):
+ *   Eight Bells Takings  1fca4JFXwFDJQ-Y8xqvobcw85eGfyIn-khndOTNlQ2CWrdQl3LRBcW_Pr
+ *     /exec AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww
+ *   Windmill Inn Takings 1UEG3IgPKxKJoVo9NpHT3RGvUTza2a_-V9ur8cBh-WrpfyXM5YoLkgoVO
+ *     /exec AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP
+ * Venue doGet delegates to PubSystemLib.routePage. The NA gate is in
+ * PubSystemLib (1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU)
+ * v58 and is already deployed on those existing /exec URLs.
+ *
+ * How to apply (Charles, in Google Apps Script) — already done via clasp
  * ---------------------------------------------
  * 1. Open each paperwork bound script (Eight Bells and Windmill).
  * 2. Find doGet(e). Search for the exact NA copy:
