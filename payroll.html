@@ -6,7 +6,7 @@
 <title>Varlo · Payroll → Wise</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="payroll-build" content="20260901-hard-contrast">
+<meta name="payroll-build" content="20260901-wise-excluded-summary">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px}
@@ -236,6 +236,28 @@ thead th.actions-head{text-align:center;width:44px}
 .dir-item-actions{display:flex;gap:6px}
 .excluded-notice{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--amber-bg);border:1px solid rgba(251,191,36,.2);border-radius:var(--radius);margin-bottom:16px;font-size:12px;color:var(--amber)}
 .excluded-notice strong{font-weight:600}
+.wise-exclusion-panel{display:none;margin-bottom:16px;border:1px solid var(--red);border-radius:var(--radius);background:var(--red-bg);overflow:hidden}
+.wise-exclusion-panel.is-visible{display:block}
+.wise-exclusion-panel.is-ok{border-color:var(--green);background:var(--green-bg)}
+.wise-exclusion-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(138,61,40,.18)}
+.wise-exclusion-panel.is-ok .wise-exclusion-head{border-bottom-color:rgba(45,90,61,.18)}
+.wise-exclusion-title{font-size:13px;font-weight:700;color:var(--red);margin:0}
+.wise-exclusion-panel.is-ok .wise-exclusion-title{color:var(--green)}
+.wise-exclusion-sub{font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4}
+.wise-exclusion-total{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--red);white-space:nowrap}
+.wise-exclusion-panel.is-ok .wise-exclusion-total{color:var(--green)}
+.wise-exclusion-list{list-style:none;margin:0;padding:0}
+.wise-exclusion-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(138,61,40,.12);font-size:12px}
+.wise-exclusion-list li:last-child{border-bottom:none}
+.wise-exclusion-name{font-weight:600;color:var(--text)}
+.wise-exclusion-reason{font-size:11px;color:var(--text-muted);margin-top:2px}
+.wise-exclusion-amt{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--red);white-space:nowrap}
+.wise-exclusion-panel.is-ok .wise-exclusion-amt{color:var(--green)}
+tbody tr.no-bank-row td{background:var(--red-bg)!important}
+tbody tr.zero-net-row td{background:var(--amber-bg)!important}
+.no-bank-tag,.zero-net-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;vertical-align:middle;font-family:'Source Sans 3',sans-serif}
+.no-bank-tag{background:var(--red-bg);color:var(--red)}
+.zero-net-tag{background:var(--amber-bg);color:var(--amber)}
 .sync-status{font-size:10px;color:var(--text-muted);padding:4px 10px;border-radius:10px;background:var(--surface-2);display:inline-flex;align-items:center;gap:5px}
 .sync-status.syncing{color:var(--amber)}
 .sync-status.synced{color:var(--green)}
@@ -254,6 +276,7 @@ thead th.actions-head{text-align:center;width:44px}
 .toast.show{transform:translateY(0);opacity:1}
 .toast.success{background:var(--green);color:var(--bg)}
 .toast.error{background:var(--red);color:white}
+.toast.info{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
 @media(max-width:768px){body{padding:12px}.manual-form,.saved-add-form,.dir-add-form{grid-template-columns:1fr 1fr}.page-header{flex-direction:column;align-items:flex-start;gap:12px}.actions-bar{flex-direction:column;align-items:stretch}.payment-ref-field{flex-direction:column;align-items:stretch}.payment-ref-field input{width:100%}.validation-bar{flex-wrap:wrap}}
 </style>
 </head>
@@ -315,6 +338,7 @@ thead th.actions-head{text-align:center;width:44px}
 
   <div class="loaded-files" id="loadedFiles"></div>
   <div class="excluded-notice" id="excludedNotice" style="display:none">⚠ <strong><span id="excludedCount">0</span> excluded staff</strong> removed from batch (weekly-paid etc.) — see Excluded section below</div>
+  <div class="wise-exclusion-panel" id="wiseExclusionPanel" aria-live="polite"></div>
   <div class="table-wrapper" id="tableWrapper" style="display:none">
     <div class="table-header"><div class="table-title" id="tableTitle">Payments</div><div class="table-count" id="tableCount">0</div></div>
     <div style="overflow-x:auto;"><table><thead><tr>
@@ -395,6 +419,10 @@ thead th.actions-head{text-align:center;width:44px}
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbyPc3fWNKaGp3IAtrxz3P8340T8TxgMyErKi9PMYDs-9OcsBAaN2YoYotwdZ7pFZYtwpA/exec';
 let employees=[],loadedFileNames=[],currentEntity='windmill',staffDirectory=[],excludedStaff=[];
+// People from BACS/Xero who never entered the payments table (excluded list, skipped, £0, etc.)
+let sourceDropouts=[];
+// After Download Wise CSV: who was left out of that file (names + amounts + reasons)
+let lastDownloadLeftOut=null;
 const $=id=>document.getElementById(id);
 function toggle(bodyId,arrowId){$(bodyId).classList.toggle('open');$(arrowId).classList.toggle('open');}
 
@@ -445,7 +473,15 @@ function handleFiles(files){
         // Wise corrections being silently overwritten on every new BACS upload.
         const corrected = applyDirectoryOverlay(emp);
         const key = corrected.sortCode + '|' + corrected.accountNumber;
-        if (exKeys.has(key)) { excludedCount++; return; }
+        if (exKeys.has(key)) {
+          excludedCount++;
+          sourceDropouts.push({
+            name: corrected.name,
+            amount: corrected.amount,
+            reason: 'On Excluded Staff list (e.g. weekly-paid) — removed before Wise'
+          });
+          return;
+        }
         // Dedupe by overlaid sort+account so the same person across multiple BACS
         // files only appears once
         if (!employees.some(e => e.sortCode === corrected.sortCode && e.accountNumber === corrected.accountNumber)) {
@@ -456,6 +492,7 @@ function handleFiles(files){
       });
       if(excludedCount>0){$('excludedNotice').style.display='flex';$('excludedCount').textContent=excludedCount;}
       autoSaveToSheet(parsed.filter(emp=>!exKeys.has(emp.sortCode+'|'+emp.accountNumber)));
+      lastDownloadLeftOut=null;
       renderFileChips();renderTable();
       const correctedMsg = correctedCount > 0 ? ' (' + correctedCount + ' name/bank corrected from directory)' : '';
       showToast(`Loaded ${parsed.length-excludedCount} payments from ${file.name}${excludedCount?' ('+excludedCount+' excluded)':''}${correctedMsg}`,'success');
@@ -533,23 +570,102 @@ function fmtSort(s){s=s.replace(/[^0-9-]/g,'');if(/^\d{6}$/.test(s))s=s.substrin
 function fmtMoney(n){return n.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function getDeductionTotal(emp){return(emp.deductions||[]).reduce((s,d)=>s+d.amount,0);}
 function getNetPay(emp){return emp.amount-getDeductionTotal(emp);}
+// UK BACS: 6-digit sort code + 8-digit account. Missing either → Wise rejects/drops the row.
+function hasValidBankDetails(e){
+  const sc=String(e&&e.sortCode||'').replace(/\D/g,'');
+  const ac=String(e&&e.accountNumber||'').replace(/\D/g,'');
+  return sc.length===6 && ac.length===8;
+}
+function collectTableDropouts(){
+  const items=[];
+  employees.forEach(e=>{
+    const net=getNetPay(e);
+    if(net<=0){
+      items.push({name:e.name,amount:net,reason:'Zero / negative net pay — blocked from Wise'});
+      return;
+    }
+    if(!hasValidBankDetails(e)){
+      items.push({name:e.name,amount:net,reason:'Missing or incomplete bank details — left out of Wise CSV'});
+    }
+  });
+  return items;
+}
+function updateWiseExclusionPanel(){
+  const panel=$('wiseExclusionPanel');
+  if(!panel)return;
+  const live=collectTableDropouts();
+  const source=sourceDropouts.slice();
+  // Prefer post-download snapshot when present; otherwise show who WILL be left out
+  const leftOut=lastDownloadLeftOut?lastDownloadLeftOut.items:[];
+  const combined=[];
+  const seen=new Set();
+  function addAll(arr){
+    arr.forEach(it=>{
+      const key=(it.name||'')+'|'+(it.reason||'')+'|'+(Number(it.amount)||0);
+      if(seen.has(key))return;
+      seen.add(key);
+      combined.push(it);
+    });
+  }
+  if(lastDownloadLeftOut){
+    addAll(leftOut);
+    // Also keep any still-broken table rows / source dropouts that weren't in the file
+    addAll(live);
+    addAll(source);
+  }else{
+    addAll(live);
+    addAll(source);
+  }
+  if(!combined.length){
+    if(employees.length){
+      panel.className='wise-exclusion-panel is-visible is-ok';
+      panel.innerHTML=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">✓ Everyone owed money is in the Wise batch</div><div class="wise-exclusion-sub">No missing bank details, zero nets, or excluded staff for this load.</div></div><div class="wise-exclusion-total">£0.00 out</div></div>`;
+    }else{
+      panel.className='wise-exclusion-panel';
+      panel.innerHTML='';
+    }
+    return;
+  }
+  const tot=combined.reduce((s,it)=>s+Math.max(0,Number(it.amount)||0),0);
+  const title=lastDownloadLeftOut
+    ? `Left out of Wise file (${lastDownloadLeftOut.fileName})`
+    : 'Not going into the Wise file';
+  const sub=lastDownloadLeftOut
+    ? 'These people were on the Xero/BACS pay run but were not included in the downloaded CSV. Fix bank details (✏️) and download again if needed.'
+    : 'Anyone owed money who will be excluded from Download Wise CSV — missing bank, zero net, or on the Excluded Staff list.';
+  let html=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">⚠ ${combined.length} ${combined.length===1?'person':'people'} — ${esc(title)}</div><div class="wise-exclusion-sub">${esc(sub)}</div></div><div class="wise-exclusion-total">£${fmtMoney(tot)} out</div></div>`;
+  html+='<ul class="wise-exclusion-list">';
+  combined.forEach(it=>{
+    html+=`<li><div><div class="wise-exclusion-name">${esc(it.name||'(unnamed)')}</div><div class="wise-exclusion-reason">${esc(it.reason||'')}</div></div><div class="wise-exclusion-amt">£${fmtMoney(Number(it.amount)||0)}</div></li>`;
+  });
+  html+='</ul>';
+  panel.className='wise-exclusion-panel is-visible';
+  panel.innerHTML=html;
+}
 
 function renderFileChips(){$('loadedFiles').innerHTML=loadedFileNames.map((n,i)=>`<div class="file-chip">📄 ${n} <span class="remove-file" onclick="removeFile(${i})">✕</span></div>`).join('');}
 function removeFile(i){loadedFileNames.splice(i,1);renderFileChips();}
 
 function renderTable(){
-  if(!employees.length){$('tableWrapper').style.display='none';$('manualSection').style.display='none';$('actionsBar').style.display='none';updateSteps(1);return;}
+  if(!employees.length){$('tableWrapper').style.display='none';$('manualSection').style.display='none';$('actionsBar').style.display='none';updateWiseExclusionPanel();updateSteps(1);return;}
   $('tableWrapper').style.display='block';$('manualSection').style.display='block';$('actionsBar').style.display='flex';
   $('tableTitle').textContent=`${currentEntity==='windmill'?'Windmill':'Eight Bells'} — Payments`;
   $('tableCount').textContent=`${employees.length} employee${employees.length!==1?'s':''}`;
   $('tableBody').innerHTML=employees.map((e,i)=>{
     const dedTotal=getDeductionTotal(e),net=getNetPay(e),hasDed=dedTotal>0;
+    const missingBank=!hasValidBankDetails(e);
+    const zeroNet=net<=0;
     const dedHTML=e.deductions&&e.deductions.length?e.deductions.map((d,di)=>`<span class="deduction-tag"><span class="ded-amount">-£${fmtMoney(d.amount)}</span> ${esc(d.reason)} <span class="ded-remove" onclick="event.stopPropagation();removeDeduction(${i},${di})">✕</span></span>`).join(' '):'';
     const correctedTag=e._correctedFrom?` <span class="corrected-tag" title="${esc(e._correctedFrom)}">↺</span>`:'';
     const editedTag=e._editedInRow?` <span class="edited-tag" title="Edited — not yet pushed to Xero/Directory">✎</span>`:'';
+    const noBankTag=missingBank?` <span class="no-bank-tag" title="Missing sort code or account number — left out of Wise CSV">NO BANK</span>`:'';
+    const zeroTag=zeroNet?` <span class="zero-net-tag" title="Zero or negative net — blocked from Wise">£0 NET</span>`:'';
     const actionButtons=`<button class="row-act" title="Edit details / push to Xero or Directory" onclick="openEditModal(${i})">✏️</button><button class="row-remove" title="Remove from this batch" onclick="removeRow(${i})">✕</button>`;
-    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''}"><td class="name-col">${esc(e.name)}${correctedTag}${editedTag}</td><td>${esc(e.sortCode)}</td><td>${esc(e.accountNumber)}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
+    const sortDisplay=e.sortCode?esc(e.sortCode):'<span style="color:var(--red)">—</span>';
+    const acctDisplay=e.accountNumber?esc(e.accountNumber):'<span style="color:var(--red)">—</span>';
+    return`<tr class="${e.manual?'manual-row':''} ${hasDed?'has-deduction':''} ${missingBank?'no-bank-row':''} ${zeroNet?'zero-net-row':''}"><td class="name-col">${esc(e.name)}${correctedTag}${editedTag}${noBankTag}${zeroTag}</td><td>${sortDisplay}</td><td>${acctDisplay}</td><td class="amount-cell" onclick="editAmount(${i},this)">£${fmtMoney(e.amount)}<span class="edit-hint">edit</span></td><td class="deduction-cell"><div class="deduction-display" onclick="startDeductionEdit(${i},this)">${dedHTML}${dedHTML?'<span class="add-deduction" style="margin-left:4px">+</span>':'<span class="add-deduction">+ deduction</span>'}</div></td><td style="text-align:right;font-weight:600" class="${hasDed||zeroNet?'net-reduced':'net-positive'}">£${fmtMoney(net)}</td><td style="text-align:center;white-space:nowrap">${actionButtons}</td></tr>`;
   }).join('');
+  updateWiseExclusionPanel();
   updateTotal();
 }
 
@@ -808,35 +924,55 @@ $('downloadBtn').addEventListener('click',async()=>{
   if(!employees.length)return;
   const g=employees.reduce((s,e)=>s+e.amount,0),raw=$('expectedTotal').value.replace(/[£,\s]/g,''),exp=parseFloat(raw);
   if(!isNaN(exp)&&Math.abs(g-exp)>=0.02){if(!confirm(`⚠ Gross (£${g.toFixed(2)}) ≠ expected (£${exp}).\nDiff: £${Math.abs(g-exp).toFixed(2)}\n\nDownload anyway?`))return;}
-  const neg=employees.filter(e=>getNetPay(e)<=0);if(neg.length){showToast(`${neg[0].name} has zero/negative net pay`,'error');return;}
-  // Owed-but-unpayable backstop: any row missing sort code OR account number would
-  // be silently dropped/rejected by Wise. List them by name+amount and require an
-  // explicit acknowledgement before allowing the download. This is the guard that
-  // would have caught Jude (processed, owed, no bank details) instead of him
-  // vanishing from the file unnoticed.
-  const noBank=employees.filter(e=>{
-    const sc=String(e.sortCode||'').replace(/\D/g,'');
-    const ac=String(e.accountNumber||'').replace(/\D/g,'');
-    return sc.length<6 || ac.length<6;
-  });
+  const neg=employees.filter(e=>getNetPay(e)<=0);
+  if(neg.length){
+    updateWiseExclusionPanel();
+    showToast(`${neg[0].name} has zero/negative net pay — see “Not going into the Wise file”`,'error');
+    return;
+  }
+  // Owed-but-unpayable: missing UK sort (6) or account (8). Confirm, then EXCLUDE from CSV.
+  const noBank=employees.filter(e=>!hasValidBankDetails(e));
+  const payable=employees.filter(e=>hasValidBankDetails(e)&&getNetPay(e)>0);
   if(noBank.length){
+    updateWiseExclusionPanel();
     const list=noBank.map(e=>`\u2022 ${e.name} \u2014 \u00a3${getNetPay(e).toFixed(2)} (no bank details)`).join('\n');
     const tot=noBank.reduce((s,e)=>s+getNetPay(e),0);
-    if(!confirm(`\u26a0 ${noBank.length} ${noBank.length===1?'person is':'people are'} owed money but ${noBank.length===1?'has':'have'} NO bank details \u2014 Wise will NOT pay ${noBank.length===1?'them':'them'}:\n\n${list}\n\nTotal unpayable: \u00a3${tot.toFixed(2)}\n\nRecommended: Cancel, add their bank details in Xero AND the Staff Directory, then regenerate.\n\nDownload anyway (they will be silently left out)?`)){return;}
+    if(!confirm(`\u26a0 ${noBank.length} ${noBank.length===1?'person is':'people are'} owed money but ${noBank.length===1?'has':'have'} NO bank details \u2014 they will be LEFT OUT of the Wise CSV:\n\n${list}\n\nTotal left out: \u00a3${tot.toFixed(2)}\n\nRecommended: Cancel, add bank details (✏️ Edit), then download again.\n\nDownload without them?`)){return;}
+  }
+  if(!payable.length){
+    showToast('No payable rows with bank details — nothing to download','error');
+    updateWiseExclusionPanel();
+    return;
   }
   const ref=$('paymentRef').value.trim()||'Payroll',entityLabel=currentEntity==='windmill'?'Windmill':'Eight Bells';
   const hdrs=['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
-  const rows=employees.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
+  const rows=payable.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
   let csv=hdrs.join(',')+'\n';rows.forEach(r=>{csv+=r.map(c=>(typeof c==='string'&&(c.includes(',')||c.includes('"')))?'"'+c.replace(/"/g,'""')+'"':c).join(',')+'\n';});
   const fn=`Wise_${currentEntity==='windmill'?'Windmill':'EightBells'}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
   const now=new Date(),monthStr=now.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
-  const payments=employees.map(e=>{const dt=getDeductionTotal(e),dr=(e.deductions||[]).map(d=>`${d.reason}: £${d.amount.toFixed(2)}`).join('; ');return{name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,grossAmount:e.amount,deductions:dt,deductionDetails:dr,amount:getNetPay(e)};});
+  const payments=payable.map(e=>{const dt=getDeductionTotal(e),dr=(e.deductions||[]).map(d=>`${d.reason}: £${d.amount.toFixed(2)}`).join('; ');return{name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,grossAmount:e.amount,deductions:dt,deductionDetails:dr,amount:getNetPay(e)};});
   apiPost({action:'logPayments',entity:entityLabel,month:monthStr,reference:ref,payments}).then(r=>{if(r.success)showToast(`Logged ${r.logged} payments to history`,'success');});
-  updateSteps(4);showToast(`Downloaded ${fn}`,'success');
+  lastDownloadLeftOut={
+    fileName:fn,
+    items:[
+      ...noBank.map(e=>({name:e.name,amount:getNetPay(e),reason:'Missing or incomplete bank details — left out of Wise CSV'})),
+      ...sourceDropouts
+    ]
+  };
+  updateSteps(4);
+  updateWiseExclusionPanel();
+  let dlMsg=`Downloaded ${fn} (${payable.length} payment${payable.length===1?'':'s'})`;
+  if(noBank.length||sourceDropouts.length){
+    const left=(noBank.length||0)+(sourceDropouts.length||0);
+    dlMsg+=` — see panel: ${left} not in file`;
+    showToast(dlMsg,'error');
+  }else{
+    showToast(dlMsg,'success');
+  }
 });
 
-$('clearBtn').addEventListener('click',()=>{employees=[];loadedFileNames=[];$('expectedTotal').value='';$('validationResult').style.display='none';$('excludedNotice').style.display='none';renderFileChips();renderTable();updateSteps(1);showToast('Cleared','success');});
+$('clearBtn').addEventListener('click',()=>{employees=[];loadedFileNames=[];sourceDropouts=[];lastDownloadLeftOut=null;$('expectedTotal').value='';$('validationResult').style.display='none';$('excludedNotice').style.display='none';renderFileChips();renderTable();updateSteps(1);showToast('Cleared','success');});
 
 function updateSteps(c){for(let i=1;i<=4;i++){const el=$('step'+i);el.classList.remove('active','done');if(i<c)el.classList.add('done');else if(i===c)el.classList.add('active');}}
 function showToast(m,t='success'){const el=$('toast');el.textContent=(t==='success'?'✓ ':'⚠ ')+m;el.className='toast '+t+' show';clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3000);}
@@ -1009,12 +1145,13 @@ async function selectPayRun(payRunId, periodEnd, paymentDate) {
       const xeroName = ((ps.firstName || '') + ' ' + (ps.lastName || '')).trim();
       const dirMatch = staffDirectory.find(d => (d.name || '').toLowerCase() === xeroName.toLowerCase());
       const hasNet = (ps.netPay || 0) > 0;
+      const payable = !!dirMatch && hasValidBankDetails(dirMatch);
       return {
         ps: ps,
         xeroName: xeroName,
         dirMatch: dirMatch || null,
         hasNet: hasNet,
-        selected: hasNet && !!dirMatch    // default: pre-check rows that are matched AND have pay
+        selected: hasNet && payable    // matched, payable, and has pay
       };
     });
     renderPayslipSelector();
@@ -1028,43 +1165,43 @@ function renderPayslipSelector() {
   if (!s) return;
   const items = s.items;
   const totalWithPay = items.filter(i => i.hasNet).length;
-  const matched = items.filter(i => i.hasNet && i.dirMatch).length;
-  const unmatched = items.filter(i => i.hasNet && !i.dirMatch).length;
+  const matched = items.filter(i => i.hasNet && i.dirMatch && hasValidBankDetails(i.dirMatch)).length;
+  const unmatched = items.filter(i => i.hasNet && (!i.dirMatch || !hasValidBankDetails(i.dirMatch))).length;
   const noPay = items.filter(i => !i.hasNet).length;
 
   let html = '<div style="margin-bottom:10px;font-size:11px;color:var(--text-muted);">';
-  html += `${items.length} payslips · ${matched} in Directory · ${unmatched} need adding · ${noPay} with £0 net`;
+  html += `${items.length} payslips · ${matched} payable via Directory · ${unmatched} need bank details · ${noPay} with £0 net`;
   html += '</div>';
 
-  // Loud, itemised warning for people who are OWED money but have no bank details
-  // available (not in the Directory) — these are the silent-drop cases. Replaces
-  // reliance on the easy-to-miss amber "not in Directory" tag further down.
-  const owedNoBank = items.filter(i => i.hasNet && !i.dirMatch);
+  // Loud warning for people owed money but with no usable bank details
+  const owedNoBank = items.filter(i => i.hasNet && (!i.dirMatch || !hasValidBankDetails(i.dirMatch)));
   if (owedNoBank.length) {
     const oList = owedNoBank.map(i => esc(i.xeroName) + ' \u00a3' + fmtMoney(i.ps.netPay)).join(', ');
     const oTot = owedNoBank.reduce((a, i) => a + i.ps.netPay, 0);
-    html += '<div style="background:rgba(248,113,113,0.12);border:1px solid var(--red,#f87171);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--red,#f87171);">' +
+    html += '<div style="background:var(--red-bg);border:1px solid var(--red);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--red);">' +
       '<strong>\u26a0 ' + owedNoBank.length + ' owed but NOT payable \u2014 no bank details:</strong> ' + oList + '.' +
-      '<div style="margin-top:4px;color:var(--text-muted);">Total \u00a3' + fmtMoney(oTot) + '. These will NOT appear in the Wise file until bank details are added (in Xero + the Directory). Tick them to import as blank rows and fill details in, or fix in Xero first.</div>' +
+      '<div style="margin-top:4px;color:var(--text-muted);">Total \u00a3' + fmtMoney(oTot) + '. These will be listed under “Not going into the Wise file” after import unless you tick them and fill bank details (✏️).</div>' +
     '</div>';
   }
 
   html += '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">';
   html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'all\')" style="font-size:11px;padding:4px 10px;">Select all</button>';
   html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'paid\')" style="font-size:11px;padding:4px 10px;">With pay &gt; £0</button>';
-  html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'matched\')" style="font-size:11px;padding:4px 10px;">In Directory</button>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'matched\')" style="font-size:11px;padding:4px 10px;">Payable in Directory</button>';
   html += '<button class="btn btn-secondary btn-sm" onclick="setPayslipSelection(\'none\')" style="font-size:11px;padding:4px 10px;">Deselect all</button>';
   html += '</div>';
 
   html += '<div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">';
   items.forEach((item, i) => {
     const matchTag = item.dirMatch
-      ? '<span style="color:var(--green,#34d399);">✓ in Directory</span>'
-      : '<span style="color:var(--amber,#fbbf24);">⚠ not in Directory</span>';
+      ? (hasValidBankDetails(item.dirMatch)
+          ? '<span style="color:var(--green);">✓ in Directory</span>'
+          : '<span style="color:var(--red);">⚠ Directory — no bank details</span>')
+      : '<span style="color:var(--amber);">⚠ not in Directory</span>';
     const payTag = item.hasNet
       ? ('£' + fmtMoney(item.ps.netPay))
       : '<span style="color:var(--text-muted);">£0.00 (no payment)</span>';
-    const rowBg = item.selected ? 'background:rgba(74,108,247,0.06);' : '';
+    const rowBg = item.selected ? 'background:rgba(36,54,44,0.06);' : '';
     html += `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;${rowBg}">
       <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleXeroPayslip(${i})" style="margin:0;cursor:pointer;">
       <div style="flex:1;min-width:0;">
@@ -1103,7 +1240,7 @@ function setPayslipSelection(mode) {
     if (mode === 'all') item.selected = true;
     else if (mode === 'none') item.selected = false;
     else if (mode === 'paid') item.selected = item.hasNet;
-    else if (mode === 'matched') item.selected = item.hasNet && !!item.dirMatch;
+    else if (mode === 'matched') item.selected = item.hasNet && !!item.dirMatch && hasValidBankDetails(item.dirMatch);
   });
   renderPayslipSelector();
 }
@@ -1118,12 +1255,37 @@ function commitXeroPull() {
   if (!xeroPullState) return;
   const exKeys = new Set(excludedStaff.map(s => s.sortCode + '|' + s.accountNumber));
   let added = 0, excludedCount = 0, manualCount = 0;
+  const pullDropouts = [];
 
   xeroPullState.items.forEach(item => {
-    if (!item.selected) return;
+    const net = item.ps.netPay || 0;
+    if (!item.selected) {
+      if (item.hasNet) {
+        pullDropouts.push({
+          name: item.xeroName,
+          amount: net,
+          reason: 'On Xero pay run but not imported (unticked)'
+        });
+      } else if (net === 0) {
+        pullDropouts.push({
+          name: item.xeroName,
+          amount: 0,
+          reason: 'Xero net pay £0 — not imported'
+        });
+      }
+      return;
+    }
     if (item.dirMatch) {
       const key = item.dirMatch.sortCode + '|' + item.dirMatch.accountNumber;
-      if (exKeys.has(key)) { excludedCount++; return; }
+      if (exKeys.has(key)) {
+        excludedCount++;
+        pullDropouts.push({
+          name: item.dirMatch.name || item.xeroName,
+          amount: net,
+          reason: 'On Excluded Staff list (e.g. weekly-paid) — removed before Wise'
+        });
+        return;
+      }
       if (!employees.some(e => e.sortCode === item.dirMatch.sortCode && e.accountNumber === item.dirMatch.accountNumber)) {
         employees.push({
           name: item.dirMatch.name,
@@ -1156,6 +1318,9 @@ function commitXeroPull() {
     }
   });
 
+  sourceDropouts = sourceDropouts.concat(pullDropouts);
+  lastDownloadLeftOut = null;
+
   if (excludedCount > 0) {
     $('excludedNotice').style.display = 'flex';
     $('excludedCount').textContent = excludedCount;
@@ -1176,7 +1341,8 @@ function commitXeroPull() {
 
   let msg = '✓ Imported ' + added + ' payment' + (added===1?'':'s') + ' from Xero';
   if (excludedCount) msg += ' (' + excludedCount + ' excluded)';
-  if (manualCount) msg += '. ' + manualCount + ' need bank details — click ✏️ to add';
+  if (manualCount) msg += '. ' + manualCount + ' need bank details — see “Not going into the Wise file”';
+  if (pullDropouts.length && !manualCount) msg += '. See “Not going into the Wise file” for anyone left out';
   showToast(msg, 'success');
   xeroPullState = null;
 }
