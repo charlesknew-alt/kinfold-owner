@@ -6,7 +6,7 @@
 <title>Varlo · Payroll → Wise</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="payroll-build" content="20260901-xero-pull-timeout">
+<meta name="payroll-build" content="20260901-wise-missing-wont-pay">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px}
@@ -1171,170 +1171,28 @@ async function applyWiseChanges(){
 // pay run data directly. Bank details come from the existing Directory by
 // matching name — no need to also pull payment methods from Xero.
 const STAFF_HUB_API = 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec';
-const STAFF_HUB_FETCH_TIMEOUT_MS = 45000;
-let xeroModalAbort = null;
-let xeroModalLoadTimers = [];
 
 $('pullXeroBtn').addEventListener('click', openXeroModal);
 
-function clearXeroModalLoadTimers() {
-  xeroModalLoadTimers.forEach(function(id) { clearTimeout(id); });
-  xeroModalLoadTimers = [];
-}
-
-function abortXeroModalFetch() {
-  clearXeroModalLoadTimers();
-  if (xeroModalAbort) {
-    try { xeroModalAbort.abort(); } catch (e) { /* ignore */ }
-    xeroModalAbort = null;
-  }
-}
-
-function venueLabel() {
-  return currentEntity === 'eightbells' ? 'Eight Bells' : 'Windmill';
-}
-
-function formatXeroPullError(err) {
-  const raw = String((err && err.message) || err || 'Unknown error');
-  const msg = raw.toLowerCase();
-  const authHit = /401|unauthor|unauthorized|forbidden|invalid_grant|token.*(expir|revok|invalid)|oauth|reconnect|not connected|no.*xero.*token|access.?denied/.test(msg);
-  if (authHit) {
-    return {
-      title: 'Reconnect Xero',
-      detail: 'The Xero login for ' + venueLabel() + ' has expired or was revoked. Open Staff Hub, reconnect Xero for this venue, then try Pull from Xero again.',
-      raw: raw
-    };
-  }
-  if (err && (err.name === 'AbortError' || msg.indexOf('timed out waiting for xero') !== -1 || msg.indexOf('the operation was aborted') !== -1)) {
-    return {
-      title: 'Timed out waiting for Xero',
-      detail: 'No usable response within ' + Math.round(STAFF_HUB_FETCH_TIMEOUT_MS / 1000) + 's for ' + venueLabel() + '. Xero may be slow, rate-limiting, or disconnected — wait a minute and retry, or reconnect Xero in Staff Hub.',
-      raw: raw
-    };
-  }
-  if (/429|rate.?limit/.test(msg)) {
-    return {
-      title: 'Xero rate limit',
-      detail: 'Xero asked us to slow down for ' + venueLabel() + '. Wait about a minute, then retry.',
-      raw: raw
-    };
-  }
-  if (/504|502|503|gateway|time-?out|timed?\s*out/.test(msg)) {
-    return {
-      title: 'Xero timed out',
-      detail: 'Xero/Staff Hub did not finish loading pay runs for ' + venueLabel() + '. Retry shortly. If this keeps happening, reconnect Xero in Staff Hub.',
-      raw: raw
-    };
-  }
-  if (/failed to fetch|networkerror|load failed|cors/.test(msg)) {
-    return {
-      title: 'Could not reach Staff Hub',
-      detail: 'Network/CORS problem talking to the Staff Hub Apps Script. Confirm you are online; if it persists, the script may need redeploying with “Anyone” access.',
-      raw: raw
-    };
-  }
-  return {
-    title: 'Failed to load from Xero',
-    detail: raw.replace(/\s+/g, ' ').trim().slice(0, 280),
-    raw: raw
-  };
-}
-
-function renderXeroModalError(err, retryFnName) {
-  const info = formatXeroPullError(err);
-  const retry = retryFnName || 'openXeroModal';
-  return '<div style="text-align:center;padding:24px;font-size:13px;">' +
-    '<div style="color:var(--red,#f87171);font-weight:600;margin-bottom:6px;">' + esc(info.title) + '</div>' +
-    '<div style="color:var(--text-muted);line-height:1.45;margin-bottom:14px;">' + esc(info.detail) + '</div>' +
-    '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
-      '<button class="btn btn-secondary btn-sm" type="button" onclick="' + retry + '()">Retry</button>' +
-      '<button class="btn btn-secondary btn-sm" type="button" onclick="closeXeroModal()">Close</button>' +
-    '</div>' +
-    (info.raw && info.raw !== info.detail
-      ? '<div style="font-size:10px;color:var(--text-muted);margin-top:12px;opacity:0.85;word-break:break-word;">Detail: ' + esc(info.raw).slice(0, 220) + '</div>'
-      : '') +
-  '</div>';
-}
-
-function setXeroModalLoading(message) {
-  $('xeroModalBody').innerHTML =
-    '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">' +
-      '<div>' + esc(message) + '</div>' +
-      '<div id="xeroLoadHint" style="font-size:11px;margin-top:10px;opacity:0.85;">Usually a few seconds — this will never spin forever.</div>' +
-    '</div>';
-  clearXeroModalLoadTimers();
-  xeroModalLoadTimers.push(setTimeout(function() {
-    const hint = $('xeroLoadHint');
-    if (hint) hint.textContent = 'Still waiting on Xero for ' + venueLabel() + '…';
-  }, 8000));
-  xeroModalLoadTimers.push(setTimeout(function() {
-    const hint = $('xeroLoadHint');
-    if (hint) hint.textContent = 'Taking longer than usual. Will stop automatically if Xero does not respond.';
-  }, 20000));
-}
-
-async function fetchStaffHubJson(url, timeoutMs) {
-  const ms = timeoutMs == null ? STAFF_HUB_FETCH_TIMEOUT_MS : timeoutMs;
-  if (xeroModalAbort) {
-    try { xeroModalAbort.abort(); } catch (e) { /* ignore */ }
-    xeroModalAbort = null;
-  }
-  const controller = new AbortController();
-  xeroModalAbort = controller;
-  const timer = setTimeout(function() {
-    controller.abort();
-  }, ms);
-  try {
-    const r = await fetch(url, { signal: controller.signal, credentials: 'omit' });
-    const text = await r.text();
-    let data;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (parseErr) {
-      const snip = text.replace(/\s+/g, ' ').trim().slice(0, 160);
-      throw new Error('Staff Hub returned non-JSON (HTTP ' + r.status + ')' + (snip ? ': ' + snip : ''));
-    }
-    if (!r.ok && !(data && data.error)) {
-      throw new Error('Staff Hub HTTP ' + r.status);
-    }
-    if (data && data.error) {
-      const errMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-      throw new Error(data.message ? (errMsg + ': ' + data.message) : errMsg);
-    }
-    return data;
-  } catch (err) {
-    if (err && err.name === 'AbortError') {
-      throw new Error('Timed out waiting for Xero');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timer);
-    if (xeroModalAbort === controller) xeroModalAbort = null;
-    clearXeroModalLoadTimers();
-  }
-}
-
 async function openXeroModal() {
-  abortXeroModalFetch();
   $('xeroModal').style.display = 'flex';
   $('xeroModalSubtitle').textContent = 'Select a posted pay run to import';
-  setXeroModalLoading('Loading recent pay runs from Xero for ' + venueLabel() + '…');
+  $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Loading recent pay runs from Xero…</div>';
   try {
-    const data = await fetchStaffHubJson(
-      STAFF_HUB_API + '?action=listPayRuns&venue=' + encodeURIComponent(currentEntity)
-    );
+    const r = await fetch(STAFF_HUB_API + '?action=listPayRuns&venue=' + encodeURIComponent(currentEntity));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
     if (!data.payRuns || !data.payRuns.length) {
-      $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No pay runs found for ' + esc(venueLabel()) + '.</div>';
+      $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No pay runs found for this venue.</div>';
       return;
     }
     renderPayRunList(data.payRuns);
   } catch (err) {
-    $('xeroModalBody').innerHTML = renderXeroModalError(err, 'openXeroModal');
+    $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--red,#f87171);font-size:13px;">Failed to load pay runs: ' + esc(err.message) + '<div style="font-size:11px;color:var(--text-muted);margin-top:8px;">If this is a CORS error, the Staff Hub Apps Script may need redeploying with "Anyone" access.</div></div>';
   }
 }
 
 function closeXeroModal() {
-  abortXeroModalFetch();
   $('xeroModal').style.display = 'none';
 }
 
@@ -1358,17 +1216,14 @@ function renderPayRunList(payRuns) {
 }
 
 let xeroPullState = null;
-let xeroPayslipRetry = null;
 
 async function selectPayRun(payRunId, periodEnd, paymentDate) {
-  abortXeroModalFetch();
-  xeroPayslipRetry = { payRunId: payRunId, periodEnd: periodEnd, paymentDate: paymentDate };
   $('xeroModalSubtitle').textContent = 'Pay run ending ' + periodEnd;
-  setXeroModalLoading('Fetching payslip list…');
+  $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">Fetching payslip list…</div>';
   try {
-    const data = await fetchStaffHubJson(
-      STAFF_HUB_API + '?action=listPayslips&venue=' + encodeURIComponent(currentEntity) + '&payRunId=' + encodeURIComponent(payRunId)
-    );
+    const r = await fetch(STAFF_HUB_API + '?action=listPayslips&venue=' + encodeURIComponent(currentEntity) + '&payRunId=' + encodeURIComponent(payRunId));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
     const payslips = data.payslips || [];
     if (!payslips.length) {
       $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No payslips in this pay run.</div>';
@@ -1391,16 +1246,8 @@ async function selectPayRun(payRunId, periodEnd, paymentDate) {
     });
     renderPayslipSelector();
   } catch (err) {
-    $('xeroModalBody').innerHTML = renderXeroModalError(err, 'retrySelectPayRun');
+    $('xeroModalBody').innerHTML = '<div style="text-align:center;padding:24px;color:var(--red,#f87171);font-size:13px;">Failed: ' + esc(err.message) + '</div>';
   }
-}
-
-function retrySelectPayRun() {
-  if (!xeroPayslipRetry) {
-    openXeroModal();
-    return;
-  }
-  selectPayRun(xeroPayslipRetry.payRunId, xeroPayslipRetry.periodEnd, xeroPayslipRetry.paymentDate);
 }
 
 function renderPayslipSelector() {
@@ -1608,15 +1455,13 @@ async function syncPayrollIdsFromXero(silent){
   if (!silent) showToast('Fetching ' + (currentEntity === 'windmill' ? 'Windmill' : 'Eight Bells') + ' Payroll IDs from Xero — this takes 10–15 seconds…', 'info');
   let xeroEmployees = [];
   try {
-    const data = await fetchStaffHubJson(
-      STAFF_HUB_API + '?action=listEmployeePayrollIds&venue=' + encodeURIComponent(currentEntity),
-      60000
-    );
+    const r = await fetch(STAFF_HUB_API + '?action=listEmployeePayrollIds&venue=' + encodeURIComponent(currentEntity));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
     xeroEmployees = data.employees || [];
   } catch (err) {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; btn.innerHTML = origLabel; }
-    const info = formatXeroPullError(err);
-    if (!silent) showToast(info.title + ': ' + info.detail, 'error');
+    if (!silent) showToast('Xero fetch failed: ' + err.message, 'error');
     return;
   }
   if (btn) btn.innerHTML = '⟳ Matching ' + xeroEmployees.length + ' employees to Directory…';
