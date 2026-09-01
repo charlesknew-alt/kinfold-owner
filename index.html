@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-pref="auto">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#24362c">
   <title>Varlo</title>
+  <script src="theme.js"></script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none'%3E%3Crect x='1.5' y='1.5' width='45' height='45' rx='12' fill='%2324362c'/%3E%3Cpath d='M11.2 12.5 24 38.2 36.8 12.5h-6.4L24 29.1 17.6 12.5H11.2Z' fill='%23e6c27a'/%3E%3Cpath d='M17.6 12.5 24 29.1 30.4 12.5' stroke='%23b68a3a' stroke-width='1.6' stroke-linejoin='round' opacity='0.9'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -44,6 +45,44 @@
       --amber: var(--brass); --amber-bg: var(--gold-bg);
       --blue: #2b6cb0; --blue-bg: #ebf4ff;
       --purple: #6b2d5b; --purple-bg: #f5eef3;
+      --btn-on-accent: #fbf7f0;
+    }
+
+    [data-theme="dark"] {
+      --ink: #f3eadc;
+      --ink-soft: #b1a697;
+      --cream: #121816;
+      --paper: #1a221e;
+      --rule: #3a453c;
+      --brass: #e0b05a;
+      --brass-deep: #e0b05a;
+      --forest: #c5d4a8;
+      --forest-mid: #d8e4bc;
+      --rust: #e07a6a;
+      --money: #8fbf8f;
+      --dark: var(--cream);
+      --bg: var(--cream);
+      --card: #1a221e;
+      --card-hover: #24302a;
+      --card-strong: #3a453c;
+      --border: var(--rule);
+      --border-strong: #4a564c;
+      --text: var(--ink);
+      --text-muted: var(--ink-soft);
+      --text-dim: #8a8074;
+      --gold: var(--brass);
+      --gold-glow: rgba(224, 176, 90, 0.16);
+      --gold-bg: rgba(224, 176, 90, 0.14);
+      --windmill: #7eb6e8;
+      --windmill-glow: #1e2a36;
+      --eightbells: #d4a0c4;
+      --eightbells-glow: #2a1e28;
+      --green: var(--money); --green-bg: rgba(143,191,143,0.16);
+      --red: var(--rust); --red-bg: rgba(224,122,106,0.16);
+      --amber: var(--brass); --amber-bg: var(--gold-bg);
+      --blue: #7eb6e8; --blue-bg: #1e2a36;
+      --purple: #d4a0c4; --purple-bg: #2a1e28;
+      --btn-on-accent: #121816;
     }
 
     html, body { height: 100%; font-family: 'Source Sans 3', 'Segoe UI', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; }
@@ -187,6 +226,20 @@
     .pw-note.bad { color:var(--rust); }
     .pw-status { font-size:12px; color:var(--text-dim); margin-top:14px; }
 
+    .theme-toggle{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;border:1px solid var(--rule);background:var(--paper)}
+    .theme-toggle button{appearance:none;border:0;background:transparent;color:var(--ink-soft);font:inherit;font-size:11px;font-weight:600;letter-spacing:.02em;padding:5px 10px;border-radius:999px;cursor:pointer;line-height:1}
+    .theme-toggle button.is-active{background:var(--forest);color:var(--btn-on-accent,#fbf7f0)}
+    .theme-toggle button:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+    .landing-theme{position:absolute;top:18px;right:18px;z-index:5}
+    [data-theme="dark"] .login-overlay{background:#0c100e}
+    [data-theme="dark"] .login-card{background:var(--paper);border-color:var(--rule)}
+    [data-theme="dark"] .login-card input,[data-theme="dark"] .role-pick{background:var(--cream);color:var(--ink);border-color:var(--rule)}
+    [data-theme="dark"] .role-pick.active{background:var(--forest);color:var(--btn-on-accent);border-color:var(--forest)}
+    [data-theme="dark"] .login-btn{background:var(--forest);color:var(--btn-on-accent)}
+    [data-theme="dark"] .app-bar{background:rgba(18,24,22,0.92)}
+    [data-theme="dark"] .app-frame{background:var(--paper)}
+    [data-theme="dark"] .shared-card,[data-theme="dark"] .pub-card{background:var(--card)}
+
     /* ── App view ── */
     .app-view { display: none; position: fixed; inset: 0; z-index: 50; background: var(--cream); flex-direction: column; overflow: hidden; }
     .app-view.active { display: flex; }
@@ -197,6 +250,7 @@
     .app-bar-back:hover { border-color: var(--brass); }
     .app-bar-title { font-size: 14px; font-weight: 600; color: var(--ink); }
     .app-bar-pub { font-size: 12px; color: var(--ink-soft); margin-left: auto; }
+    .app-bar .theme-toggle { margin-left: 8px; }
     .app-frame { flex: 1; width: 100%; border: none; overflow: auto; -webkit-overflow-scrolling: touch; background: #fff; }
     .app-loader { position: absolute; inset: 0; top: 48px; background: var(--cream); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: opacity 0.5s; }
     .app-loader.hidden { opacity: 0; pointer-events: none; }
@@ -250,6 +304,13 @@
 
   <!-- Owner landing -->
   <div class="landing" id="landing" style="display:none">
+    <div class="landing-theme">
+      <div class="theme-toggle" data-theme-toggle role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="day" aria-pressed="false">Day</button>
+        <button type="button" data-theme-set="night" aria-pressed="false">Night</button>
+        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
+      </div>
+    </div>
     <div class="brand">
       <svg class="varlo-mark varlo-mark-lg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
         <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="#24362c"/>
@@ -380,6 +441,11 @@
       <button class="app-bar-back" onclick="closeApp()">← Back</button>
       <span class="app-bar-title" id="appTitle">-</span>
       <span class="app-bar-pub" id="appPub">-</span>
+      <div class="theme-toggle" data-theme-toggle role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="day" aria-pressed="false">Day</button>
+        <button type="button" data-theme-set="night" aria-pressed="false">Night</button>
+        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
+      </div>
     </div>
     <div class="app-loader" id="appLoader">
       <div class="spinner"></div>
@@ -401,6 +467,11 @@
       </div>
       <span class="app-bar-title" id="managerTitle">Manager</span>
       <span class="app-bar-pub" id="managerPub"></span>
+      <div class="theme-toggle" data-theme-toggle role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="day" aria-pressed="false">Day</button>
+        <button type="button" data-theme-set="night" aria-pressed="false">Night</button>
+        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
+      </div>
       <button class="app-bar-back" onclick="signOut()">Sign out</button>
     </div>
     <div class="app-loader" id="managerLoader">

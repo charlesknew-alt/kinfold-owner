@@ -1,15 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-pref="auto">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#24362c">
 <title>Varlo · Payroll → Wise</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="payroll-build" content="20260901-hard-contrast">
+<meta name="payroll-build" content="20260901-day-night-theme">
+<script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px}
+:root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px;--overlay:rgba(28,22,16,.45);--shadow:0 12px 40px rgba(28,22,16,.18);--btn-on-accent:#ffffff;--modal-banner-bg:#fff6e0;--modal-banner-ink:#1c1610;--modal-banner-border:#b68a3a;--modal-banner-accent:#8a6420}
+[data-theme="dark"]{--bg:#121816;--surface:#1a221e;--surface-2:#24302a;--border:#3a453c;--text:#f3eadc;--text-muted:#b1a697;--accent:#c5d4a8;--accent-hover:#d8e4bc;--green:#8fbf8f;--green-bg:rgba(143,191,143,.16);--red:#e07a6a;--red-bg:rgba(224,122,106,.16);--amber:#e0b05a;--amber-bg:rgba(224,176,90,.16);--row-stripe:rgba(243,234,220,.03);--row-hover:rgba(243,234,220,.06);--overlay:rgba(0,0,0,.62);--shadow:0 12px 40px rgba(0,0,0,.45);--btn-on-accent:#121816;--modal-banner-bg:rgba(224,176,90,.16);--modal-banner-ink:#f0d9a0;--modal-banner-border:#e0b05a;--modal-banner-accent:#e0b05a}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Source Sans 3','Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
 .container{max-width:1200px;margin:0 auto}
@@ -110,38 +113,44 @@ thead th.actions-head{text-align:center;width:44px}
 .field input::placeholder{color:var(--text-muted);opacity:.5}
 .field input.name-input{font-family:'DM Sans',sans-serif}
 .btn{padding:7px 16px;border-radius:8px;border:none;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.btn-primary{background:var(--accent);color:white}
+.btn-primary{background:var(--accent);color:var(--btn-on-accent,#fff)}
 .btn-primary:hover{background:var(--accent-hover)}
 .btn-secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
 .btn-secondary:hover{border-color:var(--text-muted)}
-.btn-success{background:var(--green);color:var(--bg)}
-.btn-success:hover{background:#4ade80}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{filter:brightness(1.08)}
 .btn-danger{background:transparent;color:var(--red);border:1px solid rgba(248,113,113,.3)}
 .btn-danger:hover{background:var(--red-bg)}
 .btn-sm{padding:4px 10px;font-size:11px}
 .btn-amber{background:transparent;color:var(--amber);border:1px solid rgba(182,138,58,.45)}
 .btn-amber:hover{background:var(--amber-bg)}
-/* Edit modal: HARDCODED cream/ink with !important so dark-theme leftovers / var overrides cannot win */
+.theme-toggle{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;border:1px solid var(--border);background:var(--surface-2)}
+.theme-toggle button{appearance:none;border:0;background:transparent;color:var(--text-muted);font:inherit;font-size:11px;font-weight:600;letter-spacing:.02em;padding:5px 10px;border-radius:999px;cursor:pointer;line-height:1}
+.theme-toggle button.is-active{background:var(--accent);color:var(--btn-on-accent,#fff)}
+.theme-toggle button:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.varlo-lockup strong{color:var(--text)}
+[data-theme="dark"] .entity-tab.active,[data-theme="dark"] .step-indicator.active .step-num,[data-theme="dark"] .step-indicator.done .step-num{color:#121816}
+/* Edit modal: theme tokens with !important so leftover navy vars cannot win (keeps hard-contrast fix) */
 #editRowModal .edit-row-modal{
-  background:#ffffff !important;
-  border:1px solid #d8cfc0 !important;
+  background:var(--surface,#ffffff) !important;
+  border:1px solid var(--border,#d8cfc0) !important;
   border-radius:12px !important;
   padding:24px !important;
   max-width:520px !important;
   width:100% !important;
-  box-shadow:0 12px 40px rgba(28,22,16,0.18) !important;
-  color:#1c1610 !important;
+  box-shadow:var(--shadow,0 12px 40px rgba(28,22,16,0.18)) !important;
+  color:var(--text,#1c1610) !important;
 }
 #editRowModal #editModalTitle{
   font-size:16px !important;
   font-weight:700 !important;
   margin:0 !important;
-  color:#1c1610 !important;
+  color:var(--text,#1c1610) !important;
 }
 #editRowModal .edit-modal-close{
   background:none !important;
   border:none !important;
-  color:#3d3429 !important;
+  color:var(--text-muted,#3d3429) !important;
   font-size:20px !important;
   cursor:pointer !important;
   padding:0 !important;
@@ -151,63 +160,68 @@ thead th.actions-head{text-align:center;width:44px}
   font-size:12px !important;
   font-weight:700 !important;
   line-height:1.4 !important;
-  background:#fff6e0 !important;
-  color:#1c1610 !important;
-  border:1px solid #b68a3a !important;
-  border-left:4px solid #8a6420 !important;
+  background:var(--modal-banner-bg,#fff6e0) !important;
+  color:var(--modal-banner-ink,#1c1610) !important;
+  border:1px solid var(--modal-banner-border,#b68a3a) !important;
+  border-left:4px solid var(--modal-banner-accent,#8a6420) !important;
   padding:10px 12px !important;
   border-radius:6px !important;
   margin-bottom:14px !important;
 }
 #editRowModal .edit-modal-label{
   font-size:11px !important;
-  color:#3d3429 !important;
+  color:var(--text-muted,#3d3429) !important;
   display:block !important;
   margin-bottom:4px !important;
   font-weight:600 !important;
 }
-#editRowModal .edit-modal-label span{color:#3d3429 !important}
+#editRowModal .edit-modal-label span{color:var(--text-muted,#3d3429) !important}
 #editRowModal .edit-modal-input{
   width:100% !important;
   padding:8px 10px !important;
-  background:#f6f0e6 !important;
-  border:1px solid #d8cfc0 !important;
+  background:var(--surface-2,#f6f0e6) !important;
+  border:1px solid var(--border,#d8cfc0) !important;
   border-radius:6px !important;
-  color:#1c1610 !important;
+  color:var(--text,#1c1610) !important;
   font-size:13px !important;
-  -webkit-text-fill-color:#1c1610 !important;
-  caret-color:#1c1610 !important;
+  -webkit-text-fill-color:var(--text,#1c1610) !important;
+  caret-color:var(--text,#1c1610) !important;
 }
 #editRowModal .edit-modal-input:focus{
   outline:none !important;
-  border-color:#24362c !important;
+  border-color:var(--accent,#24362c) !important;
   box-shadow:0 0 0 2px rgba(36,54,44,.12) !important;
 }
+[data-theme="dark"] #editRowModal .edit-modal-input:focus{
+  box-shadow:0 0 0 2px rgba(197,212,168,.22) !important;
+}
 #editRowModal .edit-modal-input::placeholder{
-  color:#6b5e4e !important;
+  color:var(--text-muted,#6b5e4e) !important;
   opacity:1 !important;
-  -webkit-text-fill-color:#6b5e4e !important;
+  -webkit-text-fill-color:var(--text-muted,#6b5e4e) !important;
 }
 #editRowModal .edit-modal-amount{
   font-size:11px !important;
-  color:#3d3429 !important;
+  color:var(--text-muted,#3d3429) !important;
   margin-top:4px !important;
 }
 #editRowModal #editModalAmount{
-  color:#1c1610 !important;
+  color:var(--text,#1c1610) !important;
   font-weight:700 !important;
-  -webkit-text-fill-color:#1c1610 !important;
+  -webkit-text-fill-color:var(--text,#1c1610) !important;
 }
 #editRowModal .btn-secondary{
-  background:#ffffff !important;
-  color:#1c1610 !important;
-  border:1px solid #d8cfc0 !important;
+  background:var(--surface,#ffffff) !important;
+  color:var(--text,#1c1610) !important;
+  border:1px solid var(--border,#d8cfc0) !important;
 }
 #editRowModal .btn-amber{
-  background:#fff6e0 !important;
-  color:#8a6420 !important;
-  border:1px solid #b68a3a !important;
+  background:var(--modal-banner-bg,#fff6e0) !important;
+  color:var(--modal-banner-accent,#8a6420) !important;
+  border:1px solid var(--modal-banner-border,#b68a3a) !important;
 }
+#editRowModal .btn-primary{color:var(--btn-on-accent,#fff) !important}
+[data-theme="dark"] #editRowModal .btn-success{color:#121816 !important}
 .save-checkbox{margin-top:8px}
 .save-checkbox label{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer}
 .actions-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -271,7 +285,12 @@ thead th.actions-head{text-align:center;width:44px}
       </div>
       <h1>Payroll → Wise<span>BACS file parser & Wise CSV generator</span></h1>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end;">
+      <div class="theme-toggle" data-theme-toggle role="group" aria-label="Colour theme">
+        <button type="button" data-theme-set="day" aria-pressed="false">Day</button>
+        <button type="button" data-theme-set="night" aria-pressed="false">Night</button>
+        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
+      </div>
       <span class="sync-status" id="syncStatus"><span class="sync-dot"></span> Loading...</span>
       <div class="entity-tabs">
         <button class="entity-tab active" data-entity="windmill">The Windmill</button>
@@ -1253,8 +1272,8 @@ window.syncPayrollIdsFromXero = syncPayrollIdsFromXero;
 
 </script>
 
-<!-- Edit Row Modal — build 20260901-hard-contrast -->
-<div id="editRowModal" style="display:none;position:fixed;inset:0;background:rgba(28,22,16,0.45);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+<!-- Edit Row Modal — theme-aware contrast (keeps hard-contrast readability) -->
+<div id="editRowModal" style="display:none;position:fixed;inset:0;background:var(--overlay,rgba(28,22,16,0.45));z-index:1000;align-items:center;justify-content:center;padding:20px;">
   <div class="edit-row-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
       <h2 id="editModalTitle">Edit employee</h2>
