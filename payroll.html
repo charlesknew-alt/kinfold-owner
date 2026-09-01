@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Varlo · Payroll → Wise</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta name="payroll-build" content="20260901-hard-contrast">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px}
@@ -118,9 +121,93 @@ thead th.actions-head{text-align:center;width:44px}
 .btn-sm{padding:4px 10px;font-size:11px}
 .btn-amber{background:transparent;color:var(--amber);border:1px solid rgba(182,138,58,.45)}
 .btn-amber:hover{background:var(--amber-bg)}
-.edit-modal-banner{font-size:12px;font-weight:600;line-height:1.4;background:var(--surface-2,#f6f0e6);color:var(--text,#1c1610);border:1px solid var(--amber,#b68a3a);border-left:4px solid var(--amber,#b68a3a);padding:10px 12px;border-radius:6px;margin-bottom:14px}
-.edit-modal-input:focus{outline:none;border-color:var(--accent,#24362c);box-shadow:0 0 0 2px rgba(36,54,44,.12)}
-.edit-modal-input::placeholder{color:var(--text-muted,#3d3429);opacity:.55}
+/* Edit modal: HARDCODED cream/ink with !important so dark-theme leftovers / var overrides cannot win */
+#editRowModal .edit-row-modal{
+  background:#ffffff !important;
+  border:1px solid #d8cfc0 !important;
+  border-radius:12px !important;
+  padding:24px !important;
+  max-width:520px !important;
+  width:100% !important;
+  box-shadow:0 12px 40px rgba(28,22,16,0.18) !important;
+  color:#1c1610 !important;
+}
+#editRowModal #editModalTitle{
+  font-size:16px !important;
+  font-weight:700 !important;
+  margin:0 !important;
+  color:#1c1610 !important;
+}
+#editRowModal .edit-modal-close{
+  background:none !important;
+  border:none !important;
+  color:#3d3429 !important;
+  font-size:20px !important;
+  cursor:pointer !important;
+  padding:0 !important;
+  line-height:1 !important;
+}
+#editRowModal .edit-modal-banner{
+  font-size:12px !important;
+  font-weight:700 !important;
+  line-height:1.4 !important;
+  background:#fff6e0 !important;
+  color:#1c1610 !important;
+  border:1px solid #b68a3a !important;
+  border-left:4px solid #8a6420 !important;
+  padding:10px 12px !important;
+  border-radius:6px !important;
+  margin-bottom:14px !important;
+}
+#editRowModal .edit-modal-label{
+  font-size:11px !important;
+  color:#3d3429 !important;
+  display:block !important;
+  margin-bottom:4px !important;
+  font-weight:600 !important;
+}
+#editRowModal .edit-modal-label span{color:#3d3429 !important}
+#editRowModal .edit-modal-input{
+  width:100% !important;
+  padding:8px 10px !important;
+  background:#f6f0e6 !important;
+  border:1px solid #d8cfc0 !important;
+  border-radius:6px !important;
+  color:#1c1610 !important;
+  font-size:13px !important;
+  -webkit-text-fill-color:#1c1610 !important;
+  caret-color:#1c1610 !important;
+}
+#editRowModal .edit-modal-input:focus{
+  outline:none !important;
+  border-color:#24362c !important;
+  box-shadow:0 0 0 2px rgba(36,54,44,.12) !important;
+}
+#editRowModal .edit-modal-input::placeholder{
+  color:#6b5e4e !important;
+  opacity:1 !important;
+  -webkit-text-fill-color:#6b5e4e !important;
+}
+#editRowModal .edit-modal-amount{
+  font-size:11px !important;
+  color:#3d3429 !important;
+  margin-top:4px !important;
+}
+#editRowModal #editModalAmount{
+  color:#1c1610 !important;
+  font-weight:700 !important;
+  -webkit-text-fill-color:#1c1610 !important;
+}
+#editRowModal .btn-secondary{
+  background:#ffffff !important;
+  color:#1c1610 !important;
+  border:1px solid #d8cfc0 !important;
+}
+#editRowModal .btn-amber{
+  background:#fff6e0 !important;
+  color:#8a6420 !important;
+  border:1px solid #b68a3a !important;
+}
 .save-checkbox{margin-top:8px}
 .save-checkbox label{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer}
 .actions-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -1166,34 +1253,34 @@ window.syncPayrollIdsFromXero = syncPayrollIdsFromXero;
 
 </script>
 
-<!-- Edit Row Modal -->
+<!-- Edit Row Modal — build 20260901-hard-contrast -->
 <div id="editRowModal" style="display:none;position:fixed;inset:0;background:rgba(28,22,16,0.45);z-index:1000;align-items:center;justify-content:center;padding:20px;">
-  <div class="edit-row-modal" style="background:var(--surface,#fff);border:1px solid var(--border,#d8cfc0);border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 12px 40px rgba(28,22,16,0.18);color:var(--text,#1c1610);">
+  <div class="edit-row-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-      <h2 id="editModalTitle" style="font-size:16px;font-weight:700;margin:0;color:var(--text,#1c1610);">Edit employee</h2>
-      <button onclick="closeEditModal()" style="background:none;border:none;color:var(--text-muted,#3d3429);font-size:20px;cursor:pointer;padding:0;line-height:1;">×</button>
+      <h2 id="editModalTitle">Edit employee</h2>
+      <button type="button" class="edit-modal-close" onclick="closeEditModal()" aria-label="Close">×</button>
     </div>
     <div id="editModalBacsBanner" class="edit-modal-banner" style="display:none;"></div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div>
-        <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Name</label>
-        <input id="editModalName" type="text" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
+        <label class="edit-modal-label" for="editModalName">Name</label>
+        <input id="editModalName" type="text" class="edit-modal-input" autocomplete="off">
       </div>
       <div style="display:flex;gap:12px;">
         <div style="flex:1;">
-          <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Sort Code</label>
-          <input id="editModalSort" type="text" placeholder="00-00-00" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
+          <label class="edit-modal-label" for="editModalSort">Sort Code</label>
+          <input id="editModalSort" type="text" placeholder="00-00-00" class="edit-modal-input" autocomplete="off">
         </div>
         <div style="flex:1;">
-          <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Account Number</label>
-          <input id="editModalAccount" type="text" placeholder="00000000" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
+          <label class="edit-modal-label" for="editModalAccount">Account Number</label>
+          <input id="editModalAccount" type="text" placeholder="00000000" class="edit-modal-input" autocomplete="off">
         </div>
       </div>
       <div>
-        <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Xero Payroll ID <span style="color:var(--text-muted,#3d3429);">(used as Wise payment reference)</span></label>
-        <input id="editModalPayrollId" type="text" placeholder="BELLS30" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
+        <label class="edit-modal-label" for="editModalPayrollId">Xero Payroll ID <span>(used as Wise payment reference)</span></label>
+        <input id="editModalPayrollId" type="text" placeholder="BELLS30" class="edit-modal-input" autocomplete="off">
       </div>
-      <div style="font-size:11px;color:var(--text-muted,#3d3429);margin-top:4px;">Amount: <span id="editModalAmount" style="color:var(--text,#1c1610);font-weight:600;"></span></div>
+      <div class="edit-modal-amount">Amount: <span id="editModalAmount"></span></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;">
       <button class="btn btn-success btn-sm" onclick="modalSaveToDirectory()" style="flex:1;min-width:130px;">💾 Save to Directory</button>
