@@ -148,10 +148,14 @@
 
   function boot() {
     apply(readPref());
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', bind);
-    } else {
+    function afterDom() {
       bind();
+      syncToggles(readPref(), resolveMode());
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', afterDom);
+    } else {
+      afterDom();
     }
     // Re-evaluate Auto around dawn/dusk without a reload.
     setInterval(function () {
