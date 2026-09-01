@@ -116,8 +116,11 @@ thead th.actions-head{text-align:center;width:44px}
 .btn-danger{background:transparent;color:var(--red);border:1px solid rgba(248,113,113,.3)}
 .btn-danger:hover{background:var(--red-bg)}
 .btn-sm{padding:4px 10px;font-size:11px}
-.btn-amber{background:transparent;color:var(--amber);border:1px solid rgba(251,191,36,.3)}
+.btn-amber{background:transparent;color:var(--amber);border:1px solid rgba(182,138,58,.45)}
 .btn-amber:hover{background:var(--amber-bg)}
+.edit-modal-banner{font-size:12px;font-weight:600;line-height:1.4;background:var(--surface-2,#f6f0e6);color:var(--text,#1c1610);border:1px solid var(--amber,#b68a3a);border-left:4px solid var(--amber,#b68a3a);padding:10px 12px;border-radius:6px;margin-bottom:14px}
+.edit-modal-input:focus{outline:none;border-color:var(--accent,#24362c);box-shadow:0 0 0 2px rgba(36,54,44,.12)}
+.edit-modal-input::placeholder{color:var(--text-muted,#3d3429);opacity:.55}
 .save-checkbox{margin-top:8px}
 .save-checkbox label{font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer}
 .actions-bar{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -1164,33 +1167,33 @@ window.syncPayrollIdsFromXero = syncPayrollIdsFromXero;
 </script>
 
 <!-- Edit Row Modal -->
-<div id="editRowModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:var(--card,#1a1f3a);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,0.4);">
+<div id="editRowModal" style="display:none;position:fixed;inset:0;background:rgba(28,22,16,0.45);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+  <div class="edit-row-modal" style="background:var(--surface,#fff);border:1px solid var(--border,#d8cfc0);border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 12px 40px rgba(28,22,16,0.18);color:var(--text,#1c1610);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-      <h2 id="editModalTitle" style="font-size:16px;font-weight:700;margin:0;">Edit employee</h2>
-      <button onclick="closeEditModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:0;line-height:1;">×</button>
+      <h2 id="editModalTitle" style="font-size:16px;font-weight:700;margin:0;color:var(--text,#1c1610);">Edit employee</h2>
+      <button onclick="closeEditModal()" style="background:none;border:none;color:var(--text-muted,#3d3429);font-size:20px;cursor:pointer;padding:0;line-height:1;">×</button>
     </div>
-    <div id="editModalBacsBanner" style="display:none;font-size:11px;background:var(--amber-bg,rgba(245,158,11,0.1));color:var(--amber,#f59e0b);padding:8px 10px;border-radius:6px;margin-bottom:14px;"></div>
+    <div id="editModalBacsBanner" class="edit-modal-banner" style="display:none;"></div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div>
-        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Name</label>
-        <input id="editModalName" type="text" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+        <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Name</label>
+        <input id="editModalName" type="text" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
       </div>
       <div style="display:flex;gap:12px;">
         <div style="flex:1;">
-          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Sort Code</label>
-          <input id="editModalSort" type="text" placeholder="00-00-00" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+          <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Sort Code</label>
+          <input id="editModalSort" type="text" placeholder="00-00-00" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
         </div>
         <div style="flex:1;">
-          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Account Number</label>
-          <input id="editModalAccount" type="text" placeholder="00000000" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+          <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Account Number</label>
+          <input id="editModalAccount" type="text" placeholder="00000000" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
         </div>
       </div>
       <div>
-        <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Xero Payroll ID <span style="color:var(--text-muted);">(used as Wise payment reference)</span></label>
-        <input id="editModalPayrollId" type="text" placeholder="BELLS30" style="width:100%;padding:8px 10px;background:var(--card2,#0f1428);border:1px solid var(--border);border-radius:6px;color:var(--text,#fff);font-size:13px;">
+        <label style="font-size:11px;color:var(--text-muted,#3d3429);display:block;margin-bottom:4px;">Xero Payroll ID <span style="color:var(--text-muted,#3d3429);">(used as Wise payment reference)</span></label>
+        <input id="editModalPayrollId" type="text" placeholder="BELLS30" class="edit-modal-input" style="width:100%;padding:8px 10px;background:var(--surface-2,#f6f0e6);border:1px solid var(--border,#d8cfc0);border-radius:6px;color:var(--text,#1c1610);font-size:13px;">
       </div>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Amount: <span id="editModalAmount" style="color:var(--text,#fff);font-weight:600;"></span></div>
+      <div style="font-size:11px;color:var(--text-muted,#3d3429);margin-top:4px;">Amount: <span id="editModalAmount" style="color:var(--text,#1c1610);font-weight:600;"></span></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;">
       <button class="btn btn-success btn-sm" onclick="modalSaveToDirectory()" style="flex:1;min-width:130px;">💾 Save to Directory</button>
