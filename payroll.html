@@ -6,7 +6,7 @@
 <title>Varlo · Payroll → Wise</title>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="payroll-build" content="20260901-wise-excluded-summary">
+<meta name="payroll-build" content="20260901-wise-missing-wont-pay">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#fbf7f0;--surface:#fff;--surface-2:#f6f0e6;--border:#d8cfc0;--text:#1c1610;--text-muted:#3d3429;--accent:#24362c;--accent-hover:#2f4a3b;--green:#2d5a3d;--green-bg:rgba(45,90,61,.12);--red:#8a3d28;--red-bg:rgba(138,61,40,.12);--amber:#b68a3a;--amber-bg:rgba(182,138,58,.14);--row-stripe:rgba(28,22,16,.03);--row-hover:rgba(28,22,16,.05);--radius:10px}
@@ -236,23 +236,28 @@ thead th.actions-head{text-align:center;width:44px}
 .dir-item-actions{display:flex;gap:6px}
 .excluded-notice{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--amber-bg);border:1px solid rgba(251,191,36,.2);border-radius:var(--radius);margin-bottom:16px;font-size:12px;color:var(--amber)}
 .excluded-notice strong{font-weight:600}
-.wise-exclusion-panel{display:none;margin-bottom:16px;border:1px solid var(--red);border-radius:var(--radius);background:var(--red-bg);overflow:hidden}
+.wise-exclusion-panel{display:none;margin-bottom:16px;border:2px solid var(--red);border-radius:var(--radius);background:var(--red-bg);overflow:hidden;position:sticky;top:8px;z-index:40;box-shadow:0 8px 24px rgba(28,22,16,.08)}
 .wise-exclusion-panel.is-visible{display:block}
-.wise-exclusion-panel.is-ok{border-color:var(--green);background:var(--green-bg)}
+.wise-exclusion-panel.is-ok{border-color:var(--green);background:var(--green-bg);box-shadow:none}
 .wise-exclusion-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(138,61,40,.18)}
 .wise-exclusion-panel.is-ok .wise-exclusion-head{border-bottom-color:rgba(45,90,61,.18)}
-.wise-exclusion-title{font-size:13px;font-weight:700;color:var(--red);margin:0}
+.wise-exclusion-title{font-size:14px;font-weight:700;color:var(--red);margin:0}
 .wise-exclusion-panel.is-ok .wise-exclusion-title{color:var(--green)}
 .wise-exclusion-sub{font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4}
 .wise-exclusion-total{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--red);white-space:nowrap}
 .wise-exclusion-panel.is-ok .wise-exclusion-total{color:var(--green)}
-.wise-exclusion-list{list-style:none;margin:0;padding:0}
-.wise-exclusion-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(138,61,40,.12);font-size:12px}
+.wise-exclusion-list{list-style:none;margin:0;padding:0;max-height:220px;overflow-y:auto}
+.wise-exclusion-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(138,61,40,.12);font-size:12px;background:rgba(255,255,255,.35)}
 .wise-exclusion-list li:last-child{border-bottom:none}
 .wise-exclusion-name{font-weight:600;color:var(--text)}
 .wise-exclusion-reason{font-size:11px;color:var(--text-muted);margin-top:2px}
 .wise-exclusion-amt{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--red);white-space:nowrap}
 .wise-exclusion-panel.is-ok .wise-exclusion-amt{color:var(--green)}
+.wise-exclusion-block-note{padding:8px 14px;font-size:11px;font-weight:600;color:var(--red);background:rgba(138,61,40,.1);border-top:1px solid rgba(138,61,40,.18)}
+.dl-warn{display:none;font-size:11px;font-weight:600;color:var(--red);max-width:280px;text-align:right;line-height:1.35}
+.dl-warn.is-visible{display:block}
+.btn-success.is-blocked{opacity:.55;cursor:not-allowed;background:var(--red)!important}
+.btn-success.is-blocked:hover{background:var(--red)!important}
 tbody tr.no-bank-row td{background:var(--red-bg)!important}
 tbody tr.zero-net-row td{background:var(--amber-bg)!important}
 .no-bank-tag,.zero-net-tag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;vertical-align:middle;font-family:'Source Sans 3',sans-serif}
@@ -411,7 +416,11 @@ tbody tr.zero-net-row td{background:var(--amber-bg)!important}
 
   <div class="actions-bar" id="actionsBar" style="display:none">
     <div class="actions-left"><div class="payment-ref-field"><label>Payment ref:</label><input type="text" id="paymentRef" placeholder="e.g. Windmill Mar Payroll"></div></div>
-    <div style="display:flex;gap:8px;"><button class="btn btn-secondary" id="clearBtn">Clear all</button><button class="btn btn-success" id="downloadBtn">⬇ Download Wise CSV</button></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+      <div class="dl-warn" id="downloadWarn" aria-live="polite"></div>
+      <button class="btn btn-secondary" id="clearBtn">Clear all</button>
+      <button class="btn btn-success" id="downloadBtn">⬇ Download Wise CSV</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -571,31 +580,43 @@ function fmtMoney(n){return n.toLocaleString('en-GB',{minimumFractionDigits:2,ma
 function getDeductionTotal(emp){return(emp.deductions||[]).reduce((s,d)=>s+d.amount,0);}
 function getNetPay(emp){return emp.amount-getDeductionTotal(emp);}
 // UK BACS: 6-digit sort code + 8-digit account. Missing either → Wise rejects/drops the row.
+// Leading zeros (e.g. Jude 043605 / 09380302) are valid and MUST be preserved — never parse as Number.
+function bankDigits(e){
+  return {
+    sort: String(e&&e.sortCode||'').replace(/\D/g,''),
+    acct: String(e&&e.accountNumber||'').replace(/\D/g,'')
+  };
+}
 function hasValidBankDetails(e){
-  const sc=String(e&&e.sortCode||'').replace(/\D/g,'');
-  const ac=String(e&&e.accountNumber||'').replace(/\D/g,'');
-  return sc.length===6 && ac.length===8;
+  const b=bankDigits(e);
+  return b.sort.length===6 && b.acct.length===8;
+}
+// Wise CSV: keep hyphenated sort + quoted fields so leading zeros survive Excel reopen.
+function wiseSortForCsv(e){
+  const s=bankDigits(e).sort;
+  if(s.length!==6)return String(e&&e.sortCode||'');
+  return s.substring(0,2)+'-'+s.substring(2,4)+'-'+s.substring(4,6);
+}
+function wiseAcctForCsv(e){
+  return bankDigits(e).acct;
 }
 function collectTableDropouts(){
   const items=[];
   employees.forEach(e=>{
     const net=getNetPay(e);
     if(net<=0){
-      items.push({name:e.name,amount:net,reason:'Zero / negative net pay — blocked from Wise'});
+      items.push({name:e.name,amount:net,reason:'Zero / negative net pay — blocked from Wise',blocking:true});
       return;
     }
     if(!hasValidBankDetails(e)){
-      items.push({name:e.name,amount:net,reason:'Missing or incomplete bank details — left out of Wise CSV'});
+      items.push({name:e.name,amount:net,reason:'Missing or incomplete bank details — left out of Wise CSV',blocking:true});
     }
   });
   return items;
 }
-function updateWiseExclusionPanel(){
-  const panel=$('wiseExclusionPanel');
-  if(!panel)return;
+function getMissingWontPayItems(){
   const live=collectTableDropouts();
   const source=sourceDropouts.slice();
-  // Prefer post-download snapshot when present; otherwise show who WILL be left out
   const leftOut=lastDownloadLeftOut?lastDownloadLeftOut.items:[];
   const combined=[];
   const seen=new Set();
@@ -609,17 +630,49 @@ function updateWiseExclusionPanel(){
   }
   if(lastDownloadLeftOut){
     addAll(leftOut);
-    // Also keep any still-broken table rows / source dropouts that weren't in the file
     addAll(live);
     addAll(source);
   }else{
     addAll(live);
     addAll(source);
   }
+  return combined;
+}
+function updateDownloadControls(combined){
+  const btn=$('downloadBtn');
+  const warn=$('downloadWarn');
+  if(!btn)return;
+  const blocking=(combined||[]).filter(it=>it.blocking || /Missing or incomplete bank|Zero \/ negative/.test(it.reason||''));
+  const softCount=(combined||[]).length;
+  const blockCount=blocking.length;
+  btn.classList.toggle('is-blocked', blockCount>0);
+  btn.disabled=false; // keep clickable so we can toast+scroll to panel
+  if(blockCount>0){
+    btn.textContent=`⬇ Download blocked · ${blockCount} missing / won't pay`;
+    if(warn){
+      warn.className='dl-warn is-visible';
+      warn.textContent=`Fix the Missing / won't pay panel first (${blockCount}).`;
+    }
+  }else if(softCount>0){
+    btn.textContent=`⬇ Download Wise CSV · ${softCount} not in file`;
+    if(warn){
+      warn.className='dl-warn is-visible';
+      warn.textContent=`${softCount} listed above will not be in the CSV (excluded / not imported).`;
+    }
+  }else{
+    btn.textContent='⬇ Download Wise CSV';
+    if(warn){warn.className='dl-warn';warn.textContent='';}
+  }
+}
+function updateWiseExclusionPanel(){
+  const panel=$('wiseExclusionPanel');
+  if(!panel)return;
+  const combined=getMissingWontPayItems();
+  updateDownloadControls(combined);
   if(!combined.length){
     if(employees.length){
       panel.className='wise-exclusion-panel is-visible is-ok';
-      panel.innerHTML=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">✓ Everyone owed money is in the Wise batch</div><div class="wise-exclusion-sub">No missing bank details, zero nets, or excluded staff for this load.</div></div><div class="wise-exclusion-total">£0.00 out</div></div>`;
+      panel.innerHTML=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">✓ Missing / won't pay — none</div><div class="wise-exclusion-sub">Everyone owed money with valid bank details is in the Wise batch.</div></div><div class="wise-exclusion-total">£0.00 out</div></div>`;
     }else{
       panel.className='wise-exclusion-panel';
       panel.innerHTML='';
@@ -627,18 +680,22 @@ function updateWiseExclusionPanel(){
     return;
   }
   const tot=combined.reduce((s,it)=>s+Math.max(0,Number(it.amount)||0),0);
+  const blocking=combined.filter(it=>it.blocking || /Missing or incomplete bank|Zero \/ negative/.test(it.reason||''));
   const title=lastDownloadLeftOut
-    ? `Left out of Wise file (${lastDownloadLeftOut.fileName})`
-    : 'Not going into the Wise file';
+    ? `Missing / won't pay — left out of ${lastDownloadLeftOut.fileName}`
+    : 'Missing / won't pay';
   const sub=lastDownloadLeftOut
     ? 'These people were on the Xero/BACS pay run but were not included in the downloaded CSV. Fix bank details (✏️) and download again if needed.'
-    : 'Anyone owed money who will be excluded from Download Wise CSV — missing bank, zero net, or on the Excluded Staff list.';
+    : 'Anyone on this pay run who will NOT be in Download Wise CSV — zero/negative net, missing bank, excluded staff, or not imported.';
   let html=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">⚠ ${combined.length} ${combined.length===1?'person':'people'} — ${esc(title)}</div><div class="wise-exclusion-sub">${esc(sub)}</div></div><div class="wise-exclusion-total">£${fmtMoney(tot)} out</div></div>`;
   html+='<ul class="wise-exclusion-list">';
   combined.forEach(it=>{
     html+=`<li><div><div class="wise-exclusion-name">${esc(it.name||'(unnamed)')}</div><div class="wise-exclusion-reason">${esc(it.reason||'')}</div></div><div class="wise-exclusion-amt">£${fmtMoney(Number(it.amount)||0)}</div></li>`;
   });
   html+='</ul>';
+  if(blocking.length){
+    html+=`<div class="wise-exclusion-block-note">Download is blocked until zero-net and no-bank rows are fixed (or removed). Excluded / not-imported people stay listed so they cannot be missed.</div>`;
+  }
   panel.className='wise-exclusion-panel is-visible';
   panel.innerHTML=html;
 }
@@ -670,7 +727,22 @@ function renderTable(){
 }
 
 function updateTotal(){const g=employees.reduce((s,e)=>s+e.amount,0),d=employees.reduce((s,e)=>s+getDeductionTotal(e),0),n=g-d;$('totalAmount').textContent=`£${fmtMoney(n)}`;$('totalDetails').textContent=d>0?` (gross £${fmtMoney(g)} − £${fmtMoney(d)} deductions)`:'';validateTotal();}
-function removeRow(i){employees.splice(i,1);renderTable();}
+function removeRow(i){
+  const e=employees[i];
+  if(e){
+    const net=getNetPay(e);
+    if(net>0){
+      sourceDropouts.push({
+        name:e.name,
+        amount:net,
+        reason:'Removed from this batch — will not be in Wise CSV'
+      });
+    }
+  }
+  employees.splice(i,1);
+  lastDownloadLeftOut=null;
+  renderTable();
+}
 
 // ── Edit modal: opens with row's current values, lets you push to Directory / Xero / Revert ──
 let _editingRowIndex = null;
@@ -922,50 +994,68 @@ async function unexclude(i){const s=excludedStaff[i];if(!s)return;await apiPost(
 // ── Download & Log ──
 $('downloadBtn').addEventListener('click',async()=>{
   if(!employees.length)return;
+  updateWiseExclusionPanel();
+  const panel=$('wiseExclusionPanel');
   const g=employees.reduce((s,e)=>s+e.amount,0),raw=$('expectedTotal').value.replace(/[£,\s]/g,''),exp=parseFloat(raw);
   if(!isNaN(exp)&&Math.abs(g-exp)>=0.02){if(!confirm(`⚠ Gross (£${g.toFixed(2)}) ≠ expected (£${exp}).\nDiff: £${Math.abs(g-exp).toFixed(2)}\n\nDownload anyway?`))return;}
   const neg=employees.filter(e=>getNetPay(e)<=0);
-  if(neg.length){
-    updateWiseExclusionPanel();
-    showToast(`${neg[0].name} has zero/negative net pay — see “Not going into the Wise file”`,'error');
-    return;
-  }
-  // Owed-but-unpayable: missing UK sort (6) or account (8). Confirm, then EXCLUDE from CSV.
-  const noBank=employees.filter(e=>!hasValidBankDetails(e));
+  const noBank=employees.filter(e=>getNetPay(e)>0&&!hasValidBankDetails(e));
   const payable=employees.filter(e=>hasValidBankDetails(e)&&getNetPay(e)>0);
-  if(noBank.length){
+  // Hard block: zero/negative net OR missing bank — must fix before CSV (Jude incident).
+  if(neg.length||noBank.length){
     updateWiseExclusionPanel();
-    const list=noBank.map(e=>`\u2022 ${e.name} \u2014 \u00a3${getNetPay(e).toFixed(2)} (no bank details)`).join('\n');
-    const tot=noBank.reduce((s,e)=>s+getNetPay(e),0);
-    if(!confirm(`\u26a0 ${noBank.length} ${noBank.length===1?'person is':'people are'} owed money but ${noBank.length===1?'has':'have'} NO bank details \u2014 they will be LEFT OUT of the Wise CSV:\n\n${list}\n\nTotal left out: \u00a3${tot.toFixed(2)}\n\nRecommended: Cancel, add bank details (✏️ Edit), then download again.\n\nDownload without them?`)){return;}
+    if(panel)panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    const bits=[];
+    if(neg.length)bits.push(`${neg.length} zero/negative net`);
+    if(noBank.length)bits.push(`${noBank.length} missing bank`);
+    showToast(`Download blocked — ${bits.join(' + ')}. See Missing / won't pay`,'error');
+    return;
   }
   if(!payable.length){
     showToast('No payable rows with bank details — nothing to download','error');
     updateWiseExclusionPanel();
     return;
   }
+  // Soft warn: people on the pay run who are intentionally not in the CSV (excluded / unticked / removed)
+  if(sourceDropouts.length){
+    const list=sourceDropouts.map(e=>`\u2022 ${e.name} \u2014 \u00a3${(Number(e.amount)||0).toFixed(2)} (${e.reason})`).join('\n');
+    const tot=sourceDropouts.reduce((s,e)=>s+(Number(e.amount)||0),0);
+    if(!confirm(`\u26a0 ${sourceDropouts.length} ${sourceDropouts.length===1?'person is':'people are'} on this pay run but will NOT be in the Wise CSV:\n\n${list}\n\nTotal not in file: \u00a3${tot.toFixed(2)}\n\nDownload the CSV without them?`)){return;}
+  }
   const ref=$('paymentRef').value.trim()||'Payroll',entityLabel=currentEntity==='windmill'?'Windmill':'Eight Bells';
   const hdrs=['name','recipientEmail','paymentReference','receiverType','amountCurrency','amount','sourceCurrency','targetCurrency','sortCode','accountNumber'];
-  const rows=payable.map(e=>{var pid=e.payrollId||'';if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',e.sortCode,e.accountNumber];});
-  let csv=hdrs.join(',')+'\n';rows.forEach(r=>{csv+=r.map(c=>(typeof c==='string'&&(c.includes(',')||c.includes('"')))?'"'+c.replace(/"/g,'""')+'"':c).join(',')+'\n';});
+  // Quote sort + account so leading zeros (043605 / 09380302) survive Excel; Wise accepts hyphenated UK sort codes.
+  const rows=payable.map(e=>{
+    var pid=e.payrollId||'';
+    if(!pid){var d=staffDirectory.find(x=>x.sortCode===e.sortCode&&x.accountNumber===e.accountNumber);if(d)pid=d.payrollId||'';}
+    var perRowRef=pid?pid:e.name.replace(/[^A-Za-z0-9]/g,'').substring(0,10);
+    return [e.name,'',perRowRef,'PERSON','GBP',getNetPay(e).toFixed(2),'GBP','GBP',wiseSortForCsv(e),wiseAcctForCsv(e)];
+  });
+  let csv=hdrs.join(',')+'\n';
+  rows.forEach(r=>{
+    csv+=r.map((c,idx)=>{
+      const s=String(c);
+      // Always quote bank fields (idx 8 sort, 9 account) to preserve leading zeros
+      if(idx===8||idx===9||(typeof c==='string'&&(c.includes(',')||c.includes('"'))))return '"'+s.replace(/"/g,'""')+'"';
+      return s;
+    }).join(',')+'\n';
+  });
   const fn=`Wise_${currentEntity==='windmill'?'Windmill':'EightBells'}_Payroll_${new Date().toISOString().slice(0,10)}.csv`;
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();URL.revokeObjectURL(a.href);
   const now=new Date(),monthStr=now.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
-  const payments=payable.map(e=>{const dt=getDeductionTotal(e),dr=(e.deductions||[]).map(d=>`${d.reason}: £${d.amount.toFixed(2)}`).join('; ');return{name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,grossAmount:e.amount,deductions:dt,deductionDetails:dr,amount:getNetPay(e)};});
+  const payments=payable.map(e=>{const dt=getDeductionTotal(e),dr=(e.deductions||[]).map(d=>`${d.reason}: £${d.amount.toFixed(2)}`).join('; ');return{name:e.name,sortCode:wiseSortForCsv(e),accountNumber:wiseAcctForCsv(e),grossAmount:e.amount,deductions:dt,deductionDetails:dr,amount:getNetPay(e)};});
   apiPost({action:'logPayments',entity:entityLabel,month:monthStr,reference:ref,payments}).then(r=>{if(r.success)showToast(`Logged ${r.logged} payments to history`,'success');});
   lastDownloadLeftOut={
     fileName:fn,
     items:[
-      ...noBank.map(e=>({name:e.name,amount:getNetPay(e),reason:'Missing or incomplete bank details — left out of Wise CSV'})),
-      ...sourceDropouts
+      ...sourceDropouts.map(e=>({name:e.name,amount:e.amount,reason:e.reason||'Left out of Wise CSV'}))
     ]
   };
   updateSteps(4);
   updateWiseExclusionPanel();
   let dlMsg=`Downloaded ${fn} (${payable.length} payment${payable.length===1?'':'s'})`;
-  if(noBank.length||sourceDropouts.length){
-    const left=(noBank.length||0)+(sourceDropouts.length||0);
-    dlMsg+=` — see panel: ${left} not in file`;
+  if(sourceDropouts.length){
+    dlMsg+=` — see Missing / won't pay: ${sourceDropouts.length} not in file`;
     showToast(dlMsg,'error');
   }else{
     showToast(dlMsg,'success');
