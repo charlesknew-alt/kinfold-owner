@@ -1,14 +1,21 @@
 /**
- * PubSystemLib - Teya.gs (v3)
- * Teya → daily PDQ prefill (Windmill only — gated on cfg.TEYA_ENABLED).
- * Eight Bells: TEYA_ENABLED: false in VENUE_CONFIG.
+ * PubSystemLib - Teya.gs (v4) — LIVE API pull for Windmill daily PDQ
  *
- * PASTE: replace the entire Teya.gs / Teya.js file in PubSystemLib with this file.
- * Then change ONE line in Templates_Serve.js (see apps-script/teya/README.md).
- * Then create a new library version and pin Windmill (+ EB) to it.
+ * Windmill only (cfg.TEYA_ENABLED). Eight Bells keeps TEYA_ENABLED: false.
  *
- * CSV path works today. API path needs Script Properties:
- *   TEYA_CLIENT_ID, TEYA_CLIENT_SECRET, TEYA_STORE_ID
+ * PASTE: replace entire Teya.gs / Teya.js in PubSystemLib with this file.
+ * Then one-line change in Templates_Serve.js (see apps-script/teya/README.md).
+ * New library version → pin Windmill. Add venue wrappers in Windmill Code.js.
+ *
+ * Script Properties (Windmill project OR PubSystemLib — venue is fine):
+ *   TEYA_CLIENT_ID
+ *   TEYA_CLIENT_SECRET
+ *   TEYA_STORE_ID          (UUID — not the numeric MID)
+ *
+ * Optional Script Properties / VENUE_CONFIG:
+ *   TEYA_PDQ1_TERMINAL_IDS  comma-separated terminal ids for PDQ 1
+ *   TEYA_PDQ2_TERMINAL_IDS  comma-separated terminal ids for PDQ 2
+ *   (If unset, uses cfg.TEYA_CHANNEL_LABELS: label "Channel A" → pdq1, "Channel B" → pdq2)
  */
 
 function teyaIsEnabled_(cfg) {
@@ -20,61 +27,65 @@ function teyaIsEnabled(cfg) {
   return teyaIsEnabled_(cfg);
 }
 
-/**
- * Inject the "Prefill PDQ from Teya" dropzone into daily form HTML when TEYA_ENABLED.
- * Call from Templates_Serve.js serveDailyEntryForm — see README.
- */
+/** Inject "Pull from Teya" into daily form when TEYA_ENABLED. */
 function teyaInjectDailyPrefill_(cfg, html) {
   cfg = mergeConfig_(cfg || {});
   if (!teyaIsEnabled_(cfg) || !html) return html;
   var needle = '<label class="ps-label" for="pdq1">';
   if (html.indexOf(needle) === -1) {
-    needle = "for=\"pdq1\"";
+    needle = 'for="pdq1"';
     if (html.indexOf(needle) === -1) return html;
     return html.replace(needle, teyaDailyPrefillHtml_() + needle);
   }
   return html.replace(needle, teyaDailyPrefillHtml_() + needle);
 }
 
-/** HTML + client script for the daily form dropzone (no external CDN). */
+/** Daily-form UI: one button, no CSV. */
 function teyaDailyPrefillHtml_() {
   return [
     '<div id="teyaPrefillBox" class="ps-card" style="margin-bottom:14px;">',
-    '<div style="font-family:var(--serif);font-size:18px;margin-bottom:8px;">Prefill PDQ from Teya</div>',
-    '<p class="ps-hint" style="margin:0 0 10px;">Drop the Teya transaction CSV for this day. ',
-    'Fills PDQ Terminal 1 / 2 (Channel A / B). Does not save — check numbers, then Save. ',
-    'Rooms PDQ stays manual.</p>',
-    '<input type="file" id="teyaCsvFile" accept=".csv,text/csv" style="width:100%;margin-bottom:8px;">',
-    '<div id="teyaPrefillMsg" class="ps-hint" style="min-height:1.2em;"></div>',
+    '<div style="font-family:var(--serif);font-size:18px;margin-bottom:8px;">Pull PDQ from Teya</div>',
+    '<p class="ps-hint" style="margin:0 0 10px;">',
+    'Fetches live approved card sales from Teya for this calendar day and fills PDQ Terminal 1 / 2. ',
+    'Does not save — check the numbers, then Save. Rooms PDQ stays manual.',
+    '</p>',
+    '<button type="button" id="teyaPullBtn" class="ps-btn ps-btn-secondary ps-btn-block">Pull from Teya now</button>',
+    '<div id="teyaPrefillMsg" class="ps-hint" style="min-height:1.2em;margin-top:8px;"></div>',
     '</div>',
     '<script>',
     '(function(){',
-    'var fileInput=document.getElementById("teyaCsvFile");',
+    'var btn=document.getElementById("teyaPullBtn");',
     'var msg=document.getElementById("teyaPrefillMsg");',
-    'if(!fileInput)return;',
+    'if(!btn)return;',
     'function setMsg(t,err){if(!msg)return;msg.textContent=t||"";msg.style.color=err?"#c0635a":"";}',
+    'function londonToday(){',
+    'var fmt=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit"});',
+    'return fmt.format(new Date());', // en-CA → YYYY-MM-DD
+    '}',
+    'function dayKeyFromForm(){',
+    'var el=document.getElementById("dayDate")||document.querySelector("[data-day-key]");',
+    'if(el){var v=el.value||el.getAttribute("data-day-key")||"";if(/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return v;}',
+    'if(window.currentDayIso&&/^\\d{4}-\\d{2}-\\d{2}$/.test(window.currentDayIso))return window.currentDayIso;',
+    'return londonToday();',
+    '}',
     'function fillPdq(a,b,detail){',
     'var x=document.getElementById("pdq1");var y=document.getElementById("pdq2");',
     'if(x)x.value=a;if(y)y.value=b;',
     'if(typeof calculateAll==="function")calculateAll();',
     'setMsg(detail||("Filled PDQ 1 = \\u00a3"+a+", PDQ 2 = \\u00a3"+b),false);',
     '}',
-    'fileInput.addEventListener("change",function(){',
-    'var f=fileInput.files&&fileInput.files[0];if(!f)return;',
-    'var reader=new FileReader();',
-    'reader.onload=function(){',
-    'var text=String(reader.result||"");',
+    'btn.addEventListener("click",function(){',
     'if(!google||!google.script||!google.script.run){setMsg("google.script.run unavailable",true);return;}',
+    'btn.disabled=true;setMsg("Talking to Teya\\u2026",false);',
+    'var dayKey=dayKeyFromForm();',
     'google.script.run',
     '.withSuccessHandler(function(res){',
-    'if(!res||!res.success){setMsg((res&&res.message)||"Teya prefill failed",true);return;}',
+    'btn.disabled=false;',
+    'if(!res||!res.success){setMsg((res&&res.message)||"Teya pull failed",true);return;}',
     'fillPdq(res.pdq1,res.pdq2,res.message);',
     '})',
-    '.withFailureHandler(function(err){setMsg(String(err),true);})',
-    '.teyaDayTotalsFromCsv(text,"");',
-    '};',
-    'reader.onerror=function(){setMsg("Could not read that file.",true);};',
-    'reader.readAsText(f);',
+    '.withFailureHandler(function(err){btn.disabled=false;setMsg(String(err),true);})',
+    '.teyaPullDayTotals(dayKey);',
     '});',
     '})();',
     '</script>'
@@ -82,90 +93,45 @@ function teyaDailyPrefillHtml_() {
 }
 
 /**
- * Summarise approved Teya sales for a calendar day into pdq1 / pdq2.
- * Channel A → pdq1, Channel B → pdq2 via cfg.TEYA_CHANNEL_LABELS.
- * If dayKey is blank, uses the first date found in the CSV.
+ * LIVE pull: list SUCCESSFUL sales for dayKey (YYYY-MM-DD, London calendar) → pdq1/pdq2.
+ * Venue wrapper: function teyaPullDayTotals(dayKey) { return PubSystemLib.teyaPullDayTotals(VENUE_CONFIG, dayKey); }
  */
-function teyaDayTotalsFromCsv(cfg, csvText, dayKey) {
+function teyaPullDayTotals(cfg, dayKey) {
   cfg = mergeConfig_(cfg || {});
   if (!teyaIsEnabled_(cfg)) {
     return { success: false, message: 'Teya is disabled for this venue (TEYA_ENABLED).' };
   }
-  if (!csvText) {
-    return { success: false, message: 'No CSV text provided.' };
+
+  dayKey = String(dayKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
+    dayKey = teyaLondonToday_();
   }
 
-  var labels = cfg.TEYA_CHANNEL_LABELS || {};
-  var all = teyaParseCsvToDayTotals_(csvText, labels, null);
-  if (!all || !all.length) {
-    return { success: false, message: 'No approved Teya sales found in that CSV.' };
-  }
-
-  var totals = null;
-  if (dayKey) {
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].date === dayKey) { totals = all[i]; break; }
-    }
-    if (!totals) {
-      return {
-        success: false,
-        message: 'No sales for ' + dayKey + ' (CSV has ' + all.map(function (d) { return d.date; }).join(', ') + ').'
-      };
-    }
-  } else {
-    totals = all[0];
-    if (all.length > 1) {
-      // Prefer most recent date
-      totals = all[all.length - 1];
-    }
-  }
-
-  return {
-    success: true,
-    date: totals.date,
-    pdq1: totals.pdq1,
-    pdq2: totals.pdq2,
-    byDevice: totals.byDevice,
-    unknownPence: totals.unknownPence,
-    message: 'Teya ' + totals.date + ': PDQ 1 £' + totals.pdq1 + ' · PDQ 2 £' + totals.pdq2
-  };
-}
-
-/**
- * Week-sheet fetch hook. Tries live API when Script Properties are set;
- * otherwise returns a clear CSV fallback message.
- */
-function fetchTeyaTransactions(cfg, weekSheetName) {
-  cfg = mergeConfig_(cfg || {});
-  if (!teyaIsEnabled_(cfg)) {
-    return { success: false, message: 'Teya disabled (TEYA_ENABLED).' };
-  }
-
-  var props = PropertiesService.getScriptProperties();
-  var clientId = props.getProperty('TEYA_CLIENT_ID') || '';
-  var clientSecret = props.getProperty('TEYA_CLIENT_SECRET') || '';
-  var storeId = props.getProperty('TEYA_STORE_ID') || '';
-
-  if (!clientId || !clientSecret || !storeId) {
-    return {
-      success: false,
-      message:
-        'Teya API credentials not in Script Properties (need TEYA_CLIENT_ID, TEYA_CLIENT_SECRET, TEYA_STORE_ID). ' +
-        'Until then, use CSV prefill on daily entry. ' +
-        'MID ' + (cfg.TEYA_MID || '(unset)') + ', week ' + (weekSheetName || '') + '.'
-    };
-  }
+  var creds = teyaReadCreds_(cfg);
+  if (!creds.ok) return { success: false, message: creds.message };
 
   try {
-    var token = teyaFetchAccessToken_(clientId, clientSecret);
-    var payments = teyaListPayments_(token, storeId);
-    var labels = cfg.TEYA_CHANNEL_LABELS || {};
-    var days = teyaPaymentsToDayTotals_(payments, labels);
+    var token = teyaFetchAccessToken_(creds.clientId, creds.clientSecret);
+    var payments = teyaListPaymentsForDay_(token, creds.storeId, dayKey);
+    var totals = teyaPaymentsToPdq_(payments, cfg, creds);
+    if (!totals.count) {
+      return {
+        success: false,
+        message:
+          'No successful Teya sales for ' + dayKey + '. ' +
+          'If you know sales happened, check TEYA_STORE_ID / terminal mapping (run teyaListTerminals).'
+      };
+    }
     return {
       success: true,
-      message: 'Fetched ' + payments.length + ' payment(s) from Teya POSLink.',
-      days: days,
-      weekSheetName: weekSheetName || ''
+      date: dayKey,
+      pdq1: totals.pdq1,
+      pdq2: totals.pdq2,
+      byDevice: totals.byDevice,
+      count: totals.count,
+      message:
+        'Teya live ' + dayKey + ': PDQ 1 £' + totals.pdq1 + ' · PDQ 2 £' + totals.pdq2 +
+        ' (' + totals.count + ' sale' + (totals.count === 1 ? '' : 's') + ')'
     };
   } catch (err) {
     return {
@@ -175,7 +141,295 @@ function fetchTeyaTransactions(cfg, weekSheetName) {
   }
 }
 
-// ── CSV helpers ─────────────────────────────────────────────────────────────
+/**
+ * Setup helper — list stores/terminals so you can map PDQ 1 / 2.
+ * Venue: function teyaListTerminals() { return PubSystemLib.teyaListTerminals(VENUE_CONFIG); }
+ * Run from Apps Script editor → Run → teyaListTerminals → Executions / Logs.
+ */
+function teyaListTerminals(cfg) {
+  cfg = mergeConfig_(cfg || {});
+  var creds = teyaReadCreds_(cfg);
+  if (!creds.ok) return { success: false, message: creds.message };
+  try {
+    var token = teyaFetchAccessToken_(creds.clientId, creds.clientSecret);
+    var stores = teyaFetchJson_(
+      'https://api.teya.com/poslink/v1/stores',
+      token
+    );
+    var storeList = stores.stores || stores.data || stores.items || (Array.isArray(stores) ? stores : []);
+    var out = [];
+    for (var i = 0; i < storeList.length; i++) {
+      var s = storeList[i] || {};
+      var sid = s.store_id || s.id || s.storeId || '';
+      var terms = [];
+      if (sid) {
+        try {
+          var tr = teyaFetchJson_(
+            'https://api.teya.com/poslink/v1/stores/' + encodeURIComponent(sid) + '/terminals',
+            token
+          );
+          terms = tr.terminals || tr.data || tr.items || (Array.isArray(tr) ? tr : []);
+        } catch (e1) {
+          terms = [{ error: String(e1.message || e1) }];
+        }
+      }
+      out.push({ store: s, terminals: terms });
+    }
+    Logger.log(JSON.stringify(out, null, 2));
+    return { success: true, stores: out, message: 'Logged store/terminal list — check Executions log.' };
+  } catch (err) {
+    return { success: false, message: 'Teya API error: ' + (err && err.message ? err.message : String(err)) };
+  }
+}
+
+/** Kept for compatibility; prefer teyaPullDayTotals. */
+function fetchTeyaTransactions(cfg, weekSheetName) {
+  var pull = teyaPullDayTotals(cfg, teyaLondonToday_());
+  pull.weekSheetName = weekSheetName || '';
+  return pull;
+}
+
+/** CSV path retained but unused by the daily UI. */
+function teyaDayTotalsFromCsv(cfg, csvText, dayKey) {
+  cfg = mergeConfig_(cfg || {});
+  if (!teyaIsEnabled_(cfg)) {
+    return { success: false, message: 'Teya is disabled for this venue (TEYA_ENABLED).' };
+  }
+  if (!csvText) return { success: false, message: 'No CSV text provided.' };
+  var labels = cfg.TEYA_CHANNEL_LABELS || {};
+  var all = teyaParseCsvToDayTotals_(csvText, labels, null);
+  if (!all || !all.length) return { success: false, message: 'No approved Teya sales in that CSV.' };
+  var totals = dayKey ? null : all[all.length - 1];
+  if (dayKey) {
+    for (var i = 0; i < all.length; i++) if (all[i].date === dayKey) totals = all[i];
+  }
+  if (!totals) {
+    return { success: false, message: 'No sales for ' + dayKey + '.' };
+  }
+  return {
+    success: true,
+    date: totals.date,
+    pdq1: totals.pdq1,
+    pdq2: totals.pdq2,
+    byDevice: totals.byDevice,
+    message: 'Teya CSV ' + totals.date + ': PDQ 1 £' + totals.pdq1 + ' · PDQ 2 £' + totals.pdq2
+  };
+}
+
+// ── Credentials ─────────────────────────────────────────────────────────────
+
+function teyaReadCreds_(cfg) {
+  var props = PropertiesService.getScriptProperties();
+  var clientId = props.getProperty('TEYA_CLIENT_ID') || cfg.TEYA_CLIENT_ID || '';
+  var clientSecret = props.getProperty('TEYA_CLIENT_SECRET') || cfg.TEYA_CLIENT_SECRET || '';
+  var storeId = props.getProperty('TEYA_STORE_ID') || cfg.TEYA_STORE_ID || '';
+  var pdq1Ids = props.getProperty('TEYA_PDQ1_TERMINAL_IDS') || cfg.TEYA_PDQ1_TERMINAL_IDS || '';
+  var pdq2Ids = props.getProperty('TEYA_PDQ2_TERMINAL_IDS') || cfg.TEYA_PDQ2_TERMINAL_IDS || '';
+
+  if (!clientId || !clientSecret || !storeId) {
+    return {
+      ok: false,
+      message:
+        'Missing Teya API credentials. In Windmill Apps Script: Project Settings → Script properties, set ' +
+        'TEYA_CLIENT_ID, TEYA_CLIENT_SECRET, TEYA_STORE_ID (UUID). ' +
+        'MID ' + (cfg.TEYA_MID || '(unset)') + ' is not enough on its own. See apps-script/teya/README.md.'
+    };
+  }
+  return {
+    ok: true,
+    clientId: clientId,
+    clientSecret: clientSecret,
+    storeId: storeId,
+    pdq1Ids: teyaSplitIds_(pdq1Ids),
+    pdq2Ids: teyaSplitIds_(pdq2Ids)
+  };
+}
+
+function teyaSplitIds_(s) {
+  return String(s || '')
+    .split(/[\s,;]+/)
+    .map(function (x) { return x.trim(); })
+    .filter(Boolean);
+}
+
+function teyaLondonToday_() {
+  return Utilities.formatDate(new Date(), 'Europe/London', 'yyyy-MM-dd');
+}
+
+// ── HTTP / OAuth ────────────────────────────────────────────────────────────
+
+function teyaFetchAccessToken_(clientId, clientSecret) {
+  var url = 'https://id.teya.com/oauth/v2/oauth-token';
+  var res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    payload: {
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret
+    },
+    muteHttpExceptions: true
+  });
+  var code = res.getResponseCode();
+  var body = res.getContentText();
+  if (code < 200 || code >= 300) {
+    throw new Error('OAuth token HTTP ' + code + ': ' + body.slice(0, 240));
+  }
+  var json = JSON.parse(body);
+  if (!json.access_token) throw new Error('OAuth response missing access_token');
+  return json.access_token;
+}
+
+function teyaFetchJson_(url, accessToken) {
+  var res = UrlFetchApp.fetch(url, {
+    method: 'get',
+    headers: { Authorization: 'Bearer ' + accessToken, Accept: 'application/json' },
+    muteHttpExceptions: true
+  });
+  var code = res.getResponseCode();
+  var body = res.getContentText();
+  if (code < 200 || code >= 300) {
+    throw new Error('HTTP ' + code + ' for ' + url + ': ' + body.slice(0, 300));
+  }
+  return body ? JSON.parse(body) : {};
+}
+
+function teyaListPaymentsForDay_(accessToken, storeId, dayKey) {
+  // London calendar day as UTC window with pad (BST/GMT safe enough for daily totals).
+  var start = dayKey + 'T00:00:00Z';
+  var endParts = dayKey.split('-');
+  var endDate = new Date(Date.UTC(
+    parseInt(endParts[0], 10),
+    parseInt(endParts[1], 10) - 1,
+    parseInt(endParts[2], 10) + 1,
+    0, 0, 0
+  ));
+  var end =
+    endDate.getUTCFullYear() + '-' +
+    ('0' + (endDate.getUTCMonth() + 1)).slice(-2) + '-' +
+    ('0' + endDate.getUTCDate()).slice(-2) + 'T00:00:00Z';
+
+  var all = [];
+  var offset = 0;
+  var limit = 100;
+  for (var page = 0; page < 50; page++) {
+    var url =
+      'https://api.teya.com/poslink/v2/payment-requests' +
+      '?store_id=' + encodeURIComponent(storeId) +
+      '&transaction_type=SALE' +
+      '&status=SUCCESSFUL' +
+      '&start_date_time=' + encodeURIComponent(start) +
+      '&end_date_time=' + encodeURIComponent(end) +
+      '&limit=' + limit +
+      '&offset=' + offset +
+      '&sort=ASC';
+    var json = teyaFetchJson_(url, accessToken);
+    var batch = json.items || json.data || json.payment_requests || (Array.isArray(json) ? json : []);
+    if (!batch.length) break;
+    for (var i = 0; i < batch.length; i++) all.push(batch[i]);
+    if (batch.length < limit) break;
+    offset += limit;
+  }
+  return all;
+}
+
+function teyaPaymentsToPdq_(payments, cfg, creds) {
+  var labels = cfg.TEYA_CHANNEL_LABELS || {};
+  var pdq1Set = {};
+  var pdq2Set = {};
+  var i;
+  for (i = 0; i < (creds.pdq1Ids || []).length; i++) pdq1Set[creds.pdq1Ids[i]] = 1;
+  for (i = 0; i < (creds.pdq2Ids || []).length; i++) pdq2Set[creds.pdq2Ids[i]] = 1;
+
+  // Also honour Channel A/B labels keyed by device/terminal id
+  Object.keys(labels).forEach(function (id) {
+    var slot = teyaSlotForLabel_(labels[id]);
+    if (slot === 1) pdq1Set[id] = 1;
+    if (slot === 2) pdq2Set[id] = 1;
+  });
+
+  var pdq1 = 0;
+  var pdq2 = 0;
+  var unknown = 0;
+  var count = 0;
+  var byDevice = {};
+
+  for (i = 0; i < payments.length; i++) {
+    var p = payments[i] || {};
+    var status = String(p.status || '').toUpperCase();
+    if (status && status !== 'SUCCESSFUL' && status !== 'SUCCEEDED' && status !== 'SUCCESS' && status !== 'APPROVED') {
+      continue;
+    }
+    var tid = String(p.terminal_id || p.terminalId || (p.terminal && p.terminal.id) || '');
+    var pence = teyaAmountToPence_(p);
+    if (!pence) continue;
+    count += 1;
+    if (!byDevice[tid]) byDevice[tid] = { deviceId: tid, label: labels[tid] || tid, pence: 0, count: 0 };
+    byDevice[tid].pence += pence;
+    byDevice[tid].count += 1;
+
+    if (pdq1Set[tid]) pdq1 += pence;
+    else if (pdq2Set[tid]) pdq2 += pence;
+    else {
+      // If only two terminals seen and no map yet, assign by sorted id order once we finish — for now unknown
+      unknown += pence;
+    }
+  }
+
+  // Auto-map if no explicit map and exactly two terminals
+  var ids = Object.keys(byDevice).sort();
+  if (!Object.keys(pdq1Set).length && !Object.keys(pdq2Set).length && ids.length === 2) {
+    pdq1 = byDevice[ids[0]].pence;
+    pdq2 = byDevice[ids[1]].pence;
+    unknown = 0;
+    byDevice[ids[0]].label = 'PDQ 1 (auto)';
+    byDevice[ids[1]].label = 'PDQ 2 (auto)';
+  } else if (!Object.keys(pdq1Set).length && !Object.keys(pdq2Set).length && ids.length === 1) {
+    pdq1 = byDevice[ids[0]].pence;
+    pdq2 = 0;
+    unknown = 0;
+  }
+
+  return {
+    pdq1: (pdq1 / 100).toFixed(2),
+    pdq2: (pdq2 / 100).toFixed(2),
+    unknownPence: unknown,
+    count: count,
+    byDevice: byDevice
+  };
+}
+
+function teyaAmountToPence_(p) {
+  // Prefer captured/authorised amount; fall back to requested_amount (minor units).
+  var candidates = [
+    p.amount, p.Amount,
+    p.captured_amount, p.capturedAmount,
+    p.authorised_amount, p.authorized_amount,
+    p.requested_amount, p.requestedAmount
+  ];
+  for (var i = 0; i < candidates.length; i++) {
+    var a = candidates[i];
+    if (a == null) continue;
+    var value = (typeof a === 'object') ? (a.amount != null ? a.amount : a.value) : a;
+    if (value == null || value === '') continue;
+    var n = Number(value);
+    if (isNaN(n)) continue;
+    // POSLink examples use minor units (1500 = £15.00)
+    return Math.round(n);
+  }
+  return 0;
+}
+
+function teyaSlotForLabel_(label) {
+  var s = String(label || '').toUpperCase();
+  if (s.indexOf('CHANNEL A') !== -1 || s === 'A') return 1;
+  if (s.indexOf('CHANNEL B') !== -1 || s === 'B') return 2;
+  if (s.indexOf('1') !== -1 && s.indexOf('2') === -1) return 1;
+  if (s.indexOf('2') !== -1) return 2;
+  return 0;
+}
+
+// ── CSV helpers (kept; UI no longer uses them) ──────────────────────────────
 
 function teyaParseCsvToDayTotals_(csvText, channelLabels, dayKey) {
   var rows = teyaParseCsvRows_(csvText);
@@ -240,15 +494,12 @@ function teyaBuildTxns_(rows) {
   if (!rows || !rows.length) return [];
   var header = Object.keys(rows[0] || {});
   var colDate = teyaPickCol_(header, ['Date']);
-  var colTime = teyaPickCol_(header, ['Time']);
   var colAmt = teyaPickCol_(header, ['Amount', 'Sales', 'Sale', 'Value']);
   var colTerm = teyaPickCol_(header, ['Device name', 'Device Name', 'Terminal name', 'Terminal']);
   var colSer = teyaPickCol_(header, ['Device ID', 'Device Id', 'Device id', 'Terminal ID']);
   var colStat = teyaPickCol_(header, ['Status']);
   var colType = teyaPickCol_(header, ['Payment type', 'Payment Type', 'Type']);
-  if (!colDate) throw new Error('No Date column found (Teya export).');
-  if (!colAmt) throw new Error('No Amount/Sales column found (Teya export).');
-
+  if (!colDate || !colAmt) return [];
   var approvedMap = {
     SUCCEEDED: 1, SUCCESS: 1, APPROVED: 1, AUTHORISED: 1, AUTHORIZED: 1, COMPLETED: 1, '': 1
   };
@@ -256,42 +507,30 @@ function teyaBuildTxns_(rows) {
   for (var i = 0; i < rows.length; i++) {
     var raw = rows[i];
     var dateStr = String(raw[colDate] || '').trim();
-    var timeStr = colTime ? String(raw[colTime] || '').trim() : '00:00:00';
     if (!dateStr) continue;
     var isoDate = dateStr;
     var mSlash = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     var mIso = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (mSlash) {
       isoDate = mSlash[3] + '-' + ('0' + mSlash[2]).slice(-2) + '-' + ('0' + mSlash[1]).slice(-2);
-    } else if (!mIso) {
-      continue;
-    }
-    if (timeStr.length === 5) timeStr += ':00';
-
-    var amtStr = String(raw[colAmt] || '0').replace(/[^0-9.\-]/g, '');
-    var amt = parseFloat(amtStr);
+    } else if (!mIso) continue;
+    var amt = parseFloat(String(raw[colAmt] || '0').replace(/[^0-9.\-]/g, ''));
     if (isNaN(amt)) amt = 0;
     var pence = Math.round(amt * 100);
     var status = colStat ? String(raw[colStat] || '').trim().toUpperCase() : 'SUCCEEDED';
-    var approved = !!approvedMap[status];
     var type = colType ? String(raw[colType] || '').trim().toUpperCase() : 'PAYMENT';
-    var isRefund = type.indexOf('REFUND') !== -1 || type.indexOf('RETURN') !== -1 || amt < 0;
-    var signed = isRefund ? -Math.abs(pence) : pence;
-    var term = colTerm ? String(raw[colTerm] || '').trim() : '';
+    var isRefund = type.indexOf('REFUND') !== -1 || amt < 0;
     var serial = colSer ? String(raw[colSer] || '').trim() : '';
-    if (!term) term = serial || 'Unknown';
-    txns.push({ date: isoDate, term: term, serial: serial, pence: signed, approved: approved });
+    var term = colTerm ? String(raw[colTerm] || '').trim() : (serial || 'Unknown');
+    txns.push({
+      date: isoDate,
+      term: term,
+      serial: serial,
+      pence: isRefund ? -Math.abs(pence) : pence,
+      approved: !!approvedMap[status]
+    });
   }
   return txns;
-}
-
-function teyaSlotForLabel_(label) {
-  var s = String(label || '').toUpperCase();
-  if (s.indexOf('CHANNEL A') !== -1 || s === 'A') return 1;
-  if (s.indexOf('CHANNEL B') !== -1 || s === 'B') return 2;
-  if (s.indexOf('1') !== -1 && s.indexOf('2') === -1) return 1;
-  if (s.indexOf('2') !== -1) return 2;
-  return 0;
 }
 
 function teyaDayTotals_(txns, channelLabels, dayKey) {
@@ -316,7 +555,6 @@ function teyaDayTotals_(txns, channelLabels, dayKey) {
     else if (slot === 2) day.pdq2Pence += t.pence;
     else day.unknownPence += t.pence;
   }
-
   function finish(d) {
     return {
       date: d.date,
@@ -328,87 +566,6 @@ function teyaDayTotals_(txns, channelLabels, dayKey) {
       byDevice: d.byDevice
     };
   }
-
   if (dayKey) return byDay[dayKey] ? finish(byDay[dayKey]) : null;
   return Object.keys(byDay).sort().map(function (k) { return finish(byDay[k]); });
-}
-
-// ── Live API (POSLink) ──────────────────────────────────────────────────────
-
-function teyaFetchAccessToken_(clientId, clientSecret) {
-  var url = 'https://id.teya.com/oauth/v2/oauth-token';
-  var res = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/x-www-form-urlencoded',
-    payload: {
-      grant_type: 'client_credentials',
-      client_id: clientId,
-      client_secret: clientSecret
-    },
-    muteHttpExceptions: true
-  });
-  var code = res.getResponseCode();
-  var body = res.getContentText();
-  if (code < 200 || code >= 300) {
-    throw new Error('OAuth token HTTP ' + code + ': ' + body.slice(0, 200));
-  }
-  var json = JSON.parse(body);
-  if (!json.access_token) throw new Error('OAuth response missing access_token');
-  return json.access_token;
-}
-
-function teyaListPayments_(accessToken, storeId) {
-  var url =
-    'https://api.teya.com/poslink/v2/payment-requests' +
-    '?store_id=' + encodeURIComponent(storeId) +
-    '&transaction_type=SALE&page_size=100';
-  var res = UrlFetchApp.fetch(url, {
-    method: 'get',
-    headers: { Authorization: 'Bearer ' + accessToken },
-    muteHttpExceptions: true
-  });
-  var code = res.getResponseCode();
-  var body = res.getContentText();
-  if (code < 200 || code >= 300) {
-    throw new Error('payment-requests HTTP ' + code + ': ' + body.slice(0, 300));
-  }
-  var json = JSON.parse(body);
-  if (Array.isArray(json)) return json;
-  if (json.items) return json.items;
-  if (json.data) return json.data;
-  if (json.payment_requests) return json.payment_requests;
-  return [];
-}
-
-function teyaPaymentsToDayTotals_(payments, channelLabels) {
-  var txns = [];
-  for (var i = 0; i < payments.length; i++) {
-    var p = payments[i] || {};
-    var status = String(p.status || p.Status || '').toUpperCase();
-    var approved =
-      status === 'SUCCEEDED' || status === 'SUCCESS' || status === 'APPROVED' ||
-      status === 'COMPLETED' || status === 'CAPTURED';
-    var amount = p.amount || p.Amount || {};
-    var value = typeof amount === 'object' ? (amount.value != null ? amount.value : amount.amount) : amount;
-    var pence = 0;
-    if (typeof value === 'number') {
-      pence = (Math.abs(value) < 100000 && String(value).indexOf('.') !== -1)
-        ? Math.round(value * 100)
-        : Math.round(value);
-    } else {
-      pence = Math.round(parseFloat(String(value || '0').replace(/[^0-9.\-]/g, '')) * 100);
-    }
-    var created = String(p.created_at || p.createdAt || p.timestamp || p.date || '').slice(0, 10);
-    var terminalId = String(p.terminal_id || p.terminalId || (p.terminal && p.terminal.id) || '');
-    var termName = String((p.terminal && (p.terminal.name || p.terminal.label)) || terminalId || 'Unknown');
-    if (!created) continue;
-    txns.push({
-      date: created,
-      term: termName,
-      serial: terminalId,
-      pence: pence,
-      approved: approved
-    });
-  }
-  return teyaDayTotals_(txns, channelLabels, null);
 }

@@ -41,17 +41,19 @@ var missing = Teya.totalsFromCsvText(sample, labels, '2099-01-01');
 assert(missing === null, 'missing day returns null');
 
 var teyaGs = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/Teya.gs'), 'utf8');
-assert(teyaGs.indexOf('function teyaDayTotalsFromCsv') !== -1, 'Teya.gs has teyaDayTotalsFromCsv');
-assert(teyaGs.indexOf('function fetchTeyaTransactions') !== -1, 'Teya.gs has fetchTeyaTransactions');
-assert(teyaGs.indexOf('function teyaInjectDailyPrefill_') !== -1, 'Teya.gs has daily form inject helper');
-assert(teyaGs.indexOf('teyaCsvFile') !== -1, 'Teya.gs embeds prefill file input');
+assert(teyaGs.indexOf('function teyaPullDayTotals') !== -1, 'Teya.gs has teyaPullDayTotals');
+assert(teyaGs.indexOf('function teyaListTerminals') !== -1, 'Teya.gs has teyaListTerminals');
+assert(teyaGs.indexOf('Pull from Teya now') !== -1, 'Teya.gs UI is API pull button');
+assert(teyaGs.indexOf('teyaCsvFile') === -1, 'Teya.gs daily UI has no CSV file input');
+assert(teyaGs.indexOf('poslink/v2/payment-requests') !== -1, 'Teya.gs calls POSLink payment-requests');
 assert(teyaGs.indexOf('TEYA_CLIENT_ID') !== -1, 'Teya.gs documents API Script Properties');
-assert(teyaGs.indexOf('v3') !== -1, 'Teya.gs is v3 implementation');
+assert(teyaGs.indexOf('v4') !== -1, 'Teya.gs is v4 live API');
 
 var readme = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/README.md'), 'utf8');
-assert(readme.indexOf('TEYA_CHANNEL_LABELS') !== -1, 'teya README mentions channel labels');
-assert(readme.indexOf('serveDailyEntryForm') !== -1, 'teya README has Templates_Serve one-liner');
-assert(readme.indexOf('Step 1') !== -1 && readme.indexOf('Step 5') !== -1, 'teya README is numbered steps');
+assert(readme.indexOf('TEYA_STORE_ID') !== -1, 'teya README mentions store UUID');
+assert(readme.indexOf('Pull from Teya now') !== -1, 'teya README is API-first');
+assert(readme.indexOf('No CSV') !== -1, 'teya README says no CSV');
+assert(readme.indexOf('Script properties') !== -1, 'teya README has Script properties step');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');

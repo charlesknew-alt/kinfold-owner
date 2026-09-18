@@ -1,142 +1,150 @@
-# Teya → Windmill daily PDQ — idiot-proof steps
+# Teya live API → Windmill daily PDQ
 
-Do these in order. Stop after each step if something looks wrong.
+**No CSV.** Managers click **Pull from Teya now** on daily entry; Apps Script calls Teya’s POSLink API and fills PDQ 1 / 2.
 
-**You only touch two Apps Script projects:** PubSystemLib + Windmill takings.  
-Do **not** create a new web-app deployment. Pinning a new library version is enough (same lesson as the owner `shell=owner` fix).
-
----
-
-## Step 0 — Open the right files from GitHub
-
-On your PC, open this PR branch file (or download raw):
-
-- `apps-script/teya/Teya.gs`  
-  https://github.com/charlesknew-alt/kinfold-owner/blob/cursor/teya-daily-prefill-ba46/apps-script/teya/Teya.gs
-
-Keep it open in a browser tab. You will copy **all** of it.
-
----
-
-## Step 1 — Replace PubSystemLib `Teya.gs`
-
-1. Open PubSystemLib:  
-   https://script.google.com/d/1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU/edit
-2. In the left file list, click **`Teya.gs`** (or `Teya.js` — same file).
-3. Select **all** existing text → Delete.
-4. Paste the **entire** contents of `apps-script/teya/Teya.gs` from GitHub.
-5. **Ctrl+S** / Save.  
-   Top of the file should now say `Teya.gs (v3)` and include `teyaInjectDailyPrefill_`.
-
----
-
-## Step 2 — One-line change in `Templates_Serve.js`
-
-Still in **PubSystemLib**:
-
-1. Open **`Templates_Serve.js`**.
-2. Find this function (Ctrl+F: `serveDailyEntryForm`):
-
-```js
-function serveDailyEntryForm(cfg, params) {
-  cfg = _mergeConfig(cfg);
-  return _wrap(_applyBranding(DAILY_FORM_HTML, cfg, params), cfg, 'Daily Entry');
-}
-```
-
-3. Change **only** the `return` line to:
-
-```js
-function serveDailyEntryForm(cfg, params) {
-  cfg = _mergeConfig(cfg);
-  return _wrap(_applyBranding(teyaInjectDailyPrefill_(cfg, DAILY_FORM_HTML), cfg, params), cfg, 'Daily Entry');
-}
-```
-
-4. Save.
-
-(If `_mergeConfig` is named `mergeConfig_` in your file, leave that as-is — only change the `DAILY_FORM_HTML` part to wrap it with `teyaInjectDailyPrefill_(cfg, …)`.)
-
----
-
-## Step 3 — New PubSystemLib library version
-
-1. In PubSystemLib: **Deploy** → **New version** (or Manage versions → New).
-2. Description: `Teya CSV daily PDQ prefill`.
-3. **Write down the version number** (e.g. 63).
-
----
-
-## Step 4 — Pin Windmill to that version
-
-1. Open Windmill takings:  
-   https://script.google.com/d/1UEG3IgPKxKJoVo9NpHT3RGvUTza2a_-V9ur8cBh-WrpfyXM5YoLkgoVO/edit
-2. Left sidebar → **Libraries** → **PubSystemLib**.
-3. Change Version to the number from Step 3 (not HEAD unless you always use HEAD).
-4. Save.
-
-Optional but tidy: do the same pin on Eight Bells takings  
-(`1fca4JFXwFDJQ-Y8xqvobcw85eGfyIn-khndOTNlQ2CWrdQl3LRBcW_Pr`). EB has `TEYA_ENABLED: false`, so the dropzone will not appear there.
-
----
-
-## Step 5 — Add one wrapper in Windmill `Code.js`
-
-Still in **Windmill takings**, open **`Code.js`**.
-
-Near the other wrappers (`getDayData` / `saveDayData`), paste:
-
-```js
-function teyaDayTotalsFromCsv(csvText, dayKey) {
-  return PubSystemLib.teyaDayTotalsFromCsv(VENUE_CONFIG, csvText, dayKey);
-}
-```
-
-Save.
-
-(This is required — the browser calls `google.script.run.teyaDayTotalsFromCsv`, which must exist on the **venue** project.)
-
----
-
-## Step 6 — Check it works
-
-1. Open Windmill daily entry the way managers normally do  
-   (manager hub → daily, or spreadsheet menu **Daily Entry**).
-2. In section **Cash & Cards**, **above** “PDQ Terminal 1”, you should see:  
-   **Prefill PDQ from Teya** + a file picker.
-3. Export a Teya transaction CSV (same as Card Takings).
-4. Drop / choose that CSV.
-5. PDQ Terminal 1 and 2 should fill (Channel A → 1, Channel B → 2).
-6. Check the numbers → click **Save** as usual.  
-   **PDQ Rooms** is still manual.
-
-If the box is missing: library version not pinned, or Step 2 line not saved.  
-If file pick fails with a function error: Step 5 wrapper missing.  
-If numbers look wrong: confirm Device IDs still match `VENUE_CONFIG.TEYA_CHANNEL_LABELS` (`oOj2CqaI` / `7KckI3g7`).
-
----
-
-## Do NOT do these
-
-- Do not create a **new** web-app `/exec` URL.
-- Do not paste into Eight Bells `Code.js` unless you want the wrapper there too (unused).
-- Do not set API secrets yet — that is the **next** step after CSV prefill works.
-
----
-
-## Already done in Windmill config (no change needed)
+You already have in Windmill `VENUE_CONFIG`:
 
 ```js
 TEYA_ENABLED: true,
 TEYA_MID: '5151716',
 TEYA_CHANNEL_LABELS: {
-  'oOj2CqaI': 'Channel A',  // → pdq1
-  '7KckI3g7': 'Channel B'   // → pdq2
+  'oOj2CqaI': 'Channel A',  // short Device IDs from the portal CSV
+  '7KckI3g7': 'Channel B'
 }
 ```
 
+`TEYA_MID` alone is **not** enough. The live list API needs:
+
+| Script property | What it is |
+|---|---|
+| `TEYA_CLIENT_ID` | OAuth client id from Teya |
+| `TEYA_CLIENT_SECRET` | OAuth client secret |
+| `TEYA_STORE_ID` | Store **UUID** (not `5151716`) |
+
+Optional (if auto-map / Channel labels don’t match API terminal UUIDs):
+
+| Script property | What it is |
+|---|---|
+| `TEYA_PDQ1_TERMINAL_IDS` | Comma-separated terminal id(s) → PDQ 1 |
+| `TEYA_PDQ2_TERMINAL_IDS` | Comma-separated terminal id(s) → PDQ 2 |
+
 ---
 
-## Next step (after this works)
+## A — Get Teya API credentials (do this once)
 
-Teya partner OAuth app → Script Properties `TEYA_CLIENT_ID` / `TEYA_CLIENT_SECRET` / `TEYA_STORE_ID` → live `fetchTeyaTransactions` instead of CSV.
+Teya’s realtime payment list is **POSLink**. Typical path:
+
+1. Open the Teya developer / partner portal: [partner.teya.com](https://partner.teya.com) (or staging `partner.teya.xyz`).
+2. Create / open your OAuth application (Device Code / partner app) → copy **Client ID** + **Client Secret**.
+3. Connect the **Windmill** merchant Teya ID (same login as [business.teya.com](https://business.teya.com)).
+4. List stores → copy the Windmill **store UUID** (`TEYA_STORE_ID`).
+5. Register the ePOS / integration against that store if the portal asks you to (`POST /poslink/v1/epos/register`) — that often returns the M2M `client_id` / `client_secret` used for listing payments.
+6. Keep the three values somewhere safe (password manager). **Do not commit them to GitHub.**
+
+If you’re unsure which screen shows the store UUID: after code is deployed, run `teyaListTerminals` in the Windmill script editor (Step D) — it logs stores + terminals.
+
+If Teya support helped you “start API setup” before, ask them for: **client id, client secret, store UUID** for MID `5151716`.
+
+---
+
+## B — Paste code (PubSystemLib + Windmill)
+
+### B1. Replace PubSystemLib `Teya.gs`
+
+1. Open https://script.google.com/d/1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU/edit  
+2. Open **`Teya.gs`** (or `Teya.js`) → select all → delete.  
+3. Paste **all** of [`Teya.gs`](./Teya.gs) from this folder (header says **v4**).  
+4. Save.
+
+### B2. One line in `Templates_Serve.js`
+
+Find `serveDailyEntryForm` and make the return:
+
+```js
+return _wrap(_applyBranding(teyaInjectDailyPrefill_(cfg, DAILY_FORM_HTML), cfg, params), cfg, 'Daily Entry');
+```
+
+Save.
+
+### B3. New library version
+
+Deploy → New version → note the number (e.g. 63).
+
+### B4. Pin Windmill
+
+https://script.google.com/d/1UEG3IgPKxKJoVo9NpHT3RGvUTza2a_-V9ur8cBh-WrpfyXM5YoLkgoVO/edit  
+
+Libraries → PubSystemLib → that version → Save.
+
+### B5. Windmill `Code.js` wrappers
+
+You already added `teyaDayTotalsFromCsv`. Keep it. **Also add:**
+
+```js
+function teyaPullDayTotals(dayKey) {
+  return PubSystemLib.teyaPullDayTotals(VENUE_CONFIG, dayKey);
+}
+function teyaListTerminals() {
+  return PubSystemLib.teyaListTerminals(VENUE_CONFIG);
+}
+```
+
+Save. (No new `/exec` deployment needed.)
+
+---
+
+## C — Put secrets in Windmill Script properties
+
+In **Windmill takings** project:
+
+1. **Project Settings** (gear) → **Script properties**  
+2. Add:
+
+| Property | Value |
+|---|---|
+| `TEYA_CLIENT_ID` | *(from Teya)* |
+| `TEYA_CLIENT_SECRET` | *(from Teya)* |
+| `TEYA_STORE_ID` | *(store UUID)* |
+
+Save.
+
+---
+
+## D — Map terminals (once)
+
+1. In Windmill editor: select function **`teyaListTerminals`** → **Run**.  
+2. Open **Executions** / Logs → you’ll see store UUID(s) and terminal id(s).  
+3. Put the two card machines into Script properties:
+
+| Property | Value |
+|---|---|
+| `TEYA_PDQ1_TERMINAL_IDS` | terminal id for Channel A / PDQ 1 |
+| `TEYA_PDQ2_TERMINAL_IDS` | terminal id for Channel B / PDQ 2 |
+
+If there are exactly two terminals and you skip this, the code auto-assigns sorted ids to PDQ 1 / 2.
+
+---
+
+## E — Test
+
+1. Open Windmill **Daily Entry**.  
+2. Above PDQ Terminal 1: **Pull PDQ from Teya** → **Pull from Teya now**.  
+3. PDQ 1 / 2 fill from live SUCCESSFUL sales for that calendar day.  
+4. Check → **Save**. Rooms still manual.
+
+### If it fails
+
+| Message | Fix |
+|---|---|
+| Missing Teya API credentials | Step C |
+| OAuth token HTTP 401/400 | Wrong client id/secret |
+| payment-requests HTTP 403/404 | Wrong store UUID or scopes |
+| No successful Teya sales | Wrong day, or POSLink doesn’t see standalone taps — email Teya support with MID `5151716` and ask which API lists **Business Portal terminal sales** in realtime |
+
+---
+
+## Honest note
+
+Teya’s documented **realtime** list API is POSLink `GET /poslink/v2/payment-requests`. That is what this code calls.  
+Settlement reporting (SOAP) is **after** settlement — not live.  
+If Windmill’s SoftPOS taps never appear in POSLink, Teya support must enable the right product/API for MID `5151716` — we can’t invent a private portal endpoint.
