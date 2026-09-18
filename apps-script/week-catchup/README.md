@@ -38,18 +38,18 @@ Deployed **18 Sep 2026** with clasp:
 
 | Project | Pin |
 |---|---|
-| PubSystemLib | **v71** (`4.24 manager week catch-up after last submitted/approved`) |
-| Eight Bells takings `/exec` | library **v71**, web app **@203** |
-| Windmill takings `/exec` | library **v71**, web app **@54** |
+| PubSystemLib | **v72** (`4.25 catch-up uses archive/master when WEEK_ tabs were moved`) |
+| Eight Bells takings `/exec` | library **v72**, web app **@204** |
+| Windmill takings `/exec` | library **v72**, web app **@55** |
 
 Helpers: [`ManagerWeekCatchup.gs`](./ManagerWeekCatchup.gs) (also `ManagerWeekCatchup.js` in the library).
 
 Week selection now:
 
-1. Find the latest week that is **SUBMITTED** or **APPROVED** (filed toward owner)  
+1. Find the latest filed week from live SUBMITTED/APPROVED tabs, leftover `WE*_MASTER` sheets, **and the archive workbook** (finished `WEEK_` tabs are moved out of the live book)  
 2. Target = **next Sunday** after that week ending  
-3. Prefer that exact sheet — **never** a later calendar draft  
-4. If the catch-up sheet is missing, hub falls back to last submitted → **Start Next Week**, which creates `WEEK_09AUG26` (not week ending 20 Sep)  
+3. Prefer that exact sheet — **never** a later calendar draft (`WEEK_20SEP26`)  
+4. If the catch-up sheet is missing, the hub **creates** `WEEK_09AUG26` on load (can take up to a minute)  
 5. `startNewWeekImpl` ignores a later mistaken draft when creating the catch-up week  
 
-After deploy: refresh the manager hub. If `WEEK_09AUG26` does not exist yet, use **Start Next Week** once. Then **CONTINUE** should be Monday 3 Aug. Leave empty `WEEK_20SEP26` unused until catch-up reaches it.
+Hard-refresh the manager hub and wait for loading to finish. You should see **week ending 9 August** / CONTINUE on Monday 3 Aug. All weeks will still list the empty 20 Sep draft — leave it unused.

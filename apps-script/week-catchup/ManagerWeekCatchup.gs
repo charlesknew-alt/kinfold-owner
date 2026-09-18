@@ -9,41 +9,83 @@
  * ahead. Paperwork should continue from Monday of the FIRST week AFTER the
  * last SUBMITTED/APPROVED week (catch-up order).
  *
- * DEPLOYED 18 Sep 2026: PubSystemLib v71 (LIB_VERSION 4.24).
- * Eight Bells /exec @203 and Windmill /exec @54 pin library v71.
+ * Finished WEEK_ tabs are moved to ARCHIVE_SPREADSHEET_ID, so the live book
+ * may only contain the mistaken current-week draft. Last completed week is
+ * taken from live SUBMITTED/APPROVED tabs, leftover WE*_MASTER sheets, and
+ * the archive workbook.
  *
- * INSTALL (PubSystemLib)
- * ----------------------
- * Wired into findMostRecentDraftWeek, _findWeekSheetForForm, and
- * startNewWeekImpl. Venues must pin this library version.
+ * DEPLOYED: PubSystemLib 4.25+ (catch-up reads archive/master).
  *
  * Does not change owner Pending / Archive filters.
  */
 
+var _lastOwnerPipelineCache = null;
+var _lastOwnerPipelineCacheKey = '';
+
 /**
  * Latest week that has left the manager desk toward the owner.
- * Status in A1 (case-insensitive) containing SUBMITTED or APPROVED.
+ * Looks at live WEEK_ (SUBMITTED/APPROVED), live WE*_MASTER, and archive WEEK_.
  */
-function findLastOwnerPipelineWeek_(ss) {
+function findLastOwnerPipelineWeek_(ss, cfg) {
+  cfg = cfg || {};
+  var key = '';
+  try { key = String(ss.getId()); } catch (e0) { key = 'ss'; }
+  key += '|' + (cfg.ARCHIVE_SPREADSHEET_ID || '');
+  if (_lastOwnerPipelineCache && _lastOwnerPipelineCacheKey === key) {
+    return _lastOwnerPipelineCache;
+  }
+
+  var best = null;
+  function consider(weekEnd, status, sheet) {
+    if (!weekEnd) return;
+    weekEnd = stripTime_(weekEnd);
+    if (!best || weekEnd.getTime() > best.weekEnd.getTime()) {
+      best = { sheet: sheet || null, weekEnd: weekEnd, status: status || 'APPROVED' };
+    }
+  }
+
   var sheets = ss.getSheets();
-  var best = null; // { sheet, weekEnd, status }
   for (var i = 0; i < sheets.length; i++) {
     var sh = sheets[i];
     var name = sh.getName();
-    if (name.indexOf('WEEK_') !== 0) continue;
-    var weekEnd = catchupWeekEndFromSheet_(sh, name);
-    if (!weekEnd) continue;
-    var status = String(sh.getRange('A1').getValue() || '').toUpperCase();
-    if (status.indexOf('SUBMITTED') === -1 && status.indexOf('APPROVED') === -1) continue;
-    if (!best || weekEnd.getTime() > best.weekEnd.getTime()) {
-      best = { sheet: sh, weekEnd: weekEnd, status: status };
+    if (name.indexOf('WEEK_') === 0) {
+      var status = String(sh.getRange('A1').getValue() || '').toUpperCase();
+      if (status.indexOf('SUBMITTED') === -1 && status.indexOf('APPROVED') === -1) continue;
+      consider(catchupWeekEndFromSheet_(sh, name), status, sh);
+      continue;
+    }
+    var master = parseMasterSheetNameCatchup_(name);
+    if (master) {
+      var fromA2 = null;
+      try {
+        var a2 = sh.getRange('A2').getValue();
+        if (a2 instanceof Date && !isNaN(a2.getTime())) fromA2 = stripTime_(a2);
+      } catch (e1) {}
+      consider(fromA2 || master, 'APPROVED', sh);
     }
   }
+
+  if (cfg.ARCHIVE_SPREADSHEET_ID) {
+    try {
+      var archive = SpreadsheetApp.openById(cfg.ARCHIVE_SPREADSHEET_ID);
+      var aSheets = archive.getSheets();
+      for (var j = 0; j < aSheets.length; j++) {
+        var an = aSheets[j].getName();
+        if (an.indexOf('WEEK_') !== 0) continue;
+        consider(parseWeekSheetNameCatchup_(an) || catchupWeekEndFromSheet_(aSheets[j], an), 'APPROVED', aSheets[j]);
+      }
+    } catch (ae) {
+      Logger.log('ManagerWeekCatchup: archive scan failed: ' + ae);
+    }
+  }
+
+  _lastOwnerPipelineCache = best;
+  _lastOwnerPipelineCacheKey = key;
   return best;
 }
 
-function managerCatchupTargetEnd_(ss) {
-  var last = findLastOwnerPipelineWeek_(ss);
+function managerCatchupTargetEnd_(ss, cfg) {
+  var last = findLastOwnerPipelineWeek_(ss, cfg);
   if (!last) return null;
   var targetEnd = new Date(last.weekEnd.getTime());
   targetEnd.setDate(targetEnd.getDate() + 7); // next Sunday week-ending
@@ -51,13 +93,11 @@ function managerCatchupTargetEnd_(ss) {
 }
 
 /**
- * Active manager week sheet: first week AFTER last SUBMITTED/APPROVED.
+ * Active manager week sheet: first week AFTER last submitted/approved/archived.
  * Does not pick a later calendar draft while that catch-up week is still open.
- * Pass createIfMissing=true to create the WEEK_* tab via createCatchupWeekSheet_.
- * Returns null if no owner-pipeline week exists yet (brand-new venue).
  */
 function findManagerCatchupWeekSheet_(ss, cfg, createIfMissing) {
-  var targetEnd = managerCatchupTargetEnd_(ss);
+  var targetEnd = managerCatchupTargetEnd_(ss, cfg);
   if (!targetEnd) return null;
 
   var expectName = formatWeekSheetNameCatchup_(targetEnd);
@@ -82,7 +122,7 @@ function findManagerCatchupWeekSheet_(ss, cfg, createIfMissing) {
   Logger.log(
     'ManagerWeekCatchup: need week ending ' +
       Utilities.formatDate(targetEnd, 'Europe/London', 'yyyy-MM-dd') +
-      ' (' + expectName + ') — not creating from status read.'
+      ' (' + expectName + ')'
   );
   return null;
 }
@@ -96,8 +136,8 @@ function catchupWeekIsDone_(sh) {
  * Block “Start new week” if a later calendar week would skip unfinished catch-up.
  * Return null to allow; or { success:false, message } to stop.
  */
-function assertManagerWeekNotJumpingAhead_(ss) {
-  var catchup = findManagerCatchupWeekSheet_(ss);
+function assertManagerWeekNotJumpingAhead_(ss, cfg) {
+  var catchup = findManagerCatchupWeekSheet_(ss, cfg, false);
   if (!catchup) return null;
   var catchEnd = catchupWeekEndFromSheet_(catchup, catchup.getName());
   if (!catchEnd) return null;
@@ -150,6 +190,10 @@ function createCatchupWeekSheet_(ss, weekEndDate, cfg) {
   return null;
 }
 
+function hasManagerCatchupGap_(ss, cfg) {
+  return !!(managerCatchupTargetEnd_(ss, cfg) && !findManagerCatchupWeekSheet_(ss, cfg, false));
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 function stripTime_(d) {
@@ -188,6 +232,12 @@ function parseWeekSheetNameCatchup_(name) {
   if (mon == null) return null;
   var year = 2000 + parseInt(m[3], 10);
   return stripTime_(new Date(year, mon, parseInt(m[1], 10)));
+}
+
+function parseMasterSheetNameCatchup_(name) {
+  var m = String(name || '').match(/^WE(\d{1,2}[A-Z]{3}\d{2})_MASTER$/i);
+  if (!m) return null;
+  return parseWeekSheetNameCatchup_('WEEK_' + m[1]);
 }
 
 function formatWeekSheetNameCatchup_(weekEnd) {

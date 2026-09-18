@@ -50,6 +50,10 @@ assert(sandbox.formatWeekSheetNameCatchup_(target) === 'WEEK_09AUG26', 'next wee
 var sep = sandbox.parseWeekSheetNameCatchup_('WEEK_20SEP26');
 assert(sep.getTime() > target.getTime(), 'WEEK_20SEP26 is after catch-up target');
 
+var master = sandbox.parseMasterSheetNameCatchup_('WE02AUG26_MASTER');
+assert(master && master.getFullYear() === 2026 && master.getMonth() === 7 && master.getDate() === 2, 'WE02AUG26_MASTER is 2 Aug 2026');
+assert(sandbox.parseMasterSheetNameCatchup_('TABS LOG') == null, 'non-master name ignored');
+
 if (failed) {
   console.error('\n' + failed + ' failed');
   process.exit(1);
