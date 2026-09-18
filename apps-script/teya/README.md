@@ -1,9 +1,12 @@
-# Idiot-proof: Teya Gmail → Windmill daily PDQ
+# Idiot-proof: Teya Gmail → Windmill PDQ guide
 
-Teya told you: **no API** for daily card sales. Reports come by **email** (you already get them in Gmail). This setup reads those emails and fills PDQ 1 / 2.
+Teya told you: **no API** for daily card sales. Reports come by **email**. This setup reads those emails and shows Channel A / B totals as a **guide only**.
 
-**Trading day:** paperwork day **D** = sales **D 5:00am → (D+1) 5:00am** UK.  
-Yesterday’s paperwork (filled this morning) = **yesterday 5am → today 5am**.
+**Important for managers:**
+- Teya is **midnight to midnight** (00:00–23:59).
+- Pubs sell a lot **after midnight**. Those sales sit on the **next** Teya calendar day.
+- So the guide can disagree with what the card machines show for “last night”.
+- **Always type PDQ 1 and PDQ 2 from the machines.** Use Teya as a check, not the final numbers.
 
 Do these steps **in order**.
 
@@ -14,16 +17,16 @@ Do these steps **in order**.
 In **your** Gmail (the same Google account that owns the Windmill Apps Script):
 
 1. Search: `from:teya.com newer_than:14d`  
-2. Open a recent daily report.  
-3. Note:
-   - Sender (often `noreply@teya.com` or `reporting@teya.com`)
-   - Subject (e.g. Daily Settlement Report)
-   - Attachment type: **CSV** (best) or **PDF**
+2. Open a recent **Your daily settlement report** (`reporting@teya.com`).  
+3. Note the PDF attachment, e.g. `Teya_settlement_report_5151716_18.09.2026.pdf`
 
-In Teya Business Portal, confirm **daily settlement / report emails are ON** for this Gmail address.
+That PDF has **By sales channel** with device IDs:
+- `oOj2CqaI` → Channel A → **PDQ 1 guide**
+- `7KckI3g7` → Channel B → **PDQ 2 guide**
 
-**Best case:** attachment is a **transaction CSV** (columns like Date, Time, Device ID, Status, Sales) — same as Card Takings.  
-**PDF-only:** still works, but may only give a **grand total** (all on PDQ 1) unless the PDF lists Channel A/B. If so, ask Teya if they can attach CSV, or export Activity CSV to the same inbox.
+Use **Sales** by channel (gross), not the net “Settlement amount paid”.
+
+In Teya Business Portal, confirm **daily settlement emails are ON** for this Gmail address.
 
 ---
 
@@ -34,7 +37,7 @@ In Teya Business Portal, confirm **daily settlement / report emails are ON** for
 2. Open PubSystemLib:  
    https://script.google.com/d/1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU/edit  
 3. Open **`Teya.gs`** → select all → delete → paste → Save.  
-4. Top must say **`v6`** and **Gmail**.
+4. Top must say **`v8`** and **guide**.
 
 ---
 
@@ -53,7 +56,7 @@ Save.
 ## STEP 4 — New library version
 
 PubSystemLib → **Deploy** → **New version**  
-Description: `Teya Gmail PDQ ingest 5am-5am`  
+Description: `Teya Gmail PDQ guide midnight-midnight`  
 **Write down the version number.**
 
 ---
@@ -63,8 +66,7 @@ Description: `Teya Gmail PDQ ingest 5am-5am`
 1. Open Windmill:  
    https://script.google.com/d/1UEG3IgPKxKJoVo9NpHT3RGvUTza2a_-V9ur8cBh-WrpfyXM5YoLkgoVO/edit  
 2. **Libraries** → PubSystemLib → pin Step 4 version → Save.  
-3. If reports are **PDF**: left sidebar **Services** (or +) → add **Drive API** → Save.  
-   (CSV-only: you can skip Drive.)
+3. Settlement reports are **PDF**: left sidebar **Services** → add **Drive API** → Save.
 
 ---
 
@@ -95,10 +97,8 @@ Save. **No new `/exec` deployment.**
 
 1. In Windmill editor, choose function **`teyaIngestEmails`**.  
 2. Click **Run**.  
-3. Review permissions → Allow **Gmail** (and Drive if PDF).  
+3. Review permissions → Allow **Gmail** and **Drive**.  
 4. Check **Executions** / Logs: should say it ingested messages (or skipped already-seen).
-
-If it errors on permissions, run again and accept all scopes.
 
 ---
 
@@ -108,16 +108,17 @@ If it errors on permissions, run again and accept all scopes.
 2. **Run**.  
 3. Should install a daily **06:30 Europe/London** job that calls `teyaIngestEmailsTrigger`.
 
-(Triggers → check it appears.)
-
 ---
 
 ## STEP 9 — Test on Daily Entry
 
 1. Open Windmill **Daily Entry**.  
 2. Select **yesterday** (usual morning paperwork).  
-3. Above PDQ 1: **Pull PDQ from Teya email** → click **Pull from Teya email**.  
-4. PDQ 1 / 2 fill → check → **Save**. Rooms still manual.
+3. Above PDQ 1: **Teya card guide** → **Show Teya guide from email**.  
+4. Guide figures appear with the midnight warning — **do not treat them as final**.  
+5. Type PDQ 1 / 2 from the machines → **Save**. Rooms still manual.
+
+Example guide from sample report (2026-09-17): Channel A ≈ **£474.30**, Channel B ≈ **£3,763.25**.
 
 ---
 
@@ -127,9 +128,9 @@ If it errors on permissions, run again and accept all scopes.
 |---|---|
 | Button missing | Steps 3–5 (inject + library pin) |
 | `teyaPullDayTotals` not a function | Step 6 |
-| Gmail permission / auth error | Step 7 as the **owner** Google account |
-| No data for trading day | Step 1 emails; run `teyaIngestEmails` again; wait for today’s morning report |
-| PDF but no terminal split | Totals may all land on PDQ 1 — ask Teya for CSV attachment or export Activity CSV to this Gmail |
+| Gmail / Drive permission error | Step 7 as the **owner** Google account |
+| No guide for day | Step 1 emails; run `teyaIngestEmails`; wait for morning settlement PDF |
+| Guide ≠ machines | Expected — midnight–midnight vs late pub trade; type machine readings |
 | Drive OCR error | Step 5 enable Drive API |
 
 ---

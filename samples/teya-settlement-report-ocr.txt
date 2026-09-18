@@ -1,0 +1,45 @@
+THE WINDMILL LITTLEWORTH LIMITED
+The Windmill Inn, Littleworth
+Littleworth Lane
+Horsham RH13 8EJ
+  Contract No. (SID): GB0683GF (MID: 5151716)
+Settlement Report
+ GBP
+Settlement amount
+ £ 4,220.60
+Paid
+Paid on
+Sep 18, 2026
+5151716TEYA260918
+ Bank account 93347729
+ Sort Code 204258
+Initial balance
+from Sep 17, 2026 0.00
+Sales 4,237.55
+Fees -16.95
+Sales fees -16.95
+Settlement amount paid 4,220.60
+Sales breakdown
+By schemes
+# Transactions Sales
+Thursday, September 17, 2026
+ 
+Visa 36 631.34
+ 
+MasterCard 25 3,606.21
+Total 61 4,237.55
+By sales channel
+# Transactions Sales
+ 
+oOj2CqaI 28 474.30
+ 
+7KckI3g7 33 3,763.25
+Total 61 4,237.55
+Understand Your Settlement
+Sales Refunds Chargebacks Teya fees Others Balance
+Initial balance 0.00
+Visa 631.34 -2.53 628.81
+MasterCard 3,606.21 -14.42 3,591.79
+Total 4,237.55 -16.95 4,220.60
+Manage your business anytime, anywhere
+Use the Teya App to track sales, settlements and more - all in real time

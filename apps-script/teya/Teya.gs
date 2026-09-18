@@ -1,11 +1,14 @@
 /**
- * PubSystemLib - Teya.gs (v6) — Gmail daily report → Windmill PDQ
+ * PubSystemLib - Teya.gs (v8) — Gmail settlement report → Windmill PDQ guide
  *
  * Teya has no merchant API for daily card sales. Reports arrive by email
  * (noreply@teya.com / reporting@teya.com). This file:
  *   1) Reads those emails from the Apps Script owner's Gmail
- *   2) Parses CSV attachments (best) or PDF via Drive OCR
- *   3) Totals by Channel A/B → pdq1/pdq2 for trading day 05:00→05:00 UK
+ *   2) Parses settlement PDF (By sales channel) via Drive OCR, or CSV
+ *   3) Shows Channel A/B totals as a GUIDE only (midnight→midnight UK)
+ *
+ * Manager still types PDQ 1 / 2 from the card machines. After-midnight pub
+ * sales sit on the next Teya calendar day, so figures can disagree with till.
  *
  * PASTE over PubSystemLib Teya.gs, then Templates_Serve one-liner (see README).
  * Windmill wrappers + one-time Gmail auth + daily trigger — see README.
@@ -36,19 +39,29 @@ function teyaInjectDailyPrefill_(cfg, html) {
 function teyaDailyPrefillHtml_() {
   return [
     '<div id="teyaPrefillBox" class="ps-card" style="margin-bottom:14px;">',
-    '<div style="font-family:var(--serif);font-size:18px;margin-bottom:8px;">Pull PDQ from Teya email</div>',
+    '<div style="font-family:var(--serif);font-size:18px;margin-bottom:8px;">Teya card guide</div>',
     '<p class="ps-hint" style="margin:0 0 10px;">',
-    'Reads the Teya daily report from Gmail. Trading day <strong>5am\\u21925am</strong> UK ',
-    '(yesterday\\u2019s paperwork = yesterday 5am \\u2192 today 5am). ',
-    'Fills PDQ 1 / 2. Does not save \\u2014 check, then Save. Rooms stay manual.',
+    '<strong>Guide only \\u2014 type PDQ 1 and PDQ 2 from the card machines yourself.</strong> ',
+    'Teya figures are <strong>midnight to midnight</strong> (00:00\\u201323:59). ',
+    'Late drinks after midnight land on the <em>next</em> Teya day, so these numbers can disagree with the till. ',
+    'Use them as a check, not the final entry.',
     '</p>',
-    '<button type="button" id="teyaPullBtn" class="ps-btn ps-btn-secondary ps-btn-block">Pull from Teya email</button>',
+    '<button type="button" id="teyaPullBtn" class="ps-btn ps-btn-secondary ps-btn-block">Show Teya guide from email</button>',
+    '<div id="teyaGuidePanel" style="display:none;margin-top:12px;padding:10px 12px;border-left:3px solid #c0635a;background:rgba(192,99,90,0.08);">',
+    '<div style="font-weight:600;margin-bottom:6px;">Teya guide (midnight\\u2013midnight)</div>',
+    '<div id="teyaGuideFigures" style="font-size:15px;margin-bottom:8px;"></div>',
+    '<p id="teyaGuideWarn" class="ps-hint" style="margin:0;color:#8a3a32;">',
+    'Warning: after-midnight sales are not on this day\\u2019s Teya total. Enter what the machines actually show.',
+    '</p>',
+    '</div>',
     '<div id="teyaPrefillMsg" class="ps-hint" style="min-height:1.2em;margin-top:8px;"></div>',
     '</div>',
     '<script>',
     '(function(){',
     'var btn=document.getElementById("teyaPullBtn");',
     'var msg=document.getElementById("teyaPrefillMsg");',
+    'var panel=document.getElementById("teyaGuidePanel");',
+    'var figs=document.getElementById("teyaGuideFigures");',
     'if(!btn)return;',
     'function setMsg(t,err){if(!msg)return;msg.textContent=t||"";msg.style.color=err?"#c0635a":"";}',
     'function londonYmd(d){',
@@ -71,21 +84,21 @@ function teyaDailyPrefillHtml_() {
     '}catch(e){}',
     'return londonYesterday();',
     '}',
-    'function fillPdq(a,b,detail){',
-    'var x=document.getElementById("pdq1");var y=document.getElementById("pdq2");',
-    'if(x)x.value=a;if(y)y.value=b;',
-    'if(typeof calculateAll==="function")calculateAll();',
-    'setMsg(detail||("Filled PDQ 1 = \\u00a3"+a+", PDQ 2 = \\u00a3"+b),false);',
+    'function showGuide(a,b,detail){',
+    'if(figs)figs.innerHTML="Channel A / PDQ 1 guide: <strong>\\u00a3"+a+"</strong><br>Channel B / PDQ 2 guide: <strong>\\u00a3"+b+"</strong>";',
+    'if(panel)panel.style.display="block";',
+    'setMsg(detail||("Guide loaded \\u2014 type the machine readings into PDQ 1 and PDQ 2."),false);',
     '}',
     'btn.addEventListener("click",function(){',
     'if(!google||!google.script||!google.script.run){setMsg("google.script.run unavailable",true);return;}',
     'btn.disabled=true;setMsg("Checking Teya emails\\u2026",false);',
+    'if(panel)panel.style.display="none";',
     'var dayKey=dayKeyFromForm();',
     'google.script.run',
     '.withSuccessHandler(function(res){',
     'btn.disabled=false;',
     'if(!res||!res.success){setMsg((res&&res.message)||"Teya email pull failed",true);return;}',
-    'fillPdq(res.pdq1,res.pdq2,res.message);',
+    'showGuide(res.pdq1,res.pdq2,res.message);',
     '})',
     '.withFailureHandler(function(err){btn.disabled=false;setMsg(String(err),true);})',
     '.teyaPullDayTotals(dayKey);',
@@ -114,7 +127,6 @@ function teyaPullDayTotals(cfg, dayKey) {
   try {
     teyaIngestEmails(cfg); // refresh from Gmail (idempotent)
   } catch (ingestErr) {
-    // Still try cache if ingest fails (e.g. first-run auth)
     Logger.log('teyaIngestEmails: ' + (ingestErr && ingestErr.message ? ingestErr.message : ingestErr));
   }
 
@@ -127,26 +139,27 @@ function teyaPullDayTotals(cfg, dayKey) {
       pdq2: cached.pdq2,
       count: cached.count || 0,
       source: cached.source || 'gmail',
+      guideOnly: true,
       message:
-        'Teya email ' + dayKey + ' (5am\\u20135am): PDQ 1 £' + cached.pdq1 +
-        ' · PDQ 2 £' + cached.pdq2 +
-        (cached.note ? ' — ' + cached.note : '')
+        'GUIDE ONLY for ' + dayKey + ' (Teya midnight\\u2013midnight): Channel A £' + cached.pdq1 +
+        ' · Channel B £' + cached.pdq2 +
+        '. After-midnight drinks are on the next Teya day — type machine readings into PDQ 1 / 2.' +
+        (cached.note ? ' (' + cached.note + ')' : '')
     };
   }
 
   return {
     success: false,
     message:
-      'No Teya email data for trading day ' + dayKey +
-      '. Check Gmail for noreply@teya.com / reporting@teya.com, run teyaIngestEmails, ' +
-      'and confirm daily reports are enabled in the Teya Business Portal.'
+      'No Teya email guide for ' + dayKey +
+      ' (midnight\\u2013midnight). Check Gmail for reporting@teya.com / noreply@teya.com, ' +
+      'run teyaIngestEmails, and confirm daily settlement emails are on in the Teya Business Portal.'
   };
 }
 
 /**
  * Scan Gmail for recent Teya reports, parse attachments, cache day totals.
  * Venue: function teyaIngestEmails() { return PubSystemLib.teyaIngestEmails(VENUE_CONFIG); }
- * Also used by the daily time-driven trigger.
  */
 function teyaIngestEmails(cfg) {
   cfg = mergeConfig_(cfg || {});
@@ -200,7 +213,6 @@ function teyaIngestEmails(cfg) {
 /**
  * Install a morning trigger (06:30 Europe/London) to ingest Teya emails.
  * Venue: function teyaInstallEmailTrigger() { return PubSystemLib.teyaInstallEmailTrigger(VENUE_CONFIG); }
- * Run once from the Windmill script editor.
  */
 function teyaInstallEmailTrigger(cfg) {
   cfg = mergeConfig_(cfg || {});
@@ -220,10 +232,7 @@ function teyaInstallEmailTrigger(cfg) {
   return { success: true, message: 'Installed daily 06:30 Europe/London trigger → teyaIngestEmailsTrigger.' };
 }
 
-/** Trigger entry (must live on venue OR be called via library — venue should wrap). */
 function teyaIngestEmailsTrigger() {
-  // When installed on venue project, venue wrapper calls library with VENUE_CONFIG.
-  // If somehow run from library directly, no-op safely.
   try {
     if (typeof VENUE_CONFIG !== 'undefined') {
       teyaIngestEmails(VENUE_CONFIG);
@@ -260,10 +269,9 @@ function teyaParseMessage_(cfg, msg) {
     }
   }
 
-  // Body fallback (rare): plain totals
   if (!any) {
-    var body = msg.getPlainBody() || '';
-    var bodyParsed = teyaTotalsFromPlainText_(cfg, body, msg.getDate());
+    var body = (msg.getPlainBody() || '') + '\n' + (msg.getSubject() || '');
+    var bodyParsed = teyaTotalsFromSettlementText_(cfg, body);
     if (bodyParsed && bodyParsed.days) {
       Object.keys(bodyParsed.days).forEach(function (dk) {
         days[dk] = bodyParsed.days[dk];
@@ -283,12 +291,12 @@ function teyaTotalsFromCsvText_(cfg, csvText) {
   var txns = teyaBuildTxns_(rows);
   if (!txns.length) return null;
 
-  // Bucket by trading day (London wall − 5 hours)
+  // Bucket by Teya calendar day (midnight→midnight UK) — guide only for paperwork
   var byDay = {};
   for (var i = 0; i < txns.length; i++) {
     var t = txns[i];
     if (!t.approved) continue;
-    var trd = teyaTradingDayKeyFromParts_(t.date, t.hour, t.minute);
+    var trd = t.date; // calendar day on the export
     if (!byDay[trd]) byDay[trd] = [];
     byDay[trd].push(t);
   }
@@ -301,15 +309,13 @@ function teyaTotalsFromCsvText_(cfg, csvText) {
       pdq2: totals.pdq2,
       count: totals.count,
       source: 'gmail-csv',
-      note: ''
+      note: 'midnight\\u2013midnight guide'
     };
   });
   return { days: days };
 }
 
 function teyaTotalsFromPdfBlob_(cfg, blob, filename) {
-  // OCR via Drive → Google Doc → plain text. Requires Advanced Drive service
-  // OR DriveApp + Docs — use Drive.Files.insert when available; else soft-fail.
   var text = '';
   try {
     text = teyaOcrPdfToText_(blob, filename || 'teya.pdf');
@@ -318,16 +324,14 @@ function teyaTotalsFromPdfBlob_(cfg, blob, filename) {
     return null;
   }
   if (!text) return null;
-  return teyaTotalsFromPlainText_(cfg, text, new Date());
+  return teyaTotalsFromSettlementText_(cfg, text);
 }
 
 function teyaOcrPdfToText_(blob, filename) {
-  // Prefer Advanced Drive Service (enable in Windmill project: Services → Drive API).
   if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.create) {
-    // Drive API v3
     var resource = { name: 'teya-ocr-' + Date.now(), mimeType: MimeType.GOOGLE_DOCS };
     var file = Drive.Files.create(resource, blob, { ocrLanguage: 'en' });
-    var id = file.id || file.id;
+    var id = file.id;
     try {
       var doc = DocumentApp.openById(id);
       var text = doc.getBody().getText();
@@ -339,7 +343,6 @@ function teyaOcrPdfToText_(blob, filename) {
     }
   }
 
-  // Drive API v2 style
   if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.insert) {
     var res2 = { title: 'teya-ocr-' + Date.now(), mimeType: MimeType.GOOGLE_DOCS };
     var file2 = Drive.Files.insert(res2, blob, { ocr: true, ocrLanguage: 'en' });
@@ -356,62 +359,86 @@ function teyaOcrPdfToText_(blob, filename) {
   }
 
   throw new Error(
-    'PDF received but Drive API is not enabled. In Windmill Apps Script: Services → Add Drive API. ' +
-    'Or ask Teya / export a CSV attachment for reliable terminal totals.'
+    'PDF received but Drive API is not enabled. In Windmill Apps Script: Services → Add Drive API.'
   );
 }
 
-function teyaTotalsFromPlainText_(cfg, text, fallbackDate) {
+/**
+ * Parse Teya settlement PDF / email text.
+ * Uses "By sales channel" device rows (gross Sales), never net Settlement amount.
+ * Day key = sales date on the report (Teya midnight→midnight calendar day).
+ */
+function teyaTotalsFromSettlementText_(cfg, text) {
   var labels = cfg.TEYA_CHANNEL_LABELS || {};
+  var raw = String(text || '');
+  if (!raw) return null;
+
+  var salesSection = raw;
+  var chIdx = raw.search(/by\s+sales\s+channel/i);
+  if (chIdx !== -1) {
+    salesSection = raw.slice(chIdx, chIdx + 800);
+    var endIdx = salesSection.search(/\bUnderstand\b|\bManage your business\b/i);
+    if (endIdx > 0) salesSection = salesSection.slice(0, endIdx);
+  }
+
+  var channelRe =
+    /\b([A-Za-z0-9]{6,12})\s+(\d+)\s+([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}|[0-9]+\.[0-9]{2})\b/g;
+  var devices = {};
+  var match;
+  while ((match = channelRe.exec(salesSection)) !== null) {
+    var id = match[1];
+    if (/^(visa|mastercard|total|sales|fees|paid|gbp|teya)$/i.test(id)) continue;
+    var pence = Math.round(parseFloat(match[3].replace(/,/g, '')) * 100);
+    devices[id] = (devices[id] || 0) + pence;
+  }
+
+  var dayKey = teyaParseSalesDayFromSettlement_(raw);
+  if (!dayKey) dayKey = teyaLondonYesterday_();
+
+  var ids = Object.keys(devices);
   var days = {};
 
-  // Try CSV-ish blocks inside the text first
-  if (text.indexOf('Device ID') !== -1 || text.indexOf('Sales') !== -1) {
-    var fromCsv = teyaTotalsFromCsvText_(cfg, text);
-    if (fromCsv) return fromCsv;
-  }
-
-  // Heuristic: Channel A / B or Terminal 1 / 2 amounts
-  var pdq1 = teyaExtractMoneyNear_(text, /channel\s*a|terminal\s*1|pdq\s*1|device\s*a/i);
-  var pdq2 = teyaExtractMoneyNear_(text, /channel\s*b|terminal\s*2|pdq\s*2|device\s*b/i);
-  var grand = teyaExtractMoneyNear_(text, /total\s*(sales|amount|card|turnover|settlement)|net\s*sales|gross\s*sales/i);
-
-  var dayKey = teyaLondonYesterday_();
-  var dateMatch = text.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/) ||
-    text.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](20\d{2})\b/);
-  if (dateMatch) {
-    if (dateMatch[0].indexOf('-') !== -1 && dateMatch[1].length === 4) {
-      dayKey = dateMatch[1] + '-' + dateMatch[2] + '-' + dateMatch[3];
-    } else if (dateMatch[3]) {
-      dayKey = dateMatch[3] + '-' + ('0' + dateMatch[2]).slice(-2) + '-' + ('0' + dateMatch[1]).slice(-2);
+  if (ids.length) {
+    var pdq1 = 0;
+    var pdq2 = 0;
+    var count = 0;
+    for (var i = 0; i < ids.length; i++) {
+      var did = ids[i];
+      var p = devices[did];
+      var slot = teyaSlotForLabel_(labels[did] || '');
+      if (!slot && did === 'oOj2CqaI') slot = 1;
+      if (!slot && did === '7KckI3g7') slot = 2;
+      if (slot === 1) pdq1 += p;
+      else if (slot === 2) pdq2 += p;
+      count += 1;
     }
-  } else if (fallbackDate) {
-    dayKey = Utilities.formatDate(
-      new Date(fallbackDate.getTime() - 86400000),
-      'Europe/London',
-      'yyyy-MM-dd'
-    );
-  }
-
-  if (pdq1 != null || pdq2 != null) {
+    if (pdq1 === 0 && pdq2 === 0 && ids.length === 2) {
+      ids.sort();
+      pdq1 = devices[ids[0]];
+      pdq2 = devices[ids[1]];
+    } else if (pdq1 === 0 && pdq2 === 0 && ids.length === 1) {
+      pdq1 = devices[ids[0]];
+    }
     days[dayKey] = {
-      pdq1: (pdq1 != null ? pdq1 : 0).toFixed(2),
-      pdq2: (pdq2 != null ? pdq2 : 0).toFixed(2),
-      count: 0,
-      source: 'gmail-text',
-      note: 'Parsed from email/PDF text — check figures'
+      pdq1: (pdq1 / 100).toFixed(2),
+      pdq2: (pdq2 / 100).toFixed(2),
+      count: count,
+      source: 'gmail-settlement-pdf',
+      note: 'midnight\\u2013midnight guide'
     };
     return { days: days };
   }
 
-  if (grand != null) {
-    // No terminal split — put all on PDQ 1, zero PDQ 2, warn manager
+  // Gross Sales line only (not settlement/net paid)
+  var salesLine = raw.match(/(?:^|\n)\s*Sales\s+([0-9]{1,3}(?:,[0-9]{3})*\.[0-9]{2}|[0-9]+\.[0-9]{2})/i);
+  if (salesLine) {
+    var grand = parseFloat(salesLine[1].replace(/,/g, ''));
     days[dayKey] = {
       pdq1: grand.toFixed(2),
       pdq2: '0.00',
       count: 0,
-      source: 'gmail-text-total',
-      note: 'Settlement total only (no terminal split) — split PDQ 1/2 manually if needed'
+      source: 'gmail-settlement-total',
+      note: 'Sales total only (no channel split) — midnight\\u2013midnight guide'
     };
     return { days: days };
   }
@@ -419,27 +446,49 @@ function teyaTotalsFromPlainText_(cfg, text, fallbackDate) {
   return null;
 }
 
-function teyaExtractMoneyNear_(text, labelRe) {
-  var m = text.match(labelRe);
+function teyaParseSalesDayFromSettlement_(raw) {
+  var breakdown = raw.match(/Sales\s+breakdown[\s\S]{0,400}/i);
+  if (breakdown) {
+    var d1 = teyaParseLongDate_(breakdown[0]);
+    if (d1) return d1;
+  }
+  var schemeBlock = raw.match(/By\s+schemes[\s\S]{0,200}/i);
+  if (schemeBlock) {
+    var d2 = teyaParseLongDate_(schemeBlock[0]);
+    if (d2) return d2;
+  }
+  // Avoid "Paid on" — strip that clause then try
+  var withoutPaid = raw.replace(/Paid\s+on[\s\S]{0,40}/i, ' ');
+  var d3 = teyaParseLongDate_(withoutPaid);
+  if (d3) return d3;
+  var iso = withoutPaid.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  return null;
+}
+
+function teyaParseLongDate_(text) {
+  var months = {
+    january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+    july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+    jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9,
+    oct: 10, nov: 11, dec: 12
+  };
+  var m = String(text || '').match(
+    /\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(20\d{2})\b/i
+  );
+  if (!m) {
+    m = String(text || '').match(/\b([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(20\d{2})\b/);
+  }
   if (!m) return null;
-  var idx = m.index;
-  var window = text.slice(idx, Math.min(text.length, idx + 120));
-  var money = window.match(/£\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|[0-9]+\.[0-9]{2})/);
-  if (!money) money = window.match(/([0-9]+\.[0-9]{2})/);
-  if (!money) return null;
-  return parseFloat(money[1].replace(/,/g, ''));
+  var mon = months[m[1].toLowerCase()];
+  if (!mon) return null;
+  return m[3] + '-' + ('0' + mon).slice(-2) + '-' + ('0' + parseInt(m[2], 10)).slice(-2);
 }
 
 // ── Trading day / totals helpers ────────────────────────────────────────────
 
+/** Kept for compatibility; Teya guide uses calendar (midnight) day on the export. */
 function teyaTradingDayKeyFromParts_(isoDate, hour, minute) {
-  // isoDate YYYY-MM-DD is London calendar date of the sale; hour/minute London wall.
-  var h = hour == null ? 12 : hour;
-  var mi = minute == null ? 0 : minute;
-  if (h < 5 || (h === 5 && mi === 0 && false)) {
-    // Before 5am → previous calendar day is the trading day
-    if (h < 5) return teyaAddCalendarDays_(isoDate, -1);
-  }
   return isoDate;
 }
 
@@ -451,17 +500,12 @@ function teyaDayTotalsFromTxns_(txns, labels) {
     var t = txns[i];
     var id = t.serial || t.term || '';
     var slot = teyaSlotForLabel_(labels[id] || '');
-    // Fallback: known Windmill device ids
     if (!slot && id === 'oOj2CqaI') slot = 1;
     if (!slot && id === '7KckI3g7') slot = 2;
     if (slot === 1) pdq1 += t.pence;
     else if (slot === 2) pdq2 += t.pence;
-    else {
-      // Unknown device — still count toward neither until mapped
-    }
     count++;
   }
-  // If nothing mapped but exactly two device ids present, auto-assign
   if (pdq1 === 0 && pdq2 === 0) {
     var by = {};
     for (var j = 0; j < txns.length; j++) {
@@ -516,7 +560,6 @@ function teyaCacheGetAll_() {
 }
 
 function teyaCachePutAll_(obj) {
-  // Keep last ~21 days only
   var keys = Object.keys(obj).filter(function (k) { return /^\d{4}-\d{2}-\d{2}$/.test(k); }).sort();
   while (keys.length > 21) {
     delete obj[keys.shift()];

@@ -63,7 +63,7 @@ Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with
 
 ### Teya → daily PDQ (Gmail)
 
-Teya does not offer a merchant API for daily card sales. Windmill daily entry pulls PDQ 1/2 from **Teya report emails in Gmail** (5am→5am UK trading day). Paste-ready `apps-script/teya/` — see that README Steps 1–9.
+Teya does not offer a merchant API for daily card sales. Windmill daily entry shows a **PDQ guide** from **Teya settlement emails in Gmail** (midnight→midnight; manager still types machine readings). Paste-ready `apps-script/teya/` — see that README Steps 1–9.
 
 ## Varlo Auth Apps Script
 
