@@ -663,8 +663,9 @@ function teyaCacheGetAll_() {
 }
 
 function teyaCachePutAll_(obj) {
+  // Keep ~6 weeks of day totals (42 days) plus a small buffer
   var keys = Object.keys(obj).filter(function (k) { return /^\d{4}-\d{2}-\d{2}$/.test(k); }).sort();
-  while (keys.length > 21) {
+  while (keys.length > 50) {
     delete obj[keys.shift()];
   }
   PropertiesService.getScriptProperties().setProperty('TEYA_EMAIL_CACHE', JSON.stringify(obj));
