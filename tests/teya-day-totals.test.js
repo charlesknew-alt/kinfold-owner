@@ -46,14 +46,16 @@ assert(teyaGs.indexOf('function teyaListTerminals') !== -1, 'Teya.gs has teyaLis
 assert(teyaGs.indexOf('Pull from Teya now') !== -1, 'Teya.gs UI is API pull button');
 assert(teyaGs.indexOf('teyaCsvFile') === -1, 'Teya.gs daily UI has no CSV file input');
 assert(teyaGs.indexOf('poslink/v2/payment-requests') !== -1, 'Teya.gs calls POSLink payment-requests');
+assert(teyaGs.indexOf('teyaTradingWindowIso_') !== -1, 'Teya.gs has 5am trading window');
+assert(teyaGs.indexOf('05:00:00') !== -1, 'Teya.gs uses 05:00 London');
 assert(teyaGs.indexOf('TEYA_CLIENT_ID') !== -1, 'Teya.gs documents API Script Properties');
-assert(teyaGs.indexOf('v4') !== -1, 'Teya.gs is v4 live API');
+assert(teyaGs.indexOf('v5') !== -1, 'Teya.gs is v5 trading-day API');
 
 var readme = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/README.md'), 'utf8');
 assert(readme.indexOf('TEYA_STORE_ID') !== -1, 'teya README mentions store UUID');
 assert(readme.indexOf('Pull from Teya now') !== -1, 'teya README is API-first');
-assert(readme.indexOf('No CSV') !== -1, 'teya README says no CSV');
-assert(readme.indexOf('Script properties') !== -1, 'teya README has Script properties step');
+assert(readme.indexOf('5am') !== -1, 'teya README documents 5am trading day');
+assert(readme.indexOf('STEP 1') !== -1 && readme.indexOf('STEP 9') !== -1, 'teya README has steps 1-9');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');

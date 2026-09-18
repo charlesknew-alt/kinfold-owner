@@ -1,21 +1,16 @@
 /**
- * PubSystemLib - Teya.gs (v4) — LIVE API pull for Windmill daily PDQ
+ * PubSystemLib - Teya.gs (v5) — LIVE API pull for Windmill daily PDQ
  *
- * Windmill only (cfg.TEYA_ENABLED). Eight Bells keeps TEYA_ENABLED: false.
+ * Trading day (same as card takings): 05:00 → 05:00 Europe/London.
+ * Paperwork day D uses card sales from D 05:00 to (D+1) 05:00.
+ * Morning fill: yesterday's paperwork ← yesterday 5am → today 5am.
  *
  * PASTE: replace entire Teya.gs / Teya.js in PubSystemLib with this file.
  * Then one-line change in Templates_Serve.js (see apps-script/teya/README.md).
- * New library version → pin Windmill. Add venue wrappers in Windmill Code.js.
  *
- * Script Properties (Windmill project OR PubSystemLib — venue is fine):
- *   TEYA_CLIENT_ID
- *   TEYA_CLIENT_SECRET
- *   TEYA_STORE_ID          (UUID — not the numeric MID)
- *
- * Optional Script Properties / VENUE_CONFIG:
- *   TEYA_PDQ1_TERMINAL_IDS  comma-separated terminal ids for PDQ 1
- *   TEYA_PDQ2_TERMINAL_IDS  comma-separated terminal ids for PDQ 2
- *   (If unset, uses cfg.TEYA_CHANNEL_LABELS: label "Channel A" → pdq1, "Channel B" → pdq2)
+ * Script Properties (Windmill project):
+ *   TEYA_CLIENT_ID, TEYA_CLIENT_SECRET, TEYA_STORE_ID (UUID)
+ * Optional: TEYA_PDQ1_TERMINAL_IDS, TEYA_PDQ2_TERMINAL_IDS
  */
 
 function teyaIsEnabled_(cfg) {
@@ -40,14 +35,15 @@ function teyaInjectDailyPrefill_(cfg, html) {
   return html.replace(needle, teyaDailyPrefillHtml_() + needle);
 }
 
-/** Daily-form UI: one button, no CSV. */
+/** Daily-form UI: one button, no CSV. Trading day 5am–5am. */
 function teyaDailyPrefillHtml_() {
   return [
     '<div id="teyaPrefillBox" class="ps-card" style="margin-bottom:14px;">',
     '<div style="font-family:var(--serif);font-size:18px;margin-bottom:8px;">Pull PDQ from Teya</div>',
     '<p class="ps-hint" style="margin:0 0 10px;">',
-    'Fetches live approved card sales from Teya for this calendar day and fills PDQ Terminal 1 / 2. ',
-    'Does not save — check the numbers, then Save. Rooms PDQ stays manual.',
+    'Live Teya sales for this paperwork day: <strong>5am\\u21925am</strong> UK ',
+    '(e.g. yesterday\\u2019s paperwork = yesterday 5am \\u2192 today 5am). ',
+    'Fills PDQ 1 / 2. Does not save \\u2014 check, then Save. Rooms PDQ stays manual.',
     '</p>',
     '<button type="button" id="teyaPullBtn" class="ps-btn ps-btn-secondary ps-btn-block">Pull from Teya now</button>',
     '<div id="teyaPrefillMsg" class="ps-hint" style="min-height:1.2em;margin-top:8px;"></div>',
@@ -58,15 +54,28 @@ function teyaDailyPrefillHtml_() {
     'var msg=document.getElementById("teyaPrefillMsg");',
     'if(!btn)return;',
     'function setMsg(t,err){if(!msg)return;msg.textContent=t||"";msg.style.color=err?"#c0635a":"";}',
-    'function londonToday(){',
+    'function londonYmd(d){',
     'var fmt=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit"});',
-    'return fmt.format(new Date());', // en-CA → YYYY-MM-DD
+    'return fmt.format(d);',
+    '}',
+    'function londonYesterday(){',
+    'var parts=londonYmd(new Date()).split("-");',
+    'var utc=Date.UTC(+parts[0],+parts[1]-1,+parts[2]);',
+    'return londonYmd(new Date(utc-86400000));',
     '}',
     'function dayKeyFromForm(){',
+    'try{',
+    'if(typeof weekDates!=="undefined"&&weekDates&&typeof currentDayIndex==="number"&&weekDates[currentDayIndex]){',
+    'var w=weekDates[currentDayIndex];',
+    'if(w.isoDate&&/^\\d{4}-\\d{2}-\\d{2}$/.test(w.isoDate))return w.isoDate;',
+    'if(w.date&&/^\\d{4}-\\d{2}-\\d{2}$/.test(w.date))return w.date;',
+    'if(w.ymd&&/^\\d{4}-\\d{2}-\\d{2}$/.test(w.ymd))return w.ymd;',
+    '}',
+    '}catch(e){}',
     'var el=document.getElementById("dayDate")||document.querySelector("[data-day-key]");',
     'if(el){var v=el.value||el.getAttribute("data-day-key")||"";if(/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return v;}',
-    'if(window.currentDayIso&&/^\\d{4}-\\d{2}-\\d{2}$/.test(window.currentDayIso))return window.currentDayIso;',
-    'return londonToday();',
+    // Morning paperwork: default to yesterday (completed trading day ending today 5am)
+    'return londonYesterday();',
     '}',
     'function fillPdq(a,b,detail){',
     'var x=document.getElementById("pdq1");var y=document.getElementById("pdq2");',
@@ -93,8 +102,9 @@ function teyaDailyPrefillHtml_() {
 }
 
 /**
- * LIVE pull: list SUCCESSFUL sales for dayKey (YYYY-MM-DD, London calendar) → pdq1/pdq2.
- * Venue wrapper: function teyaPullDayTotals(dayKey) { return PubSystemLib.teyaPullDayTotals(VENUE_CONFIG, dayKey); }
+ * LIVE pull for paperwork dayKey (YYYY-MM-DD).
+ * Card window = dayKey 05:00 → (dayKey+1) 05:00 Europe/London.
+ * Venue: function teyaPullDayTotals(dayKey) { return PubSystemLib.teyaPullDayTotals(VENUE_CONFIG, dayKey); }
  */
 function teyaPullDayTotals(cfg, dayKey) {
   cfg = mergeConfig_(cfg || {});
@@ -104,7 +114,8 @@ function teyaPullDayTotals(cfg, dayKey) {
 
   dayKey = String(dayKey || '').trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
-    dayKey = teyaLondonToday_();
+    // Default: yesterday (morning paperwork for the night just closed at 5am today)
+    dayKey = teyaLondonYesterday_();
   }
 
   var creds = teyaReadCreds_(cfg);
@@ -112,25 +123,29 @@ function teyaPullDayTotals(cfg, dayKey) {
 
   try {
     var token = teyaFetchAccessToken_(creds.clientId, creds.clientSecret);
-    var payments = teyaListPaymentsForDay_(token, creds.storeId, dayKey);
+    var win = teyaTradingWindowIso_(dayKey);
+    var payments = teyaListPaymentsForWindow_(token, creds.storeId, win.startIso, win.endIso);
     var totals = teyaPaymentsToPdq_(payments, cfg, creds);
     if (!totals.count) {
       return {
         success: false,
         message:
-          'No successful Teya sales for ' + dayKey + '. ' +
-          'If you know sales happened, check TEYA_STORE_ID / terminal mapping (run teyaListTerminals).'
+          'No successful Teya sales for trading day ' + dayKey +
+          ' (5am\\u20135am UK: ' + win.startIso + ' \\u2192 ' + win.endIso + '). ' +
+          'Check credentials / terminal map (run teyaListTerminals).'
       };
     }
     return {
       success: true,
       date: dayKey,
+      windowStart: win.startIso,
+      windowEnd: win.endIso,
       pdq1: totals.pdq1,
       pdq2: totals.pdq2,
       byDevice: totals.byDevice,
       count: totals.count,
       message:
-        'Teya live ' + dayKey + ': PDQ 1 £' + totals.pdq1 + ' · PDQ 2 £' + totals.pdq2 +
+        'Teya ' + dayKey + ' (5am\\u20135am): PDQ 1 £' + totals.pdq1 + ' · PDQ 2 £' + totals.pdq2 +
         ' (' + totals.count + ' sale' + (totals.count === 1 ? '' : 's') + ')'
     };
   } catch (err) {
@@ -184,7 +199,7 @@ function teyaListTerminals(cfg) {
 
 /** Kept for compatibility; prefer teyaPullDayTotals. */
 function fetchTeyaTransactions(cfg, weekSheetName) {
-  var pull = teyaPullDayTotals(cfg, teyaLondonToday_());
+  var pull = teyaPullDayTotals(cfg, teyaLondonYesterday_());
   pull.weekSheetName = weekSheetName || '';
   return pull;
 }
@@ -256,6 +271,35 @@ function teyaLondonToday_() {
   return Utilities.formatDate(new Date(), 'Europe/London', 'yyyy-MM-dd');
 }
 
+function teyaLondonYesterday_() {
+  var today = teyaLondonToday_().split('-');
+  var utc = Date.UTC(+today[0], +today[1] - 1, +today[2]);
+  return Utilities.formatDate(new Date(utc - 86400000), 'Europe/London', 'yyyy-MM-dd');
+}
+
+/** Paperwork day D → [D 05:00, D+1 05:00) Europe/London as ISO-8601 with offset. */
+function teyaTradingWindowIso_(dayKey) {
+  var next = teyaAddCalendarDays_(dayKey, 1);
+  return {
+    startIso: teyaLondonWallToIso_(dayKey, '05:00:00'),
+    endIso: teyaLondonWallToIso_(next, '05:00:00')
+  };
+}
+
+function teyaAddCalendarDays_(ymd, delta) {
+  var p = ymd.split('-');
+  var utc = Date.UTC(+p[0], +p[1] - 1, +p[2] + delta);
+  return Utilities.formatDate(new Date(utc), 'UTC', 'yyyy-MM-dd');
+}
+
+function teyaLondonWallToIso_(ymd, hms) {
+  var midday = new Date(ymd + 'T12:00:00Z');
+  var raw = Utilities.formatDate(midday, 'Europe/London', 'Z');
+  var m = String(raw).match(/^([+-])(\d{2})(\d{2})$/);
+  var off = m ? m[1] + m[2] + ':' + m[3] : '+00:00';
+  return ymd + 'T' + hms + off;
+}
+
 // ── HTTP / OAuth ────────────────────────────────────────────────────────────
 
 function teyaFetchAccessToken_(clientId, clientSecret) {
@@ -294,21 +338,7 @@ function teyaFetchJson_(url, accessToken) {
   return body ? JSON.parse(body) : {};
 }
 
-function teyaListPaymentsForDay_(accessToken, storeId, dayKey) {
-  // London calendar day as UTC window with pad (BST/GMT safe enough for daily totals).
-  var start = dayKey + 'T00:00:00Z';
-  var endParts = dayKey.split('-');
-  var endDate = new Date(Date.UTC(
-    parseInt(endParts[0], 10),
-    parseInt(endParts[1], 10) - 1,
-    parseInt(endParts[2], 10) + 1,
-    0, 0, 0
-  ));
-  var end =
-    endDate.getUTCFullYear() + '-' +
-    ('0' + (endDate.getUTCMonth() + 1)).slice(-2) + '-' +
-    ('0' + endDate.getUTCDate()).slice(-2) + 'T00:00:00Z';
-
+function teyaListPaymentsForWindow_(accessToken, storeId, startIso, endIso) {
   var all = [];
   var offset = 0;
   var limit = 100;
@@ -318,8 +348,8 @@ function teyaListPaymentsForDay_(accessToken, storeId, dayKey) {
       '?store_id=' + encodeURIComponent(storeId) +
       '&transaction_type=SALE' +
       '&status=SUCCESSFUL' +
-      '&start_date_time=' + encodeURIComponent(start) +
-      '&end_date_time=' + encodeURIComponent(end) +
+      '&start_date_time=' + encodeURIComponent(startIso) +
+      '&end_date_time=' + encodeURIComponent(endIso) +
       '&limit=' + limit +
       '&offset=' + offset +
       '&sort=ASC';
