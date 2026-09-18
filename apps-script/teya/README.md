@@ -13,6 +13,16 @@ TEYA_CHANNEL_LABELS: {
 
 There are **no Teya API client secrets** in Script Properties yet. Until those exist, use the **CSV prefill** path (same export as Card Takings).
 
+## Apps Script project IDs
+
+| Project | scriptId |
+|---|---|
+| PubSystemLib | `1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU` |
+| Windmill takings | `1UEG3IgPKxKJoVo9NpHT3RGvUTza2a_-V9ur8cBh-WrpfyXM5YoLkgoVO` |
+| Eight Bells takings | `1fca4JFXwFDJQ-Y8xqvobcw85eGfyIn-khndOTNlQ2CWrdQl3LRBcW_Pr` |
+
+Daily form is `page=daily` → `PubSystemLib.serveDailyEntryForm` (`Templates_Forms.js`). Card sales fields: `pdq1`, `pdq2`, `pdqRooms`, `cardAdjustments`.
+
 ## What to paste (Apps Script — this agent cannot clasp-push for you)
 
 ### 1. Replace PubSystemLib `Teya.gs`
