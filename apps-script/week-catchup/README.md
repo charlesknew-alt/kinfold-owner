@@ -38,9 +38,9 @@ Deployed **18 Sep 2026** with clasp:
 
 | Project | Pin |
 |---|---|
-| PubSystemLib | **v73** (`4.26 All Weeks lists archived submitted/approved weeks`) |
-| Eight Bells takings `/exec` | library **v73**, web app **@205** |
-| Windmill takings `/exec` | library **v73**, web app **@56** |
+| PubSystemLib | **v74** (`4.27 Varlo header kept on tools with Main menu`) |
+| Eight Bells takings `/exec` | library **v74**, web app **@206** |
+| Windmill takings `/exec` | library **v74**, web app **@57** |
 
 Helpers: [`ManagerWeekCatchup.gs`](./ManagerWeekCatchup.gs) (also `ManagerWeekCatchup.js` in the library).
 
