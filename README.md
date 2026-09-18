@@ -52,7 +52,7 @@ There is **no separate "paperwork" project**. Owner paperwork (`page=owner`) and
 |---|---|
 | Eight Bells paperwork + cardday + manager hub | `AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww` |
 | Windmill paperwork + manager hub | `AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP` |
-| Shared library (NA gate) | PubSystemLib `1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU` (v74 Varlo header + Main menu on tools; catch-up/archive; v58+ `shell=owner`) |
+| Shared library (NA gate) | PubSystemLib `1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU` (v75 All Weeks Draft-first; v74 Varlo Main menu; catch-up/archive; v58+ `shell=owner`) |
 | Windmill Card Takings (Teya CSV) | `card-takings.html` on this Pages site — not an Apps Script page |
 
 Venue `doGet` remains `PubSystemLib.routePage(VENUE_CONFIG, e)`. Do not put an owner-paperwork link back on the manager hub.
