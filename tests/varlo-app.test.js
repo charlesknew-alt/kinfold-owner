@@ -26,6 +26,7 @@ var wmHub = extract('windmill');
 var ebPaper = extract('paperwork-eightbells');
 var wmPaper = extract('paperwork-windmill');
 var card = extract('cardtakings-eightbells');
+var cardWm = extract('cardtakings-windmill');
 
 assert(ebHub.indexOf('/exec') !== -1 && ebHub.indexOf('page=') === -1, 'EB manager hub has no page=');
 assert(wmHub.indexOf('/exec') !== -1 && wmHub.indexOf('page=') === -1, 'WM manager hub has no page=');
@@ -35,6 +36,20 @@ assert(wmHub.indexOf('shell=') === -1, 'WM manager hub has no shell=');
 assert(ebPaper.indexOf('page=owner') !== -1 && ebPaper.indexOf('shell=owner') !== -1, 'EB owner paperwork keeps page=owner&shell=owner');
 assert(wmPaper.indexOf('page=owner') !== -1 && wmPaper.indexOf('shell=owner') !== -1, 'WM owner paperwork keeps page=owner&shell=owner');
 assert(card.indexOf('page=cardday') !== -1 && card.indexOf('shell=owner') !== -1, 'EB card takings keeps page=cardday&shell=owner');
+assert(cardWm.indexOf('card-takings.html') !== -1, 'WM card takings is standalone card-takings.html');
+assert(cardWm.indexOf('page=') === -1, 'WM card takings does not use Apps Script page=');
+assert(html.indexOf("openApp('cardtakings-windmill'") !== -1, 'WM owner tile opens cardtakings-windmill');
+assert(html.indexOf('Teya CSV') !== -1, 'WM tile mentions Teya CSV');
+
+var cardHtml = fs.readFileSync(path.join(__dirname, '..', 'card-takings.html'), 'utf8');
+assert(cardHtml.indexOf('buildTxnsTeya') !== -1, 'card-takings.html has Teya parser');
+assert(cardHtml.indexOf('does not feed into paperwork') !== -1 || cardHtml.indexOf('not linked to paperwork') !== -1, 'card-takings.html says it is not paperwork');
+assert(cardHtml.indexOf('SUCCEEDED') !== -1, 'Teya SUCCEEDED status handled');
+
+// Parse sample Teya CSV with the same column aliases
+var sample = fs.readFileSync(path.join(__dirname, '..', 'samples', 'windmill-teya-transaction-report.csv'), 'utf8');
+assert(sample.indexOf('Payment type') !== -1 && sample.indexOf('Sales') !== -1, 'sample Teya CSV present');
+assert(sample.indexOf('Device name') !== -1 && sample.indexOf('Device ID') !== -1, 'sample has device columns');
 
 assert(html.indexOf('function withOwnerShell') !== -1, 'owner iframe helper kept');
 assert(html.indexOf('function stripOwnerShell') !== -1, 'manager iframe strips shell=owner');

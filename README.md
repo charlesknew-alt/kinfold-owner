@@ -18,7 +18,7 @@ Everyone signs in on this GitHub Pages site (one CNAME). After login:
 | Eight Bells manager | Venue manager hub iframe — EB `/exec` with **no** `page=` and **no** `shell=owner` |
 | Windmill manager | Venue manager hub iframe — WM `/exec` with **no** `page=` and **no** `shell=owner` |
 
-Sheets and the live takings `/exec` IDs are unchanged. Owner paperwork / Card Takings still iframe those scripts with `shell=owner`. Manager views never send `shell=owner`. There is no owner-paperwork link on the manager hub. `openOwnerReview` is untouched.
+Sheets and the live takings `/exec` IDs are unchanged. Owner paperwork still iframes those scripts with `shell=owner`. Eight Bells Card Takings still uses the Barclaycard / Apps Script `page=cardday` reader. **Windmill Card Takings** is a standalone Teya CSV reader (`card-takings.html`) — browser-only, does not feed paperwork. Manager views never send `shell=owner`. There is no owner-paperwork link on the manager hub. `openOwnerReview` is untouched.
 
 ## Owner: set manager passwords
 
@@ -53,8 +53,13 @@ There is **no separate "paperwork" project**. Owner paperwork (`page=owner`) and
 | Eight Bells paperwork + cardday + manager hub | `AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww` |
 | Windmill paperwork + manager hub | `AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP` |
 | Shared library (NA gate) | PubSystemLib `1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU` (v58 honours `shell=owner`) |
+| Windmill Card Takings (Teya CSV) | `card-takings.html` on this Pages site — not an Apps Script page |
 
 Venue `doGet` remains `PubSystemLib.routePage(VENUE_CONFIG, e)`. Do not put an owner-paperwork link back on the manager hub.
+
+### Windmill Card Takings (standalone)
+
+Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with columns like Payment type, Date, Time, Store, Source/context, Device name, Device ID, Status, Amount/Sales. Drop the CSV in; you get first/last sale and totals by machine. Nothing is uploaded or written to paperwork.
 
 ## Varlo Auth Apps Script
 

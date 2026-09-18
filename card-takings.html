@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Varlo · Windmill — Card Takings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --paint: #DFC2AF;
+      --paint-deep: #A79283;
+      --paint-pale: #E7D1C3;
+      --paint-wash: #F4EAE3;
+      --ink: #1A1814;
+      --ink-soft: #4a4640;
+      --line: #e5e0d4;
+      --white-warm: #FBF8F2;
+      --serif: 'Fraunces', Georgia, serif;
+      --sans: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', Menlo, Courier, monospace;
+      --r: 12px;
+      --r-sm: 8px;
+    }
+
+    html, body { height: auto; min-height: 100vh; }
+    body {
+      font-family: var(--sans);
+      background: var(--white-warm);
+      color: var(--ink);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .ps-header { background: var(--paint); border-bottom: 1px solid var(--paint-deep); padding: 14px 20px; }
+    .ps-header-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 2px; }
+    .ps-venue-name { font-family: var(--serif); font-weight: 500; font-size: 22px; line-height: 1.1; color: var(--ink); }
+    .ps-user-pill { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: var(--paint); padding: 8px 16px; border: 0; border-radius: 999px; font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; }
+    .ps-user-pill:hover { background: #000; }
+
+    html.iframed .ps-header { display: none; }
+    html.iframed body { padding-top: 4px; }
+
+    .cd-main { max-width: 1100px; margin: 0 auto; padding: 20px 20px 48px; }
+
+    .cd-hero { margin-bottom: 18px; }
+    .cd-hero-eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
+    .cd-hero-title { font-family: var(--serif); font-weight: 500; font-size: 32px; line-height: 1.05; margin-top: 6px; color: var(--ink); }
+    .cd-hero-subtitle { font-size: 14px; color: var(--ink-soft); margin-top: 6px; max-width: 620px; }
+
+    .cd-drop {
+      border: 1.5px dashed var(--paint-pale);
+      background: var(--paint-wash);
+      border-radius: 14px;
+      padding: 30px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .cd-drop:hover, .cd-drop.dragover { border-color: var(--ink); background: var(--white-warm); }
+    .cd-drop-icon { font-size: 30px; margin-bottom: 8px; }
+    .cd-drop-title { font-family: var(--serif); font-size: 20px; font-weight: 500; color: var(--ink); }
+    .cd-drop-sub { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+    .cd-drop-file { font-family: var(--mono); font-size: 12px; color: var(--ink); margin-top: 10px; font-weight: 600; }
+    .cd-drop-reset { background: transparent; border: 0; color: var(--ink-soft); font-size: 12px; font-weight: 600; text-decoration: underline; cursor: pointer; margin-top: 8px; }
+
+    .cd-error {
+      background: #fbeae6; border: 1px solid #e6b3a6; color: #8a3a28;
+      border-radius: var(--r); padding: 14px 16px; margin-top: 16px; font-size: 13px;
+    }
+
+    .cd-mode { display: inline-flex; background: var(--white-warm); border: 1px solid var(--line); border-radius: 999px; padding: 3px; margin-top: 22px; gap: 2px; }
+    .cd-mode-btn { border: 0; background: transparent; color: var(--ink-soft); font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; padding: 8px 16px; border-radius: 999px; cursor: pointer; }
+    .cd-mode-btn:hover { color: var(--ink); }
+    .cd-mode-btn.active { background: var(--ink); color: var(--paint); }
+    .cd-mode-note { font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; }
+
+    .cd-days { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 16px; }
+    .cd-day-pill {
+      display: inline-flex; flex-direction: column; align-items: flex-start;
+      padding: 9px 15px; background: var(--white-warm); color: var(--ink);
+      border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+      font-family: var(--sans); transition: border-color 0.15s, background 0.15s;
+      min-width: 108px;
+    }
+    .cd-day-pill:hover { border-color: var(--ink); }
+    .cd-day-pill.active { background: var(--ink); border-color: var(--ink); color: var(--paint); }
+    .cd-day-pill-label { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; opacity: 0.75; }
+    .cd-day-pill-date { font-family: var(--serif); font-size: 16px; font-weight: 500; margin-top: 2px; }
+    .cd-day-pill-meta { font-family: var(--mono); font-size: 10px; margin-top: 2px; opacity: 0.75; }
+
+    .cd-figures { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+    .cd-figure { background: var(--white-warm); border: 1px solid var(--line); border-radius: var(--r); padding: 16px 18px; }
+    .cd-figure-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
+    .cd-figure-value { font-family: var(--serif); font-weight: 500; font-size: 27px; color: var(--ink); margin-top: 8px; line-height: 1; }
+    .cd-figure-value.mono { font-family: var(--mono); font-size: 24px; font-weight: 600; }
+    .cd-figure-meta { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+
+    .cd-section-title { font-family: var(--serif); font-size: 20px; font-weight: 500; color: var(--ink); margin: 24px 0 10px; }
+    .cd-machines { display: flex; flex-direction: column; gap: 8px; }
+    .cd-machine {
+      background: var(--white-warm); border: 1px solid var(--line); border-radius: var(--r);
+      padding: 16px 18px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+    }
+    .cd-machine-id { font-family: var(--mono); font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: 0.02em; }
+    .cd-machine-sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+    .cd-machine-right { text-align: right; }
+    .cd-machine-amount { font-family: var(--serif); font-size: 22px; font-weight: 500; color: var(--ink); line-height: 1; }
+    .cd-machine-count { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+    .cd-machine-bar { grid-column: 1 / -1; height: 5px; background: var(--paint-wash); border-radius: 999px; overflow: hidden; margin-top: 2px; }
+    .cd-machine-bar span { display: block; height: 100%; background: var(--paint-deep); border-radius: 999px; }
+
+    .cd-notes { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .cd-note { font-size: 12.5px; color: var(--ink-soft); display: flex; gap: 8px; align-items: flex-start; }
+    .cd-note.warn { color: #8a5a1a; }
+    .cd-note .dot { flex-shrink: 0; }
+
+    .cd-copy { margin-top: 20px; }
+    .cd-copy-btn {
+      background: var(--white-warm); color: var(--ink); border: 1px solid var(--ink);
+      padding: 11px 20px; border-radius: var(--r-sm); font-family: var(--sans);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .cd-copy-btn:hover { background: var(--paint-wash); }
+    .cd-copy-btn.copied { background: var(--ink); color: var(--paint); border-color: var(--ink); }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 720px) {
+      .cd-figures { grid-template-columns: 1fr 1fr; }
+      .cd-hero-title { font-size: 26px; }
+      .cd-main { padding: 16px 14px 36px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="ps-header">
+    <div class="ps-header-inner">
+      <div>
+        <div class="ps-venue-eyebrow">Owner · Littleworth</div>
+        <div class="ps-venue-name">The Windmill Inn</div>
+      </div>
+      <button type="button" class="ps-user-pill" onclick="goBack()" aria-label="Back to owner hub">← Owner</button>
+    </div>
+  </header>
+
+  <main class="cd-main">
+    <section class="cd-hero">
+      <div class="cd-hero-eyebrow">Card Takings · Teya</div>
+      <h1 class="cd-hero-title">Read a card export</h1>
+      <p class="cd-hero-subtitle">Drop in a Teya terminal transaction CSV to see the first and last sale of each day and a breakdown per machine. Nothing is saved — the file is read in your browser only. This does not feed into paperwork.</p>
+    </section>
+
+    <div class="cd-drop" id="cdDrop" tabindex="0" role="button" aria-label="Upload CSV">
+      <div class="cd-drop-icon">📄</div>
+      <div class="cd-drop-title" id="cdDropTitle">Choose a CSV file</div>
+      <div class="cd-drop-sub" id="cdDropSub">or drag &amp; drop it here</div>
+      <div class="cd-drop-file hidden" id="cdDropFile"></div>
+      <button type="button" class="cd-drop-reset hidden" id="cdDropReset" onclick="cdReset(event)">Choose a different file</button>
+      <input type="file" id="cdFile" accept=".csv,text/csv" class="hidden">
+    </div>
+
+    <div class="cd-error hidden" id="cdError"></div>
+
+    <div class="hidden" id="cdResults">
+      <div class="cd-mode" role="tablist" aria-label="Day grouping">
+        <button type="button" class="cd-mode-btn active" id="modeCal" onclick="cdSetMode('calendar')">Calendar day</button>
+        <button type="button" class="cd-mode-btn" id="modeTrd" onclick="cdSetMode('trading')">Trading day · 5am</button>
+      </div>
+      <div class="cd-mode-note" id="cdModeNote">Grouped <strong>midnight to midnight</strong>. A sale at 2am counts on that calendar date.</div>
+      <div class="cd-days" id="cdDays"></div>
+      <div id="cdPanel"></div>
+      <div class="cd-copy">
+        <button type="button" class="cd-copy-btn" id="cdCopyBtn" onclick="cdCopySummary()">Copy day summary</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    if (window.self !== window.top) document.documentElement.classList.add('iframed');
+
+    var VENUE_LABEL = 'Windmill';
+    var cdTxns = [];
+    var cdMode = 'calendar';
+    var cdModel = null;
+    var cdActiveKey = null;
+
+    var drop = document.getElementById('cdDrop');
+    var fileInput = document.getElementById('cdFile');
+
+    drop.addEventListener('click', function (e) {
+      if (e.target && e.target.id === 'cdDropReset') return;
+      fileInput.click();
+    });
+    drop.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.remove('dragover'); });
+    });
+    drop.addEventListener('drop', function (e) {
+      var files = e.dataTransfer && e.dataTransfer.files;
+      if (files && files.length) handleFile(files[0]);
+    });
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files.length) handleFile(fileInput.files[0]);
+    });
+
+    window.goBack = function () {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'navigate', action: 'close' }, '*');
+        }
+      } catch (e) {}
+      if (window.history.length > 1) window.history.back();
+    };
+
+    window.cdReset = function (e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      cdTxns = []; cdModel = null; cdActiveKey = null;
+      fileInput.value = '';
+      document.getElementById('cdResults').classList.add('hidden');
+      document.getElementById('cdError').classList.add('hidden');
+      document.getElementById('cdDropTitle').textContent = 'Choose a CSV file';
+      document.getElementById('cdDropSub').classList.remove('hidden');
+      document.getElementById('cdDropFile').classList.add('hidden');
+      document.getElementById('cdDropReset').classList.add('hidden');
+    };
+
+    function showError(msg) {
+      var el = document.getElementById('cdError');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      document.getElementById('cdResults').classList.add('hidden');
+    }
+
+    function handleFile(file) {
+      document.getElementById('cdError').classList.add('hidden');
+      document.getElementById('cdDropFile').textContent = file.name;
+      document.getElementById('cdDropFile').classList.remove('hidden');
+      document.getElementById('cdDropSub').classList.add('hidden');
+      document.getElementById('cdDropReset').classList.remove('hidden');
+      document.getElementById('cdDropTitle').textContent = 'File loaded';
+
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var text = String(reader.result || '');
+          if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+          var rows = parseCSV(text);
+          if (!rows.length) { showError('That file has no rows.'); return; }
+          cdTxns = buildTxnsTeya(rows);
+          if (!cdTxns.length) {
+            showError('No readable Teya payments found. Expected columns like Date, Time, Device name, Status, Amount/Sales.');
+            return;
+          }
+          regroup(true);
+          renderMode();
+          renderDays();
+          renderPanel();
+          document.getElementById('cdResults').classList.remove('hidden');
+        } catch (err) {
+          showError('Could not read that CSV: ' + (err && err.message ? err.message : err));
+        }
+      };
+      reader.onerror = function () { showError('Failed to read the file.'); };
+      reader.readAsText(file);
+    }
+
+    function parseCSV(text) {
+      var rows = [], row = [], field = '', i = 0, inQuotes = false, c;
+      var n = text.length;
+      while (i < n) {
+        c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        }
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { row.push(field); field = ''; i++; continue; }
+        if (c === '\r') { i++; continue; }
+        if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+        field += c; i++;
+      }
+      if (field.length || row.length) { row.push(field); rows.push(row); }
+
+      var header = (rows.shift() || []).map(function (h) { return String(h).trim(); });
+      var out = [];
+      for (var r = 0; r < rows.length; r++) {
+        if (rows[r].length === 1 && rows[r][0] === '') continue;
+        var obj = {};
+        for (var k = 0; k < header.length; k++) obj[header[k]] = rows[r][k] !== undefined ? rows[r][k] : '';
+        out.push(obj);
+      }
+      return out;
+    }
+
+    function pickCol(header, candidates) {
+      for (var i = 0; i < candidates.length; i++) if (header.indexOf(candidates[i]) !== -1) return candidates[i];
+      for (var j = 0; j < header.length; j++) {
+        var h = header[j].toLowerCase();
+        for (var m = 0; m < candidates.length; m++) if (h.indexOf(candidates[m].toLowerCase()) !== -1) return header[j];
+      }
+      return null;
+    }
+
+    var londonFmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+    function londonParts(date) {
+      var p = {};
+      londonFmt.formatToParts(date).forEach(function (x) { p[x.type] = x.value; });
+      if (p.hour === '24') p.hour = '00';
+      return p;
+    }
+
+    /** Teya export: separate Date + Time, Device name / Device ID, Status, Amount|Sales */
+    function buildTxnsTeya(rows) {
+      var header = Object.keys(rows[0] || {});
+      var colDate = pickCol(header, ['Date']);
+      var colTime = pickCol(header, ['Time']);
+      var colAmt = pickCol(header, ['Amount', 'Sales', 'Sale', 'Value']);
+      var colTerm = pickCol(header, ['Device name', 'Device Name', 'Terminal name', 'Terminal']);
+      var colSer = pickCol(header, ['Device ID', 'Device Id', 'Device id', 'Terminal ID']);
+      var colStat = pickCol(header, ['Status']);
+      var colType = pickCol(header, ['Payment type', 'Payment Type', 'Type']);
+
+      if (!colDate) throw new Error('No Date column found (Teya export).');
+      if (!colAmt) throw new Error('No Amount/Sales column found (Teya export).');
+
+      var txns = [];
+      for (var i = 0; i < rows.length; i++) {
+        var raw = rows[i];
+        var dateStr = String(raw[colDate] || '').trim();
+        var timeStr = colTime ? String(raw[colTime] || '').trim() : '00:00:00';
+        if (!dateStr) continue;
+
+        // Accept YYYY-MM-DD or DD/MM/YYYY
+        var y, mo, d;
+        var isoDate = dateStr;
+        var mSlash = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        var mIso = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (mSlash) {
+          y = mSlash[3]; mo = mSlash[2].padStart(2, '0'); d = mSlash[1].padStart(2, '0');
+          isoDate = y + '-' + mo + '-' + d;
+        } else if (mIso) {
+          y = mIso[1]; mo = mIso[2]; d = mIso[3];
+        } else {
+          continue;
+        }
+        if (timeStr.length === 5) timeStr += ':00';
+        // Interpret as London wall clock
+        var when = new Date(isoDate + 'T' + timeStr);
+        if (isNaN(when.getTime())) continue;
+
+        var amtStr = String(raw[colAmt] || '0').replace(/[^0-9.\-]/g, '');
+        var amt = parseFloat(amtStr); if (isNaN(amt)) amt = 0;
+        var pence = Math.round(amt * 100);
+
+        var status = colStat ? String(raw[colStat] || '').trim().toUpperCase() : 'SUCCEEDED';
+        var approved = (
+          status === 'SUCCEEDED' || status === 'SUCCESS' || status === 'APPROVED' ||
+          status === 'AUTHORISED' || status === 'AUTHORIZED' || status === 'COMPLETED' || status === ''
+        );
+        var type = colType ? String(raw[colType] || '').trim().toUpperCase() : 'PAYMENT';
+        var isRefund = type.indexOf('REFUND') !== -1 || type.indexOf('RETURN') !== -1 || amt < 0;
+        var signed = isRefund ? -Math.abs(pence) : pence;
+
+        var term = colTerm ? String(raw[colTerm] || '').trim() : '';
+        if (!term) term = colSer ? String(raw[colSer] || '').trim() : 'Unknown';
+        var serial = colSer ? String(raw[colSer] || '').trim() : '';
+
+        var ms = when.getTime();
+        var lp = londonParts(when);
+        var lpTrd = londonParts(new Date(ms - 5 * 3600 * 1000));
+
+        txns.push({
+          ms: ms,
+          hour: parseInt(lp.hour, 10),
+          timeStr: lp.hour + ':' + lp.minute,
+          calKey: lp.year + '-' + lp.month + '-' + lp.day,
+          trdKey: lpTrd.year + '-' + lpTrd.month + '-' + lpTrd.day,
+          term: term,
+          serial: serial,
+          pence: signed,
+          approved: approved,
+          currency: 'GBP'
+        });
+      }
+      return txns;
+    }
+
+    function groupDays(txns, mode) {
+      var weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      var byKey = {}, order = [];
+
+      for (var i = 0; i < txns.length; i++) {
+        var t = txns[i];
+        var key = (mode === 'trading') ? t.trdKey : t.calKey;
+
+        if (!byKey[key]) {
+          var p = key.split('-');
+          var jsDate = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+          byKey[key] = {
+            key: key,
+            label: parseInt(p[2], 10) + ' ' + months[parseInt(p[1], 10) - 1],
+            weekday: weekdays[jsDate.getDay()],
+            fullLabel: weekdays[jsDate.getDay()] + ' ' + parseInt(p[2], 10) + ' ' + months[parseInt(p[1], 10) - 1] + ' ' + p[0],
+            firstMs: null, lastMs: null, firstTime: '', lastTime: '',
+            approvedCount: 0, approvedPence: 0, excludedCount: 0, earlyCount: 0,
+            currency: t.currency, machines: {}
+          };
+          order.push(key);
+        }
+        var day = byKey[key];
+
+        if (!t.approved) { day.excludedCount++; continue; }
+
+        if (day.firstMs === null || t.ms < day.firstMs) { day.firstMs = t.ms; day.firstTime = t.timeStr; }
+        if (day.lastMs === null || t.ms > day.lastMs) { day.lastMs = t.ms; day.lastTime = t.timeStr; }
+        if (t.hour < 5) day.earlyCount++;
+
+        day.approvedCount++;
+        day.approvedPence += t.pence;
+
+        if (!day.machines[t.term]) day.machines[t.term] = { id: t.term, serial: t.serial, count: 0, pence: 0 };
+        day.machines[t.term].count++;
+        day.machines[t.term].pence += t.pence;
+        if (t.serial && !day.machines[t.term].serial) day.machines[t.term].serial = t.serial;
+      }
+
+      order.sort();
+      return { days: order.map(function (k) { return byKey[k]; }), byKey: byKey };
+    }
+
+    function regroup(resetActive) {
+      cdModel = groupDays(cdTxns, cdMode);
+      if (resetActive || !cdModel.byKey[cdActiveKey]) {
+        cdActiveKey = cdModel.days.length ? cdModel.days[cdModel.days.length - 1].key : null;
+      }
+    }
+
+    window.cdSetMode = function (mode) {
+      if (mode === cdMode) return;
+      cdMode = mode;
+      regroup(false);
+      renderMode();
+      renderDays();
+      renderPanel();
+    };
+
+    function renderMode() {
+      document.getElementById('modeCal').classList.toggle('active', cdMode === 'calendar');
+      document.getElementById('modeTrd').classList.toggle('active', cdMode === 'trading');
+      document.getElementById('cdModeNote').innerHTML = (cdMode === 'trading')
+        ? 'Grouped <strong>5am to 5am</strong>. Sales between midnight and 05:00 roll into the previous night\'s trading day.'
+        : 'Grouped <strong>midnight to midnight</strong>. A sale at 2am counts on that calendar date.';
+    }
+
+    function renderDays() {
+      var wrap = document.getElementById('cdDays');
+      var html = '';
+      for (var i = 0; i < cdModel.days.length; i++) {
+        var d = cdModel.days[i];
+        var active = d.key === cdActiveKey ? ' active' : '';
+        html += '<button type="button" class="cd-day-pill' + active + '" onclick="cdSelectDay(\'' + d.key + '\')">'
+          + '<span class="cd-day-pill-label">' + d.weekday + '</span>'
+          + '<span class="cd-day-pill-date">' + d.label + '</span>'
+          + '<span class="cd-day-pill-meta">' + d.approvedCount + ' sales</span>'
+          + '</button>';
+      }
+      wrap.innerHTML = html;
+    }
+
+    window.cdSelectDay = function (key) {
+      cdActiveKey = key;
+      renderDays();
+      renderPanel();
+    };
+
+    function renderPanel() {
+      var d = cdModel.byKey[cdActiveKey];
+      var panel = document.getElementById('cdPanel');
+      if (!d) { panel.innerHTML = ''; return; }
+
+      var machines = Object.keys(d.machines).map(function (k) { return d.machines[k]; });
+      machines.sort(function (a, b) { return b.pence - a.pence; });
+      var maxPence = machines.length ? machines[0].pence : 0;
+
+      var html = '';
+      html += '<div class="cd-figures">';
+      html += figure('First sale', d.firstTime || '—', d.fullLabel, false);
+      html += figure('Last sale', d.lastTime || '—', 'Approved only', false);
+      html += figure('Approved sales', String(d.approvedCount), Object.keys(d.machines).length + ' machine' + (Object.keys(d.machines).length === 1 ? '' : 's'), false);
+      html += figure('Approved total', money(d.approvedPence), 'Approved sales', true);
+      html += '</div>';
+
+      html += '<div class="cd-section-title">By machine</div>';
+      html += '<div class="cd-machines">';
+      for (var i = 0; i < machines.length; i++) {
+        var m = machines[i];
+        var pct = maxPence > 0 ? Math.round((m.pence / maxPence) * 100) : 0;
+        var share = d.approvedPence > 0 ? Math.round((m.pence / d.approvedPence) * 100) : 0;
+        html += '<div class="cd-machine">'
+          + '<div>'
+          + '<div class="cd-machine-id">' + escapeHtml(m.id) + '</div>'
+          + '<div class="cd-machine-sub">' + (m.serial ? escapeHtml(m.serial) + ' · ' : '') + share + '% of day</div>'
+          + '</div>'
+          + '<div class="cd-machine-right">'
+          + '<div class="cd-machine-amount">' + money(m.pence) + '</div>'
+          + '<div class="cd-machine-count">' + m.count + ' sale' + (m.count === 1 ? '' : 's') + '</div>'
+          + '</div>'
+          + '<div class="cd-machine-bar"><span style="width:' + pct + '%"></span></div>'
+          + '</div>';
+      }
+      html += '</div>';
+
+      html += '<div class="cd-notes">';
+      if (d.excludedCount > 0) {
+        html += note(false, d.excludedCount + ' failed/declined transaction' + (d.excludedCount === 1 ? '' : 's') + ' excluded from the totals above.');
+      }
+      if (d.earlyCount > 0) {
+        if (cdMode === 'trading') {
+          html += note(false, 'Includes ' + d.earlyCount + ' early-hours sale' + (d.earlyCount === 1 ? '' : 's') + ' (00:00–05:00) rolled in from after midnight.');
+        } else {
+          html += note(true, d.earlyCount + ' sale' + (d.earlyCount === 1 ? '' : 's') + ' fell between 00:00 and 05:00 on this calendar date. Switch to Trading day to roll them into the previous night.');
+        }
+      }
+      html += note(false, 'Teya CSV · times in UK local time · approved/succeeded sales only · not linked to paperwork.');
+      html += '</div>';
+
+      panel.innerHTML = html;
+      var btn = document.getElementById('cdCopyBtn');
+      btn.classList.remove('copied');
+      btn.textContent = 'Copy day summary';
+    }
+
+    function figure(label, value, meta, mono) {
+      return '<div class="cd-figure">'
+        + '<div class="cd-figure-label">' + label + '</div>'
+        + '<div class="cd-figure-value' + (mono ? ' mono' : '') + '">' + value + '</div>'
+        + '<div class="cd-figure-meta">' + (meta || '') + '</div>'
+        + '</div>';
+    }
+    function note(warn, text) {
+      return '<div class="cd-note' + (warn ? ' warn' : '') + '"><span class="dot">' + (warn ? '⚠' : '•') + '</span><span>' + text + '</span></div>';
+    }
+
+    window.cdCopySummary = function () {
+      var d = cdModel.byKey[cdActiveKey];
+      if (!d) return;
+      var machines = Object.keys(d.machines).map(function (k) { return d.machines[k]; });
+      machines.sort(function (a, b) { return b.pence - a.pence; });
+
+      var lines = [];
+      lines.push(VENUE_LABEL + ' Card Takings — ' + d.fullLabel + (cdMode === 'trading' ? ' (trading day, 5am–5am)' : ''));
+      lines.push('First sale: ' + (d.firstTime || '—') + '   Last sale: ' + (d.lastTime || '—'));
+      lines.push('');
+      for (var i = 0; i < machines.length; i++) {
+        var m = machines[i];
+        lines.push(m.id + (m.serial ? ' (' + m.serial + ')' : '') + ': ' + m.count + ' sales — ' + money(m.pence));
+      }
+      lines.push('');
+      lines.push('Total approved: ' + money(d.approvedPence) + ' (' + d.approvedCount + ' sales)');
+      if (cdMode === 'trading' && d.earlyCount > 0) lines.push('Includes ' + d.earlyCount + ' after-midnight sale(s) up to 5am.');
+      if (d.excludedCount > 0) lines.push('Excluded (failed/declined): ' + d.excludedCount);
+
+      var text = lines.join('\n');
+      var done = function () {
+        var btn = document.getElementById('cdCopyBtn');
+        btn.classList.add('copied'); btn.textContent = 'Copied';
+        setTimeout(function () { btn.classList.remove('copied'); btn.textContent = 'Copy day summary'; }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+      } else { fallbackCopy(text, done); }
+    };
+
+    function fallbackCopy(text, done) {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta); done();
+    }
+
+    function money(pence) {
+      var neg = pence < 0;
+      var v = Math.abs(pence) / 100;
+      var s = v.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return (neg ? '-' : '') + '£' + s;
+    }
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+      });
+    }
+
+    // Expose parser for tests
+    window.CardTakingsTeya = { parseCSV: parseCSV, buildTxnsTeya: buildTxnsTeya, groupDays: groupDays };
+  })();
+  </script>
+</body>
+</html>
