@@ -140,6 +140,15 @@ function teyaPullDayTotals(cfg, dayKey) {
   }
 
   var cached = teyaCacheGetDay_(dayKey);
+  if (!cached || cached.pdq1 == null) {
+    // Paperwork can be weeks behind — hunt that calendar day in Gmail specifically
+    try {
+      teyaIngestEmailsForDay_(cfg, dayKey);
+      cached = teyaCacheGetDay_(dayKey);
+    } catch (dayErr) {
+      Logger.log('teyaIngestEmailsForDay_: ' + dayErr);
+    }
+  }
   if (cached && cached.pdq1 != null) {
     return {
       success: true,
@@ -168,6 +177,7 @@ function teyaPullDayTotals(cfg, dayKey) {
 
 /**
  * Scan Gmail for recent Teya reports, parse attachments, cache day totals.
+ * Default lookback 42 days (6 weeks) so late paperwork still finds the emails.
  * Venue: function teyaIngestEmails() { return PubSystemLib.teyaIngestEmails(VENUE_CONFIG); }
  */
 function teyaIngestEmails(cfg) {
@@ -176,12 +186,33 @@ function teyaIngestEmails(cfg) {
     return { success: false, message: 'Teya disabled.' };
   }
 
+  // 6 weeks default; override with VENUE_CONFIG.TEYA_GMAIL_LOOKBACK_DAYS if needed
+  var lookback = Number(cfg.TEYA_GMAIL_LOOKBACK_DAYS) || 42;
+  if (lookback < 14) lookback = 14;
+  if (lookback > 90) lookback = 90;
+
   var query =
     '(from:noreply@teya.com OR from:reporting@teya.com OR from:teya.com) ' +
     '(subject:Settlement OR subject:settlement OR subject:Daily OR subject:Activity OR subject:transaction OR subject:Report OR has:attachment) ' +
-    'newer_than:14d';
+    'newer_than:' + lookback + 'd';
 
-  var threads = GmailApp.search(query, 0, 30);
+  return teyaIngestQuery_(cfg, query, 80);
+}
+
+/** Targeted ingest when a specific paperwork day is missing from cache. */
+function teyaIngestEmailsForDay_(cfg, dayKey) {
+  // Gmail after:/before: want YYYY/MM/DD; before is exclusive — use day+2
+  var next = teyaAddCalendarDays_(dayKey, 2).replace(/-/g, '/');
+  var prev = teyaAddCalendarDays_(dayKey, -1).replace(/-/g, '/');
+  var query =
+    '(from:noreply@teya.com OR from:reporting@teya.com OR from:teya.com) ' +
+    '(subject:Settlement OR subject:settlement OR subject:Daily OR has:attachment) ' +
+    'after:' + prev + ' before:' + next;
+  return teyaIngestQuery_(cfg, query, 20);
+}
+
+function teyaIngestQuery_(cfg, query, maxThreads) {
+  var threads = GmailApp.search(query, 0, maxThreads || 50);
   var processed = 0;
   var skipped = 0;
   var errors = [];
@@ -204,10 +235,8 @@ function teyaIngestEmails(cfg) {
           processed++;
           teyaCacheMarkMessage_(msgId);
         } else if (result && result.failedPdf) {
-          // Do not mark seen — allow retry after PDF convert fix
           errors.push(msgId + ': PDF convert failed — will retry next run');
         } else {
-          // No usable attachment/body — don't keep retrying forever
           teyaCacheMarkMessage_(msgId);
         }
       } catch (err) {
@@ -665,7 +694,7 @@ function teyaCacheMarkMessage_(msgId) {
   var arr;
   try { arr = JSON.parse(raw); } catch (e) { arr = []; }
   arr.push(msgId);
-  while (arr.length > 200) arr.shift();
+  while (arr.length > 400) arr.shift();
   PropertiesService.getScriptProperties().setProperty('TEYA_SEEN_MSG_IDS', JSON.stringify(arr));
 }
 

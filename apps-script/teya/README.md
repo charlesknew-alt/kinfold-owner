@@ -2,11 +2,7 @@
 
 Teya told you: **no API** for daily card sales. Reports come by **email**. This setup reads those emails and shows Channel A / B totals as a **guide only**.
 
-**Important for managers:**
-- Teya is **midnight to midnight** (00:00–23:59).
-- Pubs sell a lot **after midnight**. Those sales sit on the **next** Teya calendar day.
-- So the guide can disagree with what the card machines show for “last night”.
-- **Always type PDQ 1 and PDQ 2 from the machines.** Use Teya as a check, not the final numbers.
+**Retention:** Gmail lookback and cache cover **up to 6 weeks** (42 days). If paperwork is older than that, the guide may be missing unless the email is still findable — run `teyaIngestEmails` after extending `TEYA_GMAIL_LOOKBACK_DAYS` in `VENUE_CONFIG` if needed.
 
 Do these steps **in order**.
 
