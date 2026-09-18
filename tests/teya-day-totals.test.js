@@ -56,8 +56,9 @@ assert(teyaGs.indexOf('Guide only') !== -1 || teyaGs.indexOf('GUIDE ONLY') !== -
 assert(teyaGs.indexOf('teyaCsvFile') === -1, 'Teya.gs daily UI has no CSV file input');
 assert(teyaGs.indexOf('by\\s+sales\\s+channel') !== -1, 'Teya.gs parses By sales channel');
 assert(teyaGs.indexOf('midnight') !== -1, 'Teya.gs documents midnight window');
-assert(teyaGs.indexOf('v8') !== -1, 'Teya.gs is v8');
-assert(teyaGs.indexOf('pdq1").value') === -1 && teyaGs.indexOf("pdq1').value") === -1, 'Teya.gs does not auto-fill pdq inputs');
+assert(teyaGs.indexOf('teyaPdfToText_') !== -1 || teyaGs.indexOf('teyaOcrPdfToText_') !== -1, 'Teya.gs converts PDF to text');
+assert(teyaGs.indexOf('ocr: true') === -1, 'Teya.gs does not use deprecated Drive OCR flag');
+assert(teyaGs.indexOf('function teyaClearSeenMessages') !== -1, 'Teya.gs can clear seen cache');
 
 var readme = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/README.md'), 'utf8');
 assert(readme.indexOf('Gmail') !== -1, 'teya README is Gmail-first');

@@ -37,7 +37,7 @@ In Teya Business Portal, confirm **daily settlement emails are ON** for this Gma
 2. Open PubSystemLib:  
    https://script.google.com/d/1JgPyQgHHD_DA9w28CJFth-7Bs3SNnt59vTERrxGhMJqd1g-y-j_YuOYU/edit  
 3. Open **`Teya.gs`** → select all → delete → paste → Save.  
-4. Top must say **`v8`** and **guide**.
+4. Top must say **`v8`** and **guide** (and include `teyaPdfToText_` / `teyaMergeConfig_`).
 
 ---
 
@@ -86,6 +86,9 @@ function teyaInstallEmailTrigger() {
 }
 function teyaIngestEmailsTrigger() {
   PubSystemLib.teyaIngestEmails(VENUE_CONFIG);
+}
+function teyaClearSeenMessages() {
+  return PubSystemLib.teyaClearSeenMessages(VENUE_CONFIG);
 }
 ```
 
