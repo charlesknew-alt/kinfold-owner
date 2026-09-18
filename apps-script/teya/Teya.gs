@@ -1,14 +1,14 @@
 /**
  * PubSystemLib - Teya.gs (v3)
- * Teya transaction → daily PDQ totals (Windmill only — gated on cfg.TEYA_ENABLED).
+ * Teya → daily PDQ prefill (Windmill only — gated on cfg.TEYA_ENABLED).
  * Eight Bells: TEYA_ENABLED: false in VENUE_CONFIG.
  *
- * Paste over the placeholder Teya.gs in PubSystemLib, then bump the library version
- * and pin Windmill (and EB) to that version.
+ * PASTE: replace the entire Teya.gs / Teya.js file in PubSystemLib with this file.
+ * Then change ONE line in Templates_Serve.js (see apps-script/teya/README.md).
+ * Then create a new library version and pin Windmill (+ EB) to it.
  *
- * CSV path works today (no API secrets). API path needs Script Properties:
+ * CSV path works today. API path needs Script Properties:
  *   TEYA_CLIENT_ID, TEYA_CLIENT_SECRET, TEYA_STORE_ID
- * (create an app at partner.teya.com — merchant MID is already in cfg.TEYA_MID).
  */
 
 function teyaIsEnabled_(cfg) {
@@ -16,19 +16,75 @@ function teyaIsEnabled_(cfg) {
   return cfg.TEYA_ENABLED === true;
 }
 
-/** Public alias matching the v2 placeholder. */
 function teyaIsEnabled(cfg) {
   return teyaIsEnabled_(cfg);
 }
 
 /**
+ * Inject the "Prefill PDQ from Teya" dropzone into daily form HTML when TEYA_ENABLED.
+ * Call from Templates_Serve.js serveDailyEntryForm — see README.
+ */
+function teyaInjectDailyPrefill_(cfg, html) {
+  cfg = mergeConfig_(cfg || {});
+  if (!teyaIsEnabled_(cfg) || !html) return html;
+  var needle = '<label class="ps-label" for="pdq1">';
+  if (html.indexOf(needle) === -1) {
+    needle = "for=\"pdq1\"";
+    if (html.indexOf(needle) === -1) return html;
+    return html.replace(needle, teyaDailyPrefillHtml_() + needle);
+  }
+  return html.replace(needle, teyaDailyPrefillHtml_() + needle);
+}
+
+/** HTML + client script for the daily form dropzone (no external CDN). */
+function teyaDailyPrefillHtml_() {
+  return [
+    '<div id="teyaPrefillBox" class="ps-card" style="margin-bottom:14px;">',
+    '<div style="font-family:var(--serif);font-size:18px;margin-bottom:8px;">Prefill PDQ from Teya</div>',
+    '<p class="ps-hint" style="margin:0 0 10px;">Drop the Teya transaction CSV for this day. ',
+    'Fills PDQ Terminal 1 / 2 (Channel A / B). Does not save — check numbers, then Save. ',
+    'Rooms PDQ stays manual.</p>',
+    '<input type="file" id="teyaCsvFile" accept=".csv,text/csv" style="width:100%;margin-bottom:8px;">',
+    '<div id="teyaPrefillMsg" class="ps-hint" style="min-height:1.2em;"></div>',
+    '</div>',
+    '<script>',
+    '(function(){',
+    'var fileInput=document.getElementById("teyaCsvFile");',
+    'var msg=document.getElementById("teyaPrefillMsg");',
+    'if(!fileInput)return;',
+    'function setMsg(t,err){if(!msg)return;msg.textContent=t||"";msg.style.color=err?"#c0635a":"";}',
+    'function fillPdq(a,b,detail){',
+    'var x=document.getElementById("pdq1");var y=document.getElementById("pdq2");',
+    'if(x)x.value=a;if(y)y.value=b;',
+    'if(typeof calculateAll==="function")calculateAll();',
+    'setMsg(detail||("Filled PDQ 1 = \\u00a3"+a+", PDQ 2 = \\u00a3"+b),false);',
+    '}',
+    'fileInput.addEventListener("change",function(){',
+    'var f=fileInput.files&&fileInput.files[0];if(!f)return;',
+    'var reader=new FileReader();',
+    'reader.onload=function(){',
+    'var text=String(reader.result||"");',
+    'if(!google||!google.script||!google.script.run){setMsg("google.script.run unavailable",true);return;}',
+    'google.script.run',
+    '.withSuccessHandler(function(res){',
+    'if(!res||!res.success){setMsg((res&&res.message)||"Teya prefill failed",true);return;}',
+    'fillPdq(res.pdq1,res.pdq2,res.message);',
+    '})',
+    '.withFailureHandler(function(err){setMsg(String(err),true);})',
+    '.teyaDayTotalsFromCsv(text,"");',
+    '};',
+    'reader.onerror=function(){setMsg("Could not read that file.",true);};',
+    'reader.readAsText(f);',
+    '});',
+    '})();',
+    '</script>'
+  ].join('');
+}
+
+/**
  * Summarise approved Teya sales for a calendar day into pdq1 / pdq2.
- * Channel A → pdq1, Channel B → pdq2 via cfg.TEYA_CHANNEL_LABELS (deviceId → label).
- *
- * @param {object} cfg VENUE_CONFIG
- * @param {string} csvText raw Teya transaction export
- * @param {string} dayKey YYYY-MM-DD (London calendar date on the export)
- * @return {{success:boolean, pdq1?:string, pdq2?:string, byDevice?:object, message?:string}}
+ * Channel A → pdq1, Channel B → pdq2 via cfg.TEYA_CHANNEL_LABELS.
+ * If dayKey is blank, uses the first date found in the CSV.
  */
 function teyaDayTotalsFromCsv(cfg, csvText, dayKey) {
   cfg = mergeConfig_(cfg || {});
@@ -38,14 +94,32 @@ function teyaDayTotalsFromCsv(cfg, csvText, dayKey) {
   if (!csvText) {
     return { success: false, message: 'No CSV text provided.' };
   }
-  if (!dayKey) {
-    return { success: false, message: 'dayKey (YYYY-MM-DD) is required.' };
+
+  var labels = cfg.TEYA_CHANNEL_LABELS || {};
+  var all = teyaParseCsvToDayTotals_(csvText, labels, null);
+  if (!all || !all.length) {
+    return { success: false, message: 'No approved Teya sales found in that CSV.' };
   }
 
-  var totals = teyaParseCsvToDayTotals_(csvText, cfg.TEYA_CHANNEL_LABELS || {}, dayKey);
-  if (!totals) {
-    return { success: false, message: 'No approved Teya sales for ' + dayKey + '.' };
+  var totals = null;
+  if (dayKey) {
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].date === dayKey) { totals = all[i]; break; }
+    }
+    if (!totals) {
+      return {
+        success: false,
+        message: 'No sales for ' + dayKey + ' (CSV has ' + all.map(function (d) { return d.date; }).join(', ') + ').'
+      };
+    }
+  } else {
+    totals = all[0];
+    if (all.length > 1) {
+      // Prefer most recent date
+      totals = all[all.length - 1];
+    }
   }
+
   return {
     success: true,
     date: totals.date,
@@ -53,17 +127,13 @@ function teyaDayTotalsFromCsv(cfg, csvText, dayKey) {
     pdq2: totals.pdq2,
     byDevice: totals.byDevice,
     unknownPence: totals.unknownPence,
-    message: 'PDQ totals from Teya CSV for ' + dayKey
+    message: 'Teya ' + totals.date + ': PDQ 1 £' + totals.pdq1 + ' · PDQ 2 £' + totals.pdq2
   };
 }
 
 /**
- * Week-sheet fetch hook (v2 placeholder API).
- * Tries live API when Script Properties are set; otherwise returns a clear CSV fallback message.
- *
- * @param {object} cfg
- * @param {string} weekSheetName unused until sheet write-back is wired
- * @return {{success:boolean, message:string, days?:object[]}}
+ * Week-sheet fetch hook. Tries live API when Script Properties are set;
+ * otherwise returns a clear CSV fallback message.
  */
 function fetchTeyaTransactions(cfg, weekSheetName) {
   cfg = mergeConfig_(cfg || {});
@@ -81,7 +151,7 @@ function fetchTeyaTransactions(cfg, weekSheetName) {
       success: false,
       message:
         'Teya API credentials not in Script Properties (need TEYA_CLIENT_ID, TEYA_CLIENT_SECRET, TEYA_STORE_ID). ' +
-        'Until then, use CSV prefill on daily entry (teyaDayTotalsFromCsv / dropzone). ' +
+        'Until then, use CSV prefill on daily entry. ' +
         'MID ' + (cfg.TEYA_MID || '(unset)') + ', week ' + (weekSheetName || '') + '.'
     };
   }
@@ -105,7 +175,7 @@ function fetchTeyaTransactions(cfg, weekSheetName) {
   }
 }
 
-// ── CSV helpers (Apps Script; mirrors teya-day-totals.js) ───────────────────
+// ── CSV helpers ─────────────────────────────────────────────────────────────
 
 function teyaParseCsvToDayTotals_(csvText, channelLabels, dayKey) {
   var rows = teyaParseCsvRows_(csvText);
@@ -263,7 +333,7 @@ function teyaDayTotals_(txns, channelLabels, dayKey) {
   return Object.keys(byDay).sort().map(function (k) { return finish(byDay[k]); });
 }
 
-// ── Live API (POSLink payment-requests) ─────────────────────────────────────
+// ── Live API (POSLink) ──────────────────────────────────────────────────────
 
 function teyaFetchAccessToken_(clientId, clientSecret) {
   var url = 'https://id.teya.com/oauth/v2/oauth-token';
@@ -288,7 +358,6 @@ function teyaFetchAccessToken_(clientId, clientSecret) {
 }
 
 function teyaListPayments_(accessToken, storeId) {
-  // Newest first; page through if needed. Date filters vary by API version — start broad.
   var url =
     'https://api.teya.com/poslink/v2/payment-requests' +
     '?store_id=' + encodeURIComponent(storeId) +
@@ -304,7 +373,6 @@ function teyaListPayments_(accessToken, storeId) {
     throw new Error('payment-requests HTTP ' + code + ': ' + body.slice(0, 300));
   }
   var json = JSON.parse(body);
-  // Response shape may be { items: [...] } or { data: [...] } or a bare array.
   if (Array.isArray(json)) return json;
   if (json.items) return json.items;
   if (json.data) return json.data;
@@ -322,7 +390,6 @@ function teyaPaymentsToDayTotals_(payments, channelLabels) {
       status === 'COMPLETED' || status === 'CAPTURED';
     var amount = p.amount || p.Amount || {};
     var value = typeof amount === 'object' ? (amount.value != null ? amount.value : amount.amount) : amount;
-    // Teya often uses minor units (pence). If value looks like major units (>0 with decimal), adjust.
     var pence = 0;
     if (typeof value === 'number') {
       pence = (Math.abs(value) < 100000 && String(value).indexOf('.') !== -1)
@@ -332,12 +399,8 @@ function teyaPaymentsToDayTotals_(payments, channelLabels) {
       pence = Math.round(parseFloat(String(value || '0').replace(/[^0-9.\-]/g, '')) * 100);
     }
     var created = String(p.created_at || p.createdAt || p.timestamp || p.date || '').slice(0, 10);
-    var terminalId = String(
-      p.terminal_id || p.terminalId || (p.terminal && p.terminal.id) || ''
-    );
-    var termName = String(
-      (p.terminal && (p.terminal.name || p.terminal.label)) || terminalId || 'Unknown'
-    );
+    var terminalId = String(p.terminal_id || p.terminalId || (p.terminal && p.terminal.id) || '');
+    var termName = String((p.terminal && (p.terminal.name || p.terminal.label)) || terminalId || 'Unknown');
     if (!created) continue;
     txns.push({
       date: created,

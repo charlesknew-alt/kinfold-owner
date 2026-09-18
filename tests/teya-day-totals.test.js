@@ -43,17 +43,15 @@ assert(missing === null, 'missing day returns null');
 var teyaGs = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/Teya.gs'), 'utf8');
 assert(teyaGs.indexOf('function teyaDayTotalsFromCsv') !== -1, 'Teya.gs has teyaDayTotalsFromCsv');
 assert(teyaGs.indexOf('function fetchTeyaTransactions') !== -1, 'Teya.gs has fetchTeyaTransactions');
+assert(teyaGs.indexOf('function teyaInjectDailyPrefill_') !== -1, 'Teya.gs has daily form inject helper');
+assert(teyaGs.indexOf('teyaCsvFile') !== -1, 'Teya.gs embeds prefill file input');
 assert(teyaGs.indexOf('TEYA_CLIENT_ID') !== -1, 'Teya.gs documents API Script Properties');
-assert(teyaGs.indexOf('placeholder') === -1 || teyaGs.indexOf('v3') !== -1, 'Teya.gs is v3 implementation not empty stub');
-
-var snippet = fs.readFileSync(
-  path.join(__dirname, '..', 'apps-script/teya/daily-prefill-snippet.html'),
-  'utf8'
-);
-assert(snippet.indexOf('pdq1') !== -1 && snippet.indexOf('teyaCsvFile') !== -1, 'daily snippet fills pdq1 via file input');
+assert(teyaGs.indexOf('v3') !== -1, 'Teya.gs is v3 implementation');
 
 var readme = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/README.md'), 'utf8');
 assert(readme.indexOf('TEYA_CHANNEL_LABELS') !== -1, 'teya README mentions channel labels');
+assert(readme.indexOf('serveDailyEntryForm') !== -1, 'teya README has Templates_Serve one-liner');
+assert(readme.indexOf('Step 1') !== -1 && readme.indexOf('Step 5') !== -1, 'teya README is numbered steps');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
