@@ -61,6 +61,10 @@ Venue `doGet` remains `PubSystemLib.routePage(VENUE_CONFIG, e)`. Do not put an o
 
 Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with columns like Payment type, Date, Time, Store, Source/context, Device name, Device ID, Status, Amount/Sales. Drop the CSV in; you get first/last sale and totals by machine. Nothing is uploaded or written to paperwork.
 
+### Teya → daily PDQ (Gmail)
+
+Teya does not offer a merchant API for daily card sales. Windmill daily entry shows a **PDQ guide** from **Teya settlement emails in Gmail** (midnight→midnight; manager still types machine readings). Paste-ready `apps-script/teya/` — see that README Steps 1–9.
+
 ## Varlo Auth Apps Script
 
 Standalone project in `apps-script/varlo-auth/`. JSONP `doGet` actions: `ping`, `login`, `set`, `status`. It is **not** a venue page router.
