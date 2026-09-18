@@ -42,7 +42,7 @@ function findLastOwnerPipelineWeek_(ss) {
     var sh = sheets[i];
     var name = sh.getName();
     if (name.indexOf('WEEK_') !== 0) continue;
-    var weekEnd = teyaSafeWeekEndFromSheet_(sh, name);
+    var weekEnd = catchupWeekEndFromSheet_(sh, name);
     if (!weekEnd) continue;
     var status = String(sh.getRange('A1').getValue() || '').toUpperCase();
     if (status.indexOf('SUBMITTED') === -1 && status.indexOf('APPROVED') === -1) continue;
@@ -73,7 +73,7 @@ function findManagerCatchupWeekSheet_(ss) {
     var sh = sheets[i];
     var name = sh.getName();
     if (name.indexOf('WEEK_') !== 0) continue;
-    var weekEnd = teyaSafeWeekEndFromSheet_(sh, name);
+    var weekEnd = catchupWeekEndFromSheet_(sh, name);
     if (!weekEnd) continue;
     if (weekEnd.getTime() < targetEnd.getTime()) continue;
     var status = String(sh.getRange('A1').getValue() || '').toUpperCase();
@@ -128,7 +128,7 @@ function findManagerCatchupWeekSheet_(ss) {
 function assertManagerWeekNotJumpingAhead_(ss) {
   var catchup = findManagerCatchupWeekSheet_(ss);
   if (!catchup) return null;
-  var catchEnd = teyaSafeWeekEndFromSheet_(catchup, catchup.getName());
+  var catchEnd = catchupWeekEndFromSheet_(catchup, catchup.getName());
   if (!catchEnd) return null;
 
   var cal = currentCalendarWeekEndingSunday_();
@@ -162,7 +162,7 @@ function currentCalendarWeekEndingSunday_() {
 }
 
 /** Prefer K3 date; else parse WEEK_02AUG26 style names. */
-function teyaSafeWeekEndFromSheet_(sh, name) {
+function catchupWeekEndFromSheet_(sh, name) {
   try {
     var k3 = sh.getRange('K3').getValue();
     if (k3 instanceof Date && !isNaN(k3.getTime())) return stripTime_(k3);
