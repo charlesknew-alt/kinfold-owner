@@ -14,8 +14,17 @@
  * Windmill wrappers + one-time Gmail auth + daily trigger — see README.
  */
 
+/** Use library mergeConfig_ when present; otherwise use cfg as-is (VENUE_CONFIG). */
+function teyaMergeConfig_(cfg) {
+  cfg = cfg || {};
+  try {
+    if (typeof mergeConfig_ === 'function') return mergeConfig_(cfg);
+  } catch (e) {}
+  return cfg;
+}
+
 function teyaIsEnabled_(cfg) {
-  cfg = mergeConfig_(cfg || {});
+  cfg = teyaMergeConfig_(cfg);
   return cfg.TEYA_ENABLED === true;
 }
 
@@ -25,7 +34,7 @@ function teyaIsEnabled(cfg) {
 
 /** Inject Pull UI into daily form when TEYA_ENABLED. */
 function teyaInjectDailyPrefill_(cfg, html) {
-  cfg = mergeConfig_(cfg || {});
+  cfg = teyaMergeConfig_(cfg);
   if (!teyaIsEnabled_(cfg) || !html) return html;
   var needle = '<label class="ps-label" for="pdq1">';
   if (html.indexOf(needle) === -1) {
@@ -114,7 +123,7 @@ function teyaDailyPrefillHtml_() {
  * Venue: function teyaPullDayTotals(dayKey) { return PubSystemLib.teyaPullDayTotals(VENUE_CONFIG, dayKey); }
  */
 function teyaPullDayTotals(cfg, dayKey) {
-  cfg = mergeConfig_(cfg || {});
+  cfg = teyaMergeConfig_(cfg);
   if (!teyaIsEnabled_(cfg)) {
     return { success: false, message: 'Teya is disabled for this venue (TEYA_ENABLED).' };
   }
@@ -162,7 +171,7 @@ function teyaPullDayTotals(cfg, dayKey) {
  * Venue: function teyaIngestEmails() { return PubSystemLib.teyaIngestEmails(VENUE_CONFIG); }
  */
 function teyaIngestEmails(cfg) {
-  cfg = mergeConfig_(cfg || {});
+  cfg = teyaMergeConfig_(cfg);
   if (!teyaIsEnabled_(cfg)) {
     return { success: false, message: 'Teya disabled.' };
   }
@@ -215,7 +224,7 @@ function teyaIngestEmails(cfg) {
  * Venue: function teyaInstallEmailTrigger() { return PubSystemLib.teyaInstallEmailTrigger(VENUE_CONFIG); }
  */
 function teyaInstallEmailTrigger(cfg) {
-  cfg = mergeConfig_(cfg || {});
+  cfg = teyaMergeConfig_(cfg);
   var handlers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < handlers.length; i++) {
     if (handlers[i].getHandlerFunction() === 'teyaIngestEmailsTrigger') {
