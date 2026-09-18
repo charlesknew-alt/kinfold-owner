@@ -9,24 +9,13 @@
  * ahead. Paperwork should continue from Monday of the FIRST week AFTER the
  * last SUBMITTED/APPROVED week (catch-up order).
  *
+ * DEPLOYED 18 Sep 2026: PubSystemLib v71 (LIB_VERSION 4.24).
+ * Eight Bells /exec @203 and Windmill /exec @54 pin library v71.
+ *
  * INSTALL (PubSystemLib)
  * ----------------------
- * 1. PubSystemLib → New file → name: ManagerWeekCatchup.gs → paste this whole file → Save.
- * 2. Find findMostRecentDraftWeek (or whatever getDetailedWeekStatus / _findWeekSheetForForm
- *    uses to pick the active manager week). At the START of that function, add:
- *
- *      var catchup = findManagerCatchupWeekSheet_(ss);
- *      if (catchup) return catchup;
- *
- *    (Use the same Spreadsheet `ss` variable the function already has.)
- *
- * 3. Find startNewWeek / startNewWeekImpl (creates the next WEEK_* tab). At the START:
- *
- *      var blocked = assertManagerWeekNotJumpingAhead_(ss);
- *      if (blocked) return blocked; // { success:false, message:"..." }
- *
- * 4. Deploy → New version of PubSystemLib.
- * 5. Windmill (+ Eight Bells if same hub logic) → Libraries → pin new version → Save.
+ * Wired into findMostRecentDraftWeek, _findWeekSheetForForm, and
+ * startNewWeekImpl. Venues must pin this library version.
  *
  * Does not change owner Pending / Archive filters.
  */
@@ -53,76 +42,58 @@ function findLastOwnerPipelineWeek_(ss) {
   return best;
 }
 
-/**
- * Active manager week sheet: first week AFTER last SUBMITTED/APPROVED.
- * Creates the WEEK_* tab if missing (via createCatchupWeekSheet_ hook).
- * Returns null only if no owner-pipeline week exists yet (brand-new venue).
- */
-function findManagerCatchupWeekSheet_(ss) {
+function managerCatchupTargetEnd_(ss) {
   var last = findLastOwnerPipelineWeek_(ss);
   if (!last) return null;
-
   var targetEnd = new Date(last.weekEnd.getTime());
   targetEnd.setDate(targetEnd.getDate() + 7); // next Sunday week-ending
-  targetEnd = stripTime_(targetEnd);
+  return stripTime_(targetEnd);
+}
 
-  // Prefer existing incomplete sheet on/after target, earliest first
+/**
+ * Active manager week sheet: first week AFTER last SUBMITTED/APPROVED.
+ * Does not pick a later calendar draft while that catch-up week is still open.
+ * Pass createIfMissing=true to create the WEEK_* tab via createCatchupWeekSheet_.
+ * Returns null if no owner-pipeline week exists yet (brand-new venue).
+ */
+function findManagerCatchupWeekSheet_(ss, cfg, createIfMissing) {
+  var targetEnd = managerCatchupTargetEnd_(ss);
+  if (!targetEnd) return null;
+
+  var expectName = formatWeekSheetNameCatchup_(targetEnd);
+  var existing = ss.getSheetByName(expectName);
+  if (existing && !catchupWeekIsDone_(existing)) return existing;
+
   var sheets = ss.getSheets();
-  var candidates = [];
   for (var i = 0; i < sheets.length; i++) {
     var sh = sheets[i];
     var name = sh.getName();
     if (name.indexOf('WEEK_') !== 0) continue;
     var weekEnd = catchupWeekEndFromSheet_(sh, name);
-    if (!weekEnd) continue;
-    if (weekEnd.getTime() < targetEnd.getTime()) continue;
-    var status = String(sh.getRange('A1').getValue() || '').toUpperCase();
-    if (status.indexOf('APPROVED') !== -1 && status.indexOf('SUBMITTED') === -1) {
-      // approved alone still counts as past manager desk — skip
-    }
-    var done =
-      status.indexOf('SUBMITTED') !== -1 ||
-      status.indexOf('APPROVED') !== -1;
-    if (done) continue;
-    candidates.push({ sheet: sh, weekEnd: weekEnd });
-  }
-  candidates.sort(function (a, b) { return a.weekEnd.getTime() - b.weekEnd.getTime(); });
-  if (candidates.length) return candidates[0].sheet;
-
-  // No open sheet at target — create target week (not “this calendar week”)
-  if (typeof createCatchupWeekSheet_ === 'function') {
-    return createCatchupWeekSheet_(ss, targetEnd);
-  }
-  if (typeof startNewWeekImpl === 'function') {
-    // Many codebases take an optional week-ending Date — try that
-    try {
-      var created = startNewWeekImpl(ss, targetEnd);
-      if (created && created.getSheet) return created;
-      if (created && created.sheet) return created.sheet;
-    } catch (e1) {
-      try {
-        var created2 = startNewWeekImpl(targetEnd);
-        if (created2 && created2.getSheet) return created2;
-        if (created2 && created2.sheet) return created2.sheet;
-      } catch (e2) {}
-    }
+    if (!weekEnd || weekEnd.getTime() !== targetEnd.getTime()) continue;
+    if (!catchupWeekIsDone_(sh)) return sh;
   }
 
-  // Fallback: resolve by expected sheet name if your namer matches
-  var expectName = formatWeekSheetNameCatchup_(targetEnd);
-  var existing = ss.getSheetByName(expectName);
-  if (existing) return existing;
+  // Never return a later calendar draft (that is the hub jump-ahead bug).
+  if (createIfMissing && typeof createCatchupWeekSheet_ === 'function') {
+    return createCatchupWeekSheet_(ss, targetEnd, cfg);
+  }
 
   Logger.log(
     'ManagerWeekCatchup: need week ending ' +
       Utilities.formatDate(targetEnd, 'Europe/London', 'yyyy-MM-dd') +
-      ' (' + expectName + ') but could not create — wire createCatchupWeekSheet_.'
+      ' (' + expectName + ') — not creating from status read.'
   );
   return null;
 }
 
+function catchupWeekIsDone_(sh) {
+  var status = String(sh.getRange('A1').getValue() || '').toUpperCase();
+  return status.indexOf('SUBMITTED') !== -1 || status.indexOf('APPROVED') !== -1;
+}
+
 /**
- * Block “Start new week” if it would skip past an unfinished catch-up week.
+ * Block “Start new week” if a later calendar week would skip unfinished catch-up.
  * Return null to allow; or { success:false, message } to stop.
  */
 function assertManagerWeekNotJumpingAhead_(ss) {
@@ -142,6 +113,41 @@ function assertManagerWeekNotJumpingAhead_(ss) {
       ' (' + catchup.getName() + ') before starting a later week. ' +
       'Manager paperwork must catch up in order after the last week submitted to the owner.'
   };
+}
+
+function wrapCatchupDraftWeek_(cfg, sheet) {
+  var weekEnding = sheet.getRange('K3').getValue();
+  var daysCompleted = countCompletedDays(sheet);
+  var expectedDays = countExpectedDays(sheet);
+  var weeklyDataComplete = isWeeklyDataComplete(cfg, sheet);
+  return {
+    name: sheet.getName(),
+    sheet: sheet,
+    date: weekEnding ? new Date(weekEnding) : null,
+    daysCompleted: daysCompleted,
+    expectedDays: expectedDays,
+    weeklyDataComplete: weeklyDataComplete,
+    isComplete: daysCompleted >= expectedDays && weeklyDataComplete,
+    isReadyToSubmit: daysCompleted >= expectedDays && weeklyDataComplete
+  };
+}
+
+function createCatchupWeekSheet_(ss, weekEndDate, cfg) {
+  cfg = _mergeConfig(cfg);
+  var template = ss.getSheetByName((cfg.SHEETS && cfg.SHEETS.TEMPLATE) || 'END OF WEEK');
+  if (!template) {
+    Logger.log('ManagerWeekCatchup: END OF WEEK template not found');
+    return null;
+  }
+  var created = _createWeekSheetFromTemplate(cfg, ss, template, weekEndDate, false);
+  if (created && created.success && created.weekName) {
+    return ss.getSheetByName(created.weekName);
+  }
+  var expectName = formatWeekSheetNameCatchup_(weekEndDate);
+  var existing = ss.getSheetByName(expectName);
+  if (existing) return existing;
+  Logger.log('ManagerWeekCatchup: create failed: ' + ((created && created.message) || 'unknown'));
+  return null;
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -191,10 +197,3 @@ function formatWeekSheetNameCatchup_(weekEnd) {
   var yy = String(weekEnd.getFullYear()).slice(-2);
   return 'WEEK_' + dd + mon + yy;
 }
-
-/**
- * OPTIONAL — implement in WeekSetup.js if startNewWeekImpl cannot take a Date.
- * Must create the same WEEK_* layout as a normal new week, A1 = DRAFT, K3 = weekEnd.
- *
- * function createCatchupWeekSheet_(ss, weekEndDate) { ... return sheet; }
- */

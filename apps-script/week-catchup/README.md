@@ -32,15 +32,24 @@ Optional cleanup: if `WEEK_20SEP26` is empty and was opened by mistake, leave it
 
 ---
 
-## Code fix (PubSystemLib)
+## Code fix (PubSystemLib) — live
 
-Paste-ready helpers: [`ManagerWeekCatchup.gs`](./ManagerWeekCatchup.gs)
+Deployed **18 Sep 2026** with clasp:
 
-They change week selection to:
+| Project | Pin |
+|---|---|
+| PubSystemLib | **v71** (`4.24 manager week catch-up after last submitted/approved`) |
+| Eight Bells takings `/exec` | library **v71**, web app **@203** |
+| Windmill takings `/exec` | library **v71**, web app **@54** |
+
+Helpers: [`ManagerWeekCatchup.gs`](./ManagerWeekCatchup.gs) (also `ManagerWeekCatchup.js` in the library).
+
+Week selection now:
 
 1. Find the latest week that is **SUBMITTED** or **APPROVED** (filed toward owner)  
 2. Target = **next Sunday** after that week ending  
-3. Prefer that sheet (create if missing)  
-4. **Never** prefer a later calendar draft while an earlier catch-up week is still open  
+3. Prefer that exact sheet — **never** a later calendar draft  
+4. If the catch-up sheet is missing, hub falls back to last submitted → **Start Next Week**, which creates `WEEK_09AUG26` (not week ending 20 Sep)  
+5. `startNewWeekImpl` ignores a later mistaken draft when creating the catch-up week  
 
-Wire-in steps are in that file’s header.
+After deploy: refresh the manager hub. If `WEEK_09AUG26` does not exist yet, use **Start Next Week** once. Then **CONTINUE** should be Monday 3 Aug. Leave empty `WEEK_20SEP26` unused until catch-up reaches it.
