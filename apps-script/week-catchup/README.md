@@ -38,9 +38,9 @@ Deployed **18 Sep 2026** with clasp:
 
 | Project | Pin |
 |---|---|
-| PubSystemLib | **v72** (`4.25 catch-up uses archive/master when WEEK_ tabs were moved`) |
-| Eight Bells takings `/exec` | library **v72**, web app **@204** |
-| Windmill takings `/exec` | library **v72**, web app **@55** |
+| PubSystemLib | **v73** (`4.26 All Weeks lists archived submitted/approved weeks`) |
+| Eight Bells takings `/exec` | library **v73**, web app **@205** |
+| Windmill takings `/exec` | library **v73**, web app **@56** |
 
 Helpers: [`ManagerWeekCatchup.gs`](./ManagerWeekCatchup.gs) (also `ManagerWeekCatchup.js` in the library).
 
@@ -52,4 +52,4 @@ Week selection now:
 4. If the catch-up sheet is missing, the hub **creates** `WEEK_09AUG26` on load (can take up to a minute)  
 5. `startNewWeekImpl` ignores a later mistaken draft when creating the catch-up week  
 
-Hard-refresh the manager hub and wait for loading to finish. You should see **week ending 9 August** / CONTINUE on Monday 3 Aug. All weeks will still list the empty 20 Sep draft — leave it unused.
+Hard-refresh both manager hubs (Windmill and Eight Bells use the same PubSystemLib pin). First Windmill load may take up to a minute while it creates `WEEK_09AUG26`. **All Weeks** now lists archived submitted/approved weeks as well as live drafts. Leave empty `WEEK_20SEP26` unused.
