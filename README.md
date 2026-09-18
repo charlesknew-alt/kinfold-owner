@@ -61,6 +61,10 @@ Venue `doGet` remains `PubSystemLib.routePage(VENUE_CONFIG, e)`. Do not put an o
 
 Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with columns like Payment type, Date, Time, Store, Source/context, Device name, Device ID, Status, Amount/Sales. Drop the CSV in; you get first/last sale and totals by machine. Nothing is uploaded or written to paperwork.
 
+### Teya → daily PDQ prefill (Apps Script paste)
+
+PubSystemLib’s `Teya.gs` was only a placeholder (`fetchTeyaTransactions` stub). Windmill `VENUE_CONFIG` already has `TEYA_ENABLED`, `TEYA_MID`, and `TEYA_CHANNEL_LABELS` (Device ID → Channel A/B → `pdq1`/`pdq2`). Paste-ready replacement + daily-form dropzone live in `apps-script/teya/` — see that README. CSV prefill works without API secrets; live API needs Script Properties `TEYA_CLIENT_ID` / `TEYA_CLIENT_SECRET` / `TEYA_STORE_ID`.
+
 ## Varlo Auth Apps Script
 
 Standalone project in `apps-script/varlo-auth/`. JSONP `doGet` actions: `ping`, `login`, `set`, `status`. It is **not** a venue page router.

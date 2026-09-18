@@ -1,0 +1,111 @@
+<!--
+  Paste into PubSystemLib Templates_Forms.js daily entry HTML, just above the
+  PDQ Terminal 1 / 2 inputs (Windmill only — gate with TEYA_ENABLED on the server
+  when emitting the template, or leave hidden when cfg.TEYA_ENABLED is false).
+
+  Expects:
+    - #pdq1, #pdq2 inputs already on the form
+    - window.TEYA_CHANNEL_LABELS = { 'oOj2CqaI': 'Channel A', '7KckI3g7': 'Channel B' }
+      (inject from VENUE_CONFIG when serving the form)
+    - calculateAll() already defined
+
+  Optional: include teya-day-totals.js from the kinfold-owner repo, OR rely on
+  google.script.run.teyaDayTotalsFromCsv via a thin venue wrapper.
+-->
+<div id="teyaPrefillBox" class="ps-card" style="margin-bottom:14px;display:none;">
+  <div class="card-head">
+    <div class="card-title">Prefill PDQ from Teya</div>
+  </div>
+  <p class="ps-hint" style="margin:0 0 10px;">
+    Drop the Teya transaction CSV for this day. Fills PDQ Terminal 1 / 2 from Channel A / B.
+    Does not save — check the numbers, then Save as usual. Rooms PDQ stays manual.
+  </p>
+  <input type="file" id="teyaCsvFile" accept=".csv,text/csv" style="width:100%;margin-bottom:8px;">
+  <div id="teyaPrefillMsg" class="ps-hint" style="min-height:1.2em;"></div>
+</div>
+<script>
+(function () {
+  var labels = window.TEYA_CHANNEL_LABELS || {};
+  var box = document.getElementById('teyaPrefillBox');
+  var fileInput = document.getElementById('teyaCsvFile');
+  var msg = document.getElementById('teyaPrefillMsg');
+  if (!box || !fileInput) return;
+
+  // Show when channel map is present (Windmill).
+  if (labels && Object.keys(labels).length) {
+    box.style.display = '';
+  }
+
+  function setMsg(text, isErr) {
+    if (!msg) return;
+    msg.textContent = text || '';
+    msg.style.color = isErr ? '#c0635a' : '';
+  }
+
+  function fillPdq(pdq1, pdq2, detail) {
+    var a = document.getElementById('pdq1');
+    var b = document.getElementById('pdq2');
+    if (a) a.value = pdq1;
+    if (b) b.value = pdq2;
+    if (typeof calculateAll === 'function') calculateAll();
+    setMsg(detail || ('Filled PDQ 1 = £' + pdq1 + ', PDQ 2 = £' + pdq2), false);
+  }
+
+  fileInput.addEventListener('change', function () {
+    var f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var text = String(reader.result || '');
+      // Prefer day on the form if an ISO date field exists; else prompt from first CSV date.
+      var dayEl = document.getElementById('dayDate') || document.querySelector('[data-day-key]');
+      var dayKey = dayEl ? (dayEl.value || dayEl.getAttribute('data-day-key') || '') : '';
+
+      function applyClient() {
+        if (!window.TeyaDayTotals) {
+          setMsg('TeyaDayTotals helper not loaded — add teya-day-totals.js or use server path.', true);
+          return;
+        }
+        var all = window.TeyaDayTotals.totalsFromCsvText(text, labels, null);
+        if (!all || !all.length) {
+          setMsg('No approved Teya sales in that CSV.', true);
+          return;
+        }
+        if (!dayKey) dayKey = all[0].date;
+        var one = null;
+        for (var i = 0; i < all.length; i++) if (all[i].date === dayKey) one = all[i];
+        if (!one) {
+          setMsg('No sales for ' + dayKey + ' (CSV has ' + all.map(function (d) { return d.date; }).join(', ') + ').', true);
+          return;
+        }
+        fillPdq(one.pdq1, one.pdq2, 'Teya ' + one.date + ': PDQ 1 £' + one.pdq1 + ' · PDQ 2 £' + one.pdq2);
+      }
+
+      if (google && google.script && google.script.run && typeof google.script.run.teyaDayTotalsFromCsv === 'function') {
+        // Venue wrapper: function teyaDayTotalsFromCsv(csv, day) { return PubSystemLib.teyaDayTotalsFromCsv(VENUE_CONFIG, csv, day); }
+        if (!dayKey && window.TeyaDayTotals) {
+          var peek = window.TeyaDayTotals.totalsFromCsvText(text, labels, null);
+          if (peek && peek[0]) dayKey = peek[0].date;
+        }
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (!res || !res.success) {
+              setMsg((res && res.message) || 'Teya prefill failed', true);
+              return;
+            }
+            fillPdq(res.pdq1, res.pdq2, res.message);
+          })
+          .withFailureHandler(function (err) {
+            setMsg(String(err), true);
+            applyClient();
+          })
+          .teyaDayTotalsFromCsv(text, dayKey);
+      } else {
+        applyClient();
+      }
+    };
+    reader.onerror = function () { setMsg('Could not read that file.', true); };
+    reader.readAsText(f);
+  });
+})();
+</script>
