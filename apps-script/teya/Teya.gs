@@ -202,8 +202,14 @@ function teyaIngestEmails(cfg) {
             teyaCachePutDay_(dk, result.days[dk]);
           });
           processed++;
+          teyaCacheMarkMessage_(msgId);
+        } else if (result && result.failedPdf) {
+          // Do not mark seen — allow retry after PDF convert fix
+          errors.push(msgId + ': PDF convert failed — will retry next run');
+        } else {
+          // No usable attachment/body — don't keep retrying forever
+          teyaCacheMarkMessage_(msgId);
         }
-        teyaCacheMarkMessage_(msgId);
       } catch (err) {
         errors.push(msgId + ': ' + (err && err.message ? err.message : String(err)));
       }
@@ -257,6 +263,7 @@ function teyaParseMessage_(cfg, msg) {
   var atts = msg.getAttachments({ includeInlineImages: false, includeAttachments: true });
   var days = {};
   var any = false;
+  var failedPdf = false;
 
   for (var i = 0; i < atts.length; i++) {
     var att = atts[i];
@@ -268,6 +275,7 @@ function teyaParseMessage_(cfg, msg) {
       parsed = teyaTotalsFromCsvText_(cfg, att.getDataAsString('UTF-8'));
     } else if (name.indexOf('.pdf') !== -1 || mime.indexOf('pdf') !== -1) {
       parsed = teyaTotalsFromPdfBlob_(cfg, att.copyBlob(), att.getName());
+      if (!parsed) failedPdf = true;
     }
 
     if (parsed && parsed.days) {
@@ -289,7 +297,7 @@ function teyaParseMessage_(cfg, msg) {
     }
   }
 
-  if (!any) return null;
+  if (!any) return failedPdf ? { failedPdf: true } : null;
   return { days: days };
 }
 
@@ -327,49 +335,102 @@ function teyaTotalsFromCsvText_(cfg, csvText) {
 function teyaTotalsFromPdfBlob_(cfg, blob, filename) {
   var text = '';
   try {
-    text = teyaOcrPdfToText_(blob, filename || 'teya.pdf');
+    text = teyaPdfToText_(blob, filename || 'teya.pdf');
   } catch (err) {
-    Logger.log('PDF OCR failed: ' + err);
+    Logger.log('PDF convert failed: ' + err);
     return null;
   }
   if (!text) return null;
   return teyaTotalsFromSettlementText_(cfg, text);
 }
 
-function teyaOcrPdfToText_(blob, filename) {
-  if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.create) {
-    var resource = { name: 'teya-ocr-' + Date.now(), mimeType: MimeType.GOOGLE_DOCS };
-    var file = Drive.Files.create(resource, blob, { ocrLanguage: 'en' });
-    var id = file.id;
-    try {
-      var doc = DocumentApp.openById(id);
-      var text = doc.getBody().getText();
-      DriveApp.getFileById(id).setTrashed(true);
-      return text;
-    } catch (e) {
-      try { DriveApp.getFileById(id).setTrashed(true); } catch (e2) {}
-      throw e;
-    }
+/**
+ * Convert settlement PDF → Google Doc text.
+ * Teya PDFs are text-based — do NOT use Drive OCR (deprecated / broken on Docs mime).
+ */
+function teyaPdfToText_(blob, filename) {
+  blob = blob.setName(filename || 'teya.pdf');
+  try {
+    blob.setContentType(MimeType.PDF);
+  } catch (eMime) {
+    try { blob.setContentType('application/pdf'); } catch (e2) {}
   }
 
+  var lastErr = null;
+
+  // Drive v2: convert upload to Google Doc (no ocr flag)
   if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.insert) {
-    var res2 = { title: 'teya-ocr-' + Date.now(), mimeType: MimeType.GOOGLE_DOCS };
-    var file2 = Drive.Files.insert(res2, blob, { ocr: true, ocrLanguage: 'en' });
-    var id2 = file2.id;
     try {
-      var doc2 = DocumentApp.openById(id2);
-      var text2 = doc2.getBody().getText();
-      DriveApp.getFileById(id2).setTrashed(true);
-      return text2;
-    } catch (e3) {
-      try { DriveApp.getFileById(id2).setTrashed(true); } catch (e4) {}
-      throw e3;
+      var res2 = {
+        title: 'teya-pdf-' + Date.now(),
+        mimeType: MimeType.GOOGLE_DOCS
+      };
+      var file2 = Drive.Files.insert(res2, blob);
+      return teyaReadAndTrashDoc_(file2.id);
+    } catch (eInsert) {
+      lastErr = eInsert;
+      Logger.log('Drive.Files.insert convert: ' + eInsert);
     }
   }
 
-  throw new Error(
-    'PDF received but Drive API is not enabled. In Windmill Apps Script: Services → Add Drive API.'
+  // Drive v3: convert upload to Google Doc
+  if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.create) {
+    try {
+      var resource = {
+        name: 'teya-pdf-' + Date.now(),
+        mimeType: MimeType.GOOGLE_DOCS
+      };
+      var file = Drive.Files.create(resource, blob);
+      return teyaReadAndTrashDoc_(file.id);
+    } catch (eCreate) {
+      lastErr = eCreate;
+      Logger.log('Drive.Files.create convert: ' + eCreate);
+    }
+  }
+
+  // Fallback: upload PDF via DriveApp, then copy-as-Doc via advanced Drive
+  try {
+    var pdfFile = DriveApp.createFile(blob);
+    var pdfId = pdfFile.getId();
+    try {
+      if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.copy) {
+        var copied = Drive.Files.copy(
+          { title: 'teya-pdf-doc-' + Date.now(), mimeType: MimeType.GOOGLE_DOCS },
+          pdfId
+        );
+        var text = teyaReadAndTrashDoc_(copied.id);
+        pdfFile.setTrashed(true);
+        return text;
+      }
+    } finally {
+      try { pdfFile.setTrashed(true); } catch (eTrash) {}
+    }
+  } catch (eApp) {
+    lastErr = eApp;
+    Logger.log('DriveApp convert fallback: ' + eApp);
+  }
+
+  throw lastErr || new Error(
+    'PDF received but could not convert to text. Enable Drive API (v2 is fine) on Windmill.'
   );
+}
+
+function teyaReadAndTrashDoc_(id) {
+  try {
+    var doc = DocumentApp.openById(id);
+    var text = doc.getBody().getText();
+    DriveApp.getFileById(id).setTrashed(true);
+    return text;
+  } catch (e) {
+    try { DriveApp.getFileById(id).setTrashed(true); } catch (e2) {}
+    throw e;
+  }
+}
+
+/** Clear seen-message list so failed PDFs can be re-ingested. Windmill wrapper recommended. */
+function teyaClearSeenMessages(cfg) {
+  PropertiesService.getScriptProperties().deleteProperty('TEYA_SEEN_MSG_IDS');
+  return { success: true, message: 'Cleared Teya seen-message cache. Run teyaIngestEmails again.' };
 }
 
 /**
