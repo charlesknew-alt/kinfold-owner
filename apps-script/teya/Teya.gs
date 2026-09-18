@@ -216,12 +216,16 @@ function teyaIngestEmails(cfg) {
     }
   }
 
+  var summary =
+    'Ingested ' + processed + ' new Teya message(s); skipped ' + skipped +
+    ' already seen.' + (errors.length ? ' Errors: ' + errors.join(' | ') : '');
+  Logger.log(summary);
   return {
     success: true,
     processed: processed,
     skipped: skipped,
     errors: errors,
-    message: 'Ingested ' + processed + ' new Teya message(s); skipped ' + skipped + ' already seen.'
+    message: summary
   };
 }
 
