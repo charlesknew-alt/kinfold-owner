@@ -1,29 +1,28 @@
 # Hospitality yarns (Daily Entry)
 
-Short joke / shift yarn / true-ish line under the day title when a manager opens Daily Entry.
+Short **classic joke** or **clear industry fact** under the day title on Daily Entry.
+
+## What belongs here
+
+- Classic bar / restaurant jokes with an obvious punchline (“A man walked into a bar. Ouch.”)
+- Plain-English hospitality facts (pubs, licensing, hotels, pizza, kitchen slang, coffee, etc.)
+
+## What does **not** belong
+
+- Cryptic “shift yarn” in-jokes with no punchline
+- Private-language one-liners managers have to decode
 
 ## Repeat behaviour
 
-- Built-in bank is **~840** lines (original jokes/shift yarns + verified UK pub / hospitality facts).
-- Same calendar day always shows the same yarn (stable).
-- **Year shifts the sequence**, so 18 Sep next year is not the same line as this year.
-- With this bank size, calendar days do not reuse a line within a normal year.
+- Built-in bank is ~425 clear jokes + facts.
+- Same calendar day → same yarn (stable).
+- Year shifts the sequence so the same date next year is different.
 
-## How to feed new ones (no code edit)
-
-From the PubSystemLib clasp folder (with `CLASPRC_JSON`):
+## Top-ups (no code edit)
 
 ```bash
-clasp run appendHospitalityYarns --params '[[{"k":"joke","t":"Your new short line."},{"k":"funny","t":"Another one."},{"k":"true","t":"Surprising fact…"}]]'
+clasp run appendHospitalityYarns --params '[[{"k":"joke","t":"A man walked into a bar. Ouch."},{"k":"true","t":"True: CAMRA was founded in 1971."}]]'
 ```
 
-Kinds: `joke` | `funny` | `true`  
-Keep each `t` to **one or two short sentences**.
-
-Extras live in Script Property `HOSPITALITY_YARNS_EXTRA` and merge with the built-in bank on every page serve.
-
-Or send Charles a list in chat and an agent can append + redeploy.
-
-## Notes on “true” yarns
-
-True-ish lines are short, sourced from well-known pub/licensing history (e.g. last orders / DORA wartime hours, ploughman’s marketing, CAMRA 1971, tied vs free house, snug, penny universities). Myths are called out (e.g. tip ≠ “To Insure Promptness”).
+Kinds: `joke` | `true`  
+Keep each line to one or two short sentences.
