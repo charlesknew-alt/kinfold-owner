@@ -61,9 +61,9 @@ Venue `doGet` remains `PubSystemLib.routePage(VENUE_CONFIG, e)`. Do not put an o
 
 Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with columns like Payment type, Date, Time, Store, Source/context, Device name, Device ID, Status, Amount/Sales. Drop the CSV in; you get first/last sale and totals by machine. Nothing is uploaded or written to paperwork.
 
-### Teya → daily PDQ (live API)
+### Teya → daily PDQ (Gmail)
 
-PubSystemLib `Teya.gs` (v4) pulls **live** SUCCESSFUL sales via Teya POSLink and fills `pdq1` / `pdq2` on Windmill daily entry (**Pull from Teya now** — no CSV). Paste steps + Script properties (`TEYA_CLIENT_ID`, `TEYA_CLIENT_SECRET`, `TEYA_STORE_ID`) are in `apps-script/teya/README.md`. Owner Card Takings (`card-takings.html`) stays a read-only CSV viewer.
+Teya does not offer a merchant API for daily card sales. Windmill daily entry pulls PDQ 1/2 from **Teya report emails in Gmail** (5am→5am UK trading day). Paste-ready `apps-script/teya/` — see that README Steps 1–9.
 
 ## Varlo Auth Apps Script
 

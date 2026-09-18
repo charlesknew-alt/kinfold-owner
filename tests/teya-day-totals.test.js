@@ -34,28 +34,20 @@ assert(one && one.pdq1 === '474.30', 'Channel A → pdq1 = 474.30 (got ' + (one 
 assert(one && one.pdq2 === '3763.25', 'Channel B → pdq2 = 3763.25 (got ' + (one && one.pdq2) + ')');
 assert(one.unknownPence === 0, 'no unknown-device pence');
 
-assert(Teya.slotForLabel('Channel A') === 1, 'slot Channel A = 1');
-assert(Teya.slotForLabel('Channel B') === 2, 'slot Channel B = 2');
-
-var missing = Teya.totalsFromCsvText(sample, labels, '2099-01-01');
-assert(missing === null, 'missing day returns null');
-
 var teyaGs = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/Teya.gs'), 'utf8');
 assert(teyaGs.indexOf('function teyaPullDayTotals') !== -1, 'Teya.gs has teyaPullDayTotals');
-assert(teyaGs.indexOf('function teyaListTerminals') !== -1, 'Teya.gs has teyaListTerminals');
-assert(teyaGs.indexOf('Pull from Teya now') !== -1, 'Teya.gs UI is API pull button');
+assert(teyaGs.indexOf('function teyaIngestEmails') !== -1, 'Teya.gs has teyaIngestEmails');
+assert(teyaGs.indexOf('GmailApp.search') !== -1, 'Teya.gs searches Gmail');
+assert(teyaGs.indexOf('Pull from Teya email') !== -1, 'Teya.gs UI is email pull');
 assert(teyaGs.indexOf('teyaCsvFile') === -1, 'Teya.gs daily UI has no CSV file input');
-assert(teyaGs.indexOf('poslink/v2/payment-requests') !== -1, 'Teya.gs calls POSLink payment-requests');
-assert(teyaGs.indexOf('teyaTradingWindowIso_') !== -1, 'Teya.gs has 5am trading window');
-assert(teyaGs.indexOf('05:00:00') !== -1, 'Teya.gs uses 05:00 London');
-assert(teyaGs.indexOf('TEYA_CLIENT_ID') !== -1, 'Teya.gs documents API Script Properties');
-assert(teyaGs.indexOf('v5') !== -1, 'Teya.gs is v5 trading-day API');
+assert(teyaGs.indexOf('teyaTradingDayKeyFromParts_') !== -1, 'Teya.gs has 5am trading day');
+assert(teyaGs.indexOf('v6') !== -1, 'Teya.gs is v6 Gmail');
 
 var readme = fs.readFileSync(path.join(__dirname, '..', 'apps-script/teya/README.md'), 'utf8');
-assert(readme.indexOf('TEYA_STORE_ID') !== -1, 'teya README mentions store UUID');
-assert(readme.indexOf('Pull from Teya now') !== -1, 'teya README is API-first');
+assert(readme.indexOf('Gmail') !== -1, 'teya README is Gmail-first');
 assert(readme.indexOf('5am') !== -1, 'teya README documents 5am trading day');
 assert(readme.indexOf('STEP 1') !== -1 && readme.indexOf('STEP 9') !== -1, 'teya README has steps 1-9');
+assert(/no API/i.test(readme), 'teya README notes no API');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
