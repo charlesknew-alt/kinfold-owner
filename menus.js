@@ -182,6 +182,60 @@
     };
   }
 
+  /** Menus that can be pulled onto a long sheet (main / Sunday). */
+  function includableMenus(hostId) {
+    if (hostId !== 'main' && hostId !== 'sunday') return [];
+    return MENUS.filter(function (m) {
+      return m.id !== hostId && m.id !== 'lunch-club' && m.kind === 'card';
+    });
+  }
+
+  /**
+   * Build the dish list that would print: host menu plus any ticked extras.
+   * Extra dishes keep their section; duplicates of the same name+section are skipped.
+   */
+  function composeDishes(book, hostId, includes) {
+    includes = includes || {};
+    var list = (book[hostId] || []).slice();
+    var seen = {};
+    list.forEach(function (d) {
+      seen[(d.section + '|' + d.name).toLowerCase()] = true;
+    });
+    includableMenus(hostId).forEach(function (menu) {
+      if (!includes[menu.id]) return;
+      (book[menu.id] || []).forEach(function (d) {
+        var key = (d.section + '|' + d.name).toLowerCase();
+        if (seen[key]) return;
+        seen[key] = true;
+        list.push({
+          id: d.id + '-on-' + hostId,
+          section: d.section,
+          name: d.name,
+          description: d.description,
+          price: d.price,
+          tags: d.tags,
+          lunchClub: !!d.lunchClub,
+          fromMenu: menu.id
+        });
+      });
+    });
+    return list;
+  }
+
+  function sheetPlanFor(book, hostId, includes) {
+    var list = composeDishes(book, hostId, includes);
+    var plan = sheetPlan(hostId, list.length);
+    var extras = includableMenus(hostId)
+      .filter(function (m) { return includes && includes[m.id]; })
+      .map(function (m) { return m.name; });
+    if (extras.length) {
+      plan.text += ' Includes ' + extras.join(', ') + ' (' + list.length + ' dishes in total).';
+    } else {
+      plan.text += ' ' + list.length + ' dishes.';
+    }
+    return { plan: plan, dishes: list };
+  }
+
   function lunchClubFromTicks(book) {
     var out = [];
     MENUS.forEach(function (menu) {
@@ -193,13 +247,75 @@
     return out;
   }
 
+  function emptyMarks() {
+    return { gf: false, gfOpt: false, v: false, vOpt: false, vg: false, vgOpt: false };
+  }
+
+  function parseMarks(tags) {
+    var t = String(tags || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    var m = emptyMarks();
+    if (!t) return m;
+    if (/v with gf option/.test(t)) {
+      m.v = true;
+      m.gfOpt = true;
+      return m;
+    }
+    if (/gf with vg option/.test(t)) {
+      m.gf = true;
+      m.vgOpt = true;
+      return m;
+    }
+    if (/vg\s*(?:&|\/)\s*gf(\s+option)?/.test(t)) {
+      m.vg = true;
+      m.gf = true;
+      if (/option/.test(t)) m.gfOpt = true;
+      return m;
+    }
+    if (/\bgf(\s+option)?\b/.test(t)) {
+      m.gf = true;
+      if (/gf\s+option/.test(t)) m.gfOpt = true;
+    }
+    if (/\bvg(\s+option)?\b/.test(t)) {
+      m.vg = true;
+      if (/vg\s+option/.test(t)) m.vgOpt = true;
+    }
+    // word-boundary v that is not part of vg
+    var withoutVg = t.replace(/vg(\s+option)?/g, ' ');
+    if (/(^|[^a-z])v(\s+option)?([^a-z]|$)/.test(withoutVg)) {
+      m.v = true;
+      if (/v\s+option/.test(withoutVg)) m.vOpt = true;
+    }
+    return m;
+  }
+
+  function formatMarks(m) {
+    m = m || emptyMarks();
+    if (m.v && m.gfOpt && !m.gf && !m.vg) return 'v with gf option';
+    if (m.gf && m.vgOpt && !m.vg && !m.v) return 'gf with vg option';
+    if (m.vg && m.gf && !m.v) {
+      if (m.gfOpt || m.vgOpt) return 'vg & gf option';
+      return 'vg & gf';
+    }
+    var parts = [];
+    if (m.gf) parts.push(m.gfOpt ? 'gf option' : 'gf');
+    if (m.v) parts.push(m.vOpt ? 'v option' : 'v');
+    if (m.vg) parts.push(m.vgOpt ? 'vg option' : 'vg');
+    return parts.join(', ');
+  }
+
   root.EBMenus = {
     MENUS: MENUS,
     seed: seed,
     menuById: menuById,
     parsePaste: parsePaste,
     sheetPlan: sheetPlan,
+    sheetPlanFor: sheetPlanFor,
+    composeDishes: composeDishes,
+    includableMenus: includableMenus,
     lunchClubFromTicks: lunchClubFromTicks,
-    dish: dish
+    dish: dish,
+    emptyMarks: emptyMarks,
+    parseMarks: parseMarks,
+    formatMarks: formatMarks
   };
 })(typeof window !== 'undefined' ? window : global);

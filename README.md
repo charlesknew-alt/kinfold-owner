@@ -63,7 +63,14 @@ Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with
 
 ### Eight Bells Menus
 
-Owner tile **Menus**, and the Menus button on the Eight Bells manager sign-in, open `menus.html`. Staff change one dish, add one, or paste a list. A lunch club tick marks that dish for Monday to Thursday. With no ticks, the lunch club stays its own menu. This page does not replace the PDFs on eightbellsbolney.com.
+Owner tile **Menus**, and the Menus button on the Eight Bells manager sign-in, open `menus.html`.
+
+- **Show complete menu** — tick lunch club, gf, v, vg (and “as option”) on each dish.
+- On Main or Sunday, tick **Also put on this sheet** (Sandwiches, Desserts, Little Bells) to see if they still fit.
+- **Generate menu** opens a print sheet; use the browser Print dialog to save a PDF.
+- Paste a list from ChatGPT or Canva, or change one dish.
+
+The locked wavy-box PDFs on eightbellsbolney.com are not updated from this page yet.
 
 ## Varlo Auth Apps Script
 
