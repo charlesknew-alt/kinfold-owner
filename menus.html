@@ -87,7 +87,7 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Show the complete menu and tick lunch club, gluten free, vegetarian or vegan on each dish. On Main or Sunday, tick other menus (for example Sandwiches) to see if they still fit on one sheet. Generate opens a print sheet.</p>
+    <p class="lede">Show the complete menu and tick lunch club, gluten free, vegetarian or vegan on each dish. On Main or Sunday, tick other menus (for example Sandwiches) to see if they still fit on one sheet. <strong>Generate menu</strong> opens the branded sheet — logo, wavy frames, green marks — ready to print or save as PDF.</p>
     <div class="menus" id="menuPicker"></div>
     <div class="top-actions no-print">
       <button type="button" class="go" id="doGenerate">Generate menu</button>
@@ -99,6 +99,7 @@
     </div>
   </main>
   <script src="menus.js"></script>
+  <script src="menus-print.js"></script>
   <script>
     var STORAGE = 'eb-menus-v2';
     var book = load();
@@ -426,7 +427,7 @@
       if (plan.fit === 'over') {
         html += '<p class="note">Untick an included menu, or remove dishes, before you generate.</p>';
       } else {
-        html += '<p class="note">When it looks right, press Generate menu. That opens a print sheet — use the browser Print dialog to save a PDF.</p>';
+        html += '<p class="note">When it looks right, press Generate menu. That opens the branded sheet (logo, wavy frames, green marks) — Print to save a PDF.</p>';
       }
       if (menuId === 'lunch-club') {
         html += '<p class="note">Printed as its own card. Monday to Thursday.</p>';
@@ -463,38 +464,11 @@
       var menu = EBMenus.menuById(menuId);
       var w = window.open('', '_blank');
       if (!w) {
-        alert('Allow pop-ups to open the generated sheet, then print it to PDF.');
+        alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
         return;
       }
-      var rows = '';
-      var section = '';
-      result.dishes.forEach(function (d) {
-        if (d.section !== section) {
-          section = d.section;
-          rows += '<h2>' + escapeAttr(section) + '</h2>';
-        }
-        rows += '<div class="item"><div class="n">' + (d.lunchClub && menuId !== 'lunch-club' ? '† ' : '') + escapeAttr(d.name);
-        if (menuId !== 'lunch-club' && d.price) rows += ' <span class="p">' + escapeAttr(d.price) + '</span>';
-        rows += '</div>';
-        if (d.description) rows += '<div class="d">' + escapeAttr(d.description) + '</div>';
-        if (d.tags) rows += '<div class="t">' + escapeAttr(d.tags) + '</div>';
-        rows += '</div>';
-      });
-      w.document.write('<!DOCTYPE html><html><head><title>' + escapeAttr(menu.name) + '</title><style>' +
-        'body{font-family:Georgia,serif;max-width:720px;margin:24px auto;padding:0 16px;color:#1a1814}' +
-        'h1{font-size:28px;margin:0 0 4px} .sub{color:#4a4640;margin-bottom:18px}' +
-        'h2{font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:18px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px}' +
-        '.item{margin:0 0 10px}.n{font-weight:700}.p{font-weight:500}.d{font-size:14px;color:#333}.t{color:#538135;font-style:italic;font-size:13px}' +
-        '.plan{background:#f4eae3;padding:10px 12px;border-radius:8px;margin-bottom:16px}' +
-        '@media print{button{display:none}}' +
-        '</style></head><body>' +
-        '<button onclick="window.print()" style="margin-bottom:12px;padding:8px 14px;font-weight:600">Print / save as PDF</button>' +
-        '<h1>The Eight Bells — ' + escapeAttr(menu.name) + '</h1>' +
-        '<div class="sub">' + escapeAttr(planTitle(result.plan.fit)) + '. ' + escapeAttr(result.plan.text) + '</div>' +
-        '<div class="plan">This is a working sheet from the staff menu editor. The locked wavy-box PDF style on the website comes next.</div>' +
-        rows +
-        '<p class="t" style="margin-top:24px">Please inform us of any allergies or dietary needs. gf – gluten free · v – vegetarian · vg – vegan. Lunch club Mon–Thurs.</p>' +
-        '</body></html>');
+      w.document.open();
+      w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
       w.document.close();
     }
 
