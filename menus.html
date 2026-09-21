@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Varlo · Eight Bells — Menus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --paint: #DFC2AF; --paint-deep: #A79283; --paint-wash: #F4EAE3;
+      --ink: #1A1814; --ink-soft: #4a4640; --line: #e5e0d4;
+      --white-warm: #FBF8F2; --green: #538135;
+      --serif: 'Fraunces', Georgia, serif;
+      --sans: 'Source Sans 3', sans-serif;
+    }
+    body { font-family: var(--sans); background: var(--white-warm); color: var(--ink); line-height: 1.45; }
+    .ps-header { background: var(--paint); border-bottom: 1px solid var(--paint-deep); padding: 14px 20px; }
+    .ps-header-inner { max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
+    .ps-venue-name { font-family: var(--serif); font-size: 22px; font-weight: 500; }
+    html.iframed .ps-header { display: none; }
+    main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 64px; }
+    h1 { font-family: var(--serif); font-weight: 500; font-size: 32px; }
+    .lede { color: var(--ink-soft); max-width: 640px; margin: 6px 0 18px; font-size: 15px; }
+    .menus { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .menus button, .modes button, .row button, button.go {
+      font-family: var(--sans); cursor: pointer; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 14px; font-weight: 600; font-size: 13px;
+    }
+    .menus button.on, .modes button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
+    .modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 14px; }
+    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 18px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    label { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
+    input[type=text], select, textarea {
+      width: 100%; font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--white-warm); color: var(--ink);
+    }
+    textarea { min-height: 140px; }
+    .tick { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 15px; color: var(--ink); }
+    .tick input { margin-top: 4px; }
+    .tick small { display: block; font-weight: 400; color: var(--ink-soft); }
+    button.go { background: var(--ink); color: var(--paint); border-color: var(--ink); margin-top: 14px; }
+    button.link { background: transparent; border: 0; color: var(--ink-soft); text-decoration: underline; padding: 0; font-weight: 600; cursor: pointer; font-family: var(--sans); }
+    .plan { border-radius: 12px; padding: 12px 14px; background: var(--paint-wash); margin-bottom: 12px; }
+    .plan strong { font-family: var(--serif); font-weight: 500; font-size: 18px; display: block; }
+    .plan.over { background: #fbeae6; }
+    ul.dishes { list-style: none; }
+    ul.dishes li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+    ul.dishes .name { font-weight: 700; }
+    .mark { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+    .tag { color: var(--green); font-style: italic; font-weight: 400; }
+    .note { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+    .section { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <header class="ps-header">
+    <div class="ps-header-inner">
+      <div>
+        <div class="ps-venue-eyebrow">The Eight Bells · Bolney</div>
+        <div class="ps-venue-name">Menus</div>
+      </div>
+    </div>
+  </header>
+  <main>
+    <h1>Menus</h1>
+    <p class="lede">Change one dish, add one, or paste a whole list from ChatGPT or Canva. Tick Lunch club on a dish when it is also served Monday to Thursday. Leave every tick empty when the lunch club is its own menu.</p>
+    <div class="menus" id="menuPicker"></div>
+    <div class="grid">
+      <section class="card" id="editor"></section>
+      <section class="card" id="preview"></section>
+    </div>
+  </main>
+  <script src="menus.js"></script>
+  <script>
+    var STORAGE = 'eb-menus-v1';
+    var book = load();
+    var menuId = 'main';
+    var mode = 'change';
+    var dishId = '';
+
+    if (window.parent !== window) document.documentElement.classList.add('iframed');
+
+    function load() {
+      try {
+        var saved = JSON.parse(localStorage.getItem(STORAGE) || 'null');
+        if (saved && saved.main) return saved;
+      } catch (e) {}
+      return EBMenus.seed();
+    }
+    function save() { localStorage.setItem(STORAGE, JSON.stringify(book)); }
+
+    function dishes() { return book[menuId] || (book[menuId] = []); }
+
+    function renderPicker() {
+      var box = document.getElementById('menuPicker');
+      box.innerHTML = '';
+      EBMenus.MENUS.forEach(function (menu) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = menu.name;
+        b.className = menu.id === menuId ? 'on' : '';
+        b.onclick = function () { menuId = menu.id; dishId = (dishes()[0] && dishes()[0].id) || ''; render(); };
+        box.appendChild(b);
+      });
+    }
+
+    function currentDish() {
+      var list = dishes();
+      for (var i = 0; i < list.length; i++) if (list[i].id === dishId) return list[i];
+      return null;
+    }
+
+    function render() {
+      renderPicker();
+      renderEditor();
+      renderPreview();
+    }
+
+    function renderEditor() {
+      var menu = EBMenus.menuById(menuId);
+      var el = document.getElementById('editor');
+      var html = '<h2 style="font-family:var(--serif);font-weight:500;font-size:24px">' + menu.name + '</h2>';
+      html += '<div class="modes">';
+      [['change', 'Change one dish'], ['add', 'Add a dish'], ['paste', 'Paste a list']].forEach(function (pair) {
+        html += '<button type="button" data-mode="' + pair[0] + '" class="' + (mode === pair[0] ? 'on' : '') + '">' + pair[1] + '</button>';
+      });
+      html += '</div>';
+      if (mode === 'paste') {
+        html += '<label>Paste from ChatGPT or Canva</label><textarea id="paste" placeholder="Starters&#10;Beef Ragu Arancini 8.25&#10;tomato, red onion salsa"></textarea>';
+        html += '<button class="go" id="doPaste" type="button">Read the list</button>';
+        html += '<p class="note" id="pasteNote"></p>';
+      } else if (mode === 'add' || mode === 'change') {
+        if (mode === 'change' && !dishes().length) {
+          html += '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
+        } else {
+        var item = mode === 'change' ? currentDish() : blank();
+        if (!item) item = blank();
+        if (mode === 'change') {
+          html += '<label>Dish</label><select id="pick">';
+          dishes().forEach(function (d) {
+            html += '<option value="' + d.id + '"' + (d.id === dishId ? ' selected' : '') + '>' + d.section + ' — ' + d.name + '</option>';
+          });
+          html += '</select>';
+        }
+        html += field('Section', 'section', item.section);
+        html += field('Name', 'name', item.name);
+        html += field('Description', 'description', item.description);
+        html += field('Price', 'price', item.price);
+        html += field('Dietary marks', 'tags', item.tags);
+        if (menuId !== 'lunch-club') {
+          html += '<label class="tick"><input type="checkbox" id="lunchClub"' + (item.lunchClub ? ' checked' : '') + '> <span>Lunch club<small>Monday to Thursday. The crossed knife and fork is printed beside this dish.</small></span></label>';
+        } else {
+          html += '<p class="note">This card is the lunch club itself, Monday to Thursday. Two courses £14.95, three courses £17.95. Prices on the dishes are not printed.</p>';
+        }
+        html += '<button class="go" id="doSave" type="button">' + (mode === 'add' ? 'Add dish' : 'Save dish') + '</button>';
+        if (mode === 'change' && item.id) html += ' <button class="link" id="doRemove" type="button">Remove this dish</button>';
+        }
+      }
+      html += '<p class="note"><button class="link" id="doReset" type="button">Put the sample menus back</button></p>';
+      el.innerHTML = html;
+      el.querySelectorAll('[data-mode]').forEach(function (b) {
+        b.onclick = function () { mode = b.getAttribute('data-mode'); render(); };
+      });
+      var pick = document.getElementById('pick');
+      if (pick) pick.onchange = function () { dishId = pick.value; render(); };
+      var doPaste = document.getElementById('doPaste');
+      if (doPaste) doPaste.onclick = onPaste;
+      var doSave = document.getElementById('doSave');
+      if (doSave) doSave.onclick = onSave;
+      var doRemove = document.getElementById('doRemove');
+      if (doRemove) doRemove.onclick = onRemove;
+      document.getElementById('doReset').onclick = function () {
+        book = EBMenus.seed();
+        save();
+        dishId = (dishes()[0] && dishes()[0].id) || '';
+        render();
+      };
+    }
+
+    function field(label, id, value) {
+      return '<label>' + label + '</label><input type="text" id="' + id + '" value="' + escapeAttr(value || '') + '">';
+    }
+    function escapeAttr(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+    function blank() {
+      return { section: dishes()[0] ? dishes()[0].section : 'Mains', name: '', description: '', price: '', tags: '', lunchClub: false };
+    }
+    function readForm() {
+      return {
+        section: document.getElementById('section').value.trim() || 'Dishes',
+        name: document.getElementById('name').value.trim(),
+        description: document.getElementById('description').value.trim(),
+        price: document.getElementById('price').value.trim(),
+        tags: document.getElementById('tags').value.trim(),
+        lunchClub: !!(document.getElementById('lunchClub') && document.getElementById('lunchClub').checked)
+      };
+    }
+    function onSave() {
+      var next = readForm();
+      if (!next.name) return;
+      if (mode === 'add') {
+        next.id = EBMenus.dish(next.section, next.name).id + '-' + Date.now();
+        dishes().push(next);
+        dishId = next.id;
+        mode = 'change';
+      } else {
+        var item = currentDish();
+        if (!item) return;
+        Object.keys(next).forEach(function (k) { item[k] = next[k]; });
+      }
+      save();
+      render();
+    }
+    function onRemove() {
+      book[menuId] = dishes().filter(function (d) { return d.id !== dishId; });
+      dishId = (dishes()[0] && dishes()[0].id) || '';
+      save();
+      render();
+    }
+    function onPaste() {
+      var parsed = EBMenus.parsePaste(document.getElementById('paste').value);
+      var note = document.getElementById('pasteNote');
+      if (!parsed.length) {
+        note.textContent = 'Nothing to read. Put each dish on its own line, with the price at the end.';
+        return;
+      }
+      book[menuId] = parsed;
+      dishId = parsed[0].id;
+      save();
+      note.textContent = parsed.length + ' dishes read. Tick Lunch club on any that belong there, then look at the sheet on the right.';
+      mode = 'change';
+      render();
+    }
+
+    var MARK = '<svg class="mark" viewBox="0 0 24 24" aria-label="Lunch club"><path fill="currentColor" d="M8 3c.6 0 1 .5 1 1.1V9h1.2V4.1c0-.6.4-1.1 1-1.1s1 .5 1 1.1V9H13V4.1c0-.6.5-1.1 1-1.1s1 .5 1 1.1V11c0 1.4-.8 2.6-2 3.2V21h-2v-6.6C9.2 13.8 8.2 12.4 8 11V4.1C8 3.5 8.4 3 9 3z" transform="rotate(-28 12 12)"/><path fill="currentColor" d="M11 3l1.2 8.2 1.6-.2L12.2 3zM10.2 11.2h3.2l.4 1.4c.2.8-.2 1.6-1 1.8l-.2.1V21h-1.6v-6.4l-.3-.1c-.8-.3-1.2-1.1-.9-1.9z" transform="rotate(32 12 12)"/></svg>';
+
+    function renderPreview() {
+      var list = dishes();
+      var plan = EBMenus.sheetPlan(menuId, list.length);
+      var ticks = EBMenus.lunchClubFromTicks(book);
+      var el = document.getElementById('preview');
+      var html = '<div class="plan ' + plan.fit + '"><strong>' + planTitle(plan.fit) + '</strong>' + plan.text + '</div>';
+      if (menuId === 'lunch-club') {
+        html += '<p class="note">Printed as its own card, two copies on one A4. Monday, Tuesday, Wednesday, Thursday.</p>';
+      } else if (ticks.length) {
+        html += '<p class="note">' + ticks.length + ' dish' + (ticks.length === 1 ? '' : 'es') + ' ticked for the lunch club. They keep the knife and fork on this menu, and they can also be gathered onto the lunch club card.</p>';
+      } else {
+        html += '<p class="note">No lunch club ticks. The lunch club stays a separate menu. Open Lunch club to change that card.</p>';
+      }
+      var section = '';
+      html += '<ul class="dishes">';
+      list.forEach(function (d) {
+        if (d.section !== section) {
+          section = d.section;
+          html += '<li class="section">' + section + '</li>';
+        }
+        html += '<li><div class="name">' + (d.lunchClub && menuId !== 'lunch-club' ? MARK : '') + escapeAttr(d.name);
+        if (menuId !== 'lunch-club' && d.price) html += ' <span style="font-weight:500">' + escapeAttr(d.price) + '</span>';
+        html += '</div>';
+        if (d.description) html += '<div>' + escapeAttr(d.description) + '</div>';
+        if (d.tags) html += '<div class="tag">' + escapeAttr(d.tags) + '</div>';
+        html += '</li>';
+      });
+      html += '</ul>';
+      el.innerHTML = html;
+    }
+    function planTitle(fit) {
+      if (fit === 'two-up') return 'One sheet, two copies';
+      if (fit === 'one') return 'One A4 page';
+      if (fit === 'two') return 'Two A4 pages';
+      return 'Too full';
+    }
+
+    dishId = (dishes()[0] && dishes()[0].id) || '';
+    render();
+  </script>
+</body>
+</html>

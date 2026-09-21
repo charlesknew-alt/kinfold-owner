@@ -267,6 +267,7 @@
       box-shadow:0 8px 24px rgba(28,22,16,0.18);
     }
     .rooms-fab.show{display:flex;}
+    .menus-fab{ left: 20px; right: auto; }
 
     @media (max-width: 640px) {
       .pub-grid, .pw-grid { grid-template-columns: 1fr; gap: 16px; }
@@ -389,6 +390,11 @@
             <span class="link-label">Card Takings<small>First & last sale, by machine</small></span>
             <span class="link-arrow">›</span>
           </a>
+          <a class="pub-link menus" href="#" onclick="openApp('menus-eightbells','Eight Bells');return false;">
+            <span class="link-icon">🍽️</span>
+            <span class="link-label">Menus<small>Change a dish, paste a list, lunch club tick</small></span>
+            <span class="link-arrow">›</span>
+          </a>
           <a class="pub-link payroll" href="#" onclick="openApp('payroll','Eight Bells');return false;">
             <span class="link-icon">💷</span>
             <span class="link-label">Payroll → Wise<small>BACS to Wise CSV for pay runs</small></span>
@@ -487,6 +493,7 @@
   </div>
 
   <button type="button" class="rooms-fab" id="roomsFab" onclick="openApp('rooms-windmill','Windmill Inn')">🛏️ Rooms</button>
+  <button type="button" class="rooms-fab menus-fab" id="menusFab" onclick="openApp('menus-eightbells','Eight Bells')">🍽️ Menus</button>
 
   <script>
     // Owner PIN is a last-resort fallback if the auth web app is unreachable.
@@ -511,6 +518,7 @@
       'cardtakings-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=cardday&shell=owner',
       // Standalone Teya CSV reader (browser-only). Does not feed paperwork.
       'cardtakings-windmill': 'card-takings.html?venue=windmill',
+      'menus-eightbells': 'menus.html',
       'rooms-windmill': 'https://rooms.windmilllittleworth.com',
       'payroll': 'https://owner.kinfoldinns.co.uk/payroll.html?v=20260901-xero-pull-timeout',
       'staffhub': 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec'
@@ -522,6 +530,7 @@
       'cardtakings-eightbells': '💳 Card Takings',
       'cardtakings-windmill': '💳 Card Takings',
       'rooms-windmill': '🛏️ Rooms',
+      'menus-eightbells': '🍽️ Menus',
       'payroll': '💷 Payroll → Wise',
       'staffhub': '👥 Staff Hub'
     };
@@ -555,6 +564,7 @@
       document.getElementById('appView').classList.remove('active');
       document.getElementById('managerView').classList.remove('active');
       document.getElementById('roomsFab').classList.remove('show');
+      document.getElementById('menusFab').classList.remove('show');
       document.getElementById('pw').focus();
     }
 
@@ -565,6 +575,7 @@
       document.getElementById('appView').classList.remove('active');
       document.getElementById('managerView').classList.remove('active');
       document.getElementById('roomsFab').classList.remove('show');
+      document.getElementById('menusFab').classList.remove('show');
       refreshPasswordStatus();
     }
 
@@ -577,6 +588,7 @@
       document.getElementById('managerTitle').textContent = role === 'windmill' ? 'Windmill manager' : 'Eight Bells manager';
       document.getElementById('managerPub').textContent = role === 'windmill' ? 'Littleworth' : 'Bolney';
       document.getElementById('roomsFab').classList.toggle('show', role === 'windmill');
+      document.getElementById('menusFab').classList.toggle('show', role === 'eightbells');
       loadManagerHub(role);
     }
 
@@ -858,8 +870,10 @@
 
     function openApp(system, pubName) {
       if (sessionRole && sessionRole !== 'owner') {
-        // Managers may open Rooms (Windmill). Do not send shell=owner.
-        if (system !== 'rooms-windmill') return;
+        // Managers may open Rooms (Windmill) or Menus (Eight Bells). Do not send shell=owner.
+        if (system === 'rooms-windmill' && sessionRole !== 'windmill') return;
+        if (system === 'menus-eightbells' && sessionRole !== 'eightbells') return;
+        if (system !== 'rooms-windmill' && system !== 'menus-eightbells') return;
       }
       var url = URLS[system];
       if (!url) return;
@@ -880,6 +894,8 @@
       document.getElementById('landing').style.display = 'none';
       document.getElementById('managerView').classList.remove('active');
       document.getElementById('appView').classList.add('active');
+      document.getElementById('roomsFab').classList.remove('show');
+      document.getElementById('menusFab').classList.remove('show');
       history.pushState({ view: 'app', system: system, pub: pubName, url: url }, '', '#' + system);
     }
 
@@ -891,6 +907,7 @@
       if (sessionRole === 'windmill' || sessionRole === 'eightbells') {
         document.getElementById('managerView').classList.add('active');
         document.getElementById('roomsFab').classList.toggle('show', sessionRole === 'windmill');
+        document.getElementById('menusFab').classList.toggle('show', sessionRole === 'eightbells');
         history.pushState({ view: 'manager', role: sessionRole }, '', '#' + sessionRole);
         return;
       }

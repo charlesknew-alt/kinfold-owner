@@ -61,6 +61,10 @@ Venue `doGet` remains `PubSystemLib.routePage(VENUE_CONFIG, e)`. Do not put an o
 
 Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with columns like Payment type, Date, Time, Store, Source/context, Device name, Device ID, Status, Amount/Sales. Drop the CSV in; you get first/last sale and totals by machine. Nothing is uploaded or written to paperwork.
 
+### Eight Bells Menus
+
+Owner tile **Menus**, and the Menus button on the Eight Bells manager sign-in, open `menus.html`. Staff change one dish, add one, or paste a list. A lunch club tick marks that dish for Monday to Thursday. With no ticks, the lunch club stays its own menu. This page does not replace the PDFs on eightbellsbolney.com.
+
 ## Varlo Auth Apps Script
 
 Standalone project in `apps-script/varlo-auth/`. JSONP `doGet` actions: `ping`, `login`, `set`, `status`. It is **not** a venue page router.
