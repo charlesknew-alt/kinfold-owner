@@ -67,7 +67,7 @@ Owner tile **Menus**, and the Menus button on the Eight Bells manager sign-in, o
 
 - **Show complete menu** — tick lunch club, gf, v, vg (and “as option”) on each dish.
 - On Main or Sunday, tick **Also put on this sheet** (Sandwiches, Desserts, Little Bells) to see if they still fit.
-- **Generate menu** opens a print sheet; use the browser Print dialog to save a PDF.
+- **Generate menu** opens a branded print sheet (logo, wavy frames, green marks); use the browser Print dialog to save a PDF.
 - Paste a list from ChatGPT or Canva, or change one dish.
 
 The locked wavy-box PDFs on eightbellsbolney.com are not updated from this page yet.
