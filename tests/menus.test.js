@@ -68,8 +68,8 @@ assert(api.formatMarks(api.parseMarks('v with gf option')) === 'v with gf option
 assert(api.formatMarks(api.parseMarks('vg')) === 'vg', 'vg round-trips');
 assert(api.formatMarks({ gf: true, vgOpt: true, v: false, vg: false, gfOpt: false, vOpt: false }) === 'gf with vg option', 'gf with vg option formats');
 
-assert(printJs.indexOf('planFluidLayout') !== -1, 'fluid layout planner exists');
-assert(printJs.indexOf('fillers') !== -1, 'auto fillers when space');
+assert(printJs.indexOf('border-image') !== -1, 'scallops use border-image (no stretch through text)');
+assert(printJs.indexOf('background-size:100% 100%') === -1, 'no stretched full-bleed frame fill');
 assert(print.planFluidLayout, 'planFluidLayout exported');
 
 var book = api.seed();

@@ -84,7 +84,12 @@
   }
 
   function lunchMark() {
-    return '<img class="lc" src="' + esc(asset('lunch-club-mark.png')) + '" alt="">';
+    return (
+      '<svg class="lc" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path fill="' + GREEN + '" d="M7.2 4.2h1.4v6.2H7.2zm2.6 0h1.4v6.2h-1.4zm2.6 0h1.4v6.2h-1.4zM8.4 11.2h5.2c.4 1.2-.2 2.4-1.4 2.9V20H9.8v-5.9c-1-.5-1.6-1.6-1.4-2.9z" transform="rotate(-32 12 12)"/>' +
+        '<path fill="' + GREEN + '" d="M11 3.5l1.1 8.4 1.5-.2L12.6 3.5zM10.4 12h3l.4 1.3c.2.7-.2 1.4-.9 1.6V20h-1.5v-5.1c-.7-.3-1.1-1-.9-1.7z" transform="rotate(34 12 12)"/>' +
+      '</svg>'
+    );
   }
 
   function allergy() {
@@ -141,7 +146,8 @@
   }
 
   function scallop(inner, kind) {
-    // kind: 'wide' | 'box' (selling / sandwiches)
+    // Real Canva/print frames via border-image so waves sit in the border
+    // gutter and never cut through dish text (unlike stretched SVG/PNG fill).
     var cls = kind === 'box' ? 'scallop scallop-box' : 'scallop scallop-wide';
     return '<div class="' + cls + '"><div class="scallop-pad">' + inner + '</div></div>';
   }
@@ -383,8 +389,11 @@
       var p2used = back + COST.bottomCols;
       if (layout.p2.sidesOnP2 && bag.sides) { /* already in back */ }
       var p2left = PAGE - p2used;
+      // Desserts + a full mains list leave little room — be stricter about fillers
+      var tightBack = !!(bag.desserts && bag.mains && bag.mains.dishes.length >= 6);
       if (wantSandwichNote && !layout.p1.sandwiches) {
-        var addSx = tryAdd(p2left, COST.sandwiches);
+        var sandCost = tightBack ? COST.sandwiches + 2 : COST.sandwiches;
+        var addSx = tryAdd(p2left, sandCost);
         if (addSx.ok) {
           layout.p2.sandwiches = true;
           p2left = addSx.left;
@@ -392,14 +401,14 @@
         }
       }
       if (!layout.p1.rooms) {
-        var addRooms2 = tryAdd(p2left, COST.rooms);
+        var addRooms2 = tryAdd(p2left, COST.rooms + (tightBack ? 3 : 0));
         if (addRooms2.ok) {
           layout.p2.rooms = true;
           p2left = addRooms2.left;
           layout.fillers.push('Stay a While / Gatherings (page 2)');
         }
       }
-      if (bag.hasLunch) {
+      if (bag.hasLunch && !tightBack) {
         var addL = tryAdd(p2left, COST.lunchClub);
         if (addL.ok) {
           layout.p2.lunchClub = true;
@@ -407,7 +416,8 @@
           layout.fillers.push('Lunch club note (page 2)');
         }
       }
-      var addLogo = tryAdd(p2left, COST.footLogo);
+      var logoCost = tightBack ? COST.footLogo + 4 : COST.footLogo;
+      var addLogo = tryAdd(p2left, logoCost);
       if (addLogo.ok) {
         layout.p2.footLogo = true;
         p2left = addLogo.left;
@@ -601,6 +611,8 @@
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
       '.page{width:210mm;min-height:297mm;padding:10mm 14mm 12mm;position:relative;display:flex;flex-direction:column}' +
+      '.page{page-break-inside:auto}' +
+      '.scallop,.sec,.cols,.foot-logo,.lunch-box{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;min-height:210mm}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
@@ -619,11 +631,13 @@
       '.scallop .sec-title{text-align:left;font-size:12px;letter-spacing:.14em;margin-bottom:6px}' +
       '.sec-title.soft{font-size:11px;letter-spacing:.1em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:10px}' +
-      '.scallop{margin:0 0 12px;background-color:#fff;background-repeat:no-repeat;background-position:center;background-size:100% 100%}' +
-      '.scallop-wide{background-image:url("' + asset('frame-wide.png') + '")}' +
-      '.scallop-box{background-image:url("' + asset('frame-box.png') + '")}' +
-      '.scallop-pad{padding:14px 18px 12px}' +
-      '.scallop-box .scallop-pad{padding:12px 14px 10px}' +
+      '.scallop{margin:0 0 12px;background:#fff;' +
+        'border-style:solid;border-color:transparent;border-width:16px;' +
+        'border-image-slice:42 fill;border-image-repeat:stretch;border-image-width:16px}' +
+      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '")}' +
+      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:38 fill}' +
+      '.scallop-pad{padding:6px 10px 4px}' +
+      '.scallop-box .scallop-pad{padding:4px 8px 2px}' +
       '.dish{margin:0 0 8px}' +
       '.dish-line{display:flex;justify-content:space-between;gap:10px;align-items:baseline}' +
       '.dish-name{font-weight:700;font-size:11.5px}' +
@@ -640,8 +654,8 @@
       '.promo-title{font-family:var(--serif);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:4px 0 2px}' +
       '.promo p{font-size:10.5px;font-weight:300;margin:0 0 8px;line-height:1.35}' +
       '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11px}' +
-      '.lunch-box .lc{width:22px;height:22px}' +
-      '.lc{width:13px;height:13px;vertical-align:-2px;margin-right:3px}' +
+      '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
+      '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
       '.note-line{font-size:10px;font-weight:600;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:8.5px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:17px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
