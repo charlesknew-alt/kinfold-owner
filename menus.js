@@ -46,11 +46,32 @@
       main: [
         dish('Nibbles', 'Bread and Salted Butter', '', '5.95', ''),
         dish('Nibbles', 'Marinated Olives', '', '6.95', 'vg'),
+        dish('Nibbles', 'Cheese, Chilli & Chorizo Melts', '', '7.25', ''),
+        dish('Nibbles', 'Noodle Bites', 'sriracha sauce', '6.95', 'vg'),
+        dish('Nibbles', 'Scorched Padron Peppers', 'smoked maldon salt', '6.95', 'vg & gf'),
+        dish('Nibbles', 'Breaded Whitebait', 'garlic aioli', '7.95', ''),
         dish('Starters', 'Beef Ragu Arancini', 'tomato, red onion salsa, manchego cheese', '8.25', 'gf with vg option', true),
         dish('Starters', 'Game Terrine', 'warm crusty bread, cornichons, red onion jam', '8.50', 'gf option'),
+        dish('Starters', 'Salt Cod Cake & Smoked Salmon', 'micro salad, lemon oil', '9.95', 'gf'),
+        dish('Starters', 'Quinoa Falafel', 'avocado, tahini dressing, lemon dressed tomato rocket salad', '8.25 / 14.95', 'vg & gf', true),
         dish('Starters', 'Nduja King Prawn Bruschetta', 'tomato salsa, toasted ciabatta', '8.95', 'gf option', true),
+        dish('Starters', 'Baked Camembert (to share)', 'ciabatta, red onion jam', '15.95', 'gf'),
+        dish('Pub classics & Burgers', 'Haddock & Chips', 'battered, garden peas, tartare sauce', '17.95', 'gf option'),
+        dish('Pub classics & Burgers', 'Pie of the Day', 'mash, seasonal veg, gravy', '17.95', ''),
+        dish('Pub classics & Burgers', 'Trenchmore Wagyu Beef Burger', 'seeded brioche bun, streaky bacon, monterey jack, onion rings, fries, salad', '20.95', 'gf option'),
+        dish('Pub classics & Burgers', 'Spicy Asian Burger', 'seeded brioche bun, “mayo”, onion rings, fries, salad', '16.95', 'vg, gf option'),
         dish('Mains', 'Crab Linguine', 'lemon, chilli, pangrattato, vine cherry tomatoes, balsamic', '18.95', 'gf option'),
         dish('Mains', 'Venison Casserole', 'cheese and herb dumpling, purple sprouting broccoli', '18.95', 'gf option'),
+        dish('Mains', 'Smoked Haddock, Cod & Salmon Fish Pie', 'buttered kale, ciabatta', '19.95', ''),
+        dish('Mains', 'Chilli Braised Lamb', 'harissa giant cous-cous, yogurt, toasted almonds', '20.95', ''),
+        dish('Mains', 'Calves Liver & Smokey Streaked Bacon', 'buttered mash, savoy cabbage, red onion gravy', '17.95', 'gf'),
+        dish('Mains', 'Pan Fried Hake Fillet', 'herb crushed new potatoes, buttered kale, mussel and crayfish chowder', '25.95', 'gf'),
+        dish('Mains', '10oz Sirloin Steak', 'grilled tomato, chestnut mushroom fricassée, fries, peppercorn sauce', '29.95', 'gf'),
+        dish('Mains', 'Beef Sirloin Stroganoff', 'seared beef strips, creamy sauce, rice', '18.95', 'vg option'),
+        dish('Mains', 'Honey & Mustard Glazed Cannon of Pork', 'duchess potato, creamy pancetta savoy cabbage', '21.95', 'gf'),
+        dish('Sides', 'Seasonal Veg', '', '4.95', 'gf'),
+        dish('Sides', 'Dressed Mixed Salad', '', '5.95', 'gf'),
+        dish('Sides', 'Truffle & Parmesan Fries', '', '6.95', ''),
         dish('Sides', 'Skinny Fries/Chunky Chips', 'add cheese +£1', '4.50', 'gf')
       ],
       sunday: [
@@ -174,8 +195,9 @@
         text: 'Two identical copies on one A4, cut down the middle.'
       };
     }
-    if (count <= 16) return { fit: 'one', text: 'Fits on one A4 page.' };
-    if (count <= 34) return { fit: 'two', text: 'Runs to two A4 pages. The type stays the same size.' };
+    // Long menus: coarse gate — fluid layout (with fillers) runs at Generate.
+    if (count <= 16) return { fit: 'one', text: 'Looks like one A4. Generate places columns and any selling boxes that fit.' };
+    if (count <= 36) return { fit: 'two', text: 'Looks like two A4 pages. Generate keeps type the same size and only adds rooms/sandwiches/logo if they fit.' };
     return {
       fit: 'over',
       text: 'Too full for two pages. Take dishes off. A promo does not open another page.'
@@ -231,7 +253,18 @@
     if (extras.length) {
       plan.text += ' Includes ' + extras.join(', ') + ' (' + list.length + ' dishes in total).';
     } else {
-      plan.text += ' ' + list.length + ' dishes.';
+      plan.text += ' ' + list.length + ' dishes selected.';
+    }
+    // Refine with the print layout brain when available (same rules as Generate).
+    if (typeof root.EBMenuPrint !== 'undefined' && root.EBMenuPrint.planFluidLayout) {
+      var menu = menuById(hostId);
+      if (menu.kind === 'long') {
+        var layout = root.EBMenuPrint.planFluidLayout(menu, list);
+        plan.fit = layout.fit;
+        plan.text = layout.summary;
+        if (extras.length) plan.text += ' Includes ' + extras.join(', ') + '.';
+        plan.layout = layout;
+      }
     }
     return { plan: plan, dishes: list };
   }

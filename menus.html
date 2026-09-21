@@ -87,7 +87,7 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Show the complete menu and tick lunch club, gluten free, vegetarian or vegan on each dish. On Main or Sunday, tick other menus (for example Sandwiches) to see if they still fit on one sheet. <strong>Generate menu</strong> opens the branded sheet — logo, wavy frames, green marks — ready to print or save as PDF.</p>
+    <p class="lede">Tick what’s on, including lunch club / gf / v / vg. On Main or Sunday, tick other menus to try on the same sheet. <strong>Generate</strong> lays out only what you selected — columns flex with the dish count, and Stay a While / Gatherings / sandwiches / logo are added automatically <em>only if they fit</em> (a promo never opens another page). Each print gets <strong>Week of …</strong> and a Roman numeral (I, II…).</p>
     <div class="menus" id="menuPicker"></div>
     <div class="top-actions no-print">
       <button type="button" class="go" id="doGenerate">Generate menu</button>
@@ -427,7 +427,10 @@
       if (plan.fit === 'over') {
         html += '<p class="note">Untick an included menu, or remove dishes, before you generate.</p>';
       } else {
-        html += '<p class="note">When it looks right, press Generate menu. That opens the branded sheet (logo, wavy frames, green marks) — Print to save a PDF.</p>';
+        html += '<p class="note">Generate builds the best layout for this selection. Selling boxes (rooms, sandwiches, lunch club, logo) drop in only when there’s spare room.</p>';
+      }
+      if (plan.layout && plan.layout.fillers && plan.layout.fillers.length) {
+        html += '<p class="note"><strong>Will auto-add:</strong> ' + plan.layout.fillers.map(function (f) { return escapeAttr(f); }).join(' · ') + '</p>';
       }
       if (menuId === 'lunch-club') {
         html += '<p class="note">Printed as its own card. Monday to Thursday.</p>';
