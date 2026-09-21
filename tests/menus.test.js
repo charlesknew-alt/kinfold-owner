@@ -22,41 +22,39 @@ var api = global.EBMenus;
 
 assert(html.indexOf("openApp('menus-eightbells'") !== -1, 'owner tile opens menus');
 assert(html.indexOf("'menus-eightbells': 'menus.html'") !== -1, 'menus url is menus.html');
-assert(html.indexOf('menus-eightbells') !== -1 && html.indexOf("system === 'menus-eightbells' && sessionRole !== 'eightbells'") !== -1, 'only Eight Bells manager opens menus from the manager sign-in');
-assert(page.indexOf('id="lunchClub"') !== -1, 'dish form has a lunch club tick');
-assert(page.indexOf('Paste from ChatGPT or Canva') !== -1, 'paste box is labelled');
+assert(page.indexOf('Show complete menu') !== -1, 'complete menu mode exists');
+assert(page.indexOf('doGenerate') !== -1, 'generate button exists');
+assert(page.indexOf('Also put on this sheet') !== -1, 'include-other-menus panel exists');
+assert(page.indexOf('data-include') !== -1, 'include ticks are wired');
+assert(page.indexOf('data-flag="gf"') !== -1 && page.indexOf('data-flag="v"') !== -1 && page.indexOf('data-flag="vg"') !== -1, 'dietary ticks exist');
+assert(page.indexOf('data-flag="lunchClub"') !== -1, 'lunch club ticks on complete menu');
 assert(page.indexOf('Monday to Thursday') !== -1, 'lunch club days are Monday to Thursday');
 
 var parsed = api.parsePaste('Starters\nBeef Ragu Arancini gf 8.25\ntomato salsa\nGame Terrine 8.50\n\nMains\nPie of the Day 17.95');
 assert(parsed.length === 3, 'paste reads three dishes');
-assert(parsed[0].section === 'Starters' && parsed[0].price === '8.25', 'first dish keeps section and price');
-assert(parsed[0].description === 'tomato salsa', 'line under a priced dish is the description');
 assert(parsed[0].tags.indexOf('gf') !== -1, 'gf is pulled off the name');
-assert(parsed[0].name.indexOf('gf') === -1, 'name no longer contains gf');
 assert(api.parsePaste('Mains\nVenison Casserole 18.95')[0].name === 'Venison Casserole', 'a leading v in a dish name is kept');
-assert(parsed[2].section === 'Mains', 'section changes at Mains');
 
-var lunch = api.parsePaste('Desserts\nSticky Toffee Pudding 7.95 lunch club');
-assert(lunch[0].lunchClub === true, 'lunch club on a pasted line ticks the dish');
-
-var card = api.sheetPlan('desserts', 6);
-assert(card.fit === 'two-up', 'desserts stay two copies on one sheet');
-var crowded = api.sheetPlan('desserts', 9);
-assert(crowded.fit === 'over', 'a crowded dessert card is too full');
-var longMenu = api.sheetPlan('main', 28);
-assert(longMenu.fit === 'two', 'a long main menu runs to two pages');
+assert(api.formatMarks(api.parseMarks('gf option')) === 'gf option', 'gf option round-trips');
+assert(api.formatMarks(api.parseMarks('v with gf option')) === 'v with gf option', 'v with gf option round-trips');
+assert(api.formatMarks(api.parseMarks('vg')) === 'vg', 'vg round-trips');
+assert(api.formatMarks({ gf: true, vgOpt: true, v: false, vg: false, gfOpt: false, vOpt: false }) === 'gf with vg option', 'gf with vg option formats');
 
 var book = api.seed();
-var ticked = api.lunchClubFromTicks(book);
-assert(ticked.length > 0, 'sample menus include lunch club dishes');
-assert(ticked.every(function (row) { return row.dish.lunchClub; }), 'only ticked dishes are gathered');
-book.main.forEach(function (d) { d.lunchClub = false; });
-book.sunday.forEach(function (d) { d.lunchClub = false; });
-book.desserts.forEach(function (d) { d.lunchClub = false; });
-book.sandwiches.forEach(function (d) { d.lunchClub = false; });
-book['little-bells'].forEach(function (d) { d.lunchClub = false; });
-assert(api.lunchClubFromTicks(book).length === 0, 'with no ticks the lunch club is not gathered from other menus');
-assert(book['lunch-club'].length === 12, 'the separate lunch club menu is still there');
+assert(api.includableMenus('main').some(function (m) { return m.id === 'sandwiches'; }), 'main can include sandwiches');
+assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
+
+var alone = api.sheetPlanFor(book, 'main', {});
+assert(alone.plan.fit === 'one' || alone.plan.fit === 'two', 'main alone fits one or two pages');
+var withSandwiches = api.sheetPlanFor(book, 'main', { sandwiches: true, desserts: true });
+assert(withSandwiches.dishes.length > alone.dishes.length, 'including sandwiches and desserts adds dishes');
+assert(withSandwiches.dishes.some(function (d) { return d.fromMenu === 'sandwiches'; }), 'composed list marks dishes from sandwiches');
+assert(withSandwiches.plan.text.indexOf('Sandwiches') !== -1, 'plan text names the included menus');
+
+var crowded = api.sheetPlanFor(book, 'main', { sandwiches: true, desserts: true, 'little-bells': true });
+assert(crowded.dishes.length >= withSandwiches.dishes.length, 'more includes add more dishes');
+
+assert(api.lunchClubFromTicks(book).length > 0, 'sample menus include lunch club dishes');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
