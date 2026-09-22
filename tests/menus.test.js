@@ -22,7 +22,11 @@ var api = global.EBMenus;
 
 assert(html.indexOf("openApp('menus-eightbells'") !== -1, 'owner tile opens menus');
 assert(html.indexOf("'menus-eightbells': 'menus.html'") !== -1, 'menus url is menus.html');
-assert(page.indexOf('Show complete menu') !== -1, 'complete menu mode exists');
+assert(page.indexOf('Arranging your menu') !== -1, 'generate shows arranging step');
+assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order');
+assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
+assert(page.indexOf('Adjust a dish') !== -1 && page.indexOf('Replace a dish') !== -1, 'adjust and replace modes');
+assert(page.indexOf('Add a dish') !== -1, 'add a dish mode');
 assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
@@ -80,6 +84,20 @@ assert(fluid.pages === 1 || fluid.pages === 2, 'fluid picks one or two pages');
 assert(fluid.fit === 'one' || fluid.fit === 'two', 'fluid fit is printable');
 assert(fluid.p1.rooms || (fluid.p2 && fluid.p2.rooms) || fluid.fillers.length >= 0, 'rooms considered');
 assert(fluid.summary.indexOf('Layout picks') !== -1 || fluid.summary.indexOf('Auto-adds') !== -1 || fluid.summary.indexOf('A4') !== -1, 'layout explains itself');
+
+var shuffled = [
+  api.dish('Mains', 'Pie', 'mash', '14.95', ''),
+  api.dish('Nibbles', 'Olives', '', '6.95', 'vg'),
+  api.dish('Pub classics & Burgers', 'Spicy Asian Burger', 'fries', '16.95', 'vg'),
+  api.dish('Starters', 'Soup', 'bread', '6.50', ''),
+  api.dish('Pub classics & Burgers', 'Haddock & Chips', 'peas', '17.95', '')
+];
+var ordered = print.orderDishesForPrint(shuffled);
+assert(ordered[0].section === 'Nibbles', 'orders nibbles first');
+assert(ordered[1].section === 'Starters', 'then starters');
+assert(ordered[2].name === 'Haddock & Chips', 'classics: non-burger before burger');
+assert(ordered[3].name === 'Spicy Asian Burger', 'classics: burger after');
+assert(ordered[4].section === 'Mains', 'mains after classics');
 
 // Sparse menu → one page + fillers should appear
 var sparse = [

@@ -223,6 +223,48 @@
     return /starter/i.test(name || '');
   }
 
+  /** Canonical print order — layout brain reorders whatever staff pasted. */
+  var SECTION_RANK = [
+    { test: isNibbles, rank: 10 },
+    { test: isStarters, rank: 20 },
+    { test: isClassics, rank: 30 },
+    { test: isMains, rank: 40 },
+    { test: isSides, rank: 50 },
+    { test: isSauce, rank: 55 },
+    { test: isSandwich, rank: 60 },
+    { test: isDessert, rank: 70 }
+  ];
+
+  function sectionRank(name) {
+    for (var i = 0; i < SECTION_RANK.length; i++) {
+      if (SECTION_RANK[i].test(name)) return SECTION_RANK[i].rank;
+    }
+    return 35; // unknown sections sit after classics, before sides
+  }
+
+  function isBurgerDish(d) {
+    return /burger/i.test((d && d.name) || '');
+  }
+
+  function orderDishesForPrint(dishes) {
+    var list = (dishes || []).slice();
+    // Stable sort: section order, then burgers last within classics, else keep paste order
+    list.forEach(function (d, i) { d._i = i; });
+    list.sort(function (a, b) {
+      var ra = sectionRank(a.section);
+      var rb = sectionRank(b.section);
+      if (ra !== rb) return ra - rb;
+      if (isClassics(a.section) && isClassics(b.section)) {
+        var ba = isBurgerDish(a) ? 1 : 0;
+        var bb = isBurgerDish(b) ? 1 : 0;
+        if (ba !== bb) return ba - bb;
+      }
+      return a._i - b._i;
+    });
+    list.forEach(function (d) { delete d._i; });
+    return list;
+  }
+
   /* —— Fluid layout brain ——
      Sizes the selected dishes, splits pages only when needed, and only
      drops in Stay a While / Gatherings / sandwiches / lunch-club / foot logo
@@ -288,7 +330,8 @@
    * Promo never forces an extra page.
    */
   function planFluidLayout(menu, dishes) {
-    var bag = pickSections(dishes || []);
+    dishes = orderDishesForPrint(dishes || []);
+    var bag = pickSections(dishes);
     var chrome = COST.tracker + COST.allergy + COST.logoTop;
     var front = chrome;
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
@@ -438,8 +481,9 @@
       (layout.fit === 'one' ? 'Fits on one A4.' :
         layout.fit === 'two' ? 'Runs to two A4 pages. Type stays the same size.' :
           'Too full for two pages. Take dishes off. A promo never opens another page.') +
-      ' Layout picks columns from ' + bag.count + ' dishes.' + bits;
+      ' Layout picks columns and dish order from ' + bag.count + ' dishes.' + bits;
 
+    layout.orderedDishes = dishes;
     return layout;
   }
 
@@ -459,9 +503,29 @@
 
   function buildLong(menu, dishes, plan, ver) {
     var layout = (plan && plan.layout) || planFluidLayout(menu, dishes);
+    dishes = layout.orderedDishes || orderDishesForPrint(dishes);
     var bag = layout.bag || pickSections(dishes);
     var p1opts = layout.p1 || {};
     var p2opts = layout.p2;
+
+    // Classics: put non-burgers left, burgers right above selling box (Nov style)
+    if (bag.classics && bag.classics.dishes.length >= 2) {
+      var nonBurgers = [];
+      var burgers = [];
+      bag.classics.dishes.forEach(function (d) {
+        if (isBurgerDish(d)) burgers.push(d);
+        else nonBurgers.push(d);
+      });
+      if (burgers.length && nonBurgers.length) {
+        bag.classics = {
+          name: bag.classics.name,
+          dishes: nonBurgers.concat(burgers)
+        };
+        p1opts.classicsSplit = burgers.length;
+      } else if (bag.classics.dishes.length >= 4) {
+        p1opts.classicsSplit = p1opts.classicsSplit || 1;
+      }
+    }
 
     var p1 = '<div class="page">';
     p1 += trackerBar(ver);
@@ -705,6 +769,7 @@
   root.EBMenuPrint = {
     build: build,
     planFluidLayout: planFluidLayout,
+    orderDishesForPrint: orderDishesForPrint,
     toRoman: toRoman,
     weekLabel: weekLabel,
     weekKey: weekKey,
