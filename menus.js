@@ -7,6 +7,7 @@
   var MENUS = [
     { id: 'main', name: 'Main menu', kind: 'long' },
     { id: 'sunday', name: 'Sunday', kind: 'long' },
+    { id: 'party', name: 'Party / Christmas', kind: 'party' },
     { id: 'sandwiches', name: 'Sandwiches', kind: 'card', comfortable: 10 },
     { id: 'desserts', name: 'Desserts', kind: 'card', comfortable: 7 },
     { id: 'little-bells', name: 'Little Bells', kind: 'card', comfortable: 6 },
@@ -24,6 +25,11 @@
     'pub classics & burgers': 1,
     'sunday roasts': 1
   };
+
+  /** Meta for set menus (Christmas / party) — title + course prices. */
+  function emptyMeta() {
+    return { title: '', subtitle: '', coursePrices: '', notes: '' };
+  }
 
   function dish(section, name, description, price, tags, lunchClub) {
     return {
@@ -80,6 +86,20 @@
         dish('Sunday roasts', 'Pork Loin', 'crackling and apple sauce', '19.95', ''),
         dish('Mains', 'Wild Mushroom Gnocchi', 'truffle, parmesan, beer', '17.95', ''),
         dish('Desserts', 'Sticky Toffee Pudding', 'brandy snap, clotted cream ice cream, toffee sauce', '7.95', 'v', true)
+      ],
+      party: [
+        dish('Starters', 'Jerusalem Artichoke Soup', 'finished with fragrant black truffle oil', '', 'gf av'),
+        dish('Starters', 'Smoked Salmon Pâté', 'sweet beetroot ketchup, crisp pickled cucumber and toasted ciabatta', '', 'gf'),
+        dish('Starters', 'Piedamontaise Pepper', 'filled with herbed quinoa, roasted vegetables and tomato sauce', '', 'vg gf'),
+        dish('Starters', 'Pan-Fried Guinea Fowl Breast', 'celeriac remoulade, crispy pancetta and red wine jus', '', ''),
+        dish('Mains', 'Stuffed Turkey Breast', 'pigs in blankets, roast potatoes, seasonal vegetables and gravy', '', 'gf av'),
+        dish('Mains', 'Stuffed Butternut Squash', 'herbed quinoa, roasted vegetables, tomato sauce and vegan gravy', '', 'vg gf'),
+        dish('Mains', 'Braised Short Rib of Beef', 'creamy mash, glazed carrots and red wine jus', '', 'gf'),
+        dish('Mains', 'Monkfish Tail', 'wrapped in Parma ham, crushed new potatoes, samphire and beurre blanc', '', ''),
+        dish('Desserts', 'Sherry Trifle', 'layers of sherry-soaked sponge, fruit, jelly, custard and cream', '', ''),
+        dish('Desserts', 'Orange, Cranberry, Chocolate & Frangipane Tart', 'served with clotted cream', '', ''),
+        dish('Desserts', 'Christmas Pudding', 'with brandy butter or custard and redcurrants', '', 'gf av vg'),
+        dish('Desserts', 'Milk Chocolate & Caraway Mousse', 'with crumbed gingerbread and candied peel', '', 'gf av')
       ],
       sandwiches: [
         dish('Sandwiches', 'Mozzarella, Tomato & Pesto', '', '9.50', 'v'),
@@ -168,6 +188,7 @@
         i += 1;
       }
       if (!pulled.name) continue;
+      if (typeof isJunkDishName === 'function' && isJunkDishName(pulled.name)) continue;
       dishes.push({
         id: slug(section + '-' + pulled.name + '-' + dishes.length),
         section: section,
@@ -193,6 +214,15 @@
       return {
         fit: 'two-up',
         text: 'Two identical copies on one A4, cut down the middle.'
+      };
+    }
+    if (menu.kind === 'party') {
+      if (count > 18) {
+        return { fit: 'over', text: 'Party menus stay on one centred A4. Take a few dishes off.' };
+      }
+      return {
+        fit: 'one',
+        text: 'Standardised party sheet — centred title, starters / mains / desserts, one A4 (website Christmas style).'
       };
     }
     // Long menus: coarse gate — fluid layout (with fillers) runs at Generate.
@@ -336,6 +366,52 @@
     return parts.join(', ');
   }
 
+  /** Turn Gemini / AI JSON into dish rows (+ meta). */
+  function dishesFromAiMenu(menuJson) {
+    menuJson = menuJson || {};
+    var meta = emptyMeta();
+    meta.title = menuJson.title || '';
+    meta.subtitle = menuJson.subtitle || '';
+    meta.coursePrices = menuJson.coursePrices || '';
+    meta.notes = menuJson.notes || '';
+    var list = [];
+    (menuJson.dishes || []).forEach(function (d, i) {
+      var section = d.section || 'Dishes';
+      var name = String(d.name || '').trim();
+      if (!name || isJunkDishName(name)) return;
+      list.push({
+        id: slug(section + '-' + name + '-' + i),
+        section: section,
+        name: name,
+        description: d.description || '',
+        price: d.price || '',
+        tags: normalizeAiTags(d.tags || ''),
+        lunchClub: false
+      });
+    });
+    return { dishes: list, meta: meta, kind: menuJson.kind || '' };
+  }
+
+  function normalizeAiTags(t) {
+    t = String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    t = t.replace(/\bavailable\b/g, 'option').replace(/\bav\b/g, 'option');
+    t = t.replace(/\bgluten free\b/g, 'gf').replace(/\bvegetarian\b/g, 'v').replace(/\bvegan\b/g, 'vg');
+    return formatMarks(parseMarks(t));
+  }
+
+  function isJunkDishName(name) {
+    var n = String(name || '').trim();
+    if (n.length < 3) return true;
+    if (/^the eight bells$/i.test(n)) return true;
+    if (/bolney/i.test(n) && /1740|west sussex/i.test(n)) return true;
+    if (/^party menu\b/i.test(n)) return true;
+    if (/^christmas\b/i.test(n) && n.length < 20) return true;
+    if (/^[^\w]*$/.test(n)) return true;
+    if (/^[a-z]{1,2}$/i.test(n)) return true;
+    if (/please inform|allergen|gluten free\s*[–-]\s*vegetarian/i.test(n)) return true;
+    return false;
+  }
+
   root.EBMenus = {
     MENUS: MENUS,
     seed: seed,
@@ -348,7 +424,10 @@
     lunchClubFromTicks: lunchClubFromTicks,
     dish: dish,
     emptyMarks: emptyMarks,
+    emptyMeta: emptyMeta,
     parseMarks: parseMarks,
-    formatMarks: formatMarks
+    formatMarks: formatMarks,
+    dishesFromAiMenu: dishesFromAiMenu,
+    isJunkDishName: isJunkDishName
   };
 })(typeof window !== 'undefined' ? window : global);

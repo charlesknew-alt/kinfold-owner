@@ -733,36 +733,105 @@
     );
   }
 
+  function buildParty(menu, dishes, plan, ver) {
+    var meta = (plan && plan.meta) || {};
+    var title = meta.title || menu.name || 'Party Menu';
+    var prices = meta.coursePrices || '';
+    var notes = meta.notes || '';
+    var sections = groupBySection(dishes);
+    var order = ['Starters', 'Mains', 'Desserts'];
+    var byName = {};
+    sections.forEach(function (s) { byName[s.name.toLowerCase()] = s; });
+
+    var html = '<div class="page party-page">';
+    html += trackerBar(ver);
+    html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
+    html += '<h1 class="party-title">' + esc(title) + '</h1>';
+    if (prices) html += '<div class="party-prices">' + esc(prices) + '</div>';
+
+    order.forEach(function (want) {
+      var s = byName[want.toLowerCase()];
+      if (!s) return;
+      html += '<section class="party-sec">';
+      html += '<div class="sec-title">' + esc(s.name) + '</div>';
+      s.dishes.forEach(function (d) {
+        html += '<div class="dish dish-c party-dish">';
+        html += '<div class="dish-name">' + esc(d.name);
+        if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
+        html += '</div>';
+        if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
+        html += '</div>';
+      });
+      html += '</section>';
+    });
+    // any other sections
+    sections.forEach(function (s) {
+      if (order.indexOf(s.name) !== -1) return;
+      if (/starter|main|dessert/i.test(s.name)) return;
+      html += '<section class="party-sec"><div class="sec-title">' + esc(s.name) + '</div>';
+      s.dishes.forEach(function (d) {
+        html += dishCentered(d, { hidePrice: true });
+      });
+      html += '</section>';
+    });
+
+    if (notes) html += '<div class="party-notes">' + esc(notes) + '</div>';
+    html += allergy();
+    html += '</div>';
+    return html;
+  }
+
   function build(menu, dishes, plan) {
     var ver = nextPrintVersion(menu.id);
     var landscape = menu.kind === 'card';
     var layout = null;
-    if (!landscape) {
+    plan = plan || {};
+    if (menu.kind === 'long') {
       layout = planFluidLayout(menu, dishes);
-      plan = plan || {};
       plan.layout = layout;
       plan.fit = layout.fit;
       plan.text = layout.summary;
     }
-    var body = landscape
-      ? buildCard(menu, dishes, plan, ver)
-      : '<div class="sheet-stack">' + buildLong(menu, dishes, plan, ver) + '</div>';
+    var body;
+    if (landscape) {
+      body = buildCard(menu, dishes, plan, ver);
+    } else if (menu.kind === 'party') {
+      body = '<div class="sheet-stack">' + buildParty(menu, dishes, plan, ver) + '</div>';
+    } else {
+      body = '<div class="sheet-stack">' + buildLong(menu, dishes, plan, ver) + '</div>';
+    }
 
     var fillerHint = layout && layout.fillers && layout.fillers.length
       ? ' Auto: ' + layout.fillers.join(' · ') + '.'
-      : '';
+      : (menu.kind === 'party' ? ' Standardised party layout (website Christmas style).' : '');
 
     return (
       '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(menu.name) + ' — ' + esc(ver.roman) + '</title>' +
-      '<style>' + css(landscape) + '</style></head><body>' +
+      '<style>' + css(landscape) + partyCss() + '</style></head><body>' +
       '<div class="toolbar">' +
         '<button onclick="window.print()">Print / save as PDF</button>' +
         '<span class="hint">' + esc(ver.week) + ' · print ' + esc(ver.roman) +
-        ' — fluid layout for what’s selected; selling boxes only if they fit.' +
+        ' — ' + (menu.kind === 'party'
+          ? 'centred party sheet for staff check before sharing.'
+          : 'fluid layout for what’s selected; selling boxes only if they fit.') +
         esc(fillerHint) + '</span>' +
       '</div>' +
       body +
       '</body></html>'
+    );
+  }
+
+  function partyCss() {
+    return (
+      '.party-page{text-align:center;padding-top:8mm}' +
+      '.party-logo{width:72px;margin:0 auto 8px;display:block}' +
+      '.party-title{font-family:var(--serif);font-size:22px;letter-spacing:.12em;margin:4px 0 6px;font-weight:700}' +
+      '.party-prices{font-weight:700;font-size:13px;margin:0 0 16px;letter-spacing:.04em}' +
+      '.party-sec{margin:0 0 14px}' +
+      '.party-sec .sec-title{margin-bottom:10px}' +
+      '.party-dish{margin:0 0 10px;padding:0 18mm}' +
+      '.party-dish .desc{padding-right:0;font-style:normal;color:#444}' +
+      '.party-notes{font-size:10px;color:#5a534a;margin:18px 14mm 8px;line-height:1.4}'
     );
   }
 
