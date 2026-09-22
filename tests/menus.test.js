@@ -25,6 +25,9 @@ assert(html.indexOf("'menus-eightbells': 'menus.html") !== -1, 'menus url is men
 assert(page.indexOf('Arranging your menu') !== -1, 'generate shows arranging step');
 assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order');
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
+assert(page.indexOf('flow-rail') !== -1 && page.indexOf('data-flow-step') !== -1, 'flow route step rail');
+assert(page.indexOf('Blocks') !== -1 && page.indexOf('section-block') !== -1, 'section blocks in flow');
+assert(page.indexOf('flowStep') !== -1 || page.indexOf('flow-step') !== -1, 'flow steps present');
 assert(page.indexOf('option value="adjust"') !== -1 && page.indexOf('option value="replace"') !== -1, 'adjust and replace modes');
 assert(page.indexOf('Add a dish') !== -1, 'add a dish mode');
 assert(page.indexOf('Upload / paste') !== -1, 'upload / paste mode');

@@ -25,7 +25,7 @@
     main { max-width: 720px; margin: 0 auto; padding: 16px 16px 120px; }
     h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 5vw, 34px); }
     .lede { color: var(--ink-soft); margin: 6px 0 16px; font-size: 14.5px; max-width: 40em; }
-    .menus { display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 18px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+    .menus { display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
     .menus button, button.go, button.ghost, button.soft {
       font-family: var(--sans); cursor: pointer; border-radius: 999px; border: 1px solid var(--line);
       background: #fff; color: var(--ink); padding: 10px 14px; font-weight: 600; font-size: 13px; white-space: nowrap;
@@ -34,14 +34,66 @@
     button.go { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     button.soft { background: var(--paint-wash); border-color: transparent; }
     button.link { background: transparent; border: 0; color: var(--ink-soft); text-decoration: underline; padding: 0; font-weight: 600; cursor: pointer; font-family: var(--sans); font-size: 13px; }
+
+    /* —— Flow route (Varlo / payroll style) —— */
+    .flow-rail {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px;
+      margin: 0 0 16px; padding: 10px 12px; background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    }
+    .flow-pill {
+      display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent;
+      font: 600 13px var(--sans); color: var(--ink-soft); padding: 6px 8px; border-radius: 999px; cursor: pointer;
+    }
+    .flow-pill .num {
+      width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+      background: var(--paint-wash); color: var(--ink); font-size: 12px; font-weight: 700;
+    }
+    .flow-pill.on { color: var(--ink); background: var(--paint-wash); }
+    .flow-pill.on .num { background: var(--ink); color: var(--paint); }
+    .flow-pill.done .num { background: var(--green); color: #fff; }
+    .flow-arrow { color: var(--ink-soft); opacity: .45; font-size: 12px; padding: 0 2px; }
+
     .flow-step {
-      background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px 16px 20px; margin-bottom: 14px;
+      background: #fff; border: 1px solid var(--line); border-radius: 16px; margin-bottom: 12px; overflow: hidden;
     }
-    .step-kicker {
-      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; margin-bottom: 6px;
+    .flow-step.is-collapsed { cursor: pointer; }
+    .flow-step.is-collapsed:hover { border-color: var(--paint-deep); }
+    .flow-step-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer;
+      font-family: var(--sans); color: var(--ink);
     }
-    .flow-step h2 { font-family: var(--serif); font-weight: 500; font-size: 24px; margin-bottom: 4px; }
+    .flow-step-head .kicker {
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; margin-bottom: 4px;
+    }
+    .flow-step-head h2 { font-family: var(--serif); font-weight: 500; font-size: 22px; margin: 0; }
+    .flow-step-head .summary { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+    .flow-step-head .chev { font-size: 18px; color: var(--ink-soft); line-height: 1; padding-top: 4px; }
+    .flow-step.is-open .flow-step-head { border-bottom: 1px solid var(--line); background: var(--paint-wash); }
+    .flow-step-body { display: none; padding: 16px; }
+    .flow-step.is-open .flow-step-body { display: block; }
     .flow-step .step-lede { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 14px; }
+    .flow-nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+    .section-block {
+      border: 1px solid var(--line); border-radius: 14px; margin: 0 0 12px; background: var(--white-warm); overflow: hidden;
+    }
+    .section-block-head {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 12px 14px; background: #fff; border-bottom: 1px solid var(--line);
+    }
+    .section-block-head .title {
+      font-family: var(--serif); font-weight: 500; font-size: 18px; letter-spacing: 0.02em;
+    }
+    .section-block-head .meta {
+      font-size: 12px; font-weight: 600; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .section-block-head .chip {
+      display: inline-block; padding: 3px 8px; border-radius: 999px; background: var(--paint-wash); font-size: 11px; font-weight: 700;
+      letter-spacing: 0.04em; text-transform: uppercase;
+    }
+    .section-block-body { padding: 4px 14px 10px; }
+    .section-block .dish-row:last-child { border-bottom: 0; }
     .toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
     label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
     input[type=text], input[type=url], input[type=date], select, textarea {
@@ -144,13 +196,13 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Build the dishes, choose wording for the sheet, then generate. Adjust or replace any dish from its own menu.</p>
+    <p class="lede">A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.</p>
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260922-layout1"></script>
-  <script src="menus-print.js?v=20260922-layout1"></script>
-  <script src="menus-ingest.js?v=20260922-layout1"></script>
+  <script src="menus.js?v=20260922-flow3"></script>
+  <script src="menus-print.js?v=20260922-flow3"></script>
+  <script src="menus-ingest.js?v=20260922-flow3"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -170,6 +222,14 @@
     var includes = loadIncludes();
     var pendingReview = null;
     var editingPromoId = '';
+    var flowStep = 1; // 1 dishes · 2 blocks · 3 wording · 4 generate
+
+    var FLOW_STEPS = [
+      { id: 1, key: 'dishes', label: 'Dishes' },
+      { id: 2, key: 'blocks', label: 'Blocks' },
+      { id: 3, key: 'wording', label: 'Wording' },
+      { id: 4, key: 'generate', label: 'Generate' }
+    ];
 
     function loadSectionLayout() {
       try {
@@ -272,6 +332,7 @@
           dishId = (dishes()[0] && dishes()[0].id) || '';
           if (mode === 'adjust' || mode === 'replace' || mode === 'add' || mode === 'paste') mode = 'complete';
           editingPromoId = '';
+          flowStep = 1;
           render();
         };
         box.appendChild(b);
@@ -287,18 +348,123 @@
     function renderEditor() {
       var menu = EBMenus.menuById(menuId);
       var el = document.getElementById('editor');
+      var list = dishes();
       var html = '';
 
-      // —— 1. This menu's dishes ——
-      html += '<section class="flow-step" id="step-dishes">';
-      html += '<div class="step-kicker">1 · This menu</div>';
-      html += '<h2>' + escapeAttr(menu.name) + '</h2>';
-      html += '<p class="step-lede">Current dishes for the sheet. Use each dish’s menu to adjust or replace.</p>';
+      html += renderFlowRail(menu, list);
+
+      // —— 1. Dishes ——
+      html += flowStepShell(1, 'Dishes', menu.name,
+        list.length ? (list.length + ' dish' + (list.length === 1 ? '' : 'es') + ' · ' + sectionCount(list) + ' sections') : 'Empty — upload or add dishes',
+        renderDishesStep(menu, list));
+
+      // —— 2. Blocks (section layout) ——
+      html += flowStepShell(2, 'Blocks', 'How sections sit on the sheet',
+        blockSummary(menu),
+        renderBlocksStep(menu, list));
+
+      // —— 3. Wording ——
+      html += flowStepShell(3, 'Wording', 'Events & selling lines',
+        wordingSummary(menu),
+        renderWordingStep(menu));
+
+      // —— 4. Generate ——
+      html += flowStepShell(4, 'Generate', 'Print sheet',
+        generateSummary(),
+        renderGenerateStep(menu));
+
+      el.innerHTML = html;
+      var hint = document.getElementById('generateHint');
+      if (hint) {
+        var plan = composed().plan;
+        hint.innerHTML = '<strong>' + escapeAttr(planTitle(plan.fit)) + '</strong>' + escapeAttr(plan.text || '');
+      }
+      bindEditor();
+      var open = document.getElementById('step-' + FLOW_STEPS[flowStep - 1].key);
+      if (open && flowStep > 1) open.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function sectionCount(list) {
+      var seen = {};
+      (list || []).forEach(function (d) { seen[d.section || ''] = true; });
+      return Object.keys(seen).filter(Boolean).length;
+    }
+
+    function blockSummary(menu) {
+      if (menu.kind !== 'long') return 'Card menus use a fixed card layout';
+      var custom = 0;
+      var defaults = EBMenus.defaultSectionLayout();
+      EBMenus.SECTIONS.forEach(function (s) {
+        var r = sectionLayout[s] || defaults[s];
+        if (!defaults[s] || r.width !== defaults[s].width || !!r.frame !== !!defaults[s].frame) custom += 1;
+      });
+      return custom ? custom + ' custom rule' + (custom === 1 ? '' : 's') : 'Using defaults (mains/starters full, nibbles column…)';
+    }
+
+    function wordingSummary(menu) {
+      if (menu.kind !== 'long') return 'Not used on card menus';
+      var ticks = hostPromoTicks();
+      var n = Object.keys(ticks).filter(function (k) { return ticks[k]; }).length;
+      return n ? n + ' forced line' + (n === 1 ? '' : 's') : 'Auto-pick on Generate';
+    }
+
+    function generateSummary() {
+      try {
+        var plan = composed().plan;
+        return planTitle(plan.fit);
+      } catch (e) {
+        return 'Ready when dishes are set';
+      }
+    }
+
+    function renderFlowRail(menu, list) {
+      var html = '<nav class="flow-rail no-print" aria-label="Menu flow">';
+      FLOW_STEPS.forEach(function (s, i) {
+        if (i) html += '<span class="flow-arrow" aria-hidden="true">→</span>';
+        var cls = 'flow-pill';
+        if (s.id === flowStep) cls += ' on';
+        else if (s.id < flowStep) cls += ' done';
+        html += '<button type="button" class="' + cls + '" data-flow-step="' + s.id + '">';
+        html += '<span class="num">' + (s.id < flowStep ? '✓' : s.id) + '</span> ' + escapeAttr(s.label);
+        html += '</button>';
+      });
+      html += '</nav>';
+      return html;
+    }
+
+    function flowStepShell(id, kicker, title, summary, bodyHtml) {
+      var open = flowStep === id;
+      var html = '<section class="flow-step ' + (open ? 'is-open' : 'is-collapsed') + '" id="step-' + FLOW_STEPS[id - 1].key + '">';
+      html += '<button type="button" class="flow-step-head" data-flow-step="' + id + '">';
+      html += '<div><div class="kicker">' + id + ' · ' + escapeAttr(kicker) + '</div>';
+      html += '<h2>' + escapeAttr(title) + '</h2>';
+      html += '<div class="summary">' + escapeAttr(summary) + '</div></div>';
+      html += '<span class="chev" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>';
+      html += '</button>';
+      if (open) {
+        html += '<div class="flow-step-body">' + bodyHtml + '</div>';
+      }
+      html += '</section>';
+      return html;
+    }
+
+    function flowNav(prev, next, nextLabel) {
+      var html = '<div class="flow-nav no-print">';
+      if (prev) html += '<button type="button" class="soft" data-flow-step="' + prev + '">← Back</button>';
+      else html += '<span></span>';
+      if (next) html += '<button type="button" class="go" data-flow-step="' + next + '">' + escapeAttr(nextLabel || 'Continue') + ' →</button>';
+      html += '</div>';
+      return html;
+    }
+
+    function renderDishesStep(menu, list) {
+      var html = '';
+      html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
 
       var extras = EBMenus.includableMenus(menuId);
       if (extras.length) {
         html += '<div class="include-box"><h3>Also put on this sheet</h3>';
-        html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print. Generate says if it still fits.</p><div class="include-row">';
+        html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print.</p><div class="include-row">';
         extras.forEach(function (m) {
           var on = !!(includes[menuId] && includes[menuId][m.id]);
           html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(m.name) + '</label>';
@@ -322,39 +488,90 @@
       html += '<span>·</span>';
       html += '<button class="link" id="doReset" type="button">Put sample menus back</button>';
       html += '</div>';
-      html += '</section>';
+      html += flowNav(null, 2, 'Next · Blocks');
+      return html;
+    }
 
-      // —— 2. Wording & events ——
-      html += '<section class="flow-step" id="step-wording">';
-      html += '<div class="step-kicker">2 · Wording &amp; events</div>';
-      html += '<h2>What else goes on the sheet</h2>';
+    function renderBlocksStep(menu, list) {
+      var html = '';
+      if (menu.kind !== 'long') {
+        html += '<p class="step-lede">Sandwich / dessert / card menus print on a fixed card. Layout rules apply to Main and Sunday sheets.</p>';
+        html += flowNav(1, 3, 'Next · Wording');
+        return html;
+      }
+      html += '<p class="step-lede">Treat each category as a block on the page. Full width for mains/starters by default; columns for nibbles, burgers, sandwiches, sides. Frilly box = scalloped frame. Changes save for next time.</p>';
+
+      // Quick cards for sections that have dishes
+      var bySec = {};
+      list.forEach(function (d) {
+        var s = d.section || 'Dishes';
+        if (!bySec[s]) bySec[s] = [];
+        bySec[s].push(d);
+      });
+      var defaults = EBMenus.defaultSectionLayout();
+      var order = EBMenus.SECTIONS.slice();
+      Object.keys(bySec).forEach(function (s) {
+        if (order.indexOf(s) === -1) order.push(s);
+      });
+      html += '<div class="block-cards">';
+      order.forEach(function (sec) {
+        var dishesIn = bySec[sec] || [];
+        if (!dishesIn.length && !defaults[sec]) return;
+        var rule = sectionLayout[sec] || defaults[sec] || { width: 'full', frame: false };
+        var widthLabel = (EBMenus.WIDTH_OPTIONS.filter(function (w) { return w.id === rule.width; })[0] || {}).label || rule.width;
+        html += '<div class="section-block">';
+        html += '<div class="section-block-head">';
+        html += '<div class="title">' + escapeAttr(sec) + '</div>';
+        html += '<div class="meta">';
+        html += '<span class="chip">' + dishesIn.length + ' dish' + (dishesIn.length === 1 ? '' : 'es') + '</span>';
+        html += '<span class="chip">' + escapeAttr(widthLabel) + '</span>';
+        html += '<span class="chip">' + (rule.frame ? 'Frilly' : 'No frame') + '</span>';
+        html += '</div></div>';
+        if (defaults[sec]) {
+          html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
+          html += '<div class="layout-row" style="grid-template-columns:1fr 1fr;border:0;padding:0">';
+          html += '<div><label class="field" style="margin-top:0">Width</label>';
+          html += '<select data-layout-width="' + escapeAttr(sec) + '">';
+          EBMenus.WIDTH_OPTIONS.forEach(function (w) {
+            html += '<option value="' + w.id + '"' + (rule.width === w.id ? ' selected' : '') + '>' + escapeAttr(w.label) + '</option>';
+          });
+          html += '</select></div>';
+          html += '<div><label class="field" style="margin-top:0">Frilly box</label>';
+          html += '<select data-layout-frame="' + escapeAttr(sec) + '">';
+          html += '<option value="yes"' + (rule.frame ? ' selected' : '') + '>Yes</option>';
+          html += '<option value="no"' + (!rule.frame ? ' selected' : '') + '>No</option>';
+          html += '</select></div></div></div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+      html += '<div class="toolbar-row"><button type="button" class="link" id="doResetLayout">Reset all blocks to defaults</button></div>';
+      html += flowNav(1, 3, 'Next · Wording');
+      return html;
+    }
+
+    function renderWordingStep(menu) {
+      var html = '';
       html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want, or leave blank and we’ll auto-pick (never past dates).</p>';
       if (menu.kind === 'long') html += renderPromoTicksBox();
-      else html += '<p class="note">Wording boxes are for Main and Sunday sheets. Card menus print without them.</p>';
+      else html += '<p class="note">Wording boxes are for Main and Sunday sheets.</p>';
       html += renderWordingBank();
-      if (menu.kind === 'long') html += renderSectionLayoutBox();
-      html += '</section>';
+      html += flowNav(2, 4, 'Next · Generate');
+      return html;
+    }
 
-      // —— 3. Generate ——
-      html += '<section class="flow-step" id="step-generate">';
-      html += '<div class="step-kicker">3 · Generate</div>';
-      html += '<h2>Print sheet</h2>';
+    function renderGenerateStep(menu) {
+      var html = '';
+      html += '<p class="step-lede">Check the plan, then generate the branded print sheet.</p>';
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
-      html += '<div class="generate-bar no-print"><div class="bar-inner">';
+      html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
       html += '<div class="bar-copy" id="generateHint"></div>';
       html += '<div class="bar-actions">';
       html += '<button type="button" class="go" id="doGenerate">Generate menu</button>';
       html += '<button type="button" class="ghost" id="doPrintHint">Print / PDF</button>';
       html += '</div></div></div>';
-      html += '</section>';
-
-      el.innerHTML = html;
-      var hint = document.getElementById('generateHint');
-      if (hint) {
-        var plan = composed().plan;
-        hint.innerHTML = '<strong>' + escapeAttr(planTitle(plan.fit)) + '</strong>' + escapeAttr(plan.text || '');
-      }
-      bindEditor();
+      html += flowNav(3, null);
+      return html;
     }
 
     function sectionSelectHtml(selected, attrs) {
@@ -599,15 +816,25 @@
       var list = EBMenus.sortDishesBySection(dishes());
       if (!list.length) return '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
       var showLunch = menuId !== 'lunch-club';
-      var html = '<p class="note no-print" style="margin:0 0 10px">Each dish has a <strong>section</strong> dropdown — we auto-guess after upload; change any that look wrong.</p>';
-      html += '<div class="complete-head"><div>Dish</div><div class="ticks-head">';
-      if (showLunch) html += '<span title="Lunch club">' + MARK + '</span>';
-      html += '<span class="letter">gf</span><span class="letter">v</span><span class="letter">vg</span></div></div>';
+      var defaults = EBMenus.defaultSectionLayout();
+      var html = '';
       var section = '';
-      list.forEach(function (d) {
+      var open = false;
+      list.forEach(function (d, idx) {
         if (d.section !== section) {
+          if (open) html += '</div></div>';
           section = d.section;
-          html += '<div class="section-label">' + escapeAttr(section) + '</div>';
+          var rule = sectionLayout[section] || defaults[section] || { width: 'full', frame: false };
+          var widthLabel = (EBMenus.WIDTH_OPTIONS.filter(function (w) { return w.id === rule.width; })[0] || {}).label || rule.width;
+          var count = list.filter(function (x) { return x.section === section; }).length;
+          html += '<div class="section-block">';
+          html += '<div class="section-block-head">';
+          html += '<div class="title">' + escapeAttr(section) + '</div>';
+          html += '<div class="meta"><span class="chip">' + count + '</span>';
+          html += '<span class="chip">' + escapeAttr(widthLabel) + '</span>';
+          html += '<span class="chip">' + (rule.frame ? 'Frilly' : 'Plain') + '</span></div></div>';
+          html += '<div class="section-block-body">';
+          open = true;
         }
         var m = EBMenus.parseMarks(d.tags);
         html += '<div class="dish-row" data-id="' + d.id + '">';
@@ -625,6 +852,7 @@
         html += '</div></div>';
         html += '<div class="ticks">';
         if (showLunch) html += '<label><input type="checkbox" data-flag="lunchClub" data-id="' + d.id + '"' + (d.lunchClub ? ' checked' : '') + '><span>' + MARK + '</span></label>';
+        else html += '<span></span>';
         html += '<label><input type="checkbox" data-flag="gf" data-id="' + d.id + '"' + (m.gf ? ' checked' : '') + '><span class="letter">gf</span></label>';
         html += '<label><input type="checkbox" data-flag="v" data-id="' + d.id + '"' + (m.v ? ' checked' : '') + '><span class="letter">v</span></label>';
         html += '<label><input type="checkbox" data-flag="vg" data-id="' + d.id + '"' + (m.vg ? ' checked' : '') + '><span class="letter">vg</span></label>';
@@ -632,17 +860,29 @@
         html += '<div class="dish-actions no-print"><select data-dish-action="' + escapeAttr(d.id) + '" aria-label="Edit ' + escapeAttr(d.name) + '">';
         html += '<option value="">Edit…</option><option value="adjust">Adjust</option><option value="replace">Replace</option><option value="remove">Remove</option>';
         html += '</select></div></div>';
+        if (idx === list.length - 1 && open) html += '</div></div>';
       });
       return html;
     }
 
     function bindEditor() {
       bindDateField();
+      document.querySelectorAll('[data-flow-step]').forEach(function (b) {
+        b.onclick = function (ev) {
+          ev.preventDefault();
+          var next = parseInt(b.getAttribute('data-flow-step'), 10);
+          if (!next || next === flowStep) return;
+          flowStep = next;
+          mode = 'complete';
+          render();
+        };
+      });
       document.querySelectorAll('[data-mode]').forEach(function (b) {
         b.onclick = function () {
           var next = b.getAttribute('data-mode');
           if (next === 'add') dishId = '';
           mode = next;
+          flowStep = 1;
           render();
           if (next === 'add' || next === 'adjust' || next === 'replace' || next === 'paste') {
             var form = document.querySelector('.form-card');
@@ -946,8 +1186,9 @@
         overlay.parentNode.removeChild(overlay);
         pendingReview = null;
         mode = 'complete';
+        flowStep = 1;
         render();
-        var first = document.querySelector('.dish-row');
+        var first = document.querySelector('.section-block');
         if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
     }
