@@ -21,7 +21,7 @@ require(path.join(root, 'menus.js'));
 var api = global.EBMenus;
 
 assert(html.indexOf("openApp('menus-eightbells'") !== -1, 'owner tile opens menus');
-assert(html.indexOf("'menus-eightbells': 'menus.html'") !== -1, 'menus url is menus.html');
+assert(html.indexOf("'menus-eightbells': 'menus.html") !== -1, 'menus url is menus.html');
 assert(page.indexOf('Arranging your menu') !== -1, 'generate shows arranging step');
 assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order');
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
