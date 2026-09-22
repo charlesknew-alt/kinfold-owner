@@ -835,6 +835,107 @@
     return list;
   }
 
+  /** Allergy / dietary footer wrongly stuck on a dish description. */
+  function isJunkDescription(text) {
+    var t = String(text || '').trim();
+    if (!t) return false;
+    return /please tell our team|allergies or dietary|dietary requirements|please inform|allergen/i.test(t);
+  }
+
+  /**
+   * Text after a mid-line price that looks like a second dish title
+   * (not a “served with…” garnish or half of “8.25 / 14.95”).
+   */
+  function looksLikeSecondDish(after) {
+    var t = String(after || '').trim();
+    if (!t || t.length < 3) return false;
+    if (!/^[A-ZÀ-Ý]/.test(t)) return false;
+    if (/^\//.test(t)) return false;
+    if (priceOf(t)) return true;
+    // Title Case multi-word name (e.g. Dressed Mixed Salad)
+    if (/^[A-ZÀ-Ý][\w'&-]+(\s+[A-ZÀ-Ý][\w'&-]+)+\b/.test(t)) return true;
+    if (!looksLikeDescFragment(t) && /^[A-ZÀ-Ý][\w'&-]+(\s+[\w'&-]+){0,8}$/.test(t)) return true;
+    return false;
+  }
+
+  /**
+   * Find where two dishes were smashed onto one name line.
+   * e.g. "Cheesy Garlic Bread £ 5.95 Dressed Mixed Salad 4.95"
+   */
+  function findDishSplit(name) {
+    var text = String(name || '').trim();
+    if (!text) return null;
+    var re = /(?:£\s*)?(\d+\s*\.\s*\d{1,2})(?!\s*\/)/g;
+    var m;
+    while ((m = re.exec(text)) !== null) {
+      var afterIdx = m.index + m[0].length;
+      var after = text.slice(afterIdx).replace(/^\s+/, '');
+      if (!looksLikeSecondDish(after)) continue;
+      var left = text.slice(0, m.index).replace(/\s+$/, '').replace(/[·•|–—\-:,]+$/, '').trim();
+      if (left.length < 3) continue;
+      return {
+        leftName: left,
+        leftPrice: m[1].replace(/\s*\.\s*/g, '.').replace(/\s+/g, ''),
+        rightText: after
+      };
+    }
+    return null;
+  }
+
+  function canSplitDish(d) {
+    if (!d) return false;
+    return !!findDishSplit(d.name);
+  }
+
+  /** Staff “Split” — break a smashed name into two rows at the first mid-line price. */
+  function splitDishAt(dishes, index) {
+    var list = (dishes || []).slice();
+    var i = parseInt(index, 10);
+    if (!(i >= 0) || i >= list.length) return list;
+    var d = list[i];
+    var found = findDishSplit(d && d.name);
+    if (!found) return list;
+
+    var leftName = cleanDishName(found.leftName) || found.leftName;
+    var rightRaw = found.rightText;
+    var rightPrice = '';
+    var pr = priceOf(rightRaw);
+    if (pr) {
+      rightPrice = pr.value;
+      rightRaw = rightRaw.slice(0, rightRaw.length - pr.raw.length).replace(/\s+$/, '');
+    } else if (d.price && String(d.price).trim()) {
+      rightPrice = String(d.price).trim();
+    }
+    var rightName = cleanDishName(rightRaw) || String(rightRaw || '').trim();
+    if (!rightName) return list;
+
+    var desc = String(d.description || '').trim();
+    if (isJunkDescription(desc) || isJunkDishName(desc)) desc = '';
+
+    var left = {
+      id: slug((d.section || 'Mains') + '-' + leftName + '-split-a-' + i),
+      section: d.section,
+      name: leftName,
+      description: desc,
+      price: found.leftPrice,
+      tags: d.tags || '',
+      lunchClub: !!d.lunchClub,
+      fromMenu: d.fromMenu
+    };
+    var right = {
+      id: slug((d.section || 'Mains') + '-' + rightName + '-split-b-' + i),
+      section: d.section,
+      name: rightName,
+      description: '',
+      price: rightPrice,
+      tags: '',
+      lunchClub: false,
+      fromMenu: d.fromMenu
+    };
+    list.splice(i, 1, left, right);
+    return list;
+  }
+
   function isJunkDishName(name) {
     var n = String(name || '').trim();
     if (n.length < 3) return true;
@@ -845,6 +946,8 @@
     if (/^[^\w]*$/.test(n)) return true;
     if (/^[a-z]{1,2}$/i.test(n)) return true;
     if (/please inform|allergen|gluten free\s*[–-]\s*vegetarian/i.test(n)) return true;
+    if (/please tell our team|allergies or dietary|dietary requirements/i.test(n)) return true;
+    if (/@/.test(n) && /\.(com|co\.uk|uk|net|org)\b/i.test(n)) return true;
     // Section titles are categories, not dishes
     if (isHeading(n)) return true;
     return false;
@@ -1109,6 +1212,10 @@
     mergeDishOnto: mergeDishOnto,
     mergeDishWithPrevious: mergeDishWithPrevious,
     deleteDishAt: deleteDishAt,
+    findDishSplit: findDishSplit,
+    canSplitDish: canSplitDish,
+    splitDishAt: splitDishAt,
+    isJunkDescription: isJunkDescription,
     tidyOrphanDescriptions: tidyOrphanDescriptions,
     isHeading: isHeading
   };

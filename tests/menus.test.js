@@ -118,12 +118,32 @@ assert(printJs.indexOf('shareInLeft') !== -1 || printJs.indexOf('shareAsColumn')
 assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
 assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default prefers column when it fits');
 assert(page.indexOf('Merge ↑') !== -1, 'confirm review has merge-into-above control');
+assert(page.indexOf('data-review-split') !== -1 && page.indexOf('Split') !== -1, 'confirm review has split control');
 assert(page.indexOf('data-review-delete') !== -1 && page.indexOf('Delete') !== -1, 'confirm review has delete control');
 assert(page.indexOf('syncReviewCategories') !== -1, 'review keeps category edits across merge/delete');
 assert(typeof api.mergeDishWithPrevious === 'function', 'mergeDishWithPrevious exported');
 assert(typeof api.deleteDishAt === 'function', 'deleteDishAt exported');
+assert(typeof api.canSplitDish === 'function' && typeof api.splitDishAt === 'function', 'split helpers exported');
 assert(api.deleteDishAt([api.dish('Starters', 'A', '', '1', ''), api.dish('Starters', 'B', '', '2', '')], 0).length === 1,
   'deleteDishAt removes one row');
+var smashed = {
+  section: 'Mains',
+  name: 'Cheesy Garlic Bread £ 5.95 Dressed Mixed Salad 4.95',
+  description: 'Please tell our team about any allergies or dietary requirements.',
+  price: '',
+  tags: ''
+};
+assert(api.canSplitDish(smashed), 'smashed garlic bread + salad can split');
+var splitOut = api.splitDishAt([smashed], 0);
+assert(splitOut.length === 2, 'split yields two rows');
+assert(splitOut[0].name === 'Cheesy Garlic Bread' && splitOut[0].price === '5.95', 'split left dish + price');
+assert(splitOut[1].name === 'Dressed Mixed Salad' && splitOut[1].price === '4.95', 'split right dish + price');
+assert(!splitOut[0].description, 'allergy footer dropped on split');
+assert(api.isJunkDishName('PUB@EIGHTBELLSBOLNEY.COM'), 'email address is junk dish name');
+assert(api.isJunkDescription('Please tell our team about any allergies or dietary requirements.'),
+  'allergy footer is junk description');
+assert(!api.canSplitDish(api.dish('Starters', 'Quinoa Falafel', '', '8.25 / 14.95', '')),
+  'price ranges do not trigger split');
 assert(typeof api.isHeading === 'function' && api.isHeading('STARTERS') === 'Starters', 'ALL-CAPS STARTERS is a heading');
 assert(api.isHeading('Little Bells') === 'Little Bells', 'Little Bells heading recognised');
 var titledPaste = api.parsePaste('STARTERS\nJerusalem Artichoke Soup 7.50\nMAINS\nPie of the Day 17.95\nLittle Bells\nFish Fingers 9.50');
@@ -159,8 +179,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow18') !== -1, 'menus page cache-bust is flow18');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow18') !== -1, 'hub menus link cache-bust is flow18');
+assert(page.indexOf('flow19') !== -1, 'menus page cache-bust is flow19');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow19') !== -1, 'hub menus link cache-bust is flow19');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
