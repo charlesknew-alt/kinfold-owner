@@ -360,16 +360,18 @@
   }
 
   function splitClassicsBag(sec) {
-    // Honour staff section picks: do not invent a Burgers title from dish names.
+    // Peel obvious burgers out of a Classics list (Wagyu / “Burger” in the name).
     var classics = [];
+    var burgers = [];
     var sandwichBits = [];
     ((sec && sec.dishes) || []).forEach(function (d) {
       if (isSandwich(d.section) || /^sandwiches?\b/i.test(d.name || '')) sandwichBits.push(d);
+      else if (/\bburger\b/i.test(d.name || '') || /\bwagyu\b/i.test(d.name || '')) burgers.push(d);
       else classics.push(d);
     });
     return {
       classics: classics,
-      burgers: [],
+      burgers: burgers,
       sandwiches: sandwichBits,
       classicsTitle: 'Pub Classics',
       burgersTitle: 'Burgers'
@@ -471,7 +473,7 @@
   function isBurgerDish(d) {
     if (!d) return false;
     if (isBurgers(d.section)) return true;
-    return /burger/i.test(d.name || '');
+    return /\bburger\b/i.test(d.name || '') || /\bwagyu\b/i.test(d.name || '');
   }
 
   function orderDishesForPrint(dishes) {
@@ -845,8 +847,8 @@
     var p2opts = layout.p2;
     var sidesPrint = sidesForPrint(bag);
     var hideDate = menu.id === 'party' || menu.kind === 'party';
-    var fill1 = (plan && plan.forceFillClass) || 'fill-airy';
-    var fill2 = (plan && plan.forceFillClass) || 'fill-airy';
+    var fill1 = (plan && plan.forceFillClass) || 'fill-roomy';
+    var fill2 = (plan && plan.forceFillClass) || 'fill-roomy';
 
     var nibRule = ruleFor('Nibbles', plan);
     var startRule = ruleFor('Starters', plan);
@@ -864,11 +866,18 @@
     p1 += trackerBar(ver, { hideDate: hideDate });
     p1 += '<div class="page-body">';
 
-    // Top band: Nibbles (column by default) + logo — or full-width nibbles if designer chose full
-    if (bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full') {
+    // Top band: frilly Nibbles and/or Starters beside the logo (Canva-style).
+    var startersInTop = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full');
+    var nibblesInTop = !!(bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full');
+    if (nibblesInTop || startersInTop) {
       p1 += '<div class="top-band">';
       p1 += '<div class="top-left">';
-      p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
+      if (nibblesInTop) {
+        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
+      }
+      if (startersInTop) {
+        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
+      }
       p1 += '</div>';
       p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
       p1 += '</div>';
@@ -882,17 +891,39 @@
       }
     }
 
-    if (bag.starters) {
+    if (bag.starters && !startersInTop) {
       p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
 
-    // —— Column block (golden rule: both columns start and finish together) ——
+    // —— Column block (golden rule: both columns start on the same baseline) ——
     // Left  = Sharing (when set to column) + events / feature panels
     // Right = Burgers, then Pub Classics underneath
     var split = splitClassicsBag(bag.classics);
     var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
       ? bag.burgers.dishes.slice()
       : [];
+    if (split.burgers && split.burgers.length) {
+      burgerDishes = burgerDishes.concat(split.burgers);
+    }
+    // Keep kids plates out of the Burgers column
+    var kidsFromBurgers = [];
+    burgerDishes = burgerDishes.filter(function (d) {
+      if (/fish fingers|chicken goujons|mac\s*&\s*cheese|pasta|pizza|fries\s*&\s*(dressed\s*)?salad/i.test(d.name || '')) {
+        kidsFromBurgers.push(d);
+        return false;
+      }
+      return true;
+    });
+    if (kidsFromBurgers.length) {
+      if (bag.littleBells && bag.littleBells.dishes) {
+        bag.littleBells = {
+          name: 'Little Bells',
+          dishes: bag.littleBells.dishes.concat(kidsFromBurgers)
+        };
+      } else {
+        bag.littleBells = { name: 'Little Bells', dishes: kidsFromBurgers };
+      }
+    }
     if (split.sandwiches.length) {
       if (bag.sandwiches && bag.sandwiches.dishes) {
         bag.sandwiches = {
@@ -1126,7 +1157,7 @@
     // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
-        '--dish-gap:11px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:28pt;--promo:11.5pt}' +
+        '--dish-gap:10px;--sec-gap:12px;--name:11.5pt;--desc:10pt;--title:17pt;--promo:11pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1149,36 +1180,39 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:1fr 180px;gap:10px;align-items:start;margin:0 0 8px}' +
-      '.top-band-logo{grid-template-columns:1fr 180px;min-height:40mm}' +
-      '.top-left .scallop{margin-bottom:0}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;align-items:start;margin:0 0 6px;overflow:hidden}' +
+      '.top-band-logo{grid-template-columns:1fr 150px;min-height:0}' +
+      '.top-left{min-width:0;overflow:hidden;align-self:start}' +
+      '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
-      '.logo-tr{width:170px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
+      '.logo-tr{width:140px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:var(--title)!important;letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px;text-align:center;line-height:1.1}' +
-      '.sec-title.soft-left{text-align:left;letter-spacing:.16em;margin:0 0 12px}' +
-      '.sec-title-spacer{visibility:hidden;margin:0 0 12px}' +
-      '.scallop .sec-title{text-align:left;font-size:calc(var(--title) - 2pt);letter-spacing:.14em;margin-bottom:10px}' +
-      '.sec-title.soft{font-size:calc(var(--title) - 3pt);letter-spacing:.12em}' +
+      /* Ceiling: section titles never exceed 18pt */ +
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),18pt)!important;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px;text-align:center;line-height:1.15}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.06em;margin:0 0 8px}' +
+      '.sec-title-spacer{visibility:hidden;margin:0 0 8px}' +
+      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),17pt);letter-spacing:.05em;margin-bottom:6px}' +
+      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),15pt);letter-spacing:.05em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
-      '.scallop{margin:0 0 14px;background:#fff;position:relative;' +
-        'border-style:solid;border-color:transparent;border-width:16px;' +
-        'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:16px;' +
-        'overflow:visible}' +
-      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:14px;border-image-width:14px;border-image-slice:42 fill}' +
-      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:48 fill}' +
-      '.scallop-pad{padding:6px 10px 5px;overflow:visible}' +
+      '.classics-block{margin-top:4px}' +
+      '.scallop{margin:0 0 10px;background:#fff;position:relative;height:fit-content;' +
+        'border-style:solid;border-color:transparent;border-width:12px;' +
+        'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:12px;' +
+        'overflow:hidden;max-width:100%}' +
+      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
+      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
+      '.scallop-pad{padding:6px 10px 5px;overflow:hidden;min-width:0}' +
       '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
-      '.dish{margin:0 0 var(--dish-gap);min-width:0}' +
-      '.dish-line{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto auto;column-gap:0;align-items:center;min-width:0}' +
+      '.dish{margin:0 0 var(--dish-gap);min-width:0;max-width:100%}' +
+      '.dish-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(8px,1fr) auto auto;column-gap:0;align-items:baseline;min-width:0;max-width:100%}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;overflow-wrap:anywhere}' +
-      '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:12px;height:0}' +
+      '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:8px;height:0}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;padding-left:2px}' +
-      '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%}' +
+      '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
@@ -1189,14 +1223,14 @@
       '.lunch-box .lc{width:36px;height:36px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
       '.allergy-lc .lc{width:20px;height:20px;margin:0}' +
-      '.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 10px;align-items:start}' +
+      '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       /* Golden rule: both columns start on the same baseline */ +
       '.cols-balanced{align-items:start}' +
-      '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0}' +
+      '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
-      '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%}' +
+      '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%;overflow:hidden}' +
       '.col-events > :first-child,.col-food > :first-child{margin-top:0}' +
       '.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:10px}' +
       '.col-events .sec-title:first-child,.col-food .sec-title:first-child,.col-dishes .sec-title:first-child,.col-promo .sec-title:first-child{margin-top:0}' +
@@ -1227,11 +1261,11 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — ALWAYS start airy and only tighten if the page overflows */ +
-      '.fill-airy{--dish-gap:14px;--sec-gap:20px;--name:12.5pt;--desc:10.5pt;--title:30pt;--promo:12pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:18px;--name:12pt;--desc:10.25pt;--title:29pt;--promo:11.5pt}' +
-      '.fill-normal{--dish-gap:11px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:28pt;--promo:11.5pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:24pt;--promo:10.5pt}' +
-      '.fill-compact{--dish-gap:6px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:21pt;--promo:10pt}' +
+      '.fill-airy{--dish-gap:12px;--sec-gap:14px;--name:12pt;--desc:10.25pt;--title:18pt;--promo:11.5pt}' +
+      '.fill-roomy{--dish-gap:10px;--sec-gap:12px;--name:11.5pt;--desc:10pt;--title:17pt;--promo:11pt}' +
+      '.fill-normal{--dish-gap:9px;--sec-gap:11px;--name:11pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
+      '.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10.5pt;--desc:9.5pt;--title:15pt;--promo:10pt}' +
+      '.fill-compact{--dish-gap:5px;--sec-gap:7px;--name:10pt;--desc:9pt;--title:14pt;--promo:9.5pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +

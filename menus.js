@@ -166,10 +166,14 @@
     var n = String(name || '').trim();
     var s = String(section || '').trim();
     var desc = String(description || '');
+    if (/^sandwiches?\b/i.test(n)) return 'Sandwiches';
     // Kids section wins over burger/sandwich name heuristics
     if (/little\s*bells|kids?\s*menu|children.?s/i.test(s)) return 'Little Bells';
-    if (/^sandwiches?\b/i.test(n)) return 'Sandwiches';
-    if (/\bburger\b/i.test(n)) return 'Burgers';
+    // Kids plate names (even with “burger”) stay Little Bells
+    if (/fish fingers|chicken goujons|mac\s*&\s*cheese|tomato\s*&\s*basil pasta|cheese\s*&\s*ham pizza|cheese\s*&\s*tomato pasta|fries\s*&\s*(dressed\s*)?salad/i.test(n)) {
+      return 'Little Bells';
+    }
+    if (/\bburger\b/i.test(n) || /\bwagyu\b/i.test(n)) return 'Burgers';
     if (/^(sauce robert|peppercorn|garlic butter|chilli butter|chili butter)\b/i.test(n)) {
       return 'Sauces';
     }
@@ -479,6 +483,8 @@
   /** Strip stray mid-line prices left on a name after a bad extract ("Caesar 9.5 /"). */
   function cleanDishName(name) {
     var n = String(name || '').trim();
+    n = n.replace(/\bwith\s+available\b/ig, ' ');
+    n = n.replace(/\bavailable\b/ig, ' ');
     n = n.replace(/\s+\d+\s*\.\s*\d{1,2}\s*\/\s*$/g, '');
     n = n.replace(/\s+\d+\s*\.\s*\d{1,2}\s*$/g, '');
     n = n.replace(/\s{2,}/g, ' ').replace(/[\s,–-]+$/g, '').trim();
@@ -487,12 +493,17 @@
 
   function pullTags(name) {
     var tags = [];
-    var clean = name.replace(/\blunch\s*club\b/ig, ' ').replace(/\[lunch\]/ig, ' ');
+    var clean = String(name || '');
+    // OCR often leaves “gf available” / “with available gf” in the dish title
+    clean = clean.replace(/\bwith\s+available\b/ig, ' ');
+    clean = clean.replace(/\bavailable\b/ig, ' option ');
+    clean = clean.replace(/\blunch\s*club\b/ig, ' ').replace(/\[lunch\]/ig, ' ');
     var re = /\b(?:gf|vg|v)(?:\s*(?:\/|&)\s*(?:gf|vg|v))*(?:\s+(?:with\s+)?(?:gf|vg|v(?:\s*(?:\/|&)\s*(?:gf|vg|v))*)?\s*option)?\b/ig;
     clean = clean.replace(re, function (hit) {
-      tags.push(hit.trim());
+      tags.push(hit.trim().replace(/\s+/g, ' '));
       return ' ';
     });
+    clean = clean.replace(/\boption\b/ig, ' ');
     clean = clean.replace(/\s{2,}/g, ' ').replace(/^[\s,–-]+|[\s,–-]+$/g, '');
     return { name: clean, tags: tags.join(' ').replace(/\s+/g, ' ').trim() };
   }
@@ -991,7 +1002,7 @@
    */
   var DEFAULT_SECTION_LAYOUT = {
     Nibbles: { width: 'column', frame: true },
-    Starters: { width: 'full', frame: false },
+    Starters: { width: 'column', frame: true },
     'Sharing Plates': { width: 'both', frame: false },
     'Item Boost': { width: 'full', frame: true },
     'Pub Classics': { width: 'column', frame: false },

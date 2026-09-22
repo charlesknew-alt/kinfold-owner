@@ -71,9 +71,14 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:170px/.test(printJs), 'front-page logo sized ~170px');
+assert(/logo-tr\{width:140px/.test(printJs), 'front-page logo sized ~140px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:28pt/.test(printJs), 'section titles large but fit-friendly');
+assert(/--title:1[4-8]pt/.test(printJs) || /min\(var\(--title\),18pt\)/.test(printJs),
+  'section titles capped at 18pt ceiling');
+assert(printJs.indexOf('min(var(--title),18pt)') !== -1, 'title size has hard CSS ceiling');
+assert(printJs.indexOf('startersInTop') !== -1, 'starters can sit frilly beside the logo');
+assert(printJs.indexOf('minmax(0,1fr) minmax(8px,1fr) auto auto') !== -1,
+  'dish lines stay inside their column (no ghost prices)');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('n<6') !== -1 || printJs.indexOf('start=n<6') !== -1 ||
   /var start=n<6/.test(printJs), 'sparse pages start roomy instead of airy-balloon');
@@ -88,7 +93,8 @@ assert(printJs.indexOf('Lunch club mark after the price') !== -1 || printJs.inde
 assert(/\.lc\{width:28px/.test(printJs), 'lunch club mark is large enough beside prices');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
 assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
-assert(printJs.indexOf('Honour staff section picks') !== -1 || printJs.indexOf('do not invent a Burgers title') !== -1, 'print respects staff sections');
+assert(printJs.indexOf('Peel obvious burgers') !== -1 || printJs.indexOf('split.burgers') !== -1,
+  'print peels named burgers out of Classics');
 assert(api.SECTIONS.indexOf('Sauces') !== -1, 'Sauces is a canonical section');
 assert(api.guessSection('Sauces', 'Peppercorn', '') === 'Sauces', 'guesses Sauces section');
 assert(api.SECTIONS.indexOf('Item Boost') !== -1, 'Item Boost is a canonical section');
@@ -149,8 +155,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow15') !== -1, 'menus page cache-bust is flow15');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow15') !== -1, 'hub menus link cache-bust is flow15');
+assert(page.indexOf('flow16') !== -1, 'menus page cache-bust is flow16');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow16') !== -1, 'hub menus link cache-bust is flow16');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
@@ -267,7 +273,7 @@ assert(/col-food[\s\S]*Burgers[\s\S]*Pub Classics|Burgers[\s\S]*Pub Classics/i.t
 assert(printJs.indexOf('cols-balanced') !== -1 && printJs.indexOf('col-events') !== -1, 'balanced columns: events left, food right');
 assert(/bottom-cols-balanced/.test(htmlPreview) || fluid.pages === 1, 'page 2 uses balanced sides columns when two pages');
 
-// Staff filed Spicy Asian as Pub Classics — must not invent a Burgers heading
+// Spicy Asian Burger filed under Pub Classics still peels into Burgers by name
 var classicOnly = [
   api.dish('Nibbles', 'Olives', '', '6.95', 'vg'),
   api.dish('Pub Classics', 'Haddock & Chips', 'peas', '17.95', ''),
@@ -275,10 +281,20 @@ var classicOnly = [
   api.dish('Mains', 'Pie', 'mash', '14.95', '')
 ];
 var classicLayout = print.planFluidLayout(mainMenu, classicOnly);
-assert(!classicLayout.bag.burgers || !(classicLayout.bag.burgers.dishes || []).length, 'no Burgers bag when staff only used Pub Classics');
 var classicHtml = print.build(mainMenu, classicOnly, {});
-assert(classicHtml.indexOf('>Burgers<') === -1 && classicHtml.indexOf('>BURGERS<') === -1, 'no Burgers section title when none categorised');
 assert(/Spicy Asian Burger/.test(classicHtml), 'classic-filed burger still prints');
+assert(/>Burgers<|BURGERS/i.test(classicHtml), 'named burger peels into Burgers column');
+assert(/Haddock/.test(classicHtml), 'true classics stay on the sheet');
+// Classics-only sheet (no burger in the name) must not invent a Burgers heading
+var pureClassics = [
+  api.dish('Nibbles', 'Olives', '', '6.95', 'vg'),
+  api.dish('Pub Classics', 'Haddock & Chips', 'peas', '17.95', ''),
+  api.dish('Pub Classics', 'Pie of the Day', 'mash', '14.95', ''),
+  api.dish('Mains', 'Risotto', '', '15.95', '')
+];
+var pureHtml = print.build(mainMenu, pureClassics, {});
+assert(pureHtml.indexOf('>Burgers<') === -1 && pureHtml.indexOf('>BURGERS<') === -1,
+  'no Burgers section title when none categorised');
 assert(print.partyOccasion('Christmas Party Menu', {}) === 'christmas', 'detects Christmas occasion');
 assert(print.partyOccasion('Valentine Dinner', {}) === 'valentine', 'detects Valentine occasion');
 
@@ -322,9 +338,11 @@ assert(api.sectionLayoutFor('Mains').width === 'full', 'mains default full width
 assert(api.sectionLayoutFor('Nibbles').frame === true, 'nibbles default frilly box');
 assert(api.sectionLayoutFor('Burgers').width === 'column', 'burgers default column');
 assert(api.sectionLayoutFor('Sandwiches').frame === true, 'sandwiches default frilly box');
+assert(api.sectionLayoutFor('Starters').width === 'column' && api.sectionLayoutFor('Starters').frame === true,
+  'starters default frilly column beside logo');
 var customLayout = api.normalizeSectionLayout({ Mains: { width: 'column', frame: true } });
 assert(customLayout.Mains.width === 'column' && customLayout.Mains.frame === true, 'layout overrides persist shape');
-assert(customLayout.Starters.width === 'full', 'other sections keep defaults');
+assert(customLayout.Starters.width === 'column', 'other sections keep defaults');
 
 assert(page.indexOf('Section layout rules') !== -1, 'layout rules UI present');
 assert(page.indexOf('data-layout-width') !== -1 && page.indexOf('data-layout-frame') !== -1, 'layout width/frame controls');
