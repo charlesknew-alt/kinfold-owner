@@ -29,4 +29,14 @@ Cash rooms are **not declared**:
 Room **PDQ** (card) is unchanged.
 
 ## Live
-Pushed to PubSystemLib as **4.34** (library **version 83**). Pin both venue scripts (Eight Bells + Windmill) to **v83**, then hard-refresh the manager hubs.
+Pushed to PubSystemLib as **4.34** (library **version 83**).
+
+Live pins (deployed 22 Sep 2026):
+
+| Project | Pin |
+|---|---|
+| PubSystemLib | **v83** (`4.34`) |
+| Eight Bells takings `/exec` | library **v83**, web app **@215** |
+| Windmill takings `/exec` | library **v83**, web app **@67** |
+
+Hard-refresh both manager hubs.
