@@ -188,6 +188,28 @@
     });
   }
 
+  /** Ask Gemini to sense-check page balance before print (needs AI reader URL + redeployed script). */
+  function reviewLayout(layoutSummary, onProgress) {
+    var url = getAiUrl();
+    if (!url) return Promise.resolve(null);
+    if (onProgress) onProgress('Gemini checking page balance…');
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'reviewLayout',
+        layout: layoutSummary || {}
+      })
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        var data;
+        try { data = JSON.parse(t); } catch (e) { return null; }
+        if (!data || !data.ok) return null;
+        return data;
+      });
+    }).catch(function () { return null; });
+  }
+
   function dishesFromText(text) {
     if (!root.EBMenus) return [];
     return root.EBMenus.parsePaste(text).filter(function (d) {
@@ -268,6 +290,7 @@
     cleanExtractedText: cleanExtractedText,
     getAiUrl: getAiUrl,
     setAiUrl: setAiUrl,
+    reviewLayout: reviewLayout,
     AI_URL_KEY: AI_URL_KEY
   };
 })(typeof window !== 'undefined' ? window : global);

@@ -200,9 +200,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260922-flow10"></script>
-  <script src="menus-print.js?v=20260922-flow10"></script>
-  <script src="menus-ingest.js?v=20260922-flow10"></script>
+  <script src="menus.js?v=20260922-flow11"></script>
+  <script src="menus-print.js?v=20260922-flow11"></script>
+  <script src="menus-ingest.js?v=20260922-flow11"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1454,7 +1454,8 @@
       var steps = [
         'Ordering sections (Nibbles → Starters → Classics → Mains…)',
         'Choosing one or two pages and columns',
-        'Placing wording bank / sandwiches / logo only if they fit',
+        'Placing wording / sandwiches / logo only if they fit',
+        'Gemini checking page balance (if AI reader is set)',
         'Opening classy print preview'
       ];
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px">Layout</div>';
@@ -1464,47 +1465,101 @@
         html += '<li data-step="' + i + '" style="opacity:.35;margin:0 0 6px">' + s + '</li>';
       });
       html += '</ul>';
-      if (layout && layout.summary) {
-        html += '<p id="arrangeSummary" style="display:none;margin:14px 0 0;font-family:system-ui,sans-serif;font-size:13px;line-height:1.45;color:#3a342c"></p>';
-      }
+      html += '<p id="arrangeSummary" style="display:none;margin:14px 0 0;font-family:system-ui,sans-serif;font-size:13px;line-height:1.45;color:#3a342c"></p>';
       card.innerHTML = html;
       overlay.appendChild(card);
       document.body.appendChild(overlay);
+
+      function layoutPayload() {
+        if (!layout) return { kind: menu.kind, pages: 1 };
+        return {
+          kind: menu.kind,
+          pages: layout.pages,
+          fit: layout.fit,
+          leftover: layout.leftover,
+          fillers: layout.fillers || [],
+          p1: layout.p1,
+          p2: layout.p2,
+          sections: (result.dishes || []).reduce(function (acc, d) {
+            acc[d.section] = (acc[d.section] || 0) + 1;
+            return acc;
+          }, {})
+        };
+      }
+
+      function applyLayoutAdvice(advice) {
+        if (!advice || !layout) return;
+        if (advice.density) result.plan.forceFillClass = 'fill-' + advice.density;
+        if (advice.dropFootLogo) {
+          if (layout.p1) layout.p1.footLogo = false;
+          if (layout.p2) layout.p2.footLogo = false;
+        }
+        if (advice.sandwichesOn === 'page1') {
+          layout.p1.sandwiches = true;
+          if (layout.p2) layout.p2.sandwiches = false;
+        } else if (advice.sandwichesOn === 'omit') {
+          layout.p1.sandwiches = false;
+          if (layout.p2) layout.p2.sandwiches = false;
+        } else if (advice.sandwichesOn === 'page2' && layout.p2) {
+          layout.p1.sandwiches = false;
+          layout.p2.sandwiches = true;
+        }
+        if (advice.notes) result.plan.layoutReview = advice.notes;
+        result.plan.layout = layout;
+      }
+
+      function openPrintPreview() {
+        var w = window.open('', '_blank');
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+        if (hint) hint.disabled = false;
+        if (!w) {
+          alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
+          return;
+        }
+        result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
+        if (menu.kind === 'party' && !result.plan.meta.title) {
+          result.plan.meta.title = 'Christmas Party Menu';
+          result.plan.meta.coursePrices = result.plan.meta.coursePrices || '2 courses £32.95 · 3 courses £39.95';
+        }
+        w.document.open();
+        w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
+        w.document.close();
+      }
 
       var i = 0;
       function tick() {
         var li = overlay.querySelector('[data-step="' + i + '"]');
         if (li) li.style.opacity = '1';
         i += 1;
-        if (i < steps.length) {
-          setTimeout(tick, 280);
+        if (i < 3) {
+          setTimeout(tick, 240);
           return;
         }
-        var sum = document.getElementById('arrangeSummary');
-        if (sum && layout) {
-          sum.style.display = 'block';
-          sum.textContent = layout.summary;
-        }
-        setTimeout(function () {
-          var w = window.open('', '_blank');
-          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
-          if (hint) hint.disabled = false;
-          if (!w) {
-            alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
-            return;
+        // Step 3: optional Gemini balance check
+        var reviewPromise = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewLayout && menu.kind === 'long')
+          ? EBMenuIngest.reviewLayout(layoutPayload())
+          : Promise.resolve(null);
+        reviewPromise.then(function (advice) {
+          var li3 = overlay.querySelector('[data-step="3"]');
+          if (li3) {
+            li3.style.opacity = '1';
+            if (!advice) li3.textContent = 'Balance check skipped (no AI reader URL / script not redeployed)';
+            else if (advice.notes) li3.textContent = 'Gemini: ' + advice.notes;
           }
-          result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
-          if (menu.kind === 'party' && !result.plan.meta.title) {
-            result.plan.meta.title = 'Christmas Party Menu';
-            result.plan.meta.coursePrices = result.plan.meta.coursePrices || '2 courses £32.95 · 3 courses £39.95';
+          applyLayoutAdvice(advice);
+          var sum = document.getElementById('arrangeSummary');
+          if (sum) {
+            sum.style.display = 'block';
+            sum.textContent = (layout && layout.summary ? layout.summary + ' ' : '') +
+              (advice && advice.notes ? advice.notes : '');
           }
-          w.document.open();
-          w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
-          w.document.close();
-        }, 450);
+          var li4 = overlay.querySelector('[data-step="4"]');
+          if (li4) li4.style.opacity = '1';
+          setTimeout(openPrintPreview, 420);
+        });
       }
-      setTimeout(tick, 200);
+      setTimeout(tick, 180);
     }
 
     // Generate buttons live inside step 4 — bind in bindEditor after render, not here.

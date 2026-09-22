@@ -28,3 +28,7 @@ Uses your Gemini API quota (often free tier is enough for staff menu updates). E
 ## Spelling changes
 
 Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix it made. The Menus review screen shows these **before** you save.
+
+## Layout review (optional)
+
+Redeploy the same web app after pulling updates. Generate can POST `{ "action": "reviewLayout", "layout": { … } }` so Gemini checks page balance before the print preview opens. Without a redeploy, Generate still works and skips that step.

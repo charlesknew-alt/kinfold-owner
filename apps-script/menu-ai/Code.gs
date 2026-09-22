@@ -19,6 +19,10 @@ function doPost(e) {
   try {
     var raw = e && e.postData && e.postData.contents ? e.postData.contents : '{}';
     var body = JSON.parse(raw);
+    // Optional second use: check a planned print layout before staff export.
+    if (body && body.action === 'reviewLayout') {
+      return json_(reviewLayoutWithGemini_(body));
+    }
     var result = readMenuWithGemini_(body);
     return json_(result);
   } catch (err) {
@@ -138,5 +142,83 @@ function readMenuWithGemini_(body) {
     source: 'gemini',
     fileName: body.fileName || '',
     menu: menu
+  };
+}
+
+/**
+ * Review a planned 1–2 page print layout (no image). Staff Generate can call this
+ * so Gemini checks balance / blank areas before the PDF opens.
+ */
+function reviewLayoutWithGemini_(body) {
+  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) {
+    return { ok: false, error: 'GEMINI_API_KEY is not set in Script Properties.' };
+  }
+  var layout = body.layout || body;
+  var prompt =
+    'You are checking an Eight Bells (Bolney) pub menu print layout before staff export to PDF.\n' +
+    'Return ONLY valid JSON (no markdown):\n' +
+    '{\n' +
+    '  "density": "airy"|"roomy"|"normal"|"tight"|"compact",\n' +
+    '  "sandwichesOn": "page1"|"page2"|"omit",\n' +
+    '  "dropFootLogo": true|false,\n' +
+    '  "okToPrint": true|false,\n' +
+    '  "notes": "one short sentence for staff"\n' +
+    '}\n' +
+    'Goals: both pages look filled without huge blank regions; columns roughly balanced;\n' +
+    'allergy footer must remain; type must not go unreadably small (prefer tight over compact).\n' +
+    'Only invent sections that staff already listed. Prefer sandwichesOn page2 beside sides.\n' +
+    'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
+
+  var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||
+    'gemini-3.6-flash';
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+    model + ':generateContent?key=' + encodeURIComponent(key);
+
+  var payload = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.2,
+      responseMimeType: 'application/json'
+    }
+  };
+
+  var resp = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  var code = resp.getResponseCode();
+  var text = resp.getContentText();
+  if (code < 200 || code >= 300) {
+    return { ok: false, error: 'Gemini HTTP ' + code + ': ' + text.slice(0, 400) };
+  }
+  var parsed = JSON.parse(text);
+  var parts = (((parsed || {}).candidates || [])[0] || {}).content || {};
+  var partList = parts.parts || [];
+  var outText = '';
+  for (var i = 0; i < partList.length; i++) {
+    if (partList[i].text) outText += partList[i].text;
+  }
+  outText = String(outText || '').replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+  var advice;
+  try {
+    advice = JSON.parse(outText);
+  } catch (e2) {
+    return { ok: false, error: 'Gemini layout review returned non-JSON', raw: outText.slice(0, 500) };
+  }
+  var density = String(advice.density || 'normal').toLowerCase();
+  if (['airy', 'roomy', 'normal', 'tight', 'compact'].indexOf(density) === -1) density = 'normal';
+  var sandwichesOn = String(advice.sandwichesOn || 'page2').toLowerCase();
+  if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page2';
+  return {
+    ok: true,
+    source: 'gemini-layout',
+    density: density,
+    sandwichesOn: sandwichesOn,
+    dropFootLogo: !!advice.dropFootLogo,
+    okToPrint: advice.okToPrint !== false,
+    notes: String(advice.notes || '').slice(0, 280)
   };
 }

@@ -342,17 +342,16 @@
   }
 
   function splitClassicsBag(sec) {
+    // Honour staff section picks: do not invent a Burgers title from dish names.
     var classics = [];
-    var burgers = [];
     var sandwichBits = [];
     ((sec && sec.dishes) || []).forEach(function (d) {
-      if (isSandwichDish(d)) sandwichBits.push(d);
-      else if (isBurgerDish(d)) burgers.push(d);
+      if (isSandwich(d.section) || /^sandwiches?\b/i.test(d.name || '')) sandwichBits.push(d);
       else classics.push(d);
     });
     return {
       classics: classics,
-      burgers: burgers,
+      burgers: [],
       sandwiches: sandwichBits,
       classicsTitle: 'Pub Classics',
       burgersTitle: 'Burgers'
@@ -469,7 +468,7 @@
   var COST = {
     tracker: 2,
     allergy: 4,
-    logoTop: 12,
+    logoTop: 10,
     nibblesBox: 2.5,
     sectionHead: 2.8,
     rooms: 9,
@@ -502,36 +501,31 @@
       other: [], hasLunch: false, count: dishes.length
     };
     var straySandwiches = [];
-    var strayBurgers = [];
     sections.forEach(function (s) {
       if (isNibbles(s.name) && !bag.nibbles) bag.nibbles = s;
       else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
       else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
       else if (isClassics(s.name) && !bag.classics) {
-        var kept = [];
-        (s.dishes || []).forEach(function (d) {
-          if (isSandwichDish(d)) straySandwiches.push(d);
-          else if (isBurgerDish(d)) strayBurgers.push(d);
-          else kept.push(d);
-        });
-        bag.classics = { name: 'Pub Classics', dishes: kept };
+        // Keep every staff-assigned classic here — including a lone burger filed as classic.
+        bag.classics = { name: 'Pub Classics', dishes: (s.dishes || []).slice() };
       } else if (isMains(s.name) && !bag.mains) bag.mains = s;
       else if (isDessert(s.name) && !bag.desserts) bag.desserts = s;
       else if (isSides(s.name) && !bag.sides) bag.sides = s;
       else if (isSandwich(s.name) && !bag.sandwiches) bag.sandwiches = s;
       else if (isSauce(s.name) && !bag.sauces) bag.sauces = s;
       else bag.other.push(s);
-      (s.dishes || []).forEach(function (d) { if (d.lunchClub) bag.hasLunch = true; });
+      (s.dishes || []).forEach(function (d) {
+        if (d.lunchClub) bag.hasLunch = true;
+        // Only peel sandwich *selling* lines left under the wrong heading
+        if (isClassics(s.name) && /^sandwiches?\b/i.test(d.name || '')) straySandwiches.push(d);
+      });
     });
-    if (strayBurgers.length) {
-      if (bag.burgers && bag.burgers.dishes) {
-        bag.burgers = { name: 'Burgers', dishes: bag.burgers.dishes.concat(strayBurgers) };
-      } else {
-        bag.burgers = { name: 'Burgers', dishes: strayBurgers };
-      }
-    }
-    if (straySandwiches.length) {
+    if (straySandwiches.length && bag.classics) {
+      bag.classics = {
+        name: bag.classics.name,
+        dishes: bag.classics.dishes.filter(function (d) { return !/^sandwiches?\b/i.test(d.name || ''); })
+      };
       if (bag.sandwiches && bag.sandwiches.dishes) {
         bag.sandwiches = {
           name: bag.sandwiches.name || 'Sandwiches',
@@ -540,11 +534,6 @@
       } else {
         bag.sandwiches = { name: 'Sandwiches', dishes: straySandwiches };
       }
-    }
-    // Merge burger section into classics bag for the two-column block
-    if (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length) {
-      if (!bag.classics) bag.classics = { name: 'Pub Classics', dishes: [] };
-      // keep burgers on bag.burgers; buildLong reads both
     }
     return bag;
   }
@@ -795,8 +784,8 @@
     var p2opts = layout.p2;
     var sidesPrint = sidesForPrint(bag);
     var hideDate = menu.id === 'party' || menu.kind === 'party';
-    var fill1 = fillClass((layout.leftover && layout.leftover.p1) || 12);
-    var fill2 = fillClass((layout.leftover && layout.leftover.p2) || 12);
+    var fill1 = (plan && plan.forceFillClass) || fillClass((layout.leftover && layout.leftover.p1) || 12);
+    var fill2 = (plan && plan.forceFillClass) || fillClass((layout.leftover && layout.leftover.p2) || 12);
 
     var nibRule = ruleFor('Nibbles', plan);
     var startRule = ruleFor('Starters', plan);
@@ -843,11 +832,11 @@
       }
     });
 
-    // Column block: Pub Classics (left) | Burgers + Stay a While below (right)
+    // Column block: Pub Classics (left) | Burgers only if staff used that section + Stay a While
     var split = splitClassicsBag(bag.classics);
     var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
       ? bag.burgers.dishes.slice()
-      : split.burgers.slice();
+      : [];
     if (split.sandwiches.length) {
       if (bag.sandwiches && bag.sandwiches.dishes) {
         bag.sandwiches = {
@@ -861,9 +850,9 @@
     var classicDishes = split.classics;
     var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms || p1opts.sandwiches ||
       (p1opts.sidesOnP1 && sidesPrint);
-    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length;
+    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length || !!p1opts.rooms;
     var sandwichesAsColumn = wantsColumn(sandRule);
-    var burgersOnRight = !!(layout.p1 && layout.p1.classicsSplit) || !!burgerDishes.length;
+    var burgersOnRight = !!burgerDishes.length;
 
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
@@ -872,17 +861,13 @@
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
-      if (burgerDishes.length && !burgersOnRight) {
-        p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
-      }
-      if (!classicDishes.length && !(burgerDishes.length && !burgersOnRight)) p1 += '&nbsp;';
+      if (!classicDishes.length) p1 += '&nbsp;';
       p1 += '</div><div class="col col-promo">';
-      if (burgerDishes.length && burgersOnRight) {
+      if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
       }
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches && sandwichesAsColumn) {
-        // sandwichNote already frames; honour “no frilly” by stripping to plain if needed
         if (sandRule.frame) p1 += renderFiller('sandwiches', bag);
         else {
           p1 += '<div class="promo sandwich-promo sec-plain">' +
@@ -897,7 +882,6 @@
       }
       p1 += '</div></div></section>';
     } else if (classicDishes.length || burgerDishes.length) {
-      // Full-width classics / burgers when designer chose full
       if (classicDishes.length) {
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
       }
@@ -943,37 +927,23 @@
     if (showBottom) {
       var sidesCol = sidesPrint && wantsColumn(sideRule);
       var sideList = (p2opts.sidesOnP2 && sidesPrint) ? sidesPrint.dishes.slice() : [];
-      var mid = Math.ceil(sideList.length / 2);
-      var sidesLeft = sideList.slice(0, mid);
-      var sidesRight = sideList.slice(mid);
-      // Split sides across two columns; sandwiches share the right for balance + bigger type room above.
-      if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms)) {
-        p2 += '<div class="cols bottom-cols bottom-cols-balanced">';
+      // Sides (and sauces) in the left column; Sandwiches fully in the frilly box on the right.
+      if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms || bag.sauces)) {
+        p2 += '<div class="cols bottom-cols">';
         p2 += '<div class="col col-sides">';
         if (sideList.length) {
           p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-          p2 += listDishes(sidesLeft.length ? sidesLeft : sideList);
-        } else if (p2opts.sidesOnP2 && bag.sauces) {
-          p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
-          p2 += listDishes(bag.sauces.dishes);
-        } else {
-          p2 += '&nbsp;';
+          p2 += listDishes(sideList);
         }
-        p2 += '</div><div class="col col-sides-b">';
-        if (sidesRight.length) {
-          if (!sidesLeft.length) p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-          else p2 += '<div class="sec-title soft-left sec-title-spacer" aria-hidden="true">&nbsp;</div>';
-          p2 += listDishes(sidesRight);
-        }
-        if (p2opts.sidesOnP2 && bag.sauces && sideList.length) {
+        if (p2opts.sidesOnP2 && bag.sauces) {
           p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
           p2 += listDishes(bag.sauces.dishes);
         }
-        if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag, promos, { alignTitle: true });
+        if (!sideList.length && !(p2opts.sidesOnP2 && bag.sauces)) p2 += '&nbsp;';
+        p2 += '</div><div class="col col-promo">';
+        if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag, promos);
         else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
-        if (!sidesRight.length && !p2opts.sandwiches && !p2opts.rooms && !(p2opts.sidesOnP2 && bag.sauces)) {
-          p2 += '&nbsp;';
-        }
+        else p2 += '&nbsp;';
         p2 += '</div></div>';
       } else if (p2opts.sidesOnP2 && sidesPrint) {
         p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
@@ -1072,11 +1042,11 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:1fr 230px;gap:12px;align-items:start;margin:0 0 10px}' +
-      '.top-band-logo{grid-template-columns:1fr 230px;min-height:48mm}' +
+      '.top-band{display:grid;grid-template-columns:1fr 180px;gap:10px;align-items:start;margin:0 0 8px}' +
+      '.top-band-logo{grid-template-columns:1fr 180px;min-height:40mm}' +
       '.top-left .scallop{margin-bottom:0}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
-      '.logo-tr{width:220px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
+      '.logo-tr{width:170px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:96px;height:auto}' +
@@ -1153,7 +1123,7 @@
       '.a5-face .page-body{flex:0 0 auto}' +
       '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
       '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
-      '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .logo-tr{width:96px!important}' +
       '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 118px;gap:8px;min-height:28mm}' +
       '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
       '.a5-face .tracker .roman{font-size:3.5pt!important}' +
@@ -1186,6 +1156,17 @@
     }).join('');
   }
 
+  function partyOccasion(title, meta) {
+    var blob = [title, meta && meta.subtitle, meta && meta.notes, meta && meta.coursePrices]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (/christmas|xmas|festive|yule|advent/.test(blob)) return 'christmas';
+    if (/valentine|romantic/.test(blob)) return 'valentine';
+    if (/new\s*year|hogmanay/.test(blob)) return 'newyear';
+    if (/easter/.test(blob)) return 'easter';
+    if (/mother|father|wedding|anniversary|celebration|summer/.test(blob)) return 'celebration';
+    return 'party';
+  }
+
   function buildParty(menu, dishes, plan, ver) {
     var meta = (plan && plan.meta) || {};
     var title = meta.title || menu.name || 'Party Menu';
@@ -1196,7 +1177,8 @@
     var byName = {};
     sections.forEach(function (s) { byName[s.name.toLowerCase()] = s; });
 
-    var html = '<div class="page party-page fill-page fill-roomy">';
+    var occasion = partyOccasion(title, meta);
+    var html = '<div class="page party-page party-theme-' + occasion + ' fill-page fill-roomy">';
     html += trackerBar(ver, { hideDate: true });
     html += '<div class="page-body">';
     html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
@@ -1308,6 +1290,9 @@
         'function boot(){fitPages();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitPages);}' +
         'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();' +
         'setTimeout(fitPages,80);setTimeout(fitPages,400);' +
+        'window.addEventListener("beforeprint",fitPages);' +
+        'var pb=document.querySelector(".toolbar button");' +
+        'if(pb){pb.onclick=function(ev){ev.preventDefault();fitPages();setTimeout(function(){window.print();},60);};}' +
       '})();<\/script>' +
       '</body></html>'
     );
@@ -1315,7 +1300,7 @@
 
   function partyCss() {
     return (
-      '.party-page{text-align:center;padding-top:8mm}' +
+      '.party-page{text-align:center;padding-top:8mm;position:relative}' +
       '.party-logo{width:76px;margin:0 auto 8px;display:block}' +
       '.party-title{font-family:var(--serif);font-size:24px;letter-spacing:.1em;margin:4px 0 6px;font-weight:700}' +
       '.party-prices{font-weight:700;font-size:14px;margin:0 0 14px;letter-spacing:.04em}' +
@@ -1323,13 +1308,28 @@
       '.party-sec .sec-title{margin-bottom:10px}' +
       '.party-dish{margin:0 0 10px;padding:0 14mm}' +
       '.party-dish .desc{padding-right:0;font-style:normal;color:#444}' +
-      '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}'
+      '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
+      /* Light occasion flourishes — classy, not cartoon */ +
+      '.party-theme-christmas{box-shadow:inset 0 0 0 1.5px #2f5d3a}' +
+      '.party-theme-christmas .party-title,.party-theme-christmas .sec-title{color:#1e3d28}' +
+      '.party-theme-christmas .party-prices{color:#6b2b2b}' +
+      '.party-theme-christmas .allergy{color:#2f5d3a}' +
+      '.party-theme-valentine{box-shadow:inset 0 0 0 1.5px #a85c6a}' +
+      '.party-theme-valentine .party-title,.party-theme-valentine .sec-title{color:#6e2c3a}' +
+      '.party-theme-valentine .party-prices{color:#8a4050}' +
+      '.party-theme-valentine .allergy{color:#8a4050}' +
+      '.party-theme-newyear{box-shadow:inset 0 0 0 1.5px #5a534a}' +
+      '.party-theme-newyear .party-title{letter-spacing:.18em}' +
+      '.party-theme-easter{box-shadow:inset 0 0 0 1.5px #6a7d4e}' +
+      '.party-theme-celebration .party-title{letter-spacing:.14em}' +
+      '.party-theme-party .party-title{letter-spacing:.12em}'
     );
   }
 
   root.EBMenuPrint = {
     build: build,
     planFluidLayout: planFluidLayout,
+    partyOccasion: partyOccasion,
     orderDishesForPrint: orderDishesForPrint,
     toRoman: toRoman,
     weekLabel: weekLabel,

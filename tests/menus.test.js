@@ -71,15 +71,21 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:220px/.test(printJs), 'front-page logo sized ~220px');
+assert(/logo-tr\{width:170px/.test(printJs), 'front-page logo sized ~170px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
 assert(/--title:18pt/.test(printJs), 'section titles large but fit-friendly');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
-assert(printJs.indexOf('bottom-cols-balanced') !== -1, 'page-2 sides split for balance');
+assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
+assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
+assert(printJs.indexOf('Honour staff section picks') !== -1 || printJs.indexOf('do not invent a Burgers title') !== -1, 'print respects staff sections');
 assert(api.SECTIONS.indexOf('Sauces') !== -1, 'Sauces is a canonical section');
 assert(api.guessSection('Sauces', 'Peppercorn', '') === 'Sauces', 'guesses Sauces section');
 assert(api.priceOf('Masala Sea Bass 16 .95').value === '16.95', 'priceOf tolerates spaced decimals');
 assert(api.cleanDishName('Masala Sea Bass 16 .95') === 'Masala Sea Bass', 'cleanDishName strips spaced price');
+assert(printJs.indexOf('bottom-cols-balanced') === -1 || printJs.indexOf('Sides (and sauces) in the left column') !== -1, 'sides stay one column beside sandwiches');
+assert(ingestJs.indexOf('reviewLayout') !== -1, 'ingest can ask Gemini to review layout balance');
+assert(aiGs.indexOf('reviewLayoutWithGemini_') !== -1, 'Apps Script supports layout review action');
+assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
   { section: 'Pub Classics', name: 'Fish & Chips', description: 'served with chips, garden peas', price: '17.95', tags: '' },
@@ -175,6 +181,21 @@ assert(fluid.p1.classicsSplit === 1 || fluid.pages === 1, 'layout prefers burger
 var htmlPreview = print.build(mainMenu, aloneDishes, {});
 assert(/col-promo[\s\S]*Burgers/i.test(htmlPreview) || /Burgers[\s\S]*Stay a While/i.test(htmlPreview), 'burgers render before Stay a While in right column');
 assert(/bottom-cols-balanced/.test(htmlPreview) || fluid.pages === 1, 'page 2 uses balanced sides columns when two pages');
+
+// Staff filed Spicy Asian as Pub Classics — must not invent a Burgers heading
+var classicOnly = [
+  api.dish('Nibbles', 'Olives', '', '6.95', 'vg'),
+  api.dish('Pub Classics', 'Haddock & Chips', 'peas', '17.95', ''),
+  api.dish('Pub Classics', 'Spicy Asian Burger', 'fries', '16.95', 'vg'),
+  api.dish('Mains', 'Pie', 'mash', '14.95', '')
+];
+var classicLayout = print.planFluidLayout(mainMenu, classicOnly);
+assert(!classicLayout.bag.burgers || !(classicLayout.bag.burgers.dishes || []).length, 'no Burgers bag when staff only used Pub Classics');
+var classicHtml = print.build(mainMenu, classicOnly, {});
+assert(classicHtml.indexOf('>Burgers<') === -1 && classicHtml.indexOf('>BURGERS<') === -1, 'no Burgers section title when none categorised');
+assert(/Spicy Asian Burger/.test(classicHtml), 'classic-filed burger still prints');
+assert(print.partyOccasion('Christmas Party Menu', {}) === 'christmas', 'detects Christmas occasion');
+assert(print.partyOccasion('Valentine Dinner', {}) === 'valentine', 'detects Valentine occasion');
 
 var shuffled = [
   api.dish('Mains', 'Pie', 'mash', '14.95', ''),
