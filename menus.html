@@ -18,60 +18,117 @@
     }
     body { font-family: var(--sans); background: var(--white-warm); color: var(--ink); line-height: 1.45; }
     .ps-header { background: var(--paint); border-bottom: 1px solid var(--paint-deep); padding: 14px 20px; }
-    .ps-header-inner { max-width: 1180px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .ps-header-inner { max-width: 720px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
     .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
     .ps-venue-name { font-family: var(--serif); font-size: 22px; font-weight: 500; }
-    html.iframed .ps-header { display: none; } /* HARD: never restore display:block for iframed/varlo-header — shell already has the chrome */
-    main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 64px; }
-    h1 { font-family: var(--serif); font-weight: 500; font-size: 32px; }
-    .lede { color: var(--ink-soft); max-width: 720px; margin: 6px 0 18px; font-size: 15px; }
-    .menus, .modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-    .menus button, .modes button, button.go, button.ghost {
+    html.iframed .ps-header { display: none; } /* HARD: never restore display:block for iframed/varlo-header */
+    main { max-width: 720px; margin: 0 auto; padding: 16px 16px 120px; }
+    h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 5vw, 34px); }
+    .lede { color: var(--ink-soft); margin: 6px 0 16px; font-size: 14.5px; max-width: 40em; }
+    .menus { display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 18px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+    .menus button, button.go, button.ghost, button.soft {
       font-family: var(--sans); cursor: pointer; border-radius: 999px; border: 1px solid var(--line);
-      background: #fff; color: var(--ink); padding: 8px 14px; font-weight: 600; font-size: 13px;
+      background: #fff; color: var(--ink); padding: 10px 14px; font-weight: 600; font-size: 13px; white-space: nowrap;
     }
-    .menus button.on, .modes button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
+    .menus button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     button.go { background: var(--ink); color: var(--paint); border-color: var(--ink); }
-    button.link { background: transparent; border: 0; color: var(--ink-soft); text-decoration: underline; padding: 0; font-weight: 600; cursor: pointer; font-family: var(--sans); }
-    .top-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 16px; }
-    .grid { display: grid; grid-template-columns: 1.25fr 0.85fr; gap: 18px; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
-    label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
-    input[type=text], select, textarea {
-      width: 100%; font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--white-warm); color: var(--ink);
+    button.soft { background: var(--paint-wash); border-color: transparent; }
+    button.link { background: transparent; border: 0; color: var(--ink-soft); text-decoration: underline; padding: 0; font-weight: 600; cursor: pointer; font-family: var(--sans); font-size: 13px; }
+    .flow-step {
+      background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 18px 16px 20px; margin-bottom: 14px;
     }
-    textarea { min-height: 140px; }
-    .plan { border-radius: 12px; padding: 12px 14px; background: var(--paint-wash); margin-bottom: 12px; }
+    .step-kicker {
+      font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; margin-bottom: 6px;
+    }
+    .flow-step h2 { font-family: var(--serif); font-weight: 500; font-size: 24px; margin-bottom: 4px; }
+    .flow-step .step-lede { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 14px; }
+    .toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+    label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
+    input[type=text], input[type=url], input[type=date], select, textarea {
+      width: 100%; font: inherit; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--white-warm); color: var(--ink);
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    .plan { border-radius: 12px; padding: 12px 14px; background: var(--paint-wash); margin-bottom: 10px; }
     .plan strong { font-family: var(--serif); font-weight: 500; font-size: 18px; display: block; }
     .plan.over { background: #fbeae6; }
-    .plan.one, .plan.two-up { background: #e8f0e4; }
+    .plan.one, .plan.two, .plan.two-up { background: #e8f0e4; }
     .note { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
     .include-box { background: var(--paint-wash); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
     .include-box h3 { font-family: var(--serif); font-weight: 500; font-size: 17px; margin-bottom: 6px; }
-    .include-row { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+    .include-row { display: flex; flex-wrap: wrap; gap: 10px 14px; }
     .include-row label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
-    .complete-head { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: end; margin: 8px 0; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
-    .ticks-head { display: grid; grid-template-columns: repeat(4, 52px); gap: 4px; text-align: center; }
-    .dish-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line); }
-    .dish-row .name { font-weight: 700; }
-    .dish-row .meta { font-size: 13px; color: var(--ink-soft); }
-    .dish-row .tag { color: var(--green); font-style: italic; }
-    .ticks { display: grid; grid-template-columns: repeat(4, 52px); gap: 4px; justify-items: center; padding-top: 2px; }
-    .ticks label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
+    .complete-head {
+      display: none;
+    }
+    @media (min-width: 640px) {
+      .complete-head { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 8px; align-items: end; margin: 8px 0; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
+    }
+    .ticks-head { display: grid; grid-template-columns: repeat(4, 44px); gap: 4px; text-align: center; }
+    .dish-row {
+      display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; align-items: start;
+      padding: 12px 0; border-bottom: 1px solid var(--line);
+    }
+    @media (min-width: 640px) {
+      .dish-row { grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; }
+    }
+    .dish-row .name { font-weight: 700; font-size: 15px; }
+    .dish-row .meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+    .dish-row .tag { color: var(--green); font-style: italic; font-size: 13px; }
+    .dish-row select.section-pick, .form-card select#section {
+      display: block; width: 100%; max-width: 220px; margin-top: 4px;
+      font: 600 13px var(--sans); padding: 7px 10px; border: 1px solid var(--line);
+      border-radius: 10px; background: var(--paint-wash); color: var(--ink);
+    }
+    .layout-grid { display: flex; flex-direction: column; gap: 8px; }
+    .layout-head, .layout-row {
+      display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1fr) minmax(0,0.7fr);
+      gap: 8px; align-items: center;
+    }
+    .layout-head { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
+    .layout-name { font-weight: 700; font-size: 13.5px; }
+    .layout-row select {
+      font: 600 12.5px var(--sans); padding: 7px 8px; border: 1px solid var(--line);
+      border-radius: 10px; background: #fff; color: var(--ink); width: 100%;
+    }
+    @media (max-width: 560px) {
+      .layout-head { display: none; }
+      .layout-row { grid-template-columns: 1fr; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    }
+    .dish-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .dish-actions select {
+      width: auto; min-width: 7.5rem; padding: 8px 10px; font-size: 13px; font-weight: 600; background: #fff;
+    }
+    .ticks { display: grid; grid-template-columns: repeat(4, 44px); gap: 4px; justify-items: center; }
+    .ticks label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--ink-soft); cursor: pointer; min-height: 44px; justify-content: center; }
     .ticks .letter { color: var(--green); font-style: italic; font-size: 12px; }
-    .section-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 12px; font-weight: 700; }
+    .section-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 14px; font-weight: 700; }
     .mark { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
     .opt-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
     .opt-row label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-soft); font-weight: 600; cursor: pointer; }
-    ul.dishes { list-style: none; }
-    ul.dishes li { padding: 8px 0; border-bottom: 1px solid var(--line); }
-    ul.dishes .name { font-weight: 700; }
+    .bank-item { padding: 10px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; }
+    .bank-item .name { font-weight: 700; }
+    .bank-item .meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
     .from { font-size: 11px; color: var(--ink-soft); font-weight: 600; }
+    .form-card { background: var(--paint-wash); border-radius: 12px; padding: 14px; margin: 12px 0; }
+    .form-card h3 { font-family: var(--serif); font-weight: 500; font-size: 18px; margin-bottom: 4px; }
+    .generate-bar {
+      position: sticky; bottom: 0; z-index: 8; margin: 8px -16px -16px; padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+      background: rgba(251,248,242,.94); backdrop-filter: blur(8px); border-top: 1px solid var(--line);
+    }
+    .generate-bar .bar-inner { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+    .generate-bar .bar-copy { flex: 1 1 200px; font-size: 13px; color: var(--ink-soft); }
+    .generate-bar .bar-copy strong { color: var(--ink); font-family: var(--serif); font-weight: 500; font-size: 16px; display: block; }
+    .generate-bar .bar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .date-field { display: grid; grid-template-columns: 1fr 3rem; gap: 8px; align-items: stretch; }
+    .date-field input[type=date] {
+      width: 100%; min-width: 0; padding: 8px 4px; cursor: pointer; min-height: 44px;
+    }
+    .date-field input[type=text] { min-height: 44px; }
+    details.more > summary { cursor: pointer; font-weight: 600; font-size: 13px; color: var(--ink-soft); list-style: none; }
+    details.more > summary::-webkit-details-marker { display: none; }
     @media print {
-      .ps-header, .lede, .menus, .modes, .top-actions, #editor, .no-print { display: none !important; }
-      .grid { display: block; }
-      .card { border: 0; padding: 0; }
+      .ps-header, .lede, .menus, .generate-bar, .no-print, .dish-actions, .toolbar-row { display: none !important; }
+      .flow-step { border: 0; padding: 0; }
       body { background: #fff; }
     }
   </style>
@@ -87,20 +144,13 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Build each menu — <strong>upload a PDF or image</strong>, paste a list, or add/adjust dishes. Keep a <strong>wording bank</strong> for Stay a While, pub quizzes and events (with dates). Tick what to print, or leave unticked and Generate auto-picks — never past dates.</p>
-    <div class="menus" id="menuPicker"></div>
-    <div class="top-actions no-print">
-      <button type="button" class="go" id="doGenerate">Generate menu</button>
-      <button type="button" class="ghost" id="doPrintHint">Print / save as PDF from the generated sheet</button>
-    </div>
-    <div class="grid">
-      <section class="card" id="editor"></section>
-      <section class="card" id="preview"></section>
-    </div>
+    <p class="lede">Build the dishes, choose wording for the sheet, then generate. Adjust or replace any dish from its own menu.</p>
+    <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
+    <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260922-wording2"></script>
-  <script src="menus-print.js?v=20260922-wording2"></script>
-  <script src="menus-ingest.js?v=20260922-wording2"></script>
+  <script src="menus.js?v=20260922-layout1"></script>
+  <script src="menus-print.js?v=20260922-layout1"></script>
+  <script src="menus-ingest.js?v=20260922-layout1"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -108,16 +158,30 @@
     var META_STORAGE = 'eb-menus-meta-v1';
     var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
     var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
+    var LAYOUT_STORAGE = 'eb-menu-section-layout-v1';
     var book = load();
     var metaBook = loadMeta();
     var promoBank = loadPromoBank();
     var promoTicks = loadPromoTicks();
+    var sectionLayout = loadSectionLayout();
     var menuId = 'main';
     var mode = 'complete';
     var dishId = '';
     var includes = loadIncludes();
     var pendingReview = null;
     var editingPromoId = '';
+
+    function loadSectionLayout() {
+      try {
+        var raw = JSON.parse(localStorage.getItem(LAYOUT_STORAGE) || 'null');
+        return EBMenus.normalizeSectionLayout(raw);
+      } catch (e) {
+        return EBMenus.defaultSectionLayout();
+      }
+    }
+    function saveSectionLayout() {
+      localStorage.setItem(LAYOUT_STORAGE, JSON.stringify(sectionLayout));
+    }
 
     function loadPromoBank() {
       try {
@@ -191,7 +255,6 @@
     function render() {
       renderPicker();
       renderEditor();
-      renderPreview();
     }
 
     function renderPicker() {
@@ -200,12 +263,15 @@
       EBMenus.MENUS.forEach(function (menu) {
         var b = document.createElement('button');
         b.type = 'button';
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-selected', menu.id === menuId ? 'true' : 'false');
         b.textContent = menu.name;
         b.className = menu.id === menuId ? 'on' : '';
         b.onclick = function () {
           menuId = menu.id;
           dishId = (dishes()[0] && dishes()[0].id) || '';
-          if (mode !== 'complete' && mode !== 'adjust' && mode !== 'replace' && mode !== 'add' && mode !== 'paste') mode = 'complete';
+          if (mode === 'adjust' || mode === 'replace' || mode === 'add' || mode === 'paste') mode = 'complete';
+          editingPromoId = '';
           render();
         };
         box.appendChild(b);
@@ -221,101 +287,197 @@
     function renderEditor() {
       var menu = EBMenus.menuById(menuId);
       var el = document.getElementById('editor');
-      var html = '<h2 style="font-family:var(--serif);font-weight:500;font-size:24px">' + menu.name + '</h2>';
-      html += '<div class="modes">';
-      [
-        ['complete', 'Show complete menu'],
-        ['adjust', 'Adjust a dish'],
-        ['replace', 'Replace a dish'],
-        ['add', 'Add a dish'],
-        ['paste', 'Upload / paste'],
-        ['wording', 'Wording / events']
-      ].forEach(function (pair) {
-        html += '<button type="button" data-mode="' + pair[0] + '" class="' + (mode === pair[0] ? 'on' : '') + '">' + pair[1] + '</button>';
-      });
-      html += '</div>';
+      var html = '';
+
+      // —— 1. This menu's dishes ——
+      html += '<section class="flow-step" id="step-dishes">';
+      html += '<div class="step-kicker">1 · This menu</div>';
+      html += '<h2>' + escapeAttr(menu.name) + '</h2>';
+      html += '<p class="step-lede">Current dishes for the sheet. Use each dish’s menu to adjust or replace.</p>';
 
       var extras = EBMenus.includableMenus(menuId);
       if (extras.length) {
         html += '<div class="include-box"><h3>Also put on this sheet</h3>';
-        html += '<p class="note" style="margin:0 0 8px">Tick another menu to try it on the same sheet. The note on the right says if it still fits.</p><div class="include-row">';
+        html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print. Generate says if it still fits.</p><div class="include-row">';
         extras.forEach(function (m) {
           var on = !!(includes[menuId] && includes[menuId][m.id]);
-          html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + m.name + '</label>';
+          html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(m.name) + '</label>';
         });
         html += '</div></div>';
       }
 
-      if (menu.kind === 'long') {
-        html += renderPromoTicksBox();
+      if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
+        html += renderDishForm(menu);
+      } else if (mode === 'paste') {
+        html += renderPasteBlock(menu);
       }
 
-      if (mode === 'complete') {
-        html += renderComplete();
-      } else if (mode === 'wording') {
-        html += renderWordingBank();
-      } else if (mode === 'paste') {
-        html += '<p class="note">Upload a designed menu <strong>PDF or photo</strong>, or paste text. You will <strong>review</strong> the dishes before they replace <em>' + menu.name + '</em>.</p>';
-        html += '<div class="include-box" style="margin-bottom:14px">';
-        html += '<h3>AI reader (recommended for Christmas / Canva art)</h3>';
-        html += '<p class="note" style="margin:0 0 8px">Same idea as the website conversion: Gemini reads the picture and returns clean dishes. Needs a one-time Apps Script URL (uses your AI credits). Without it, images fall back to OCR and are often wrong.</p>';
-        html += '<label class="field">AI reader URL</label>';
-        html += '<input type="url" id="aiUrl" placeholder="https://script.google.com/macros/s/…/exec" value="' + escapeAttr((window.EBMenuIngest && EBMenuIngest.getAiUrl()) || '') + '">';
-        html += '<button class="link" id="doSaveAiUrl" type="button" style="margin-top:8px">Save AI URL</button>';
-        html += '<p class="note" id="aiUrlNote" style="margin-top:6px">Setup: see apps-script/menu-ai/README.md in the repo.</p>';
-        html += '</div>';
-        html += '<div class="include-box" style="margin-bottom:14px">';
-        html += '<h3>Upload PDF or image</h3>';
-        html += '<input type="file" id="menuFile" accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp" style="display:block;width:100%;font:inherit">';
-        html += '<button class="go" id="doUpload" type="button" style="margin-top:12px">Read uploaded file</button>';
-        html += '<p class="note" id="uploadNote" style="margin-top:8px"></p>';
-        html += '</div>';
-        html += '<label class="field">Or paste / edit text</label><textarea id="paste" placeholder="Starters&#10;Jerusalem Artichoke Soup&#10;finished with fragrant black truffle oil"></textarea>';
-        html += '<button class="go" id="doPaste" type="button" style="margin-top:12px">Read whole menu</button>';
-        html += '<p class="note" id="pasteNote"></p>';
-        if (menu.kind === 'party') {
-          var m = metaBook[menuId] || EBMenus.emptyMeta();
-          html += '<div class="include-box" style="margin-top:14px"><h3>Party sheet details</h3>';
-          html += field('Title', 'metaTitle', m.title || 'Christmas Party Menu');
-          html += field('Course prices', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
-          html += field('Notes (pre-order / deposit)', 'metaNotes', m.notes || '');
-          html += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party details</button></div>';
-        }
-      } else if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
-        if ((mode === 'adjust' || mode === 'replace') && !dishes().length) {
-          html += '<p class="note">This menu is empty. Add a dish, or paste a whole menu.</p>';
-        } else {
-          var item = (mode === 'adjust' || mode === 'replace') ? currentDish() : blank();
-          if (!item) item = blank();
-          if (mode === 'replace') {
-            html += '<p class="note">Pick the dish to swap out, then type the new one. Same slot on the menu.</p>';
-          }
-          if (mode === 'adjust' || mode === 'replace') {
-            html += '<label class="field">Dish</label><select id="pick">';
-            dishes().forEach(function (d) {
-              html += '<option value="' + d.id + '"' + (d.id === dishId ? ' selected' : '') + '>' + d.section + ' — ' + d.name + '</option>';
-            });
-            html += '</select>';
-          }
-          var formItem = mode === 'replace' ? blank() : item;
-          if (mode === 'replace') formItem.section = item.section;
-          html += field('Section', 'section', formItem.section);
-          html += field('Name', 'name', formItem.name);
-          html += field('Description', 'description', formItem.description);
-          html += field('Price', 'price', formItem.price);
-          html += marksEditor(mode === 'replace' ? formItem : item, 'form');
-          var saveLabel = mode === 'add' ? 'Add dish' : (mode === 'replace' ? 'Replace dish' : 'Save changes');
-          html += '<button class="go" id="doSave" type="button" style="margin-top:14px">' + saveLabel + '</button>';
-          if (mode === 'adjust' && item.id) html += ' <button class="link" id="doRemove" type="button">Remove this dish</button>';
+      html += renderComplete();
+      html += '<div class="toolbar-row no-print">';
+      html += '<button type="button" class="soft" data-mode="add">Add a dish</button>';
+      html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
+      html += '</div>';
+      html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+      html += '<button class="link" id="doClear" type="button">Clear this menu</button>';
+      html += '<span>·</span>';
+      html += '<button class="link" id="doReset" type="button">Put sample menus back</button>';
+      html += '</div>';
+      html += '</section>';
+
+      // —— 2. Wording & events ——
+      html += '<section class="flow-step" id="step-wording">';
+      html += '<div class="step-kicker">2 · Wording &amp; events</div>';
+      html += '<h2>What else goes on the sheet</h2>';
+      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want, or leave blank and we’ll auto-pick (never past dates).</p>';
+      if (menu.kind === 'long') html += renderPromoTicksBox();
+      else html += '<p class="note">Wording boxes are for Main and Sunday sheets. Card menus print without them.</p>';
+      html += renderWordingBank();
+      if (menu.kind === 'long') html += renderSectionLayoutBox();
+      html += '</section>';
+
+      // —— 3. Generate ——
+      html += '<section class="flow-step" id="step-generate">';
+      html += '<div class="step-kicker">3 · Generate</div>';
+      html += '<h2>Print sheet</h2>';
+      html += '<div id="preview">' + renderPlanHtml() + '</div>';
+      html += '<div class="generate-bar no-print"><div class="bar-inner">';
+      html += '<div class="bar-copy" id="generateHint"></div>';
+      html += '<div class="bar-actions">';
+      html += '<button type="button" class="go" id="doGenerate">Generate menu</button>';
+      html += '<button type="button" class="ghost" id="doPrintHint">Print / PDF</button>';
+      html += '</div></div></div>';
+      html += '</section>';
+
+      el.innerHTML = html;
+      var hint = document.getElementById('generateHint');
+      if (hint) {
+        var plan = composed().plan;
+        hint.innerHTML = '<strong>' + escapeAttr(planTitle(plan.fit)) + '</strong>' + escapeAttr(plan.text || '');
+      }
+      bindEditor();
+    }
+
+    function sectionSelectHtml(selected, attrs) {
+      var opts = EBMenus.sectionOptions();
+      var html = '<select ' + (attrs || '') + '>';
+      var seen = false;
+      opts.forEach(function (s) {
+        var on = s === selected;
+        if (on) seen = true;
+        html += '<option value="' + escapeAttr(s) + '"' + (on ? ' selected' : '') + '>' + escapeAttr(s) + '</option>';
+      });
+      if (selected && !seen) {
+        html += '<option value="' + escapeAttr(selected) + '" selected>' + escapeAttr(selected) + '</option>';
+      }
+      html += '</select>';
+      return html;
+    }
+
+    function renderDishForm(menu) {
+      var html = '<div class="form-card no-print">';
+      if ((mode === 'adjust' || mode === 'replace') && !dishes().length) {
+        html += '<p class="note">This menu is empty. Add a dish, or paste a whole menu.</p></div>';
+        return html;
+      }
+      var item = (mode === 'adjust' || mode === 'replace') ? currentDish() : blank();
+      if (!item) item = blank();
+      html += '<h3>' + (mode === 'add' ? 'Add a dish' : (mode === 'replace' ? 'Replace dish' : 'Adjust dish')) + '</h3>';
+      if (mode === 'replace') html += '<p class="note">Type the new dish — same slot on the menu.</p>';
+      if (mode === 'adjust' || mode === 'replace') {
+        html += '<label class="field">Dish</label><select id="pick">';
+        dishes().forEach(function (d) {
+          html += '<option value="' + d.id + '"' + (d.id === dishId ? ' selected' : '') + '>' + escapeAttr(d.section + ' — ' + d.name) + '</option>';
+        });
+        html += '</select>';
+      }
+      var formItem = mode === 'replace' ? blank() : item;
+      if (mode === 'replace') formItem.section = item.section;
+      html += '<label class="field">Section</label>' + sectionSelectHtml(formItem.section || 'Mains', 'id="section"');
+      html += field('Name', 'name', formItem.name);
+      html += field('Description', 'description', formItem.description);
+      html += field('Price', 'price', formItem.price);
+      html += marksEditor(mode === 'replace' ? formItem : item, 'form');
+      var saveLabel = mode === 'add' ? 'Add dish' : (mode === 'replace' ? 'Replace dish' : 'Save changes');
+      html += '<div class="toolbar-row">';
+      html += '<button class="go" id="doSave" type="button">' + saveLabel + '</button>';
+      html += '<button class="link" data-mode="complete" type="button">Cancel</button>';
+      if (mode === 'adjust' && item.id) html += '<button class="link" id="doRemove" type="button">Remove this dish</button>';
+      html += '</div></div>';
+      return html;
+    }
+
+    function renderPasteBlock(menu) {
+      var html = '<div class="form-card no-print">';
+      html += '<h3>Upload / paste whole menu</h3>';
+      html += '<p class="note">You will <strong>review</strong> dishes before they replace <em>' + escapeAttr(menu.name) + '</em>.</p>';
+      html += '<div class="include-box" style="margin-bottom:14px;background:#fff">';
+      html += '<h3>AI reader (Christmas / Canva art)</h3>';
+      html += '<p class="note" style="margin:0 0 8px">Gemini reads the picture. Needs Apps Script URL (your AI credits).</p>';
+      html += '<label class="field">AI reader URL</label>';
+      html += '<input type="url" id="aiUrl" placeholder="https://script.google.com/macros/s/…/exec" value="' + escapeAttr((window.EBMenuIngest && EBMenuIngest.getAiUrl()) || '') + '">';
+      html += '<button class="link" id="doSaveAiUrl" type="button" style="margin-top:8px">Save AI URL</button>';
+      html += '<p class="note" id="aiUrlNote" style="margin-top:6px"></p></div>';
+      html += '<label class="field">Upload PDF or image</label>';
+      html += '<input type="file" id="menuFile" accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp" style="display:block;width:100%;font:inherit">';
+      html += '<button class="go" id="doUpload" type="button" style="margin-top:10px">Read uploaded file</button>';
+      html += '<p class="note" id="uploadNote"></p>';
+      html += '<label class="field">Or paste text</label><textarea id="paste" placeholder="Starters&#10;Jerusalem Artichoke Soup&#10;…"></textarea>';
+      html += '<div class="toolbar-row">';
+      html += '<button class="go" id="doPaste" type="button">Read pasted text</button>';
+      html += '<button class="link" data-mode="complete" type="button">Cancel</button>';
+      html += '</div>';
+      if (menu.kind === 'party') {
+        var m = metaBook[menuId] || EBMenus.emptyMeta();
+        html += '<div class="include-box" style="margin-top:14px;background:#fff"><h3>Party sheet details</h3>';
+        html += field('Title', 'metaTitle', m.title || 'Christmas Party Menu');
+        html += field('Course prices', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
+        html += field('Notes (pre-order / deposit)', 'metaNotes', m.notes || '');
+        html += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party details</button></div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function dateFieldHtml(isoValue) {
+      var iso = EBMenus.toIsoDate(isoValue || '') || '';
+      var uk = EBMenus.toUkDate(iso) || '';
+      var html = '<label class="field">Date (optional)</label>';
+      html += '<div class="date-field">';
+      html += '<input type="text" id="promoDateUk" placeholder="DD-MM-YYYY" inputmode="numeric" autocomplete="off" value="' + escapeAttr(uk) + '">';
+      html += '<input type="date" id="promoDate" value="' + escapeAttr(iso) + '" title="Open calendar" aria-label="Pick a date">';
+      html += '</div>';
+      html += '<p class="note" style="margin-top:4px">UK format DD-MM-YYYY — use the calendar icon to pick.</p>';
+      return html;
+    }
+
+    function bindDateField() {
+      var uk = document.getElementById('promoDateUk');
+      var iso = document.getElementById('promoDate');
+      if (!uk || !iso) return;
+      function syncFromPicker() {
+        uk.value = EBMenus.toUkDate(iso.value) || '';
+      }
+      function syncFromText() {
+        var next = EBMenus.toIsoDate(uk.value);
+        if (next) {
+          iso.value = next;
+          uk.value = EBMenus.toUkDate(next);
+        } else if (!String(uk.value || '').trim()) {
+          iso.value = '';
         }
       }
-      html += '<div class="note" style="margin-top:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
-      html += '<button class="link" id="doClear" type="button">Clear this menu (start again)</button>';
-      html += '<span>·</span>';
-      html += '<button class="link" id="doReset" type="button">Put all sample menus back</button>';
-      html += '</div>';
-      el.innerHTML = html;
-      bindEditor();
+      iso.addEventListener('change', syncFromPicker);
+      iso.addEventListener('input', syncFromPicker);
+      uk.addEventListener('change', syncFromText);
+      uk.addEventListener('blur', syncFromText);
+    }
+
+    function readPromoDateIso() {
+      var isoEl = document.getElementById('promoDate');
+      var ukEl = document.getElementById('promoDateUk');
+      var fromPicker = isoEl && isoEl.value ? EBMenus.toIsoDate(isoEl.value) : '';
+      if (fromPicker) return fromPicker;
+      return ukEl ? EBMenus.toIsoDate(ukEl.value) : '';
     }
 
     function marksEditor(item, prefix) {
@@ -339,6 +501,39 @@
     }
     function tick(label, id, on) {
       return '<label><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
+    }
+
+    function renderSectionLayoutBox() {
+      var defaults = EBMenus.defaultSectionLayout();
+      var html = '<div class="include-box layout-rules" style="margin-top:14px"><h3>Section layout rules</h3>';
+      html += '<p class="note" style="margin:0 0 10px">Defaults are set per category. Change any row and it <strong>saves for next time</strong> until someone changes it again.</p>';
+      html += '<div class="layout-grid">';
+      html += '<div class="layout-head"><span>Section</span><span>Width</span><span>Frilly box</span></div>';
+      EBMenus.SECTIONS.forEach(function (sec) {
+        var rule = sectionLayout[sec] || defaults[sec];
+        var isDefault = defaults[sec] &&
+          defaults[sec].width === rule.width &&
+          !!defaults[sec].frame === !!rule.frame;
+        html += '<div class="layout-row" data-layout-sec="' + escapeAttr(sec) + '">';
+        html += '<div class="layout-name">' + escapeAttr(sec);
+        if (!isDefault) html += ' <span class="from">custom</span>';
+        html += '</div>';
+        html += '<select data-layout-width="' + escapeAttr(sec) + '" aria-label="Width for ' + escapeAttr(sec) + '">';
+        EBMenus.WIDTH_OPTIONS.forEach(function (w) {
+          html += '<option value="' + w.id + '"' + (rule.width === w.id ? ' selected' : '') + '>' + escapeAttr(w.label) + '</option>';
+        });
+        html += '</select>';
+        html += '<select data-layout-frame="' + escapeAttr(sec) + '" aria-label="Frilly box for ' + escapeAttr(sec) + '">';
+        html += '<option value="yes"' + (rule.frame ? ' selected' : '') + '>Yes</option>';
+        html += '<option value="no"' + (!rule.frame ? ' selected' : '') + '>No</option>';
+        html += '</select>';
+        html += '</div>';
+      });
+      html += '</div>';
+      html += '<div class="toolbar-row" style="margin-top:12px">';
+      html += '<button type="button" class="link" id="doResetLayout">Reset all layout rules to defaults</button>';
+      html += '</div></div>';
+      return html;
     }
 
     function renderPromoTicksBox() {
@@ -374,8 +569,8 @@
       promoBank.forEach(function (p) { if (p.id === editingPromoId) edit = p; });
       html += field('Title', 'promoTitle', edit ? edit.title : '');
       html += '<label class="field">Wording</label><textarea id="promoBody" placeholder="Join us from 8pm…">' + escapeAttr(edit ? edit.body : '') + '</textarea>';
-      html += field('Date (optional, YYYY-MM-DD)', 'promoDate', edit ? (edit.date || '') : '');
-      html += '<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+      html += dateFieldHtml(edit ? edit.date : '');
+      html += '<div class="toolbar-row">';
       html += '<button class="go" id="doSavePromo" type="button">' + (edit ? 'Save wording' : 'Add to bank') + '</button>';
       if (edit) html += '<button class="link" id="doCancelPromo" type="button">Cancel edit</button>';
       html += '</div></div>';
@@ -401,10 +596,11 @@
     }
 
     function renderComplete() {
-      var list = dishes();
+      var list = EBMenus.sortDishesBySection(dishes());
       if (!list.length) return '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
       var showLunch = menuId !== 'lunch-club';
-      var html = '<div class="complete-head"><div>Dish</div><div class="ticks-head">';
+      var html = '<p class="note no-print" style="margin:0 0 10px">Each dish has a <strong>section</strong> dropdown — we auto-guess after upload; change any that look wrong.</p>';
+      html += '<div class="complete-head"><div>Dish</div><div class="ticks-head">';
       if (showLunch) html += '<span title="Lunch club">' + MARK + '</span>';
       html += '<span class="letter">gf</span><span class="letter">v</span><span class="letter">vg</span></div></div>';
       var section = '';
@@ -420,6 +616,8 @@
         html += '</div>';
         if (d.description) html += '<div class="meta">' + escapeAttr(d.description) + '</div>';
         if (d.tags) html += '<div class="tag">' + escapeAttr(d.tags) + '</div>';
+        html += '<label class="field no-print" style="margin:8px 0 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)">Section</label>';
+        html += sectionSelectHtml(d.section, 'data-section-id="' + escapeAttr(d.id) + '" class="section-pick" aria-label="Section for ' + escapeAttr(d.name) + '"');
         html += '<div class="opt-row">';
         if (m.gf) html += '<label><input type="checkbox" data-flag="gfOpt" data-id="' + d.id + '"' + (m.gfOpt ? ' checked' : '') + '> gf as option</label>';
         if (m.v) html += '<label><input type="checkbox" data-flag="vOpt" data-id="' + d.id + '"' + (m.vOpt ? ' checked' : '') + '> v as option</label>';
@@ -430,15 +628,75 @@
         html += '<label><input type="checkbox" data-flag="gf" data-id="' + d.id + '"' + (m.gf ? ' checked' : '') + '><span class="letter">gf</span></label>';
         html += '<label><input type="checkbox" data-flag="v" data-id="' + d.id + '"' + (m.v ? ' checked' : '') + '><span class="letter">v</span></label>';
         html += '<label><input type="checkbox" data-flag="vg" data-id="' + d.id + '"' + (m.vg ? ' checked' : '') + '><span class="letter">vg</span></label>';
-        html += '</div></div>';
+        html += '</div>';
+        html += '<div class="dish-actions no-print"><select data-dish-action="' + escapeAttr(d.id) + '" aria-label="Edit ' + escapeAttr(d.name) + '">';
+        html += '<option value="">Edit…</option><option value="adjust">Adjust</option><option value="replace">Replace</option><option value="remove">Remove</option>';
+        html += '</select></div></div>';
       });
       return html;
     }
 
     function bindEditor() {
+      bindDateField();
       document.querySelectorAll('[data-mode]').forEach(function (b) {
-        b.onclick = function () { mode = b.getAttribute('data-mode'); render(); };
+        b.onclick = function () {
+          var next = b.getAttribute('data-mode');
+          if (next === 'add') dishId = '';
+          mode = next;
+          render();
+          if (next === 'add' || next === 'adjust' || next === 'replace' || next === 'paste') {
+            var form = document.querySelector('.form-card');
+            if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        };
       });
+      document.querySelectorAll('[data-section-id]').forEach(function (sel) {
+        sel.onchange = function () {
+          var id = sel.getAttribute('data-section-id');
+          var next = sel.value;
+          book[menuId] = EBMenus.sortDishesBySection(dishes().map(function (d) {
+            if (d.id !== id) return d;
+            return {
+              id: d.id,
+              section: next,
+              name: d.name,
+              description: d.description,
+              price: d.price,
+              tags: d.tags,
+              lunchClub: d.lunchClub,
+              fromMenu: d.fromMenu
+            };
+          }));
+          save();
+          render();
+        };
+      });
+      document.querySelectorAll('[data-dish-action]').forEach(function (sel) {
+        sel.onchange = function () {
+          var id = sel.getAttribute('data-dish-action');
+          var act = sel.value;
+          sel.value = '';
+          if (!act) return;
+          dishId = id;
+          if (act === 'remove') {
+            if (!confirm('Remove this dish?')) return;
+            book[menuId] = dishes().filter(function (d) { return d.id !== id; });
+            dishId = (dishes()[0] && dishes()[0].id) || '';
+            save();
+            mode = 'complete';
+            render();
+            return;
+          }
+          mode = act;
+          render();
+          var form = document.querySelector('.form-card');
+          if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+      });
+      var doGen = document.getElementById('doGenerate');
+      if (doGen) doGen.onclick = generateMenu;
+      var doHint = document.getElementById('doPrintHint');
+      if (doHint) doHint.onclick = generateMenu;
       document.querySelectorAll('[data-include]').forEach(function (box) {
         box.onchange = function () {
           if (!includes[menuId]) includes[menuId] = {};
@@ -455,17 +713,44 @@
           renderPreview();
         };
       });
+      function persistLayoutFromDom() {
+        var next = EBMenus.defaultSectionLayout();
+        EBMenus.SECTIONS.forEach(function (sec) {
+          var w = document.querySelector('[data-layout-width="' + sec + '"]');
+          var f = document.querySelector('[data-layout-frame="' + sec + '"]');
+          next[sec] = {
+            width: (w && w.value) || next[sec].width,
+            frame: !!(f && f.value === 'yes')
+          };
+        });
+        sectionLayout = EBMenus.normalizeSectionLayout(next);
+        saveSectionLayout();
+      }
+      document.querySelectorAll('[data-layout-width],[data-layout-frame]').forEach(function (sel) {
+        sel.onchange = function () {
+          persistLayoutFromDom();
+          render();
+        };
+      });
+      var resetLayout = document.getElementById('doResetLayout');
+      if (resetLayout) {
+        resetLayout.onclick = function () {
+          if (!confirm('Reset every section to the default width and frilly-box settings?')) return;
+          sectionLayout = EBMenus.defaultSectionLayout();
+          saveSectionLayout();
+          render();
+        };
+      }
       var savePromo = document.getElementById('doSavePromo');
       if (savePromo) {
         savePromo.onclick = function () {
           var title = (document.getElementById('promoTitle') || {}).value || '';
           var body = (document.getElementById('promoBody') || {}).value || '';
-          var date = (document.getElementById('promoDate') || {}).value || '';
           title = String(title).trim();
           if (!title) { alert('Add a title for this wording.'); return; }
-          date = String(date).trim();
-          if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            alert('Date must be YYYY-MM-DD, or leave blank.');
+          var date = readPromoDateIso();
+          if (String((document.getElementById('promoDateUk') || {}).value || '').trim() && !date) {
+            alert('Date must be DD-MM-YYYY, or leave blank.');
             return;
           }
           if (editingPromoId) {
@@ -554,19 +839,25 @@
 
     function openReview(result) {
       pendingReview = result;
+      // Auto-guess sections before staff confirms
+      pendingReview.dishes = EBMenus.assignSections(result.dishes || []);
       var existing = document.getElementById('reviewOverlay');
       if (existing) existing.parentNode.removeChild(existing);
       var overlay = document.createElement('div');
       overlay.id = 'reviewOverlay';
       overlay.setAttribute('style',
-        'position:fixed;inset:0;z-index:50;background:rgba(28,22,16,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto');
+        'position:fixed;inset:0;z-index:50;background:rgba(28,22,16,.55);display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto');
       var card = document.createElement('div');
       card.setAttribute('style',
-        'background:#fffaf4;color:#1c1610;max-width:560px;width:100%;border-radius:16px;padding:22px 24px;margin:24px 0;box-shadow:0 18px 40px rgba(0,0,0,.25)');
+        'background:#fffaf4;color:#1c1610;max-width:640px;width:100%;border-radius:16px;padding:22px 20px;margin:16px 0 40px;box-shadow:0 18px 40px rgba(0,0,0,.25)');
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:6px;font-family:system-ui,sans-serif">Check before saving</div>';
-      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Review extracted menu</div>';
+      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Confirm sections</div>';
       html += '<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.45;margin:0 0 12px;color:#3a342c">' +
-        escapeAttr(result.warning || 'Check every dish before you accept.') + '</p>';
+        'We’ve auto-guessed Nibbles, Starters, Pub Classics, Burgers, Sandwiches, and the rest. ' +
+        '<strong>Scroll through every dish</strong> and fix any wrong section before you save.</p>';
+      if (result.warning) {
+        html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 12px;color:#5a534a">' + escapeAttr(result.warning) + '</p>';
+      }
       var fixes = result.spellingFixes || [];
       if (fixes.length) {
         html += '<div style="margin:0 0 14px;padding:12px 14px;border:2px solid #1c1610;border-radius:12px;background:#fff8e8">';
@@ -589,16 +880,24 @@
         html += '</p>';
       }
       html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 8px">' +
-        (result.dishes || []).length + ' dishes · untick any junk lines</p>';
-      html += '<div id="reviewList" style="max-height:42vh;overflow:auto;border:1px solid #e4d9cc;border-radius:10px;padding:8px 10px;background:#fff;font-family:system-ui,sans-serif;font-size:13px">';
-      (result.dishes || []).forEach(function (d, i) {
-        html += '<label style="display:flex;gap:8px;align-items:flex-start;margin:0 0 8px;cursor:pointer">';
-        html += '<input type="checkbox" data-review-i="' + i + '" checked style="margin-top:3px">';
-        html += '<span><strong>' + escapeAttr(d.section) + '</strong> — ' + escapeAttr(d.name);
-        if (d.price) html += ' <span style="opacity:.7">' + escapeAttr(d.price) + '</span>';
-        if (d.tags) html += ' <em style="color:#538135">' + escapeAttr(d.tags) + '</em>';
-        if (d.description) html += '<br><span style="color:#555">' + escapeAttr(d.description) + '</span>';
-        html += '</span></label>';
+        (pendingReview.dishes || []).length + ' dishes · untick junk · fix sections</p>';
+      html += '<div id="reviewList" style="max-height:58vh;overflow:auto;border:1px solid #e4d9cc;border-radius:10px;padding:10px 12px;background:#fff;font-family:system-ui,sans-serif;font-size:13px">';
+      var lastSec = '';
+      (pendingReview.dishes || []).forEach(function (d, i) {
+        if (d.section !== lastSec) {
+          lastSec = d.section;
+          html += '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#5a534a;margin:' +
+            (i ? '14px' : '0') + ' 0 8px">' + escapeAttr(lastSec) + '</div>';
+        }
+        html += '<div style="display:grid;grid-template-columns:auto minmax(7.5rem,9rem) minmax(0,1fr);gap:8px;align-items:start;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #f0ebe3">';
+        html += '<input type="checkbox" data-review-i="' + i + '" checked style="margin-top:8px" title="Keep this dish">';
+        html += sectionSelectHtml(d.section, 'data-review-section="' + i + '" style="font:600 12px system-ui,sans-serif;padding:6px 8px;border:1px solid #cfc7bb;border-radius:8px;background:#fffaf4;width:100%"');
+        html += '<div><div style="font-weight:700">' + escapeAttr(d.name);
+        if (d.price) html += ' <span style="font-weight:500;opacity:.75">' + escapeAttr(d.price) + '</span>';
+        if (d.tags) html += ' <em style="color:#538135;font-weight:400">' + escapeAttr(d.tags) + '</em>';
+        html += '</div>';
+        if (d.description) html += '<div style="color:#555;margin-top:2px">' + escapeAttr(d.description) + '</div>';
+        html += '</div></div>';
       });
       html += '</div>';
       if (result.kind === 'party' && menuId !== 'party') {
@@ -618,16 +917,27 @@
       document.getElementById('reviewAccept').onclick = function () {
         var keep = [];
         overlay.querySelectorAll('[data-review-i]').forEach(function (box) {
-          if (box.checked) {
-            var d = pendingReview.dishes[parseInt(box.getAttribute('data-review-i'), 10)];
-            if (d) keep.push(d);
-          }
+          if (!box.checked) return;
+          var i = parseInt(box.getAttribute('data-review-i'), 10);
+          var d = pendingReview.dishes[i];
+          if (!d) return;
+          var sel = overlay.querySelector('[data-review-section="' + i + '"]');
+          var section = sel && sel.value ? sel.value : d.section;
+          keep.push({
+            id: EBMenus.dish(section, d.name, d.description, d.price, d.tags, d.lunchClub).id + '-' + keep.length,
+            section: section,
+            name: d.name,
+            description: d.description || '',
+            price: d.price || '',
+            tags: d.tags || '',
+            lunchClub: !!d.lunchClub
+          });
         });
         if (!keep.length) {
           alert('Tick at least one dish, or cancel.');
           return;
         }
-        book[menuId] = keep;
+        book[menuId] = EBMenus.sortDishesBySection(keep);
         if (pendingReview.meta && (pendingReview.meta.title || pendingReview.meta.coursePrices || pendingReview.meta.notes)) {
           metaBook[menuId] = pendingReview.meta;
         }
@@ -637,6 +947,8 @@
         pendingReview = null;
         mode = 'complete';
         render();
+        var first = document.querySelector('.dish-row');
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
       };
     }
 
@@ -781,9 +1093,13 @@
     function composed() {
       var result = EBMenus.sheetPlanFor(book, menuId, hostIncludes());
       var menu = EBMenus.menuById(menuId);
+      result.plan.sectionLayout = sectionLayout;
       if (menu.kind === 'long' && typeof EBMenuPrint !== 'undefined' && EBMenuPrint.planFluidLayout) {
         var promos = pickedPromosForSheet();
-        var layout = EBMenuPrint.planFluidLayout(menu, result.dishes, { promos: promos });
+        var layout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
+          promos: promos,
+          sectionLayout: sectionLayout
+        });
         result.plan.layout = layout;
         result.plan.fit = layout.fit;
         result.plan.text = layout.summary;
@@ -862,11 +1178,15 @@
       var promos = menu.kind === 'long' ? pickedPromosForSheet() : [];
       var layout = null;
       if (menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
-        layout = EBMenuPrint.planFluidLayout(menu, result.dishes, { promos: promos });
+        layout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
+          promos: promos,
+          sectionLayout: sectionLayout
+        });
         result.plan.layout = layout;
         result.plan.fit = layout.fit;
         result.plan.text = layout.summary;
         result.plan.promos = promos;
+        result.plan.sectionLayout = sectionLayout;
       }
 
       var overlay = document.createElement('div');

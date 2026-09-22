@@ -154,7 +154,10 @@
     html += '</span>';
     if (!opts.hidePrice && d.price) html += '<span class="price">' + esc(cleanPrice(d.price)) + '</span>';
     html += '</div>';
-    if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
+    if (d.description) {
+      // Always a separate block under the name — never inherit dish-name bold.
+      html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
+    }
     html += '</div>';
     return html;
   }
@@ -227,11 +230,17 @@
 
   function sandwichNote(dishes) {
     var price = 'all 9.50';
+    var hours = '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)';
+    var body = 'Filled ciabatta or farmhouse sandwich, all served with fries and salad.';
+    var foot = 'Ask waiting staff for today’s fillings';
     if (dishes && dishes.length) {
       var prices = {};
       dishes.forEach(function (d) {
         var p = cleanPrice(d.price);
         if (p) prices[p] = true;
+        var blob = ((d.name || '') + ' ' + (d.description || '')).trim();
+        var hm = blob.match(/\(\s*12[^)]+\)/);
+        if (hm) hours = hm[0].replace(/\s+/g, ' ');
       });
       var keys = Object.keys(prices);
       if (keys.length === 1) price = 'all ' + keys[0];
@@ -240,12 +249,83 @@
       '<div class="promo sandwich-promo">' +
         '<div class="promo-head"><span class="promo-title">Sandwiches</span>' +
         '<span class="price">' + esc(price) + '</span></div>' +
-        '<p class="note-line">(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)</p>' +
-        '<p>filled ciabatta or farmhouse sandwich<br>all served with fries and salad.</p>' +
-        '<p class="note-line">See our Sandwich menu for today’s fillings</p>' +
+        '<p class="note-line">' + esc(hours) + '</p>' +
+        '<p class="desc">' + esc(body) + '</p>' +
+        '<p class="note-line">' + esc(foot) + '</p>' +
       '</div>',
       'box'
     );
+  }
+
+  /** Description fragments wrongly stored as dish titles (no price, lowercase / side-list). */
+  function looksLikeDescFragment(name) {
+    var n = String(name || '').trim();
+    if (!n || n.length > 90) return false;
+    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter)/i.test(n)) {
+      return true;
+    }
+    if (/^[a-z]/.test(n) && !/burger|haddock|pie|fish|steak|salad|arancini|cocktail/i.test(n)) {
+      return true;
+    }
+    return false;
+  }
+
+  function isSandwichDish(d) {
+    if (!d) return false;
+    if (isSandwich(d.section)) return true;
+    return /^sandwiches?\b/i.test(d.name || '');
+  }
+
+  /**
+   * Merge orphan “description” rows back onto the previous dish, and fold
+   * sandwich selling lines into one sandwiches bucket for the side column.
+   */
+  function tidyDishesForPrint(dishes) {
+    var out = [];
+    (dishes || []).forEach(function (raw) {
+      var d = {
+        id: raw.id,
+        section: raw.section,
+        name: raw.name,
+        description: raw.description || '',
+        price: raw.price || '',
+        tags: raw.tags || '',
+        lunchClub: !!raw.lunchClub,
+        fromMenu: raw.fromMenu
+      };
+      var price = cleanPrice(d.price);
+      if (out.length && !price && looksLikeDescFragment(d.name)) {
+        var prev = out[out.length - 1];
+        var bit = d.name + (d.description ? ', ' + d.description : '');
+        prev.description = prev.description ? (prev.description + ', ' + bit) : bit;
+        return;
+      }
+      if (out.length && !price && looksLikeDescFragment(d.description) && !d.name) {
+        var prev2 = out[out.length - 1];
+        prev2.description = prev2.description ? (prev2.description + ', ' + d.description) : d.description;
+        return;
+      }
+      out.push(d);
+    });
+    return out;
+  }
+
+  function splitClassicsBag(sec) {
+    var classics = [];
+    var burgers = [];
+    var sandwichBits = [];
+    ((sec && sec.dishes) || []).forEach(function (d) {
+      if (isSandwichDish(d)) sandwichBits.push(d);
+      else if (isBurgerDish(d)) burgers.push(d);
+      else classics.push(d);
+    });
+    return {
+      classics: classics,
+      burgers: burgers,
+      sandwiches: sandwichBits,
+      classicsTitle: 'Pub Classics',
+      burgersTitle: 'Burgers'
+    };
   }
 
   /** Sides list must not repeat the sandwiches selling box. */
@@ -279,7 +359,14 @@
     return /nibble|light bite/i.test(name || '');
   }
   function isClassics(name) {
-    return /classic|burger/i.test(name || '');
+    // Match “Pub Classics” and legacy “Pub classics & Burgers”
+    return /classic/i.test(name || '');
+  }
+  function isBurgers(name) {
+    return /^burgers?$/i.test(String(name || '').trim());
+  }
+  function isSharing(name) {
+    return /shar(e|ing)|for the table/i.test(name || '');
   }
   function isSides(name) {
     return /^sides?$/i.test(name || '');
@@ -304,7 +391,9 @@
   var SECTION_RANK = [
     { test: isNibbles, rank: 10 },
     { test: isStarters, rank: 20 },
+    { test: isSharing, rank: 25 },
     { test: isClassics, rank: 30 },
+    { test: isBurgers, rank: 32 },
     { test: isMains, rank: 40 },
     { test: isSides, rank: 50 },
     { test: isSauce, rank: 55 },
@@ -320,22 +409,19 @@
   }
 
   function isBurgerDish(d) {
-    return /burger/i.test((d && d.name) || '');
+    if (!d) return false;
+    if (isBurgers(d.section)) return true;
+    return /burger/i.test(d.name || '');
   }
 
   function orderDishesForPrint(dishes) {
-    var list = (dishes || []).slice();
-    // Stable sort: section order, then burgers last within classics, else keep paste order
+    var list = tidyDishesForPrint(dishes || []).slice();
+    // Stable sort: section order, then keep paste order within section
     list.forEach(function (d, i) { d._i = i; });
     list.sort(function (a, b) {
       var ra = sectionRank(a.section);
       var rb = sectionRank(b.section);
       if (ra !== rb) return ra - rb;
-      if (isClassics(a.section) && isClassics(b.section)) {
-        var ba = isBurgerDish(a) ? 1 : 0;
-        var bb = isBurgerDish(b) ? 1 : 0;
-        if (ba !== bb) return ba - bb;
-      }
       return a._i - b._i;
     });
     list.forEach(function (d) { delete d._i; });
@@ -378,22 +464,55 @@
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
-      nibbles: null, starters: null, classics: null, mains: null,
-      desserts: null, sides: null, sandwiches: null, sauces: null,
+      nibbles: null, starters: null, sharing: null, classics: null, burgers: null,
+      mains: null, desserts: null, sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
+    var straySandwiches = [];
+    var strayBurgers = [];
     sections.forEach(function (s) {
       if (isNibbles(s.name) && !bag.nibbles) bag.nibbles = s;
       else if (isStarters(s.name) && !bag.starters) bag.starters = s;
-      else if (isClassics(s.name) && !bag.classics) bag.classics = s;
-      else if (isMains(s.name) && !bag.mains) bag.mains = s;
+      else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
+      else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
+      else if (isClassics(s.name) && !bag.classics) {
+        var kept = [];
+        (s.dishes || []).forEach(function (d) {
+          if (isSandwichDish(d)) straySandwiches.push(d);
+          else if (isBurgerDish(d)) strayBurgers.push(d);
+          else kept.push(d);
+        });
+        bag.classics = { name: 'Pub Classics', dishes: kept };
+      } else if (isMains(s.name) && !bag.mains) bag.mains = s;
       else if (isDessert(s.name) && !bag.desserts) bag.desserts = s;
       else if (isSides(s.name) && !bag.sides) bag.sides = s;
       else if (isSandwich(s.name) && !bag.sandwiches) bag.sandwiches = s;
       else if (isSauce(s.name) && !bag.sauces) bag.sauces = s;
       else bag.other.push(s);
-      s.dishes.forEach(function (d) { if (d.lunchClub) bag.hasLunch = true; });
+      (s.dishes || []).forEach(function (d) { if (d.lunchClub) bag.hasLunch = true; });
     });
+    if (strayBurgers.length) {
+      if (bag.burgers && bag.burgers.dishes) {
+        bag.burgers = { name: 'Burgers', dishes: bag.burgers.dishes.concat(strayBurgers) };
+      } else {
+        bag.burgers = { name: 'Burgers', dishes: strayBurgers };
+      }
+    }
+    if (straySandwiches.length) {
+      if (bag.sandwiches && bag.sandwiches.dishes) {
+        bag.sandwiches = {
+          name: bag.sandwiches.name || 'Sandwiches',
+          dishes: bag.sandwiches.dishes.concat(straySandwiches)
+        };
+      } else {
+        bag.sandwiches = { name: 'Sandwiches', dishes: straySandwiches };
+      }
+    }
+    // Merge burger section into classics bag for the two-column block
+    if (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length) {
+      if (!bag.classics) bag.classics = { name: 'Pub Classics', dishes: [] };
+      // keep burgers on bag.burgers; buildLong reads both
+    }
     return bag;
   }
 
@@ -589,6 +708,43 @@
     return (list || []).map(function (d) { return dishRow(d); }).join('');
   }
 
+  function layoutMap(plan) {
+    if (root.EBMenus && root.EBMenus.normalizeSectionLayout) {
+      return root.EBMenus.normalizeSectionLayout(plan && plan.sectionLayout);
+    }
+    return (plan && plan.sectionLayout) || {};
+  }
+
+  function ruleFor(sectionName, plan) {
+    if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+      return root.EBMenus.sectionLayoutFor(sectionName, plan && plan.sectionLayout);
+    }
+    var map = layoutMap(plan);
+    var key = sectionName || '';
+    return map[key] || { width: 'full', frame: false };
+  }
+
+  function wantsColumn(rule) {
+    if (root.EBMenus && root.EBMenus.isColumnWidth) return root.EBMenus.isColumnWidth(rule.width);
+    return rule.width === 'column' || rule.width === 'both';
+  }
+
+  function wantsFull(rule) {
+    if (root.EBMenus && root.EBMenus.isFullWidth) return root.EBMenus.isFullWidth(rule.width);
+    return rule.width === 'full' || rule.width === 'both';
+  }
+
+  /** Wrap section HTML in a scallop frame when the designer said Yes. */
+  function framedBlock(inner, rule, kind) {
+    if (rule && rule.frame) return scallop(inner, kind || 'wide');
+    return '<div class="sec-plain">' + inner + '</div>';
+  }
+
+  function sectionBlock(title, dishes, rule, kind) {
+    if (!dishes || !dishes.length) return '';
+    return framedBlock(sectionTitle(title) + listDishes(dishes), rule, kind || 'wide');
+  }
+
   function renderFiller(which, bag, promos) {
     if (which === 'rooms') return renderPromoBank(promos && promos.length ? promos : (bag && bag.promos));
     if (which === 'sandwiches') return sandwichNote(bag.sandwiches && bag.sandwiches.dishes);
@@ -600,7 +756,10 @@
   }
 
   function buildLong(menu, dishes, plan, ver) {
-    var layout = (plan && plan.layout) || planFluidLayout(menu, dishes, { promos: (plan && plan.promos) || [] });
+    var layout = (plan && plan.layout) || planFluidLayout(menu, dishes, {
+      promos: (plan && plan.promos) || [],
+      sectionLayout: plan && plan.sectionLayout
+    });
     dishes = layout.orderedDishes || orderDishesForPrint(dishes);
     var bag = layout.bag || pickSections(dishes);
     var promos = (plan && plan.promos) || layout.promos || [];
@@ -612,50 +771,125 @@
     var fill1 = fillClass((layout.leftover && layout.leftover.p1) || 12);
     var fill2 = fillClass((layout.leftover && layout.leftover.p2) || 12);
 
+    var nibRule = ruleFor('Nibbles', plan);
+    var startRule = ruleFor('Starters', plan);
+    var shareRule = ruleFor('Sharing Plates', plan);
+    var classRule = ruleFor('Pub Classics', plan);
+    var burgRule = ruleFor('Burgers', plan);
+    var mainRule = ruleFor('Mains', plan);
+    var sandRule = ruleFor('Sandwiches', plan);
+    var sideRule = ruleFor('Sides', plan);
+    var dessRule = ruleFor('Desserts', plan);
+
     var p1 = '<div class="page fill-page ' + fill1 + '">';
     p1 += trackerBar(ver, { hideDate: hideDate });
     p1 += '<div class="page-body">';
-    p1 += '<div class="top-band">';
-    p1 += '<div class="top-left">';
-    if (bag.nibbles) {
-      p1 += scallop(sectionTitle(bag.nibbles.name) + listDishes(bag.nibbles.dishes), 'wide');
+
+    // Top band: Nibbles (column by default) + logo — or full-width nibbles if designer chose full
+    if (bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full') {
+      p1 += '<div class="top-band">';
+      p1 += '<div class="top-left">';
+      p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
+      p1 += '</div>';
+      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '</div>';
+    } else {
+      p1 += '<div class="top-band top-band-logo">';
+      p1 += '<div class="top-left"></div>';
+      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '</div>';
+      if (bag.nibbles) {
+        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
+      }
     }
-    p1 += '</div>';
-    p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
-    p1 += '</div>';
 
     if (bag.starters) {
-      p1 += '<section class="sec">' + sectionTitle(bag.starters.name) + listDishes(bag.starters.dishes) + '</section>';
+      p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
+    }
+    if (bag.sharing) {
+      p1 += '<section class="sec">' + sectionBlock(bag.sharing.name, bag.sharing.dishes, shareRule) + '</section>';
     }
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name)) {
-        p1 += '<section class="sec">' + sectionTitle(s.name) + listDishes(s.dishes) + '</section>';
+      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name)) {
+        var otherRule = ruleFor(s.name, plan);
+        p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
       }
     });
 
-    // Classics left (full list) + selling column right — never squeeze burgers + promo into one narrow col
-    if (bag.classics || p1opts.rooms || p1opts.sandwiches) {
+    // Column block: Pub Classics + Burgers (left) | promo + Sandwiches + optional sides (right)
+    var split = splitClassicsBag(bag.classics);
+    var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
+      ? bag.burgers.dishes.slice()
+      : split.burgers.slice();
+    if (split.sandwiches.length) {
+      if (bag.sandwiches && bag.sandwiches.dishes) {
+        bag.sandwiches = {
+          name: 'Sandwiches',
+          dishes: bag.sandwiches.dishes.concat(split.sandwiches)
+        };
+      } else {
+        bag.sandwiches = { name: 'Sandwiches', dishes: split.sandwiches };
+      }
+    }
+    var classicDishes = split.classics;
+    var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms || p1opts.sandwiches ||
+      (p1opts.sidesOnP1 && sidesPrint);
+    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule);
+    var sandwichesAsColumn = wantsColumn(sandRule);
+
+    if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
-      if (bag.classics) p1 += sectionTitle(bag.classics.name);
-      p1 += '<div class="cols cols-classics"><div class="col col-dishes">';
-      if (bag.classics) p1 += listDishes(bag.classics.dishes);
+      p1 += '<div class="cols cols-classics">';
+      p1 += '<div class="col col-dishes">';
+      if (classicDishes.length) {
+        p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
+      }
+      if (burgerDishes.length) {
+        p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
+      }
       p1 += '</div><div class="col col-promo">';
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
-      if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
-      if (p1opts.sidesOnP1 && sidesPrint) {
-        p1 += sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes);
+      if (p1opts.sandwiches && sandwichesAsColumn) {
+        // sandwichNote already frames; honour “no frilly” by stripping to plain if needed
+        if (sandRule.frame) p1 += renderFiller('sandwiches', bag);
+        else {
+          p1 += '<div class="promo sandwich-promo sec-plain">' +
+            '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>' +
+            '<p class="note-line">(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)</p>' +
+            '<p class="desc">Filled ciabatta or farmhouse sandwich, all served with fries and salad.</p>' +
+            '<p class="note-line">Ask waiting staff for today’s fillings</p></div>';
+        }
       }
+      if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
+        p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+      }
+      p1 += '</div></div></section>';
+    } else if (classicDishes.length || burgerDishes.length) {
+      // Full-width classics / burgers when designer chose full
+      if (classicDishes.length) {
+        p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
+      }
+      if (burgerDishes.length) {
+        p1 += '<section class="sec">' + framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule) + '</section>';
+      }
+      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+      if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
+    } else if (p1opts.rooms || p1opts.sandwiches) {
+      p1 += '<section class="sec classics-block"><div class="cols cols-classics">';
+      p1 += '<div class="col col-dishes">&nbsp;</div><div class="col col-promo">';
+      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+      if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
       p1 += '</div></div></section>';
     }
 
     if (layout.pages === 1) {
-      if (bag.mains) p1 += '<section class="sec">' + sectionTitle(bag.mains.name) + listDishes(bag.mains.dishes) + '</section>';
-      if (bag.desserts) p1 += '<section class="sec">' + sectionTitle(bag.desserts.name) + listDishes(bag.desserts.dishes) + '</section>';
+      if (bag.mains) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+      if (bag.desserts) p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
       if (sidesPrint && !p1opts.sidesOnP1) {
-        p1 += '<section class="sec">' + sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes) + '</section>';
+        p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
-      if (p1opts.sandwiches && !bag.classics && !(p1opts.rooms)) p1 += renderFiller('sandwiches', bag);
+      if (p1opts.sandwiches && !showColBlock) p1 += renderFiller('sandwiches', bag);
       if (p1opts.lunchClub) p1 += renderFiller('lunch', bag);
       if (p1opts.footLogo) p1 += renderFiller('logo', bag);
     }
@@ -670,19 +904,26 @@
     var p2 = '<div class="page fill-page ' + fill2 + '">';
     p2 += trackerBar(ver, { hideDate: hideDate });
     p2 += '<div class="page-body">';
-    if (bag.mains) p2 += '<section class="sec">' + sectionTitle(bag.mains.name) + listDishes(bag.mains.dishes) + '</section>';
-    if (bag.desserts) p2 += '<section class="sec">' + sectionTitle(bag.desserts.name) + listDishes(bag.desserts.dishes) + '</section>';
+    if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+    if (bag.desserts) p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
 
     var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {
-      p2 += '<div class="cols bottom-cols"><div class="col">';
-      if (p2opts.sidesOnP2 && sidesPrint) p2 += sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes);
-      if (p2opts.sidesOnP2 && bag.sauces) p2 += sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes);
-      if (!(p2opts.sidesOnP2 && (sidesPrint || bag.sauces))) p2 += '&nbsp;';
-      p2 += '</div><div class="col col-promo">';
-      if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag);
-      else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
-      p2 += '</div></div>';
+      var sidesCol = sidesPrint && wantsColumn(sideRule);
+      if (sidesCol || p2opts.sandwiches || p2opts.rooms) {
+        p2 += '<div class="cols bottom-cols"><div class="col">';
+        if (p2opts.sidesOnP2 && sidesPrint) {
+          p2 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+        }
+        if (p2opts.sidesOnP2 && bag.sauces) p2 += sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes);
+        if (!(p2opts.sidesOnP2 && (sidesPrint || bag.sauces))) p2 += '&nbsp;';
+        p2 += '</div><div class="col col-promo">';
+        if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag);
+        else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
+        p2 += '</div></div>';
+      } else if (p2opts.sidesOnP2 && sidesPrint) {
+        p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
+      }
     } else if (p2opts.rooms) {
       p2 += renderFiller('rooms', bag, promos);
     }
@@ -772,7 +1013,10 @@
       '.card-face:last-child{border-right:0}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5a534a;margin:0 0 6px;font-weight:600;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--serif);font-size:15px;letter-spacing:.12em;color:var(--ink)}' +
+      '.sec-plain{margin:0 0 8px}' +
+      '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
       '.top-band{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:start;margin:0 0 6px}' +
+      '.top-band-logo{grid-template-columns:1fr 92px;min-height:0}' +
       '.top-left .scallop{margin-bottom:0}' +
       '.logo-tr{width:88px;height:auto;display:block;margin-left:auto}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
@@ -784,27 +1028,30 @@
       '.scallop .sec-title{text-align:left;font-size:13px;letter-spacing:.1em;margin-bottom:6px}' +
       '.sec-title.soft{font-size:12px;letter-spacing:.08em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:10px}' +
-      '.scallop{margin:0 0 10px;background:#fff;' +
-        'border-style:solid;border-color:transparent;border-width:14px;' +
-        'border-image-slice:42 fill;border-image-repeat:stretch;border-image-width:14px;' +
-        'overflow:hidden}' +
-      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '")}' +
-      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:38 fill}' +
-      '.scallop-pad{padding:5px 8px 3px;overflow:hidden}' +
-      '.scallop-box .scallop-pad{padding:4px 7px 2px}' +
-      '.dish{margin:0 0 var(--dish-gap)}' +
-      '.dish-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline}' +
-      '.dish-name{font-weight:700;font-size:var(--name);line-height:1.25}' +
-      '.price{font-weight:600;font-size:var(--name);white-space:nowrap;flex:0 0 auto}' +
-      '.desc{font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;padding-right:28px;line-height:1.35}' +
+      '.scallop{margin:0 0 10px;background:#fff;position:relative;' +
+        'border-style:solid;border-color:transparent;border-width:16px;' +
+        'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:16px;' +
+        'overflow:visible}' +
+      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:14px;border-image-width:14px;border-image-slice:42 fill}' +
+      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:48 fill}' +
+      '.scallop-pad{padding:6px 10px 5px;overflow:visible}' +
+      '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
+      '.dish{margin:0 0 var(--dish-gap);min-width:0}' +
+      '.dish-line{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:baseline;min-width:0}' +
+      '.dish-name{font-weight:700;font-size:var(--name);line-height:1.25;min-width:0;overflow-wrap:anywhere}' +
+      '.price{font-weight:600;font-size:var(--name);white-space:nowrap}' +
+      '.desc{font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.35;max-width:100%}' +
+      '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
-      '.cols{display:grid;grid-template-columns:1.15fr 0.85fr;gap:16px;margin:4px 0 6px;align-items:start}' +
-      '.cols-classics{grid-template-columns:1.2fr 0.8fr}' +
-      '.col-promo{min-width:0;max-width:100%}' +
-      '.col-promo .scallop{max-width:100%}' +
-      '.col-promo .promo p{font-size:11px;line-height:1.35;margin:0 0 6px}' +
+      '.cols{display:grid;grid-template-columns:1.15fr 0.85fr;gap:14px;margin:4px 0 6px;align-items:start}' +
+      '.cols-classics{grid-template-columns:1.15fr 0.85fr}' +
+      '.col-dishes,.col-promo{min-width:0;max-width:100%}' +
+      '.col-dishes .sec-title{text-align:left;margin-top:2px}' +
+      '.col-dishes .sec-title:first-child{margin-top:0}' +
+      '.col-promo .scallop{max-width:100%;width:100%}' +
+      '.col-promo .promo p,.col-promo .promo .desc{font-size:11px;line-height:1.35;margin:0 0 6px;font-weight:400}' +
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.bottom-cols{margin-top:10px;margin-bottom:4px}' +
       '.bottom-cols .sec-title{text-align:left}' +
@@ -813,6 +1060,8 @@
       '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.06em;text-transform:uppercase;margin:2px 0 2px}' +
       '.promo-date{font-family:var(--sans);font-weight:600;font-size:10.5px;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.promo p{font-size:11px;font-weight:400;margin:0 0 6px;line-height:1.35}' +
+      '.sandwich-promo .note-line{font-weight:600}' +
+      '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
       '.lunch-box{display:flex;gap:10px;align-items:center;font-size:12px}' +
       '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
       '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
@@ -926,11 +1175,17 @@
     var guillotine = !!plan.guillotine && !landscape;
     var layout = null;
     if (menu.kind === 'long') {
-      layout = planFluidLayout(menu, dishes, { promos: plan.promos || [] });
+      layout = planFluidLayout(menu, dishes, {
+        promos: plan.promos || [],
+        sectionLayout: plan.sectionLayout
+      });
       plan.layout = layout;
       plan.fit = layout.fit;
       plan.text = layout.summary;
       if (!plan.promos) plan.promos = layout.promos || [];
+      if (!plan.sectionLayout && root.EBMenus && root.EBMenus.defaultSectionLayout) {
+        plan.sectionLayout = root.EBMenus.defaultSectionLayout();
+      }
     }
     var body;
     if (landscape) {

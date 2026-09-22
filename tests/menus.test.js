@@ -25,7 +25,7 @@ assert(html.indexOf("'menus-eightbells': 'menus.html") !== -1, 'menus url is men
 assert(page.indexOf('Arranging your menu') !== -1, 'generate shows arranging step');
 assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order');
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
-assert(page.indexOf('Adjust a dish') !== -1 && page.indexOf('Replace a dish') !== -1, 'adjust and replace modes');
+assert(page.indexOf('option value="adjust"') !== -1 && page.indexOf('option value="replace"') !== -1, 'adjust and replace modes');
 assert(page.indexOf('Add a dish') !== -1, 'add a dish mode');
 assert(page.indexOf('Upload / paste') !== -1, 'upload / paste mode');
 assert(page.indexOf('menus-ingest.js') !== -1, 'ingest script is loaded');
@@ -139,16 +139,31 @@ assert(fluid.summary.indexOf('Layout picks') !== -1 || fluid.summary.indexOf('Au
 var shuffled = [
   api.dish('Mains', 'Pie', 'mash', '14.95', ''),
   api.dish('Nibbles', 'Olives', '', '6.95', 'vg'),
-  api.dish('Pub classics & Burgers', 'Spicy Asian Burger', 'fries', '16.95', 'vg'),
+  api.dish('Burgers', 'Spicy Asian Burger', 'fries', '16.95', 'vg'),
   api.dish('Starters', 'Soup', 'bread', '6.50', ''),
-  api.dish('Pub classics & Burgers', 'Haddock & Chips', 'peas', '17.95', '')
+  api.dish('Pub Classics', 'Haddock & Chips', 'peas', '17.95', '')
 ];
 var ordered = print.orderDishesForPrint(shuffled);
 assert(ordered[0].section === 'Nibbles', 'orders nibbles first');
 assert(ordered[1].section === 'Starters', 'then starters');
-assert(ordered[2].name === 'Haddock & Chips', 'classics: non-burger before burger');
-assert(ordered[3].name === 'Spicy Asian Burger', 'classics: burger after');
+assert(ordered[2].name === 'Haddock & Chips', 'pub classics before burgers');
+assert(ordered[3].name === 'Spicy Asian Burger', 'burgers after classics');
 assert(ordered[4].section === 'Mains', 'mains after classics');
+
+assert(api.guessSection('Pub classics & Burgers', 'Spicy Asian Burger', '') === 'Burgers', 'guesses burger section from name');
+assert(api.guessSection('Pub classics & Burgers', 'Haddock & Chips', '') === 'Pub Classics', 'guesses classics from combined heading');
+assert(api.sectionLayoutFor('Mains').width === 'full', 'mains default full width');
+assert(api.sectionLayoutFor('Nibbles').frame === true, 'nibbles default frilly box');
+assert(api.sectionLayoutFor('Burgers').width === 'column', 'burgers default column');
+assert(api.sectionLayoutFor('Sandwiches').frame === true, 'sandwiches default frilly box');
+var customLayout = api.normalizeSectionLayout({ Mains: { width: 'column', frame: true } });
+assert(customLayout.Mains.width === 'column' && customLayout.Mains.frame === true, 'layout overrides persist shape');
+assert(customLayout.Starters.width === 'full', 'other sections keep defaults');
+
+assert(page.indexOf('Section layout rules') !== -1, 'layout rules UI present');
+assert(page.indexOf('data-layout-width') !== -1 && page.indexOf('data-layout-frame') !== -1, 'layout width/frame controls');
+assert(page.indexOf('data-section-id') !== -1 || page.indexOf('section-pick') !== -1, 'per-dish section dropdown');
+assert(page.indexOf('Confirm sections') !== -1 || page.indexOf('auto-guess') !== -1, 'extract review confirms sections');
 
 // Sparse menu → one page + fillers should appear
 var sparse = [

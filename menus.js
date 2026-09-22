@@ -14,17 +14,133 @@
     { id: 'lunch-club', name: 'Lunch club', kind: 'card', comfortable: 12 }
   ];
 
-  var SECTION_NAMES = {
-    nibbles: 1,
-    starters: 1,
-    mains: 1,
-    desserts: 1,
-    sides: 1,
-    sandwiches: 1,
-    'pub classics': 1,
-    'pub classics & burgers': 1,
-    'sunday roasts': 1
-  };
+  /** Canonical sections staff pick from — print layout keys off these. */
+  var SECTIONS = [
+    'Nibbles',
+    'Starters',
+    'Sharing Plates',
+    'Pub Classics',
+    'Burgers',
+    'Mains',
+    'Sandwiches',
+    'Sides',
+    'Desserts'
+  ];
+
+  var SECTION_NAMES = (function () {
+    var map = {};
+    SECTIONS.forEach(function (s) { map[s.toLowerCase()] = s; });
+    // Pasted / AI aliases → canonical
+    map['pub classics & burgers'] = 'Pub Classics';
+    map['classics'] = 'Pub Classics';
+    map['pub classic'] = 'Pub Classics';
+    map['sharing'] = 'Sharing Plates';
+    map['to share'] = 'Sharing Plates';
+    map['light bites'] = 'Nibbles';
+    map['nibble'] = 'Nibbles';
+    map['starter'] = 'Starters';
+    map['main'] = 'Mains';
+    map['main courses'] = 'Mains';
+    map['sandwich'] = 'Sandwiches';
+    map['burger'] = 'Burgers';
+    map['side'] = 'Sides';
+    map['sides & extras'] = 'Sides';
+    map['dessert'] = 'Desserts';
+    map['puddings'] = 'Desserts';
+    map['sunday roasts'] = 'Mains';
+    map['roasts'] = 'Mains';
+    return map;
+  })();
+
+  function sectionOptions() {
+    return SECTIONS.slice();
+  }
+
+  function sectionRank(name) {
+    var canon = normalizeSectionName(name);
+    var i = SECTIONS.indexOf(canon);
+    return i >= 0 ? i : 50;
+  }
+
+  function normalizeSectionName(name) {
+    var bare = String(name || '').replace(/:$/, '').trim();
+    if (!bare) return 'Mains';
+    var hit = SECTION_NAMES[bare.toLowerCase()];
+    if (hit) return hit;
+    // Partial match
+    var lower = bare.toLowerCase();
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (lower.indexOf(SECTIONS[i].toLowerCase()) !== -1) return SECTIONS[i];
+    }
+    if (/classic/.test(lower)) return 'Pub Classics';
+    if (/burger/.test(lower)) return 'Burgers';
+    if (/sandwich/.test(lower)) return 'Sandwiches';
+    if (/nibble|light bite/.test(lower)) return 'Nibbles';
+    if (/starter/.test(lower)) return 'Starters';
+    if (/shar(e|ing)|for the table/.test(lower)) return 'Sharing Plates';
+    if (/side/.test(lower)) return 'Sides';
+    if (/dessert|pudding|sweet/.test(lower)) return 'Desserts';
+    if (/main|roast/.test(lower)) return 'Mains';
+    return bare.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  /**
+   * Auto-guess a canonical section from paste/AI section + dish name.
+   * Burgers / sandwiches win from the dish name even under “Pub classics & Burgers”.
+   */
+  function guessSection(section, name, description) {
+    var n = String(name || '').trim();
+    var s = String(section || '').trim();
+    var desc = String(description || '');
+    if (/^sandwiches?\b/i.test(n)) return 'Sandwiches';
+    if (/\bburger\b/i.test(n)) return 'Burgers';
+    if (/\bto share\b/i.test(n) || /\bfor the table\b/i.test(n) || /\bsharing\b/i.test(n)) {
+      return 'Sharing Plates';
+    }
+    if (/charcuterie|sharing board|baked camembert/i.test(n) && /share|board/i.test(n + ' ' + desc)) {
+      return 'Sharing Plates';
+    }
+    // Classic pub plates by name when section is vague
+    var fromSec = normalizeSectionName(s);
+    if (fromSec === 'Pub Classics' || /classic|burger/i.test(s)) {
+      if (/\bburger\b/i.test(n)) return 'Burgers';
+      return 'Pub Classics';
+    }
+    if (SECTIONS.indexOf(fromSec) !== -1) return fromSec;
+    if (/haddock|scampi|fish of the day|pie of the day|sausage|ham.?egg|liver/i.test(n)) {
+      return 'Pub Classics';
+    }
+    return fromSec || 'Mains';
+  }
+
+  function assignSections(dishes) {
+    return (dishes || []).map(function (d, i) {
+      var section = guessSection(d.section, d.name, d.description);
+      return {
+        id: d.id || slug(section + '-' + (d.name || 'dish') + '-' + i),
+        section: section,
+        name: d.name,
+        description: d.description || '',
+        price: d.price || '',
+        tags: d.tags || '',
+        lunchClub: !!d.lunchClub,
+        fromMenu: d.fromMenu
+      };
+    });
+  }
+
+  function sortDishesBySection(dishes) {
+    var list = (dishes || []).slice();
+    list.forEach(function (d, i) { d._i = i; });
+    list.sort(function (a, b) {
+      var ra = sectionRank(a.section);
+      var rb = sectionRank(b.section);
+      if (ra !== rb) return ra - rb;
+      return a._i - b._i;
+    });
+    list.forEach(function (d) { delete d._i; });
+    return list;
+  }
 
   /** Meta for set menus (Christmas / party) — title + course prices. */
   function emptyMeta() {
@@ -62,10 +178,10 @@
         dish('Starters', 'Quinoa Falafel', 'avocado, tahini dressing, lemon dressed tomato rocket salad', '8.25 / 14.95', 'vg & gf', true),
         dish('Starters', 'Nduja King Prawn Bruschetta', 'tomato salsa, toasted ciabatta', '8.95', 'gf option', true),
         dish('Starters', 'Baked Camembert (to share)', 'ciabatta, red onion jam', '15.95', 'gf'),
-        dish('Pub classics & Burgers', 'Haddock & Chips', 'battered, garden peas, tartare sauce', '17.95', 'gf option'),
-        dish('Pub classics & Burgers', 'Pie of the Day', 'mash, seasonal veg, gravy', '17.95', ''),
-        dish('Pub classics & Burgers', 'Trenchmore Wagyu Beef Burger', 'seeded brioche bun, streaky bacon, monterey jack, onion rings, fries, salad', '20.95', 'gf option'),
-        dish('Pub classics & Burgers', 'Spicy Asian Burger', 'seeded brioche bun, “mayo”, onion rings, fries, salad', '16.95', 'vg, gf option'),
+        dish('Pub Classics', 'Haddock & Chips', 'battered, garden peas, tartare sauce', '17.95', 'gf option'),
+        dish('Pub Classics', 'Pie of the Day', 'mash, seasonal veg, gravy', '17.95', ''),
+        dish('Burgers', 'Trenchmore Wagyu Beef Burger', 'seeded brioche bun, streaky bacon, monterey jack, onion rings, fries, salad', '20.95', 'gf option'),
+        dish('Burgers', 'Spicy Asian Burger', 'seeded brioche bun, “mayo”, onion rings, fries, salad', '16.95', 'vg, gf option'),
         dish('Mains', 'Crab Linguine', 'lemon, chilli, pangrattato, vine cherry tomatoes, balsamic', '18.95', 'gf option'),
         dish('Mains', 'Venison Casserole', 'cheese and herb dumpling, purple sprouting broccoli', '18.95', 'gf option'),
         dish('Mains', 'Smoked Haddock, Cod & Salmon Fish Pie', 'buttered kale, ciabatta', '19.95', ''),
@@ -146,12 +262,16 @@
 
   function isHeading(line) {
     var bare = String(line).replace(/:$/, '').trim();
-    if (SECTION_NAMES[bare.toLowerCase()]) return bare;
+    if (!bare) return '';
+    if (SECTION_NAMES[bare.toLowerCase()]) return normalizeSectionName(bare);
+    // Allow “PUB CLASSICS” etc.
+    var norm = normalizeSectionName(bare);
+    if (SECTIONS.indexOf(norm) !== -1 && !priceOf(bare)) return norm;
     return '';
   }
 
   function priceOf(line) {
-    var m = String(line).match(/(?:£\s*)?(\d+\.\d{2}(?:\s*\/\s*£?\s*\d+\.\d{2})?)\s*$/);
+    var m = String(line).match(/(?:£\s*)?(\d+\.\d{1,2}(?:\s*\/\s*£?\s*\d+\.\d{1,2})?)\s*$/);
     if (!m) return null;
     return { raw: m[0], value: m[1].replace(/£/g, '').replace(/\s+/g, '') };
   }
@@ -189,9 +309,10 @@
       }
       if (!pulled.name) continue;
       if (typeof isJunkDishName === 'function' && isJunkDishName(pulled.name)) continue;
+      var guessed = guessSection(section, pulled.name, description);
       dishes.push({
-        id: slug(section + '-' + pulled.name + '-' + dishes.length),
-        section: section,
+        id: slug(guessed + '-' + pulled.name + '-' + dishes.length),
+        section: guessed,
         name: pulled.name,
         description: description,
         price: price ? price.value : '',
@@ -199,7 +320,7 @@
         lunchClub: lunch
       });
     }
-    return dishes;
+    return sortDishesBySection(dishes);
   }
 
   function sheetPlan(menuId, count) {
@@ -398,9 +519,9 @@
     meta.notes = menuJson.notes || '';
     var list = [];
     (menuJson.dishes || []).forEach(function (d, i) {
-      var section = d.section || 'Dishes';
       var name = String(d.name || '').trim();
       if (!name || isJunkDishName(name)) return;
+      var section = guessSection(d.section || 'Dishes', name, d.description || '');
       list.push({
         id: slug(section + '-' + name + '-' + i),
         section: section,
@@ -412,7 +533,7 @@
       });
     });
     return {
-      dishes: list,
+      dishes: sortDishesBySection(list),
       meta: meta,
       kind: menuJson.kind || '',
       spellingFixes: normalizeSpellingFixes(menuJson.spellingFixes)
@@ -478,9 +599,34 @@
   }
 
   function parsePromoDate(dateStr) {
-    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return null;
-    return new Date(+m[1], +m[2] - 1, +m[3]);
+    var s = String(dateStr || '').trim();
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    return null;
+  }
+
+  /** Store dates as YYYY-MM-DD; show staff DD-MM-YYYY. */
+  function toIsoDate(dateStr) {
+    var dt = parsePromoDate(dateStr);
+    if (!dt || isNaN(dt.getTime())) {
+      var bare = String(dateStr || '').trim();
+      return /^\d{4}-\d{2}-\d{2}$/.test(bare) ? bare : '';
+    }
+    var y = dt.getFullYear();
+    var mo = String(dt.getMonth() + 1);
+    var d = String(dt.getDate());
+    if (mo.length < 2) mo = '0' + mo;
+    if (d.length < 2) d = '0' + d;
+    return y + '-' + mo + '-' + d;
+  }
+
+  function toUkDate(dateStr) {
+    var iso = toIsoDate(dateStr);
+    if (!iso) return '';
+    var p = iso.split('-');
+    return p[2] + '-' + p[1] + '-' + p[0];
   }
 
   function isPastPromoDate(dateStr, today) {
@@ -556,8 +702,77 @@
     return out.length ? out : seedPromoBank();
   }
 
+  /**
+   * Per-section print layout rules.
+   * width: 'full' | 'column' | 'both'
+   *   full   — always full page width
+   *   column — sits in a column (beside promo / another column section)
+   *   both   — prefer column when a partner fits, otherwise full width
+   * frame: scalloped “frilly” box around the section
+   */
+  var DEFAULT_SECTION_LAYOUT = {
+    Nibbles: { width: 'column', frame: true },
+    Starters: { width: 'full', frame: false },
+    'Sharing Plates': { width: 'full', frame: false },
+    'Pub Classics': { width: 'column', frame: false },
+    Burgers: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false },
+    Sandwiches: { width: 'column', frame: true },
+    Sides: { width: 'column', frame: false },
+    Desserts: { width: 'full', frame: false }
+  };
+
+  var WIDTH_OPTIONS = [
+    { id: 'full', label: 'Full width' },
+    { id: 'column', label: 'Column' },
+    { id: 'both', label: 'Both (column if it fits)' }
+  ];
+
+  function defaultSectionLayout() {
+    var out = {};
+    SECTIONS.forEach(function (s) {
+      var d = DEFAULT_SECTION_LAYOUT[s] || { width: 'full', frame: false };
+      out[s] = { width: d.width, frame: !!d.frame };
+    });
+    return out;
+  }
+
+  function normalizeSectionLayout(raw) {
+    var base = defaultSectionLayout();
+    if (!raw || typeof raw !== 'object') return base;
+    SECTIONS.forEach(function (s) {
+      var row = raw[s];
+      if (!row || typeof row !== 'object') return;
+      var width = String(row.width || base[s].width).toLowerCase();
+      if (width !== 'full' && width !== 'column' && width !== 'both') width = base[s].width;
+      base[s] = {
+        width: width,
+        frame: row.frame === true || row.frame === 'yes' || row.frame === 1
+      };
+    });
+    return base;
+  }
+
+  function sectionLayoutFor(name, layouts) {
+    var canon = normalizeSectionName(name);
+    var map = normalizeSectionLayout(layouts);
+    if (map[canon]) return map[canon];
+    // Unknown sections: full, no frame
+    return { width: 'full', frame: false };
+  }
+
+  function isColumnWidth(width) {
+    return width === 'column' || width === 'both';
+  }
+
+  function isFullWidth(width) {
+    return width === 'full' || width === 'both';
+  }
+
   root.EBMenus = {
     MENUS: MENUS,
+    SECTIONS: SECTIONS,
+    WIDTH_OPTIONS: WIDTH_OPTIONS,
     seed: seed,
     menuById: menuById,
     parsePaste: parsePaste,
@@ -579,6 +794,20 @@
     normalizePromoBank: normalizePromoBank,
     pickPromos: pickPromos,
     isPastPromoDate: isPastPromoDate,
-    formatPromoDate: formatPromoDate
+    formatPromoDate: formatPromoDate,
+    toIsoDate: toIsoDate,
+    toUkDate: toUkDate,
+    parsePromoDate: parsePromoDate,
+    sectionOptions: sectionOptions,
+    guessSection: guessSection,
+    normalizeSectionName: normalizeSectionName,
+    assignSections: assignSections,
+    sortDishesBySection: sortDishesBySection,
+    sectionRank: sectionRank,
+    defaultSectionLayout: defaultSectionLayout,
+    normalizeSectionLayout: normalizeSectionLayout,
+    sectionLayoutFor: sectionLayoutFor,
+    isColumnWidth: isColumnWidth,
+    isFullWidth: isFullWidth
   };
 })(typeof window !== 'undefined' ? window : global);
