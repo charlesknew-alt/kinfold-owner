@@ -19,6 +19,7 @@
     'Nibbles',
     'Starters',
     'Sharing Plates',
+    'Item Boost',
     'Pub Classics',
     'Burgers',
     'Mains',
@@ -48,6 +49,17 @@
     map['sides & extras'] = 'Sides';
     map['sauce'] = 'Sauces';
     map['sauces'] = 'Sauces';
+    map['item boost'] = 'Item Boost';
+    map['item boosts'] = 'Item Boost';
+    map['boost'] = 'Item Boost';
+    map['specials'] = 'Item Boost';
+    map["today's special"] = 'Item Boost';
+    map["today's specials"] = 'Item Boost';
+    map['chefs special'] = 'Item Boost';
+    map["chef's special"] = 'Item Boost';
+    map['fish of the day'] = 'Item Boost';
+    map['pie of the day'] = 'Item Boost';
+    map['catch of the day'] = 'Item Boost';
     map['dessert'] = 'Desserts';
     map['puddings'] = 'Desserts';
     map['sunday roasts'] = 'Mains';
@@ -81,6 +93,9 @@
     if (/nibble|light bite/.test(lower)) return 'Nibbles';
     if (/starter/.test(lower)) return 'Starters';
     if (/shar(e|ing)|for the table/.test(lower)) return 'Sharing Plates';
+    if (/item\s*boost|specials?|fish of the day|pie of the day|catch of the day|chef.?s special/.test(lower)) {
+      return 'Item Boost';
+    }
     if (/^sauces?$/.test(lower) || /\bsauces?\b/.test(lower) && lower.length < 12) return 'Sauces';
     if (/side/.test(lower)) return 'Sides';
     if (/dessert|pudding|sweet/.test(lower)) return 'Desserts';
@@ -102,6 +117,9 @@
       return 'Sauces';
     }
     if (/^sauces?\b/i.test(s)) return 'Sauces';
+    // Featured specials staff file under Item Boost (Fish / Pie of the Day, etc.)
+    if (/item\s*boost|specials?/i.test(s)) return 'Item Boost';
+    if (/\b(fish|pie|catch|special)\s+of\s+the\s+day\b/i.test(n)) return 'Item Boost';
     if (/\bto share\b/i.test(n) || /\bfor the table\b/i.test(n) || /\bsharing\b/i.test(n)) {
       return 'Sharing Plates';
     }
@@ -186,6 +204,7 @@
         dish('Starters', 'Quinoa Falafel', 'avocado, tahini dressing, lemon dressed tomato rocket salad', '8.25 / 14.95', 'vg & gf', true),
         dish('Starters', 'Nduja King Prawn Bruschetta', 'tomato salsa, toasted ciabatta', '8.95', 'gf option', true),
         dish('Starters', 'Baked Camembert (to share)', 'ciabatta, red onion jam', '15.95', 'gf'),
+        dish('Item Boost', 'Fish of the Day', 'ask waiting staff for today’s catch', 'MP', ''),
         dish('Pub Classics', 'Haddock & Chips', 'battered, garden peas, tartare sauce', '17.95', 'gf option'),
         dish('Pub Classics', 'Pie of the Day', 'mash, seasonal veg, gravy', '17.95', ''),
         dish('Burgers', 'Trenchmore Wagyu Beef Burger', 'seeded brioche bun, streaky bacon, monterey jack, onion rings, fries, salad', '20.95', 'gf option'),
@@ -280,7 +299,7 @@
     if (SECTIONS.indexOf(norm) === -1) return '';
     var words = bare.replace(/[^a-zA-Z\s&]/g, '').trim().split(/\s+/).filter(Boolean);
     if (words.length > 5) return '';
-    if (!/classic|burger|sandwich|nibble|starter|main|side|dessert|shar|sauce|roast|light bite/i.test(bare)) {
+    if (!/classic|burger|sandwich|nibble|starter|main|side|dessert|shar|sauce|roast|light bite|boost|special|fish of the day|pie of the day/i.test(bare)) {
       return '';
     }
     return norm;
@@ -289,17 +308,56 @@
   /** Description wrap lines wrongly stored as dish titles (PDF extract). */
   function looksLikeDescFragment(name) {
     var n = String(name || '').trim();
-    if (!n || n.length > 90) return false;
-    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter|choice of|tomato|garden peas|tartare|dressed)\b/i.test(n)) {
+    if (!n || n.length > 100) return false;
+    // Expand “served with…” / ingredient-list fragments (price may sit on that line).
+    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter|choice of|tomato|garden peas|tartare|dressed|ciabatta|red onion|horseradish|honey|braised|crispy|pickled|smoked bacon|micro salad|tomato salsa|pangrattato)\b/i.test(n)) {
       return true;
     }
     if (/^[a-z]/.test(n) && !/burger|haddock|pie|fish|steak|salad|arancini|cocktail/i.test(n)) {
       return true;
     }
+    // Long comma-lists of garnish (no dish verb) — e.g. "horseradish cream, honey braised leeks…"
+    if (/,/.test(n) && n.length > 28 &&
+      !/\b(burger|steak|pie|curry|pasta|gnocchi|schnitzel|casserole|linguini|linguine)\b/i.test(n) &&
+      !/^\d/.test(n)) {
+      return true;
+    }
     return false;
   }
 
-  /** Merge orphan description rows back onto the previous dish (review + paste). */
+  /** Fold dish `next` onto `prev` as description (+ price/tags when missing). */
+  function mergeDishOnto(prev, next) {
+    if (!prev || !next) return prev;
+    var bit = String(next.name || '').trim();
+    if (next.description) bit = bit ? (bit + ' ' + next.description) : String(next.description);
+    if (bit) prev.description = prev.description ? (prev.description + ' ' + bit) : bit;
+    if (!(prev.price && String(prev.price).trim()) && next.price) {
+      prev.price = String(next.price).trim();
+    }
+    if (!(prev.tags && String(prev.tags).trim()) && next.tags) {
+      prev.tags = next.tags;
+    }
+    return prev;
+  }
+
+  /**
+   * Should this row fold onto the previous dish?
+   * Covers: unpriced wrap lines, and priced descriptions under a title that
+   * had no price (Smoked Salmon / horseradish… 8.95; Camembert / served with… 14.95).
+   */
+  function shouldMergeOntoPrevious(prev, d) {
+    if (!prev || !d) return false;
+    var name = String(d.name || '').trim();
+    if (!name || !looksLikeDescFragment(name)) return false;
+    var hasPrice = !!(d.price && String(d.price).trim());
+    var prevPrice = !!(prev.price && String(prev.price).trim());
+    if (!hasPrice) return true;
+    if (!prevPrice) return true;
+    // Both priced — only fold obvious “served with…” leftovers
+    return /^(serves?|served|with|and)\b/i.test(name);
+  }
+
+  /** Merge orphan description rows back onto the previous dish (review + paste + print). */
   function tidyOrphanDescriptions(dishes) {
     var out = [];
     (dishes || []).forEach(function (raw) {
@@ -313,16 +371,34 @@
         lunchClub: !!raw.lunchClub,
         fromMenu: raw.fromMenu
       };
-      var hasPrice = !!(d.price && String(d.price).trim());
-      if (out.length && !hasPrice && looksLikeDescFragment(d.name)) {
-        var prev = out[out.length - 1];
-        var bit = d.name + (d.description ? ' ' + d.description : '');
-        prev.description = prev.description ? (prev.description + ' ' + bit) : bit;
+      if (out.length && shouldMergeOntoPrevious(out[out.length - 1], d)) {
+        mergeDishOnto(out[out.length - 1], d);
         return;
       }
       out.push(d);
     });
     return out;
+  }
+
+  /** Staff “Merge with dish above” — fold index into index-1 in a list. */
+  function mergeDishWithPrevious(dishes, index) {
+    var list = (dishes || []).slice();
+    var i = parseInt(index, 10);
+    if (!(i > 0) || i >= list.length) return list;
+    var prev = {
+      id: list[i - 1].id,
+      section: list[i - 1].section,
+      name: list[i - 1].name,
+      description: list[i - 1].description || '',
+      price: list[i - 1].price || '',
+      tags: list[i - 1].tags || '',
+      lunchClub: !!list[i - 1].lunchClub,
+      fromMenu: list[i - 1].fromMenu
+    };
+    mergeDishOnto(prev, list[i]);
+    list[i - 1] = prev;
+    list.splice(i, 1);
+    return list;
   }
 
   function priceOf(line) {
@@ -389,6 +465,23 @@
               i += 1;
             }
             break;
+          }
+        }
+      } else if (i + 1 < lines.length && !isHeading(lines[i + 1])) {
+        // Title on its own line; price sits on the description line
+        // ("Baked Camembert for Two" / "served with … 14.95").
+        var nextPrice = priceOf(lines[i + 1]);
+        if (nextPrice) {
+          var nextRaw = lines[i + 1].slice(0, lines[i + 1].length - nextPrice.raw.length).trim();
+          if (looksLikeDescFragment(nextRaw) || !nextRaw) {
+            description = nextRaw;
+            price = nextPrice;
+            i += 1;
+            while (i + 1 < lines.length && !priceOf(lines[i + 1]) && !isHeading(lines[i + 1]) &&
+              looksLikeDescFragment(lines[i + 1])) {
+              description = description ? description + ' ' + lines[i + 1] : lines[i + 1];
+              i += 1;
+            }
           }
         }
       }
@@ -808,6 +901,7 @@
     Nibbles: { width: 'column', frame: true },
     Starters: { width: 'full', frame: false },
     'Sharing Plates': { width: 'full', frame: false },
+    'Item Boost': { width: 'full', frame: true },
     'Pub Classics': { width: 'column', frame: false },
     Burgers: { width: 'column', frame: false },
     Mains: { width: 'full', frame: false },
@@ -907,6 +1001,9 @@
     cleanDishName: cleanDishName,
     priceOf: priceOf,
     looksLikeDescFragment: looksLikeDescFragment,
+    shouldMergeOntoPrevious: shouldMergeOntoPrevious,
+    mergeDishOnto: mergeDishOnto,
+    mergeDishWithPrevious: mergeDishWithPrevious,
     tidyOrphanDescriptions: tidyOrphanDescriptions
   };
 })(typeof window !== 'undefined' ? window : global);

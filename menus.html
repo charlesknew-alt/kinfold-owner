@@ -200,9 +200,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260922-flow11"></script>
-  <script src="menus-print.js?v=20260922-flow11"></script>
-  <script src="menus-ingest.js?v=20260922-flow11"></script>
+  <script src="menus.js?v=20260922-flow12"></script>
+  <script src="menus-print.js?v=20260922-flow12"></script>
+  <script src="menus-ingest.js?v=20260922-flow12"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -865,7 +865,9 @@
         html += '<label><input type="checkbox" data-flag="vg" data-id="' + d.id + '"' + (m.vg ? ' checked' : '') + '><span class="letter">vg</span></label>';
         html += '</div>';
         html += '<div class="dish-actions no-print"><select data-dish-action="' + escapeAttr(d.id) + '" aria-label="Edit ' + escapeAttr(d.name) + '">';
-        html += '<option value="">Edit…</option><option value="adjust">Adjust</option><option value="replace">Replace</option><option value="remove">Remove</option>';
+        html += '<option value="">Edit…</option><option value="adjust">Adjust</option><option value="replace">Replace</option>';
+        if (idx > 0) html += '<option value="merge-up">Merge ↑ into dish above</option>';
+        html += '<option value="remove">Remove</option>';
         html += '</select></div></div>';
         if (idx === list.length - 1 && open) html += '</div></div>';
       });
@@ -925,6 +927,23 @@
           sel.value = '';
           if (!act) return;
           dishId = id;
+          if (act === 'merge-up') {
+            var sorted = EBMenus.sortDishesBySection(dishes());
+            var idx = -1;
+            for (var mi = 0; mi < sorted.length; mi++) {
+              if (sorted[mi].id === id) { idx = mi; break; }
+            }
+            if (idx <= 0) {
+              alert('Nothing above to merge into.');
+              return;
+            }
+            book[menuId] = EBMenus.mergeDishWithPrevious(sorted, idx);
+            dishId = book[menuId][Math.max(0, idx - 1)].id;
+            save();
+            mode = 'complete';
+            render();
+            return;
+          }
           if (act === 'remove') {
             if (!confirm('Remove this dish?')) return;
             book[menuId] = dishes().filter(function (d) { return d.id !== id; });
@@ -1103,7 +1122,8 @@
       html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Confirm sections</div>';
       html += '<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.45;margin:0 0 12px;color:#3a342c">' +
         'We’ve auto-guessed Nibbles, Starters, Pub Classics, Burgers, Sandwiches, and the rest. ' +
-        '<strong>Scroll through every dish</strong> and fix any wrong section before you save.</p>';
+        '<strong>Scroll through every dish</strong> and fix any wrong section before you save. ' +
+        'If a line is really the description for the dish above (e.g. “horseradish cream…” under Smoked Salmon), tap <strong>Merge ↑</strong>.</p>';
       if (result.warning) {
         html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 12px;color:#5a534a">' + escapeAttr(result.warning) + '</p>';
       }
@@ -1128,27 +1148,9 @@
         if (result.meta.coursePrices) html += '<br>' + escapeAttr(result.meta.coursePrices);
         html += '</p>';
       }
-      html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 8px">' +
-        (pendingReview.dishes || []).length + ' dishes · untick junk · fix sections</p>';
-      html += '<div id="reviewList" style="max-height:58vh;overflow:auto;border:1px solid #e4d9cc;border-radius:10px;padding:10px 12px;background:#fff;font-family:system-ui,sans-serif;font-size:13px">';
-      var lastSec = '';
-      (pendingReview.dishes || []).forEach(function (d, i) {
-        if (d.section !== lastSec) {
-          lastSec = d.section;
-          html += '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#5a534a;margin:' +
-            (i ? '14px' : '0') + ' 0 8px">' + escapeAttr(lastSec) + '</div>';
-        }
-        html += '<div style="display:grid;grid-template-columns:auto minmax(7.5rem,9rem) minmax(0,1fr);gap:8px;align-items:start;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #f0ebe3">';
-        html += '<input type="checkbox" data-review-i="' + i + '" checked style="margin-top:8px" title="Keep this dish">';
-        html += sectionSelectHtml(d.section, 'data-review-section="' + i + '" style="font:600 12px system-ui,sans-serif;padding:6px 8px;border:1px solid #cfc7bb;border-radius:8px;background:#fffaf4;width:100%"');
-        html += '<div><div style="font-weight:700">' + escapeAttr(d.name);
-        if (d.price) html += ' <span style="font-weight:500;opacity:.75">' + escapeAttr(d.price) + '</span>';
-        if (d.tags) html += ' <em style="color:#538135;font-weight:400">' + escapeAttr(d.tags) + '</em>';
-        html += '</div>';
-        if (d.description) html += '<div style="color:#555;margin-top:2px">' + escapeAttr(d.description) + '</div>';
-        html += '</div></div>';
-      });
-      html += '</div>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 8px" id="reviewCount">' +
+        (pendingReview.dishes || []).length + ' dishes · untick junk · fix sections · merge descriptions</p>';
+      html += '<div id="reviewList" style="max-height:58vh;overflow:auto;border:1px solid #e4d9cc;border-radius:10px;padding:10px 12px;background:#fff;font-family:system-ui,sans-serif;font-size:13px"></div>';
       if (result.kind === 'party' && menuId !== 'party') {
         html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:12px 0 0;color:#5a2a2a">AI thinks this is a <strong>party / Christmas</strong> set menu. Use the <strong>Party / Christmas</strong> tab for the standardised centred layout.</p>';
       }
@@ -1159,6 +1161,57 @@
       card.innerHTML = html;
       overlay.appendChild(card);
       document.body.appendChild(overlay);
+
+      function paintReviewList() {
+        var listEl = document.getElementById('reviewList');
+        var countEl = document.getElementById('reviewCount');
+        if (countEl) {
+          countEl.textContent = (pendingReview.dishes || []).length +
+            ' dishes · untick junk · fix sections · merge descriptions';
+        }
+        if (!listEl) return;
+        var lastSec = '';
+        var rows = '';
+        (pendingReview.dishes || []).forEach(function (d, i) {
+          if (d.section !== lastSec) {
+            lastSec = d.section;
+            rows += '<div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:#5a534a;margin:' +
+              (i ? '14px' : '0') + ' 0 8px">' + escapeAttr(lastSec) + '</div>';
+          }
+          var suggestMerge = i > 0 && EBMenus.shouldMergeOntoPrevious(pendingReview.dishes[i - 1], d);
+          rows += '<div style="display:grid;grid-template-columns:auto minmax(7.5rem,9rem) minmax(0,1fr) auto;gap:8px;align-items:start;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #f0ebe3' +
+            (suggestMerge ? ';background:#fff8e8;border-radius:8px;padding:8px' : '') + '">';
+          rows += '<input type="checkbox" data-review-i="' + i + '" checked style="margin-top:8px" title="Keep this dish">';
+          rows += sectionSelectHtml(d.section, 'data-review-section="' + i + '" style="font:600 12px system-ui,sans-serif;padding:6px 8px;border:1px solid #cfc7bb;border-radius:8px;background:#fffaf4;width:100%"');
+          rows += '<div><div style="font-weight:700">' + escapeAttr(d.name);
+          if (d.price) rows += ' <span style="font-weight:500;opacity:.75">' + escapeAttr(d.price) + '</span>';
+          if (d.tags) rows += ' <em style="color:#538135;font-weight:400">' + escapeAttr(d.tags) + '</em>';
+          rows += '</div>';
+          if (d.description) rows += '<div style="color:#555;margin-top:2px">' + escapeAttr(d.description) + '</div>';
+          if (suggestMerge) {
+            rows += '<div style="margin-top:4px;font-size:12px;color:#6b5344">Looks like a description for the dish above</div>';
+          }
+          rows += '</div>';
+          if (i > 0) {
+            rows += '<button type="button" data-review-merge="' + i + '" style="font:600 12px system-ui,sans-serif;padding:6px 10px;border:1px solid #1c1610;border-radius:999px;background:' +
+              (suggestMerge ? '#1c1610' : '#fff') + ';color:' + (suggestMerge ? '#f4eae3' : '#1c1610') +
+              ';cursor:pointer;white-space:nowrap;margin-top:4px" title="Merge this line into the dish above as its description">Merge ↑</button>';
+          } else {
+            rows += '<span></span>';
+          }
+          rows += '</div>';
+        });
+        listEl.innerHTML = rows;
+        listEl.querySelectorAll('[data-review-merge]').forEach(function (btn) {
+          btn.onclick = function () {
+            var idx = parseInt(btn.getAttribute('data-review-merge'), 10);
+            pendingReview.dishes = EBMenus.mergeDishWithPrevious(pendingReview.dishes, idx);
+            paintReviewList();
+          };
+        });
+      }
+      paintReviewList();
+
       document.getElementById('reviewCancel').onclick = function () {
         overlay.parentNode.removeChild(overlay);
         pendingReview = null;
@@ -1186,7 +1239,7 @@
           alert('Tick at least one dish, or cancel.');
           return;
         }
-        book[menuId] = EBMenus.sortDishesBySection(keep);
+        book[menuId] = EBMenus.sortDishesBySection(EBMenus.tidyOrphanDescriptions(keep));
         if (pendingReview.meta && (pendingReview.meta.title || pendingReview.meta.coursePrices || pendingReview.meta.notes)) {
           metaBook[menuId] = pendingReview.meta;
         }
