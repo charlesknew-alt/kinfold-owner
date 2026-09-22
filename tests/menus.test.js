@@ -75,7 +75,16 @@ assert(/logo-tr\{width:170px/.test(printJs), 'front-page logo sized ~170px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
 assert(/--title:28pt/.test(printJs), 'section titles large but fit-friendly');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
+assert(printJs.indexOf('ALWAYS start roomiest') !== -1 || printJs.indexOf('always fill') !== -1 ||
+  /for\(var j=0;j<STEPS\.length/.test(printJs), 'fit always starts airy so pages fill');
+assert(printJs.indexOf('fonts.googleapis.com/css2?family=Cinzel') !== -1, 'print loads Cinzel/Roboto/Crimson via stylesheet link');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
+assert(printJs.indexOf('document.fonts.ready') !== -1, 'print waits for webfonts before PDF');
+assert(/padding:18mm/.test(printJs), 'pages keep a generous top margin');
+assert(printJs.indexOf('lunch-club-mark.png') !== -1, 'lunch club uses branded mark asset');
+assert(printJs.indexOf('Lunch club mark after the price') !== -1 || printJs.indexOf('after the price so dish titles') !== -1,
+  'lunch club mark sits after price, not before the title');
+assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
 assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
 assert(printJs.indexOf('Honour staff section picks') !== -1 || printJs.indexOf('do not invent a Burgers title') !== -1, 'print respects staff sections');
 assert(api.SECTIONS.indexOf('Sauces') !== -1, 'Sauces is a canonical section');

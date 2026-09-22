@@ -122,21 +122,25 @@
   }
 
   function lunchMark() {
+    // Branded crossed knife & fork — sized to read clearly beside dish names
     return (
-      '<svg class="lc" viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path fill="' + GREEN + '" d="M7.2 4.2h1.4v6.2H7.2zm2.6 0h1.4v6.2h-1.4zm2.6 0h1.4v6.2h-1.4zM8.4 11.2h5.2c.4 1.2-.2 2.4-1.4 2.9V20H9.8v-5.9c-1-.5-1.6-1.6-1.4-2.9z" transform="rotate(-32 12 12)"/>' +
-        '<path fill="' + GREEN + '" d="M11 3.5l1.1 8.4 1.5-.2L12.6 3.5zM10.4 12h3l.4 1.3c.2.7-.2 1.4-.9 1.6V20h-1.5v-5.1c-.7-.3-1.1-1-.9-1.7z" transform="rotate(34 12 12)"/>' +
-      '</svg>'
+      '<img class="lc" src="' + esc(asset('lunch-club-mark.png')) + '" alt="" width="28" height="28">'
     );
   }
 
-  function allergy() {
-    return (
+  function allergy(opts) {
+    opts = opts || {};
+    var html =
       '<div class="allergy">' +
         'Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can’t guarantee it’s allergen-free.<br>' +
-        'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan' +
-      '</div>'
-    );
+        'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan';
+    if (opts.lunchClub) {
+      html +=
+        '<br><span class="allergy-lc">' + lunchMark() +
+        ' Bells Lunch Club option — Monday to Thursday &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function cleanPrice(p) {
@@ -159,7 +163,6 @@
     var html = '<div class="dish">';
     html += '<div class="dish-line">';
     html += '<span class="dish-name">';
-    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += esc(name);
     if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     html += '</span>';
@@ -167,6 +170,8 @@
       html += '<span class="dish-leader" aria-hidden="true"></span>';
       html += '<span class="price">' + esc(cleanPrice(price)) + '</span>';
     }
+    // Lunch club mark after the price so dish titles stay left-aligned
+    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += '</div>';
     if (d.description) {
       html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
@@ -179,9 +184,9 @@
     opts = opts || {};
     var html = '<div class="dish dish-c">';
     html += '<div class="dish-name">';
-    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += esc(d.name);
     if (!opts.hidePrice && d.price) html += ' <span class="price">' + esc(d.price) + '</span>';
+    if (d.lunchClub && !opts.hideLunch) html += ' ' + lunchMark();
     html += '</div>';
     if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
     if (d.tags) html += '<div class="tags">' + esc(d.tags) + '</div>';
@@ -825,8 +830,8 @@
     var p2opts = layout.p2;
     var sidesPrint = sidesForPrint(bag);
     var hideDate = menu.id === 'party' || menu.kind === 'party';
-    var fill1 = (plan && plan.forceFillClass) || fillClass((layout.leftover && layout.leftover.p1) || 12);
-    var fill2 = (plan && plan.forceFillClass) || fillClass((layout.leftover && layout.leftover.p2) || 12);
+    var fill1 = (plan && plan.forceFillClass) || 'fill-airy';
+    var fill2 = (plan && plan.forceFillClass) || 'fill-airy';
 
     var nibRule = ruleFor('Nibbles', plan);
     var startRule = ruleFor('Starters', plan);
@@ -990,7 +995,7 @@
 
     p1 += '</div>'; // page-body content ends; spacer fills leftover
     p1 += '<div class="page-spacer" aria-hidden="true"></div>';
-    p1 += allergy();
+    p1 += allergy({ lunchClub: !!(bag.hasLunch) });
     p1 += '</div>';
 
     if (layout.pages < 2 || !p2opts) return p1;
@@ -1034,7 +1039,7 @@
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
     p2 += '</div>'; // page-body
     p2 += '<div class="page-spacer" aria-hidden="true"></div>';
-    p2 += allergy();
+    p2 += allergy({ lunchClub: !!(bag.hasLunch) });
     p2 += '</div>';
 
     return p1 + p2;
@@ -1095,9 +1100,9 @@
     var guillotine = !!opts.guillotine;
     // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
     // titles, Crimson Text allergy. Logo ~220px; type steps down to fit the page.
+    // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
-      '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap");' +
-      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,serif;' +
+      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
         '--dish-gap:11px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:28pt;--promo:11.5pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
@@ -1106,9 +1111,9 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:11mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:18mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
-      '.page-body-start{padding-top:6mm}' +
+      '.page-body-start{padding-top:4mm}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
       '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
@@ -1116,7 +1121,7 @@
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 8px;font-weight:400;flex:0 0 auto}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 10px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
@@ -1146,7 +1151,7 @@
       '.scallop-pad{padding:6px 10px 5px;overflow:visible}' +
       '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
       '.dish{margin:0 0 var(--dish-gap);min-width:0}' +
-      '.dish-line{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto;column-gap:0;align-items:baseline;min-width:0}' +
+      '.dish-line{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto auto;column-gap:0;align-items:center;min-width:0}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;overflow-wrap:anywhere}' +
       '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:12px;height:0}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;padding-left:2px}' +
@@ -1157,6 +1162,10 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{grid-template-columns:1fr;justify-items:center}' +
       '.dish-c .dish-leader{display:none}' +
+      '.lc{width:22px;height:22px;vertical-align:middle;margin-left:8px;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lunch-box .lc{width:28px;height:28px;margin-left:0;flex:0 0 auto}' +
+      '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
+      '.allergy-lc .lc{width:16px;height:16px;margin:0}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       '.cols-balanced{align-items:stretch}' +
@@ -1184,8 +1193,6 @@
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
       '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11pt}' +
-      '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
-      '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
@@ -1193,7 +1200,7 @@
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density ladder — fit script steps down until content clears the page */ +
+      /* Density ladder — ALWAYS start airy and only tighten if the page overflows */ +
       '.fill-airy{--dish-gap:14px;--sec-gap:20px;--name:12.5pt;--desc:10.5pt;--title:30pt;--promo:12pt}' +
       '.fill-roomy{--dish-gap:12px;--sec-gap:18px;--name:12pt;--desc:10.25pt;--title:29pt;--promo:11.5pt}' +
       '.fill-normal{--dish-gap:11px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:28pt;--promo:11.5pt}' +
@@ -1343,6 +1350,9 @@
 
     return (
       '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(menu.name) + ' — ' + esc(ver.roman) + '</title>' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
       '<style>' + css({ landscape: landscape, guillotine: guillotine }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
@@ -1353,7 +1363,7 @@
           '<label class="paper-opt"><input type="radio" name="paper" value="a4" checked onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
           '<label class="paper-opt"><input type="radio" name="paper" value="a5" onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint">' + esc(dateHint) +
-        ' — type auto-shrinks to fit each page (allergy line kept clear); selling boxes stay framed.' +
+        ' — pages always fill (type opens out, then shrinks only if needed); allergy line kept clear.' +
         esc(fillerHint) + '</span>' +
       '</div>' +
       a4Stack + a5Stack +
@@ -1361,21 +1371,26 @@
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
         'function overflows(page){return page.scrollHeight>page.clientHeight+2;}' +
+        // Golden rule: always fill the page — start roomiest, tighten only if overflowing.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
-          'var start=0;for(var i=0;i<STEPS.length;i++){if(page.classList.contains(STEPS[i])){start=i;break;}}' +
-          'for(var j=start;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+          'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
           'if(!overflows(page))break;}});}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
         'if(old)old.remove();s.textContent=a5?"@media print{@page{size:A4 landscape;margin:0}}":"@media print{@page{size:A4 portrait;margin:0}}";' +
         'document.head.appendChild(s);setTimeout(fitPages,30);}' +
         'document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});' +
-        'function boot(){fitPages();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitPages);}' +
+        'function boot(){fitPages();' +
+          'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){fitPages();});}' +
+        '}' +
         'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();' +
-        'setTimeout(fitPages,80);setTimeout(fitPages,400);' +
+        'setTimeout(fitPages,80);setTimeout(fitPages,400);setTimeout(fitPages,1200);' +
         'window.addEventListener("beforeprint",fitPages);' +
         'var pb=document.querySelector(".toolbar button");' +
-        'if(pb){pb.onclick=function(ev){ev.preventDefault();fitPages();setTimeout(function(){window.print();},60);};}' +
+        'if(pb){pb.onclick=function(ev){ev.preventDefault();' +
+          'function go(){fitPages();setTimeout(function(){window.print();},80);}' +
+          'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);}else go();' +
+        '};}' +
       '})();<\/script>' +
       '</body></html>'
     );
