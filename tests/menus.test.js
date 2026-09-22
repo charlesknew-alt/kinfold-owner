@@ -71,9 +71,9 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:260px/.test(printJs), 'front-page logo larger (260px)');
-assert(/tracker \.roman\{[^}]*font-size:5\.5pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:17pt/.test(printJs), 'section titles much larger');
+assert(/logo-tr\{width:300px/.test(printJs), 'front-page logo larger (300px)');
+assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
+assert(/--title:22pt/.test(printJs), 'section titles much larger');
 assert(printJs.indexOf('bottom-cols-balanced') !== -1, 'page-2 sides split for balance');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
