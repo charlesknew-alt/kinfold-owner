@@ -22,7 +22,15 @@ drops `?week=`. Parent `postMessage` navigation alone is enough.
 - `Templates_Serve.js`: map `params.week` → `weekSheet` / `__WEEK_SHEET__`
 - `Templates_Menus.js`: skip iframe self-navigation after `postMessage`
 
+## Also fixed (v86)
+Portal already shows a Varlo app-bar. Apps Script was forcing a second
+Varlo/Main-menu strip in the iframe, and the sticky action bar (`top:0`)
+stacked on top of it — the mashed header you saw on owner review.
+
+- Hide `.ps-header.varlo-header` when `html.iframed`
+- Sticky action bar sits below the header when standalone
+
 ## Deploy
-- PubSystemLib **v85**
-- **Eight Bells** pinned to **85**, `/exec` @216
-- **Windmill** pinned to **85**, `/exec` @68
+- PubSystemLib **v86**
+- **Eight Bells** pinned to **86**, `/exec` @217
+- **Windmill** pinned to **86**, `/exec` @69
