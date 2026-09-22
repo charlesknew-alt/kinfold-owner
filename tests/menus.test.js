@@ -71,10 +71,15 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:300px/.test(printJs), 'front-page logo larger (300px)');
+assert(/logo-tr\{width:220px/.test(printJs), 'front-page logo sized ~220px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:22pt/.test(printJs), 'section titles much larger');
+assert(/--title:18pt/.test(printJs), 'section titles large but fit-friendly');
+assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('bottom-cols-balanced') !== -1, 'page-2 sides split for balance');
+assert(api.SECTIONS.indexOf('Sauces') !== -1, 'Sauces is a canonical section');
+assert(api.guessSection('Sauces', 'Peppercorn', '') === 'Sauces', 'guesses Sauces section');
+assert(api.priceOf('Masala Sea Bass 16 .95').value === '16.95', 'priceOf tolerates spaced decimals');
+assert(api.cleanDishName('Masala Sea Bass 16 .95') === 'Masala Sea Bass', 'cleanDishName strips spaced price');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
   { section: 'Pub Classics', name: 'Fish & Chips', description: 'served with chips, garden peas', price: '17.95', tags: '' },

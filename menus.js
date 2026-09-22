@@ -24,6 +24,7 @@
     'Mains',
     'Sandwiches',
     'Sides',
+    'Sauces',
     'Desserts'
   ];
 
@@ -45,6 +46,8 @@
     map['burger'] = 'Burgers';
     map['side'] = 'Sides';
     map['sides & extras'] = 'Sides';
+    map['sauce'] = 'Sauces';
+    map['sauces'] = 'Sauces';
     map['dessert'] = 'Desserts';
     map['puddings'] = 'Desserts';
     map['sunday roasts'] = 'Mains';
@@ -78,6 +81,7 @@
     if (/nibble|light bite/.test(lower)) return 'Nibbles';
     if (/starter/.test(lower)) return 'Starters';
     if (/shar(e|ing)|for the table/.test(lower)) return 'Sharing Plates';
+    if (/^sauces?$/.test(lower) || /\bsauces?\b/.test(lower) && lower.length < 12) return 'Sauces';
     if (/side/.test(lower)) return 'Sides';
     if (/dessert|pudding|sweet/.test(lower)) return 'Desserts';
     if (/main|roast/.test(lower)) return 'Mains';
@@ -94,6 +98,10 @@
     var desc = String(description || '');
     if (/^sandwiches?\b/i.test(n)) return 'Sandwiches';
     if (/\bburger\b/i.test(n)) return 'Burgers';
+    if (/^(sauce robert|peppercorn|garlic butter|chilli butter|chili butter)\b/i.test(n)) {
+      return 'Sauces';
+    }
+    if (/^sauces?\b/i.test(s)) return 'Sauces';
     if (/\bto share\b/i.test(n) || /\bfor the table\b/i.test(n) || /\bsharing\b/i.test(n)) {
       return 'Sharing Plates';
     }
@@ -319,22 +327,22 @@
 
   function priceOf(line) {
     // Prefer full ranges like "9.5 / 15.95" or "7.95/13.95" so the cheap half
-    // is not left stuck on the dish name.
+    // is not left stuck on the dish name. Allow "16 .95" OCR spacing.
     var m = String(line).match(
-      /(?:£\s*)?(\d+\.\d{1,2}\s*\/\s*£?\s*\d+\.\d{1,2}|\d+\.\d{1,2})\s*$/
+      /(?:£\s*)?(\d+\s*\.\s*\d{1,2}\s*\/\s*£?\s*\d+\s*\.\s*\d{1,2}|\d+\s*\.\s*\d{1,2})\s*$/
     );
     if (!m) return null;
     return {
       raw: m[0],
-      value: m[1].replace(/£/g, '').replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/')
+      value: m[1].replace(/£/g, '').replace(/\s*\.\s*/g, '.').replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/')
     };
   }
 
   /** Strip stray mid-line prices left on a name after a bad extract ("Caesar 9.5 /"). */
   function cleanDishName(name) {
     var n = String(name || '').trim();
-    n = n.replace(/\s+\d+\.\d{1,2}\s*\/\s*$/g, '');
-    n = n.replace(/\s+\d+\.\d{1,2}\s*$/g, '');
+    n = n.replace(/\s+\d+\s*\.\s*\d{1,2}\s*\/\s*$/g, '');
+    n = n.replace(/\s+\d+\s*\.\s*\d{1,2}\s*$/g, '');
     n = n.replace(/\s{2,}/g, ' ').replace(/[\s,–-]+$/g, '').trim();
     return n;
   }
@@ -805,6 +813,7 @@
     Mains: { width: 'full', frame: false },
     Sandwiches: { width: 'column', frame: true },
     Sides: { width: 'column', frame: false },
+    Sauces: { width: 'column', frame: false },
     Desserts: { width: 'full', frame: false }
   };
 

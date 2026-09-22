@@ -370,11 +370,12 @@
   }
 
   function fillClass(leftover) {
-    // Prefer airy type so sheets look filled rather than sparse with tiny text.
-    if (leftover > 18) return 'fill-airy';
-    if (leftover > 8) return 'fill-roomy';
-    if (leftover < 3) return 'fill-tight';
-    return 'fill-normal';
+    // Start denser when the sheet is full; browser fit script can step down further.
+    if (leftover > 22) return 'fill-airy';
+    if (leftover > 14) return 'fill-roomy';
+    if (leftover > 6) return 'fill-normal';
+    if (leftover > -2) return 'fill-tight';
+    return 'fill-compact';
   }
 
   function lunchClubBox() {
@@ -407,7 +408,7 @@
     return /sandwich/i.test(name || '');
   }
   function isSauce(name) {
-    return /sauce/i.test(name || '');
+    return /^sauces?$/i.test(String(name || '').trim());
   }
   function isDessert(name) {
     return /dessert/i.test(name || '');
@@ -467,10 +468,10 @@
   var PAGE = 100;
   var COST = {
     tracker: 2,
-    allergy: 2.5,
-    logoTop: 8,
+    allergy: 4,
+    logoTop: 12,
     nibblesBox: 2.5,
-    sectionHead: 2.2,
+    sectionHead: 2.8,
     rooms: 9,
     sandwiches: 8,
     lunchClub: 5,
@@ -1045,11 +1046,11 @@
     var landscape = !!opts.landscape;
     var guillotine = !!opts.guillotine;
     // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
-    // titles, Crimson Text allergy line. Generous titles/logo; roomy dish type.
+    // titles, Crimson Text allergy. Logo ~220px; type steps down to fit the page.
     return (
       '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap");' +
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,serif;' +
-        '--dish-gap:14px;--sec-gap:20px;--name:12pt;--desc:10.5pt;--title:22pt;--promo:12.5pt}' +
+        '--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1057,9 +1058,9 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:6mm 10mm 8mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:7mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
-      '.page-spacer{flex:1 1 auto;min-height:2mm}' +
+      '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
       '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;min-height:210mm;height:auto}' +
@@ -1071,17 +1072,17 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;margin:0 0 14px}' +
-      '.top-band-logo{grid-template-columns:1fr 320px;min-height:72mm}' +
+      '.top-band{display:grid;grid-template-columns:1fr 230px;gap:12px;align-items:start;margin:0 0 10px}' +
+      '.top-band-logo{grid-template-columns:1fr 230px;min-height:48mm}' +
       '.top-left .scallop{margin-bottom:0}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
-      '.logo-tr{width:300px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
+      '.logo-tr{width:220px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
-      '.foot-logo img{width:120px;height:auto}' +
+      '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:var(--title)!important;letter-spacing:.16em;text-transform:uppercase;margin:0 0 14px;text-align:center;line-height:1.15}' +
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:var(--title)!important;letter-spacing:.14em;text-transform:uppercase;margin:0 0 10px;text-align:center;line-height:1.15}' +
       '.sec-title.soft-left{text-align:left;letter-spacing:.14em;margin:0 0 10px}' +
       '.sec-title-spacer{visibility:hidden;margin:0 0 10px}' +
       '.scallop .sec-title{text-align:left;font-size:calc(var(--title) - 2pt);letter-spacing:.14em;margin-bottom:8px}' +
@@ -1122,7 +1123,7 @@
       '.bottom-cols{margin-top:16px;margin-bottom:4px}' +
       '.bottom-cols-balanced{grid-template-columns:1fr 1fr;gap:20px}' +
       '.bottom-cols .sec-title{text-align:left}' +
-      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:10.5pt;text-align:center;line-height:1.4;margin-top:10px;flex:0 0 auto}' +
+      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:4mm;padding-top:2mm;flex:0 0 auto}' +
       '.promo{text-align:left}' +
       '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:2px 0 2px}' +
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
@@ -1139,11 +1140,12 @@
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density floors stay large — balanced columns free space for bigger type */ +
-      '.fill-airy{--dish-gap:16px;--sec-gap:24px;--name:13pt;--desc:11pt;--title:24pt;--promo:13pt}' +
-      '.fill-roomy{--dish-gap:15px;--sec-gap:22px;--name:12.5pt;--desc:10.75pt;--title:23pt;--promo:12.5pt}' +
-      '.fill-normal{--dish-gap:14px;--sec-gap:20px;--name:12pt;--desc:10.5pt;--title:22pt;--promo:12.5pt}' +
-      '.fill-tight{--dish-gap:10px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
+      /* Density ladder — fit script steps down until content clears the page */ +
+      '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12.5pt;--desc:10.5pt;--title:20pt;--promo:12pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:12pt;--desc:10.25pt;--title:19pt;--promo:11.5pt}' +
+      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:15.5pt;--promo:10.5pt}' +
+      '.fill-compact{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:14pt;--promo:10pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
@@ -1151,8 +1153,8 @@
       '.a5-face .page-body{flex:0 0 auto}' +
       '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
       '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
-      '.a5-face .logo-tr{width:150px!important}' +
-      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 138px;gap:8px;min-height:34mm}' +
+      '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 118px;gap:8px;min-height:28mm}' +
       '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
       '.a5-face .tracker .roman{font-size:3.5pt!important}' +
       '.a5-face .allergy{font-size:8.5pt}' +
@@ -1286,14 +1288,27 @@
           '<label class="paper-opt"><input type="radio" name="paper" value="a4" checked onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
           '<label class="paper-opt"><input type="radio" name="paper" value="a5" onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint">' + esc(dateHint) +
-        ' — type scales to fill the sheet; selling boxes stay inside their frames.' +
+        ' — type auto-shrinks to fit each page (allergy line kept clear); selling boxes stay framed.' +
         esc(fillerHint) + '</span>' +
       '</div>' +
       a4Stack + a5Stack +
-      '<script>(function(){function sync(){var a5=document.body.classList.contains("paper-a5");' +
+      '<script>(function(){' +
+        'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
+        'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
+        'function overflows(page){return page.scrollHeight>page.clientHeight+2;}' +
+        'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
+          'var start=0;for(var i=0;i<STEPS.length;i++){if(page.classList.contains(STEPS[i])){start=i;break;}}' +
+          'for(var j=start;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+          'if(!overflows(page))break;}});}' +
+        'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
         'if(old)old.remove();s.textContent=a5?"@media print{@page{size:A4 landscape;margin:0}}":"@media print{@page{size:A4 portrait;margin:0}}";' +
-        'document.head.appendChild(s);}document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});})();<\/script>' +
+        'document.head.appendChild(s);setTimeout(fitPages,30);}' +
+        'document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});' +
+        'function boot(){fitPages();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitPages);}' +
+        'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();' +
+        'setTimeout(fitPages,80);setTimeout(fitPages,400);' +
+      '})();<\/script>' +
       '</body></html>'
     );
   }
