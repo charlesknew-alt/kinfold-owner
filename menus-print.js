@@ -122,21 +122,25 @@
   }
 
   function lunchMark() {
+    // Branded crossed knife & fork — sized to read clearly beside dish names
     return (
-      '<svg class="lc" viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path fill="' + GREEN + '" d="M7.2 4.2h1.4v6.2H7.2zm2.6 0h1.4v6.2h-1.4zm2.6 0h1.4v6.2h-1.4zM8.4 11.2h5.2c.4 1.2-.2 2.4-1.4 2.9V20H9.8v-5.9c-1-.5-1.6-1.6-1.4-2.9z" transform="rotate(-32 12 12)"/>' +
-        '<path fill="' + GREEN + '" d="M11 3.5l1.1 8.4 1.5-.2L12.6 3.5zM10.4 12h3l.4 1.3c.2.7-.2 1.4-.9 1.6V20h-1.5v-5.1c-.7-.3-1.1-1-.9-1.7z" transform="rotate(34 12 12)"/>' +
-      '</svg>'
+      '<img class="lc" src="' + esc(asset('lunch-club-mark.png')) + '" alt="" width="28" height="28">'
     );
   }
 
-  function allergy() {
-    return (
+  function allergy(opts) {
+    opts = opts || {};
+    var html =
       '<div class="allergy">' +
         'Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can’t guarantee it’s allergen-free.<br>' +
-        'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan' +
-      '</div>'
-    );
+        'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan';
+    if (opts.lunchClub) {
+      html +=
+        '<br><span class="allergy-lc">' + lunchMark() +
+        ' Bells Lunch Club option — Monday to Thursday &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function cleanPrice(p) {
@@ -159,7 +163,6 @@
     var html = '<div class="dish">';
     html += '<div class="dish-line">';
     html += '<span class="dish-name">';
-    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += esc(name);
     if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     html += '</span>';
@@ -167,6 +170,8 @@
       html += '<span class="dish-leader" aria-hidden="true"></span>';
       html += '<span class="price">' + esc(cleanPrice(price)) + '</span>';
     }
+    // Lunch club mark after the price so dish titles stay left-aligned
+    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += '</div>';
     if (d.description) {
       html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
@@ -179,9 +184,9 @@
     opts = opts || {};
     var html = '<div class="dish dish-c">';
     html += '<div class="dish-name">';
-    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += esc(d.name);
     if (!opts.hidePrice && d.price) html += ' <span class="price">' + esc(d.price) + '</span>';
+    if (d.lunchClub && !opts.hideLunch) html += ' ' + lunchMark();
     html += '</div>';
     if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
     if (d.tags) html += '<div class="tags">' + esc(d.tags) + '</div>';
@@ -565,8 +570,12 @@
   function planFluidLayout(menu, dishes, opts) {
     opts = opts || {};
     var promos = Array.isArray(opts.promos) ? opts.promos : null;
+    // Empty array from the host means “auto” — fall back to seed wording bank.
+    if (promos && !promos.length && root.EBMenus && root.EBMenus.seedPromoBank) {
+      promos = root.EBMenus.seedPromoBank();
+    }
     var promoCost = promos && promos.length
-      ? Math.min(14, 5 + promos.length * 3.5)
+      ? Math.min(22, 5 + promos.length * 3.2)
       : COST.rooms;
     var wantPromoBox = promos ? promos.length > 0 : true;
     var promoLabel = promos && promos.length
@@ -627,7 +636,7 @@
       layout.fit = 'one';
       layout.mode = 'single';
       var left1 = PAGE - oneNeed;
-      // Pack fillers into leftover — never push over PAGE
+      // Pack Stay a While / events into leftover — never push over PAGE
       var add;
       if (wantPromoBox) {
         add = tryAdd(left1, promoCost);
@@ -645,7 +654,7 @@
       add = tryAdd(left1, COST.footLogo);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = left1;
-      // Burgers sit in the right column with Stay a While below (Jul-style).
+      // Burgers + Classics stack on the right; events fill the left (balanced columns).
       layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
     } else if (hasBackContent || oneNeed > PAGE) {
       // —— Two pages (Jul/Nov column use) ——
@@ -657,7 +666,7 @@
 
       var p1used = front;
       var p1left = PAGE - p1used;
-      // Stay a While / Gatherings under burgers on page 1; sandwiches keep page 2 balanced with sides
+      // Events / feature panels on the left; Burgers + Pub Classics stack on the right
       if (wantPromoBox) {
         var addR = tryAdd(p1left, promoCost);
         if (addR.ok) {
@@ -793,7 +802,11 @@
   }
 
   function renderFiller(which, bag, promos, opts) {
-    if (which === 'rooms') return renderPromoBank(promos && promos.length ? promos : (bag && bag.promos));
+    if (which === 'rooms') {
+      var list = (promos && promos.length) ? promos : (bag && bag.promos);
+      if (list && list.length) return renderPromoBank(list);
+      return promoRooms();
+    }
     if (which === 'sandwiches') {
       return sandwichNote(bag.sandwiches && bag.sandwiches.dishes, opts || {});
     }
@@ -817,8 +830,8 @@
     var p2opts = layout.p2;
     var sidesPrint = sidesForPrint(bag);
     var hideDate = menu.id === 'party' || menu.kind === 'party';
-    var fill1 = (plan && plan.forceFillClass) || fillClass((layout.leftover && layout.leftover.p1) || 12);
-    var fill2 = (plan && plan.forceFillClass) || fillClass((layout.leftover && layout.leftover.p2) || 12);
+    var fill1 = (plan && plan.forceFillClass) || 'fill-airy';
+    var fill2 = (plan && plan.forceFillClass) || 'fill-airy';
 
     var nibRule = ruleFor('Nibbles', plan);
     var startRule = ruleFor('Starters', plan);
@@ -857,7 +870,9 @@
       p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
 
-    // Column block: Pub Classics (left) | Burgers + Stay a While (right)
+    // —— Column block (golden rule: both columns start and finish together) ——
+    // Left  = Sharing (when set to column) + events / feature panels
+    // Right = Burgers, then Pub Classics underneath
     var split = splitClassicsBag(bag.classics);
     var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
       ? bag.burgers.dishes.slice()
@@ -873,15 +888,20 @@
       }
     }
     var classicDishes = split.classics;
-    // Sparse classics leave a hole under the left column — drop Sharing into that
-    // column so page 1 balances; otherwise print Sharing full-width (2-col when ≥2).
-    var shareInLeft = !!(bag.sharing && bag.sharing.dishes && bag.sharing.dishes.length &&
-      classicDishes.length > 0 && classicDishes.length <= 2 &&
-      (burgerDishes.length || p1opts.rooms));
-    if (bag.sharing && !shareInLeft) {
-      var shareTwoCol = (bag.sharing.dishes || []).length >= 2;
+    var shareDishes = (bag.sharing && bag.sharing.dishes) ? bag.sharing.dishes.slice() : [];
+    // Honour staff width: column/both → left column; full → band above (2-col when ≥2)
+    var shareAsColumn = !!(shareDishes.length && wantsColumn(shareRule));
+    var shareAsFull = !!(shareDishes.length && !shareAsColumn);
+    // Sparse food on the right: also pull full-width Sharing into the left column to balance
+    var foodUnits = classicDishes.length + burgerDishes.length;
+    var shareInLeft = shareAsColumn ||
+      (!!shareDishes.length && foodUnits > 0 && foodUnits <= 4 && (burgerDishes.length || p1opts.rooms));
+
+    if (shareAsFull && !shareInLeft) {
       p1 += '<section class="sec">' +
-        sectionBlock(bag.sharing.name, bag.sharing.dishes, shareRule, 'wide', { twoCol: shareTwoCol }) +
+        sectionBlock(bag.sharing.name, shareDishes, shareRule, 'wide', {
+          twoCol: shareDishes.length >= 2
+        }) +
         '</section>';
     }
     if (bag.boost) {
@@ -896,28 +916,38 @@
 
     var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms || p1opts.sandwiches ||
       (p1opts.sidesOnP1 && sidesPrint) || shareInLeft;
-    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length || !!p1opts.rooms || shareInLeft;
+    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length ||
+      !!p1opts.rooms || shareInLeft || classicDishes.length > 0;
     var sandwichesAsColumn = wantsColumn(sandRule);
-    var burgersOnRight = !!burgerDishes.length;
 
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
-      p1 += '<div class="cols cols-classics">';
-      p1 += '<div class="col col-dishes">';
-      if (classicDishes.length) {
-        p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
-      }
+      p1 += '<div class="cols cols-classics cols-balanced">';
+      // LEFT — events + optional Sharing (fills to match the food column)
+      p1 += '<div class="col col-events">';
       if (shareInLeft) {
-        p1 += '<div class="sec-title soft-left">' + esc(bag.sharing.name) + '</div>';
-        p1 += listDishes(bag.sharing.dishes);
+        p1 += framedBlock(
+          sectionTitle(bag.sharing.name) + listDishes(shareDishes),
+          shareRule
+        );
       }
-      if (!classicDishes.length && !shareInLeft) p1 += '&nbsp;';
-      p1 += '</div><div class="col col-promo">';
+      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+      if (p1opts.sandwiches && sandwichesAsColumn && !burgerDishes.length && !classicDishes.length) {
+        p1 += renderFiller('sandwiches', bag);
+      }
+      if (!shareInLeft && !p1opts.rooms && !(p1opts.sandwiches && sandwichesAsColumn)) {
+        p1 += '&nbsp;';
+      }
+      p1 += '</div>';
+      // RIGHT — Burgers, then Pub Classics under them
+      p1 += '<div class="col col-food">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
       }
-      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
-      if (p1opts.sandwiches && sandwichesAsColumn) {
+      if (classicDishes.length) {
+        p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
+      }
+      if (p1opts.sandwiches && sandwichesAsColumn && (burgerDishes.length || classicDishes.length)) {
         if (sandRule.frame) p1 += renderFiller('sandwiches', bag);
         else {
           p1 += '<div class="promo sandwich-promo sec-plain">' +
@@ -930,21 +960,24 @@
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
+      if (!burgerDishes.length && !classicDishes.length) p1 += '&nbsp;';
       p1 += '</div></div></section>';
     } else if (classicDishes.length || burgerDishes.length) {
-      if (classicDishes.length) {
-        p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
-      }
       if (burgerDishes.length) {
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule) + '</section>';
+      }
+      if (classicDishes.length) {
+        p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
       }
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
     } else if (p1opts.rooms || p1opts.sandwiches) {
-      p1 += '<section class="sec classics-block"><div class="cols cols-classics">';
-      p1 += '<div class="col col-dishes">&nbsp;</div><div class="col col-promo">';
+      p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced">';
+      p1 += '<div class="col col-events">';
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+      p1 += '</div><div class="col col-food">';
       if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
+      else p1 += '&nbsp;';
       p1 += '</div></div></section>';
     }
 
@@ -962,7 +995,7 @@
 
     p1 += '</div>'; // page-body content ends; spacer fills leftover
     p1 += '<div class="page-spacer" aria-hidden="true"></div>';
-    p1 += allergy();
+    p1 += allergy({ lunchClub: !!(bag.hasLunch) });
     p1 += '</div>';
 
     if (layout.pages < 2 || !p2opts) return p1;
@@ -1006,7 +1039,7 @@
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
     p2 += '</div>'; // page-body
     p2 += '<div class="page-spacer" aria-hidden="true"></div>';
-    p2 += allergy();
+    p2 += allergy({ lunchClub: !!(bag.hasLunch) });
     p2 += '</div>';
 
     return p1 + p2;
@@ -1067,10 +1100,10 @@
     var guillotine = !!opts.guillotine;
     // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
     // titles, Crimson Text allergy. Logo ~220px; type steps down to fit the page.
+    // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
-      '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap");' +
-      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,serif;' +
-        '--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
+      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
+        '--dish-gap:11px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:28pt;--promo:11.5pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1078,17 +1111,17 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:9mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:18mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
-      '.page-body-start{padding-top:3mm}' +
+      '.page-body-start{padding-top:4mm}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
-      '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo{page-break-inside:avoid}' +
+      '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;min-height:210mm;height:auto}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 5px;font-weight:400;flex:0 0 auto}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 10px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
@@ -1103,10 +1136,10 @@
       '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:var(--title)!important;letter-spacing:.14em;text-transform:uppercase;margin:0 0 10px;text-align:center;line-height:1.15}' +
-      '.sec-title.soft-left{text-align:left;letter-spacing:.14em;margin:0 0 10px}' +
-      '.sec-title-spacer{visibility:hidden;margin:0 0 10px}' +
-      '.scallop .sec-title{text-align:left;font-size:calc(var(--title) - 2pt);letter-spacing:.14em;margin-bottom:8px}' +
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:var(--title)!important;letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px;text-align:center;line-height:1.1}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.16em;margin:0 0 12px}' +
+      '.sec-title-spacer{visibility:hidden;margin:0 0 12px}' +
+      '.scallop .sec-title{text-align:left;font-size:calc(var(--title) - 2pt);letter-spacing:.14em;margin-bottom:10px}' +
       '.sec-title.soft{font-size:calc(var(--title) - 3pt);letter-spacing:.12em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
       '.scallop{margin:0 0 14px;background:#fff;position:relative;' +
@@ -1118,7 +1151,7 @@
       '.scallop-pad{padding:6px 10px 5px;overflow:visible}' +
       '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
       '.dish{margin:0 0 var(--dish-gap);min-width:0}' +
-      '.dish-line{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto;column-gap:0;align-items:baseline;min-width:0}' +
+      '.dish-line{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto auto;column-gap:0;align-items:center;min-width:0}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;overflow-wrap:anywhere}' +
       '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:12px;height:0}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;padding-left:2px}' +
@@ -1129,15 +1162,21 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{grid-template-columns:1fr;justify-items:center}' +
       '.dish-c .dish-leader{display:none}' +
+      '.lc{width:22px;height:22px;vertical-align:middle;margin-left:8px;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lunch-box .lc{width:28px;height:28px;margin-left:0;flex:0 0 auto}' +
+      '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
+      '.allergy-lc .lc{width:16px;height:16px;margin:0}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
+      '.cols-balanced{align-items:stretch}' +
+      '.cols-balanced .col-events,.cols-balanced .col-food{display:flex;flex-direction:column;min-height:100%}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
-      '.col-dishes,.col-promo,.col-sides,.col-sides-b{min-width:0;max-width:100%}' +
-      '.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:4px}' +
-      '.col-dishes .sec-title:first-child,.col-promo .sec-title:first-child{margin-top:0}' +
-      '.col-promo .scallop{max-width:100%;width:100%}' +
-      '.col-promo .promo p,.col-promo .promo .desc{font-size:10.5pt;line-height:1.4;margin:0 0 6px;font-weight:400}' +
+      '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%}' +
+      '.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:4px}' +
+      '.col-events .sec-title:first-child,.col-food .sec-title:first-child,.col-dishes .sec-title:first-child,.col-promo .sec-title:first-child{margin-top:0}' +
+      '.col-events .scallop,.col-food .scallop,.col-promo .scallop{max-width:100%;width:100%}' +
+      '.col-events .promo p,.col-promo .promo p,.col-promo .promo .desc{font-size:10.5pt;line-height:1.4;margin:0 0 6px;font-weight:400}' +
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
@@ -1154,8 +1193,6 @@
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
       '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11pt}' +
-      '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
-      '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
@@ -1163,12 +1200,12 @@
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density ladder — fit script steps down until content clears the page */ +
-      '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12.5pt;--desc:10.5pt;--title:24pt;--promo:12pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:12pt;--desc:10.25pt;--title:23pt;--promo:11.5pt}' +
-      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:19pt;--promo:10.5pt}' +
-      '.fill-compact{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:17pt;--promo:10pt}' +
+      /* Density ladder — ALWAYS start airy and only tighten if the page overflows */ +
+      '.fill-airy{--dish-gap:14px;--sec-gap:20px;--name:12.5pt;--desc:10.5pt;--title:30pt;--promo:12pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:18px;--name:12pt;--desc:10.25pt;--title:29pt;--promo:11.5pt}' +
+      '.fill-normal{--dish-gap:11px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:28pt;--promo:11.5pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:24pt;--promo:10.5pt}' +
+      '.fill-compact{--dish-gap:6px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:21pt;--promo:10pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
@@ -1313,6 +1350,9 @@
 
     return (
       '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(menu.name) + ' — ' + esc(ver.roman) + '</title>' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">' +
+      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
+      '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
       '<style>' + css({ landscape: landscape, guillotine: guillotine }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
@@ -1323,7 +1363,7 @@
           '<label class="paper-opt"><input type="radio" name="paper" value="a4" checked onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
           '<label class="paper-opt"><input type="radio" name="paper" value="a5" onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint">' + esc(dateHint) +
-        ' — type auto-shrinks to fit each page (allergy line kept clear); selling boxes stay framed.' +
+        ' — pages always fill (type opens out, then shrinks only if needed); allergy line kept clear.' +
         esc(fillerHint) + '</span>' +
       '</div>' +
       a4Stack + a5Stack +
@@ -1331,21 +1371,26 @@
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
         'function overflows(page){return page.scrollHeight>page.clientHeight+2;}' +
+        // Golden rule: always fill the page — start roomiest, tighten only if overflowing.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
-          'var start=0;for(var i=0;i<STEPS.length;i++){if(page.classList.contains(STEPS[i])){start=i;break;}}' +
-          'for(var j=start;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+          'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
           'if(!overflows(page))break;}});}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
         'if(old)old.remove();s.textContent=a5?"@media print{@page{size:A4 landscape;margin:0}}":"@media print{@page{size:A4 portrait;margin:0}}";' +
         'document.head.appendChild(s);setTimeout(fitPages,30);}' +
         'document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});' +
-        'function boot(){fitPages();if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitPages);}' +
+        'function boot(){fitPages();' +
+          'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(function(){fitPages();});}' +
+        '}' +
         'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();' +
-        'setTimeout(fitPages,80);setTimeout(fitPages,400);' +
+        'setTimeout(fitPages,80);setTimeout(fitPages,400);setTimeout(fitPages,1200);' +
         'window.addEventListener("beforeprint",fitPages);' +
         'var pb=document.querySelector(".toolbar button");' +
-        'if(pb){pb.onclick=function(ev){ev.preventDefault();fitPages();setTimeout(function(){window.print();},60);};}' +
+        'if(pb){pb.onclick=function(ev){ev.preventDefault();' +
+          'function go(){fitPages();setTimeout(function(){window.print();},80);}' +
+          'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);}else go();' +
+        '};}' +
       '})();<\/script>' +
       '</body></html>'
     );
