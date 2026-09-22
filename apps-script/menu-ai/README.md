@@ -12,7 +12,7 @@ Browser OCR alone cannot read a decorative Christmas poster reliably. This Apps 
 2. Replace `Code.gs` with `apps-script/menu-ai/Code.gs` from this repo
 3. **Project Settings → Script properties**
    - `GEMINI_API_KEY` = key from [Google AI Studio](https://aistudio.google.com/apikey)
-   - optional: `GEMINI_MODEL` = `gemini-2.0-flash` (default)
+   - optional: `GEMINI_MODEL` = `gemini-3.6-flash` (default)
 4. **Deploy → New deployment → Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**
