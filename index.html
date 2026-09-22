@@ -518,7 +518,7 @@
       'cardtakings-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=cardday&shell=owner',
       // Standalone Teya CSV reader (browser-only). Does not feed paperwork.
       'cardtakings-windmill': 'card-takings.html?venue=windmill',
-      'menus-eightbells': 'menus.html?v=20260922-wording',
+      'menus-eightbells': 'menus.html?v=20260922-hash',
       'rooms-windmill': 'https://rooms.windmilllittleworth.com',
       'payroll': 'https://owner.kinfoldinns.co.uk/payroll.html?v=20260901-xero-pull-timeout',
       'staffhub': 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec'
@@ -533,6 +533,17 @@
       'menus-eightbells': '🍽️ Menus',
       'payroll': '💷 Payroll → Wise',
       'staffhub': '👥 Staff Hub'
+    };
+    var PUBS = {
+      'invoicing': 'Both Venues',
+      'paperwork-windmill': 'Windmill Inn',
+      'paperwork-eightbells': 'Eight Bells',
+      'cardtakings-eightbells': 'Eight Bells',
+      'cardtakings-windmill': 'Windmill Inn',
+      'rooms-windmill': 'Windmill Inn',
+      'menus-eightbells': 'Eight Bells',
+      'payroll': 'Both Venues',
+      'staffhub': 'Both Venues'
     };
 
     var currentSystem = null;
@@ -833,6 +844,7 @@
     if (qRole) setRole(decodeURIComponent(qRole).toLowerCase());
 
     restoreSession();
+    restoreFromHash();
 
     // Paperwork / Card Takings use the same Apps Scripts as the manager hubs.
     // Keep shell=owner on every load of those scripts, including iframe
@@ -868,7 +880,8 @@
         .replace(/[?&]$/, '');
     }
 
-    function openApp(system, pubName) {
+    function openApp(system, pubName, opts) {
+      opts = opts || {};
       if (sessionRole && sessionRole !== 'owner') {
         // Managers may open Rooms (Windmill) or Menus (Eight Bells). Do not send shell=owner.
         if (system === 'rooms-windmill' && sessionRole !== 'windmill') return;
@@ -880,6 +893,11 @@
       if (system === 'payroll') {
         var entity = pubName === 'Eight Bells' ? 'eightbells' : 'windmill';
         url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'entity=' + entity;
+      }
+      // Bust GitHub Pages / iframe cache on local html apps (Menus, etc.)
+      if (/\.html(\?|$)/.test(url) && url.indexOf('://') === -1) {
+        url = url.replace(/([?&])v=[^&]*/g, '$1').replace(/\?&/, '?').replace(/[?&]$/, '');
+        url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
       }
       if (sessionRole === 'owner') url = withOwnerShell(url);
       currentSystem = system;
@@ -896,7 +914,29 @@
       document.getElementById('appView').classList.add('active');
       document.getElementById('roomsFab').classList.remove('show');
       document.getElementById('menusFab').classList.remove('show');
-      history.pushState({ view: 'app', system: system, pub: pubName, url: url }, '', '#' + system);
+      var hist = { view: 'app', system: system, pub: pubName, url: url };
+      if (opts.replace) history.replaceState(hist, '', '#' + system);
+      else history.pushState(hist, '', '#' + system);
+    }
+
+    /** After refresh, #menus-eightbells (etc.) must reopen the app — history.state is gone. */
+    function systemFromHash() {
+      var raw = String(location.hash || '').replace(/^#/, '').split('/')[0];
+      if (!raw || raw === 'owner' || raw === 'login') return '';
+      if (raw === 'eightbells' || raw === 'windmill') return '';
+      return URLS[raw] ? raw : '';
+    }
+
+    function restoreFromHash() {
+      var system = systemFromHash();
+      if (!system || !sessionRole) return false;
+      var pub = PUBS[system] || '';
+      if (system === 'payroll') {
+        pub = sessionRole === 'eightbells' ? 'Eight Bells'
+          : sessionRole === 'windmill' ? 'Windmill Inn' : 'Windmill Inn';
+      }
+      openApp(system, pub, { replace: true });
+      return true;
     }
 
     function closeApp() {
