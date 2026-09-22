@@ -73,16 +73,39 @@ assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
 assert(/logo-tr\{width:170px/.test(printJs), 'front-page logo sized ~170px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:18pt/.test(printJs), 'section titles large but fit-friendly');
+assert(/--title:22pt/.test(printJs), 'section titles large but fit-friendly');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
 assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
 assert(printJs.indexOf('Honour staff section picks') !== -1 || printJs.indexOf('do not invent a Burgers title') !== -1, 'print respects staff sections');
 assert(api.SECTIONS.indexOf('Sauces') !== -1, 'Sauces is a canonical section');
 assert(api.guessSection('Sauces', 'Peppercorn', '') === 'Sauces', 'guesses Sauces section');
+assert(api.SECTIONS.indexOf('Item Boost') !== -1, 'Item Boost is a canonical section');
+assert(api.guessSection('Item Boost', 'Fish of the Day', '') === 'Item Boost', 'keeps Item Boost section');
+assert(api.guessSection('', 'Fish of the Day', 'ask for today’s catch') === 'Item Boost', 'guesses Fish of the Day as Item Boost');
+assert(api.guessSection('Specials', 'Pie of the Day', '') === 'Item Boost', 'maps Specials heading to Item Boost');
+assert(api.sectionLayoutFor('Item Boost').frame === true, 'Item Boost defaults to frilly frame');
+assert(printJs.indexOf('share-cols') !== -1, 'sharing plates can print in two columns');
+assert(printJs.indexOf('shareInLeft') !== -1, 'sparse classics pull sharing into left column');
+assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
+assert(page.indexOf('Merge ↑') !== -1, 'confirm review has merge-into-above control');
+assert(typeof api.mergeDishWithPrevious === 'function', 'mergeDishWithPrevious exported');
+var salmonSplit = [
+  { section: 'Starters', name: 'Smoked Salmon', description: '', price: '', tags: '' },
+  { section: 'Starters', name: 'horseradish cream, honey braised leeks, crispy capers & pickled walnuts', description: '', price: '8.95', tags: '' }
+];
+var salmonMerged = api.tidyOrphanDescriptions(salmonSplit);
+assert(salmonMerged.length === 1 && salmonMerged[0].price === '8.95', 'Smoked Salmon priced garnish merges onto title');
+assert(/horseradish/.test(salmonMerged[0].description), 'Smoked Salmon description kept');
+var manualMerge = api.mergeDishWithPrevious([
+  api.dish('Starters', 'Duck Croquette', '', '8.95', ''),
+  api.dish('Starters', 'served with spicy beetroot sauce', '', '', '')
+], 1);
+assert(manualMerge.length === 1 && /beetroot/.test(manualMerge[0].description), 'manual merge folds description into dish above');
 assert(api.priceOf('Masala Sea Bass 16 .95').value === '16.95', 'priceOf tolerates spaced decimals');
 assert(api.cleanDishName('Masala Sea Bass 16 .95') === 'Masala Sea Bass', 'cleanDishName strips spaced price');
 assert(printJs.indexOf('bottom-cols-balanced') === -1 || printJs.indexOf('Sides (and sauces) in the left column') !== -1, 'sides stay one column beside sandwiches');
+assert(printJs.indexOf('isItemBoost') !== -1 && printJs.indexOf('bag.boost') !== -1, 'print bags Item Boost for layout');
 assert(ingestJs.indexOf('reviewLayout') !== -1, 'ingest can ask Gemini to review layout balance');
 assert(aiGs.indexOf('reviewLayoutWithGemini_') !== -1, 'Apps Script supports layout review action');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
@@ -95,6 +118,21 @@ assert(/tartare/.test(api.tidyOrphanDescriptions([
   { section: 'Pub Classics', name: 'Fish & Chips', description: 'served with chips, garden peas', price: '17.95', tags: '' },
   { section: 'Pub Classics', name: 'and tartare sauce.', description: '', price: '', tags: '' }
 ])[0].description), 'merged orphan lands on previous description');
+var camembertTidy = api.tidyOrphanDescriptions([
+  { section: 'Sharing Plates', name: 'Baked Camembert for Two', description: '', price: '', tags: 'v' },
+  { section: 'Sharing Plates', name: 'served with ciabatta, red onion jam', description: '', price: '14.95', tags: '' }
+]);
+assert(camembertTidy.length === 1 && camembertTidy[0].price === '14.95', 'Camembert desc+price merges onto title');
+assert(/ciabatta/.test(camembertTidy[0].description), 'Camembert description kept on merge');
+var camembertPaste = api.parsePaste(
+  'Sharing Plates\nBaked Camembert for Two\nserved with ciabatta, red onion jam 14.95'
+);
+assert(camembertPaste.length === 1 && camembertPaste[0].price === '14.95', 'paste joins Camembert price on desc line');
+var boostPaste = api.parsePaste(
+  'Item Boost\nFish of the Day 19.95\nask waiting staff for today’s catch'
+);
+assert(boostPaste.length === 1 && boostPaste[0].section === 'Item Boost', 'paste keeps Item Boost section');
+assert(/Fish of the Day/i.test(boostPaste[0].name), 'paste reads Fish of the Day');
 var steakPaste = api.parsePaste(
   'Pub Classics\n8oz Trenchmore Farm Flat Iron Steak gf 24.95\nserved with chips, mushroom, tomato &\nchoice of sauce (see options)\nFish & Chips 17.95\nserved with chips, garden peas\nand tartare sauce.'
 );
@@ -196,6 +234,26 @@ assert(classicHtml.indexOf('>Burgers<') === -1 && classicHtml.indexOf('>BURGERS<
 assert(/Spicy Asian Burger/.test(classicHtml), 'classic-filed burger still prints');
 assert(print.partyOccasion('Christmas Party Menu', {}) === 'christmas', 'detects Christmas occasion');
 assert(print.partyOccasion('Valentine Dinner', {}) === 'valentine', 'detects Valentine occasion');
+
+// Item Boost (e.g. Fish of the Day) prints in a frilly box after Sharing Plates
+var withBoost = [
+  api.dish('Nibbles', 'Olives', '', '6.95', 'vg'),
+  api.dish('Starters', 'Soup', 'bread', '6.50', ''),
+  api.dish('Sharing Plates', 'Baked Camembert for Two', 'ciabatta', '14.95', 'v'),
+  api.dish('Item Boost', 'Fish of the Day', 'ask waiting staff', '19.95', ''),
+  api.dish('Pub Classics', 'Haddock & Chips', 'peas', '17.95', ''),
+  api.dish('Mains', 'Pie', 'mash', '14.95', '')
+];
+var boostLayout = print.planFluidLayout(mainMenu, withBoost);
+assert(boostLayout.bag.boost && /Fish of the Day/i.test(boostLayout.bag.boost.dishes[0].name), 'bags Item Boost for Fish of the Day');
+var boostHtml = print.build(mainMenu, withBoost, {});
+assert(/ITEM BOOST|Item Boost/i.test(boostHtml), 'prints Item Boost section title');
+assert(/Fish of the Day/i.test(boostHtml), 'prints Fish of the Day dish');
+assert(/scallop[\s\S]*Fish of the Day|Fish of the Day[\s\S]*scallop/i.test(boostHtml) ||
+  /scallop[\s\S]*ITEM BOOST/i.test(boostHtml), 'Item Boost uses frilly scallop frame');
+var seedMain = api.seed().main;
+assert(seedMain.some(function (d) { return d.section === 'Item Boost' && /Fish of the Day/i.test(d.name); }),
+  'sample main menu includes Item Boost Fish of the Day');
 
 var shuffled = [
   api.dish('Mains', 'Pie', 'mash', '14.95', ''),

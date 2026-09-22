@@ -163,8 +163,10 @@
     html += esc(name);
     if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     html += '</span>';
-    html += '<span class="dish-leader" aria-hidden="true"></span>';
-    if (!opts.hidePrice && price) html += '<span class="price">' + esc(cleanPrice(price)) + '</span>';
+    if (!opts.hidePrice && price) {
+      html += '<span class="dish-leader" aria-hidden="true"></span>';
+      html += '<span class="price">' + esc(cleanPrice(price)) + '</span>';
+    }
     html += '</div>';
     if (d.description) {
       html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
@@ -288,11 +290,14 @@
     );
   }
 
-  /** Description fragments wrongly stored as dish titles (no price, lowercase / side-list). */
+  /** Prefer shared tidy from menus.js when available (priced desc orphans too). */
   function looksLikeDescFragment(name) {
+    if (root.EBMenus && root.EBMenus.looksLikeDescFragment) {
+      return root.EBMenus.looksLikeDescFragment(name);
+    }
     var n = String(name || '').trim();
-    if (!n || n.length > 90) return false;
-    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter)/i.test(n)) {
+    if (!n || n.length > 100) return false;
+    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter|horseradish|honey|ciabatta)/i.test(n)) {
       return true;
     }
     if (/^[a-z]/.test(n) && !/burger|haddock|pie|fish|steak|salad|arancini|cocktail/i.test(n)) {
@@ -308,37 +313,40 @@
   }
 
   /**
-   * Merge orphan “description” rows back onto the previous dish, and fold
-   * sandwich selling lines into one sandwiches bucket for the side column.
+   * Merge orphan “description” rows back onto the previous dish (including
+   * priced garnish lines under an unpriced title), then keep sandwich notes tidy.
    */
   function tidyDishesForPrint(dishes) {
-    var out = [];
-    (dishes || []).forEach(function (raw) {
-      var d = {
-        id: raw.id,
-        section: raw.section,
-        name: raw.name,
-        description: raw.description || '',
-        price: raw.price || '',
-        tags: raw.tags || '',
-        lunchClub: !!raw.lunchClub,
-        fromMenu: raw.fromMenu
-      };
-      var price = cleanPrice(d.price);
-      if (out.length && !price && looksLikeDescFragment(d.name)) {
-        var prev = out[out.length - 1];
-        var bit = d.name + (d.description ? ', ' + d.description : '');
-        prev.description = prev.description ? (prev.description + ', ' + bit) : bit;
-        return;
-      }
-      if (out.length && !price && looksLikeDescFragment(d.description) && !d.name) {
-        var prev2 = out[out.length - 1];
-        prev2.description = prev2.description ? (prev2.description + ', ' + d.description) : d.description;
-        return;
-      }
-      out.push(d);
-    });
-    return out;
+    var list = dishes || [];
+    if (root.EBMenus && root.EBMenus.tidyOrphanDescriptions) {
+      list = root.EBMenus.tidyOrphanDescriptions(list);
+    } else {
+      var out = [];
+      list.forEach(function (raw) {
+        var d = {
+          id: raw.id,
+          section: raw.section,
+          name: raw.name,
+          description: raw.description || '',
+          price: raw.price || '',
+          tags: raw.tags || '',
+          lunchClub: !!raw.lunchClub,
+          fromMenu: raw.fromMenu
+        };
+        var price = cleanPrice(d.price);
+        var prev = out.length ? out[out.length - 1] : null;
+        var prevPrice = prev && cleanPrice(prev.price);
+        if (prev && looksLikeDescFragment(d.name) && (!price || !prevPrice)) {
+          var bit = d.name + (d.description ? ', ' + d.description : '');
+          prev.description = prev.description ? (prev.description + ', ' + bit) : bit;
+          if (!prevPrice && price) prev.price = d.price;
+          return;
+        }
+        out.push(d);
+      });
+      list = out;
+    }
+    return list;
   }
 
   function splitClassicsBag(sec) {
@@ -400,6 +408,11 @@
   function isSharing(name) {
     return /shar(e|ing)|for the table/i.test(name || '');
   }
+  function isItemBoost(name) {
+    return /item\s*boost|specials?|fish of the day|pie of the day|catch of the day|chef.?s special/i.test(
+      String(name || '').trim()
+    );
+  }
   function isSides(name) {
     return /^sides?$/i.test(name || '');
   }
@@ -424,6 +437,7 @@
     { test: isNibbles, rank: 10 },
     { test: isStarters, rank: 20 },
     { test: isSharing, rank: 25 },
+    { test: isItemBoost, rank: 27 },
     { test: isClassics, rank: 30 },
     { test: isBurgers, rank: 32 },
     { test: isMains, rank: 40 },
@@ -496,7 +510,7 @@
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
-      nibbles: null, starters: null, sharing: null, classics: null, burgers: null,
+      nibbles: null, starters: null, sharing: null, boost: null, classics: null, burgers: null,
       mains: null, desserts: null, sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
@@ -505,6 +519,7 @@
       if (isNibbles(s.name) && !bag.nibbles) bag.nibbles = s;
       else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
+      else if (isItemBoost(s.name) && !bag.boost) bag.boost = { name: 'Item Boost', dishes: s.dishes };
       else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
       else if (isClassics(s.name) && !bag.classics) {
         // Keep every staff-assigned classic here — including a lone burger filed as classic.
@@ -564,6 +579,9 @@
     var front = chrome;
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
+    if (bag.sharing) front += sectionUnits(bag.sharing, false);
+    // Item Boost defaults to a frilly frame (Fish of the Day, etc.)
+    if (bag.boost) front += sectionUnits(bag.boost, true);
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name)) front += sectionUnits(s, false);
     });
@@ -722,6 +740,26 @@
     return (list || []).map(function (d) { return dishRow(d); }).join('');
   }
 
+  /** Split a section across two columns when it has enough dishes to look sparse full-width. */
+  function listDishesCols(list) {
+    list = list || [];
+    if (list.length < 2) return listDishes(list);
+    var mid = Math.ceil(list.length / 2);
+    return (
+      '<div class="cols share-cols">' +
+        '<div class="col">' + listDishes(list.slice(0, mid)) + '</div>' +
+        '<div class="col">' + listDishes(list.slice(mid)) + '</div>' +
+      '</div>'
+    );
+  }
+
+  function sectionBlock(title, dishes, rule, kind, opts) {
+    if (!dishes || !dishes.length) return '';
+    opts = opts || {};
+    var body = opts.twoCol ? listDishesCols(dishes) : listDishes(dishes);
+    return framedBlock(sectionTitle(title) + body, rule, kind || 'wide');
+  }
+
   function layoutMap(plan) {
     if (root.EBMenus && root.EBMenus.normalizeSectionLayout) {
       return root.EBMenus.normalizeSectionLayout(plan && plan.sectionLayout);
@@ -752,11 +790,6 @@
   function framedBlock(inner, rule, kind) {
     if (rule && rule.frame) return scallop(inner, kind || 'wide');
     return '<div class="sec-plain">' + inner + '</div>';
-  }
-
-  function sectionBlock(title, dishes, rule, kind) {
-    if (!dishes || !dishes.length) return '';
-    return framedBlock(sectionTitle(title) + listDishes(dishes), rule, kind || 'wide');
   }
 
   function renderFiller(which, bag, promos, opts) {
@@ -790,6 +823,7 @@
     var nibRule = ruleFor('Nibbles', plan);
     var startRule = ruleFor('Starters', plan);
     var shareRule = ruleFor('Sharing Plates', plan);
+    var boostRule = ruleFor('Item Boost', plan);
     var classRule = ruleFor('Pub Classics', plan);
     var burgRule = ruleFor('Burgers', plan);
     var mainRule = ruleFor('Mains', plan);
@@ -822,17 +856,8 @@
     if (bag.starters) {
       p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
-    if (bag.sharing) {
-      p1 += '<section class="sec">' + sectionBlock(bag.sharing.name, bag.sharing.dishes, shareRule) + '</section>';
-    }
-    bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name)) {
-        var otherRule = ruleFor(s.name, plan);
-        p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
-      }
-    });
 
-    // Column block: Pub Classics (left) | Burgers only if staff used that section + Stay a While
+    // Column block: Pub Classics (left) | Burgers + Stay a While (right)
     var split = splitClassicsBag(bag.classics);
     var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
       ? bag.burgers.dishes.slice()
@@ -848,9 +873,30 @@
       }
     }
     var classicDishes = split.classics;
+    // Sparse classics leave a hole under the left column — drop Sharing into that
+    // column so page 1 balances; otherwise print Sharing full-width (2-col when ≥2).
+    var shareInLeft = !!(bag.sharing && bag.sharing.dishes && bag.sharing.dishes.length &&
+      classicDishes.length > 0 && classicDishes.length <= 2 &&
+      (burgerDishes.length || p1opts.rooms));
+    if (bag.sharing && !shareInLeft) {
+      var shareTwoCol = (bag.sharing.dishes || []).length >= 2;
+      p1 += '<section class="sec">' +
+        sectionBlock(bag.sharing.name, bag.sharing.dishes, shareRule, 'wide', { twoCol: shareTwoCol }) +
+        '</section>';
+    }
+    if (bag.boost) {
+      p1 += '<section class="sec">' + sectionBlock(bag.boost.name, bag.boost.dishes, boostRule) + '</section>';
+    }
+    bag.other.forEach(function (s) {
+      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) && !isItemBoost(s.name)) {
+        var otherRule = ruleFor(s.name, plan);
+        p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
+      }
+    });
+
     var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms || p1opts.sandwiches ||
-      (p1opts.sidesOnP1 && sidesPrint);
-    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length || !!p1opts.rooms;
+      (p1opts.sidesOnP1 && sidesPrint) || shareInLeft;
+    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length || !!p1opts.rooms || shareInLeft;
     var sandwichesAsColumn = wantsColumn(sandRule);
     var burgersOnRight = !!burgerDishes.length;
 
@@ -861,7 +907,11 @@
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
-      if (!classicDishes.length) p1 += '&nbsp;';
+      if (shareInLeft) {
+        p1 += '<div class="sec-title soft-left">' + esc(bag.sharing.name) + '</div>';
+        p1 += listDishes(bag.sharing.dishes);
+      }
+      if (!classicDishes.length && !shareInLeft) p1 += '&nbsp;';
       p1 += '</div><div class="col col-promo">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
@@ -919,7 +969,7 @@
 
     var p2 = '<div class="page fill-page ' + fill2 + '">';
     p2 += trackerBar(ver, { hideDate: hideDate });
-    p2 += '<div class="page-body">';
+    p2 += '<div class="page-body page-body-start">';
     if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
     if (bag.desserts) p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
 
@@ -1020,7 +1070,7 @@
     return (
       '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap");' +
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,serif;' +
-        '--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
+        '--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1028,8 +1078,9 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:7mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:9mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
+      '.page-body-start{padding-top:3mm}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
       '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo{page-break-inside:avoid}' +
@@ -1037,7 +1088,7 @@
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 1px;font-weight:400;flex:0 0 auto}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 5px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
@@ -1080,6 +1131,8 @@
       '.dish-c .dish-leader{display:none}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
+      '.share-cols{margin:0 0 4px;gap:22px}' +
+      '.share-cols .col{min-width:0}' +
       '.col-dishes,.col-promo,.col-sides,.col-sides-b{min-width:0;max-width:100%}' +
       '.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:4px}' +
       '.col-dishes .sec-title:first-child,.col-promo .sec-title:first-child{margin-top:0}' +
@@ -1111,11 +1164,11 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — fit script steps down until content clears the page */ +
-      '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12.5pt;--desc:10.5pt;--title:20pt;--promo:12pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:12pt;--desc:10.25pt;--title:19pt;--promo:11.5pt}' +
-      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:15.5pt;--promo:10.5pt}' +
-      '.fill-compact{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:14pt;--promo:10pt}' +
+      '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12.5pt;--desc:10.5pt;--title:24pt;--promo:12pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:12pt;--desc:10.25pt;--title:23pt;--promo:11.5pt}' +
+      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:19pt;--promo:10.5pt}' +
+      '.fill-compact{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:17pt;--promo:10pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
