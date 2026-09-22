@@ -1057,16 +1057,16 @@
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:8pt;letter-spacing:.04em;text-transform:uppercase;color:#8a8278;margin:0 0 2px;font-weight:500;flex:0 0 auto}' +
-      '.tracker .roman{font-family:var(--sans);font-size:7.5pt;font-weight:400;letter-spacing:.04em;color:#9a9288;text-transform:none}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 1px;font-weight:400;flex:0 0 auto}' +
+      '.tracker .roman{font-family:var(--sans);font-size:5.5pt;font-weight:400;letter-spacing:.02em;color:#b5ada3;text-transform:none;opacity:.85}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:1fr 168px;gap:12px;align-items:start;margin:0 0 10px}' +
-      '.top-band-logo{grid-template-columns:1fr 168px;min-height:42mm}' +
+      '.top-band{display:grid;grid-template-columns:1fr 210px;gap:14px;align-items:start;margin:0 0 12px}' +
+      '.top-band-logo{grid-template-columns:1fr 210px;min-height:52mm}' +
       '.top-left .scallop{margin-bottom:0}' +
-      '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:2mm}' +
-      '.logo-tr{width:160px;height:auto;display:block;margin-left:auto}' +
+      '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:1mm}' +
+      '.logo-tr{width:200px;height:auto;display:block;margin-left:auto}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:110px;height:auto}' +
@@ -1140,10 +1140,10 @@
       '.a5-face .page-body{flex:0 0 auto}' +
       '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
       '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10pt;--desc:9.5pt;--title:11.5pt;--promo:10pt}' +
-      '.a5-face .logo-tr{width:96px}' +
-      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 104px;gap:8px;min-height:28mm}' +
-      '.a5-face .tracker{font-size:7pt;margin-bottom:2px}' +
-      '.a5-face .tracker .roman{font-size:6.5pt}' +
+      '.a5-face .logo-tr{width:118px}' +
+      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 126px;gap:8px;min-height:32mm}' +
+      '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
+      '.a5-face .tracker .roman{font-size:5pt}' +
       '.a5-face .allergy{font-size:8.5pt}' +
       '.a5-face .cols{gap:10px}' +
       '.a5-face .scallop{border-width:10px;border-image-width:10px}' +

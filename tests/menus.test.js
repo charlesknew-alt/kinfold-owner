@@ -71,8 +71,8 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:160px/.test(printJs), 'front-page logo ~2× (160px)');
-assert(/tracker \.roman\{[^}]*font-size:7\.5pt/.test(printJs), 'Roman version mark is staff-small');
+assert(/logo-tr\{width:200px/.test(printJs), 'front-page logo ~2×+ (200px)');
+assert(/tracker \.roman\{[^}]*font-size:5\.5pt/.test(printJs), 'Roman version mark is staff-small');
 assert(printJs.indexOf('dish-leader') !== -1, 'dish lines use leaders toward prices');
 assert(printJs.indexOf('sandwich-aligned') !== -1, 'sandwiches title aligns with sides');
 assert(api.cleanDishName('Chicken Caesar Salad 9.5 /') === 'Chicken Caesar Salad', 'strips dangling half-range from dish name');
