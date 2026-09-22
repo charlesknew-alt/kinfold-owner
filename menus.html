@@ -98,10 +98,12 @@
       <section class="card" id="preview"></section>
     </div>
   </main>
-  <script src="menus.js"></script>
-  <script src="menus-print.js"></script>
-  <script src="menus-ingest.js"></script>
+  <script src="menus.js?v=20260922-wording2"></script>
+  <script src="menus-print.js?v=20260922-wording2"></script>
+  <script src="menus-ingest.js?v=20260922-wording2"></script>
   <script>
+    if (window.parent !== window) document.documentElement.classList.add('iframed');
+
     var STORAGE = 'eb-menus-v2';
     var META_STORAGE = 'eb-menus-meta-v1';
     var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
@@ -117,14 +119,19 @@
     var pendingReview = null;
     var editingPromoId = '';
 
-    if (window.parent !== window) document.documentElement.classList.add('iframed');
-
     function loadPromoBank() {
       try {
+        if (!window.EBMenus || typeof EBMenus.normalizePromoBank !== 'function') {
+          return (EBMenus && EBMenus.seedPromoBank) ? EBMenus.seedPromoBank() : [];
+        }
         var raw = JSON.parse(localStorage.getItem(PROMO_STORAGE) || 'null');
         return EBMenus.normalizePromoBank(raw);
       } catch (e) {
-        return EBMenus.seedPromoBank();
+        try {
+          return (window.EBMenus && EBMenus.seedPromoBank) ? EBMenus.seedPromoBank() : [];
+        } catch (e2) {
+          return [];
+        }
       }
     }
     function savePromoBank() {
@@ -141,6 +148,7 @@
       return (promoTicks[menuId] && typeof promoTicks[menuId] === 'object') ? promoTicks[menuId] : {};
     }
     function pickedPromosForSheet() {
+      if (!window.EBMenus || typeof EBMenus.pickPromos !== 'function') return [];
       return EBMenus.pickPromos(promoBank, hostPromoTicks(), { max: 2 });
     }
     function load() {

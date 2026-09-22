@@ -40,6 +40,8 @@ assert(cardWm.indexOf('card-takings.html') !== -1, 'WM card takings is standalon
 assert(cardWm.indexOf('page=') === -1, 'WM card takings does not use Apps Script page=');
 assert(html.indexOf("openApp('cardtakings-windmill'") !== -1, 'WM owner tile opens cardtakings-windmill');
 assert(html.indexOf('Teya CSV') !== -1, 'WM tile mentions Teya CSV');
+assert(html.indexOf('function restoreFromHash') !== -1 && html.indexOf('systemFromHash') !== -1, 'hash restore reopens app after refresh');
+assert(html.indexOf('restoreFromHash();') !== -1, 'hash restore runs on boot');
 
 var cardHtml = fs.readFileSync(path.join(__dirname, '..', 'card-takings.html'), 'utf8');
 assert(cardHtml.indexOf('buildTxnsTeya') !== -1, 'card-takings.html has Teya parser');
