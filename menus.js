@@ -366,7 +366,29 @@
     return parts.join(', ');
   }
 
-  /** Turn Gemini / AI JSON into dish rows (+ meta). */
+  /** Normalise Gemini spellingFixes for the review gate. */
+  function normalizeSpellingFixes(raw) {
+    if (!Array.isArray(raw)) return [];
+    var out = [];
+    var seen = {};
+    raw.forEach(function (fix) {
+      if (!fix || typeof fix !== 'object') return;
+      var from = String(fix.from != null ? fix.from : (fix.original != null ? fix.original : '')).trim();
+      var to = String(fix.to != null ? fix.to : (fix.corrected != null ? fix.corrected : '')).trim();
+      if (!from || !to || from === to) return;
+      var key = from.toLowerCase() + '\0' + to.toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({
+        from: from,
+        to: to,
+        where: String(fix.where || fix.field || '').trim()
+      });
+    });
+    return out;
+  }
+
+  /** Turn Gemini / AI JSON into dish rows (+ meta + spellingFixes). */
   function dishesFromAiMenu(menuJson) {
     menuJson = menuJson || {};
     var meta = emptyMeta();
@@ -389,7 +411,12 @@
         lunchClub: false
       });
     });
-    return { dishes: list, meta: meta, kind: menuJson.kind || '' };
+    return {
+      dishes: list,
+      meta: meta,
+      kind: menuJson.kind || '',
+      spellingFixes: normalizeSpellingFixes(menuJson.spellingFixes)
+    };
   }
 
   function normalizeAiTags(t) {
@@ -412,6 +439,123 @@
     return false;
   }
 
+  /** Selling / event wording bank (Stay a While, pub quiz, etc.). */
+  function promoItem(title, body, date, id) {
+    return {
+      id: id || slug(title + '-' + (date || 'evergreen')),
+      title: title || '',
+      body: body || '',
+      date: date ? String(date).slice(0, 10) : ''
+    };
+  }
+
+  function seedPromoBank() {
+    return [
+      promoItem(
+        'Stay a While',
+        'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.',
+        '',
+        'stay-a-while'
+      ),
+      promoItem(
+        'Gatherings',
+        'whether it’s a quiet supper or a special get together, we’re always happy to host your event',
+        '',
+        'gatherings'
+      ),
+      promoItem(
+        'Pub Quiz',
+        'Join us for our pub quiz — teams welcome, cash prizes, from 8pm.',
+        '',
+        'pub-quiz'
+      )
+    ];
+  }
+
+  function startOfDay(d) {
+    d = d ? new Date(d) : new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function parsePromoDate(dateStr) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3]);
+  }
+
+  function isPastPromoDate(dateStr, today) {
+    var dt = parsePromoDate(dateStr);
+    if (!dt) return false;
+    return dt < startOfDay(today);
+  }
+
+  function formatPromoDate(dateStr) {
+    var dt = parsePromoDate(dateStr);
+    if (!dt) return '';
+    var day = dt.getDate();
+    var ord = (day % 10 === 1 && day !== 11) ? 'st'
+      : (day % 10 === 2 && day !== 12) ? 'nd'
+        : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
+    var months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    var weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return weekdays[dt.getDay()] + ' ' + day + ord + ' ' + months[dt.getMonth()];
+  }
+
+  /**
+   * Choose bank wording for Generate.
+   * If staff ticked any: use those (manual override, past dates allowed).
+   * If none ticked: auto-pick upcoming/evergreen only — never past-dated.
+   */
+  function pickPromos(bank, ticks, opts) {
+    opts = opts || {};
+    var max = opts.max != null ? opts.max : 2;
+    var today = opts.today || new Date();
+    bank = Array.isArray(bank) ? bank.slice() : [];
+    ticks = ticks || {};
+    var anyTick = false;
+    Object.keys(ticks).forEach(function (k) { if (ticks[k]) anyTick = true; });
+
+    var chosen;
+    if (anyTick) {
+      chosen = bank.filter(function (p) { return p && ticks[p.id]; });
+    } else {
+      chosen = bank.filter(function (p) {
+        return p && p.title && !isPastPromoDate(p.date, today);
+      });
+      chosen.sort(function (a, b) {
+        var ad = a.date || '';
+        var bd = b.date || '';
+        if (ad && bd) return ad < bd ? -1 : ad > bd ? 1 : 0;
+        if (ad && !bd) return -1;
+        if (!ad && bd) return 1;
+        return 0;
+      });
+    }
+    return chosen.slice(0, Math.max(0, max));
+  }
+
+  function normalizePromoBank(raw) {
+    if (!Array.isArray(raw)) return seedPromoBank();
+    var out = [];
+    var seen = {};
+    raw.forEach(function (p, i) {
+      if (!p || typeof p !== 'object') return;
+      var title = String(p.title || '').trim();
+      if (!title) return;
+      var id = String(p.id || slug(title + '-' + i));
+      if (seen[id]) id = id + '-' + i;
+      seen[id] = true;
+      out.push({
+        id: id,
+        title: title,
+        body: String(p.body || '').trim(),
+        date: p.date ? String(p.date).slice(0, 10) : ''
+      });
+    });
+    return out.length ? out : seedPromoBank();
+  }
+
   root.EBMenus = {
     MENUS: MENUS,
     seed: seed,
@@ -428,6 +572,13 @@
     parseMarks: parseMarks,
     formatMarks: formatMarks,
     dishesFromAiMenu: dishesFromAiMenu,
-    isJunkDishName: isJunkDishName
+    normalizeSpellingFixes: normalizeSpellingFixes,
+    isJunkDishName: isJunkDishName,
+    promoItem: promoItem,
+    seedPromoBank: seedPromoBank,
+    normalizePromoBank: normalizePromoBank,
+    pickPromos: pickPromos,
+    isPastPromoDate: isPastPromoDate,
+    formatPromoDate: formatPromoDate
   };
 })(typeof window !== 'undefined' ? window : global);

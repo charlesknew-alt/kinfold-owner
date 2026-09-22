@@ -87,7 +87,7 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Build each menu — <strong>upload a PDF or image</strong>, paste a list, or add/adjust dishes. Tick lunch club / gf / v / vg. On Main or Sunday, tick other menus to try on the same sheet. <strong>Generate</strong> chooses layout and dish order, and only adds Stay a While / sandwiches / logo when they fit.</p>
+    <p class="lede">Build each menu — <strong>upload a PDF or image</strong>, paste a list, or add/adjust dishes. Keep a <strong>wording bank</strong> for Stay a While, pub quizzes and events (with dates). Tick what to print, or leave unticked and Generate auto-picks — never past dates.</p>
     <div class="menus" id="menuPicker"></div>
     <div class="top-actions no-print">
       <button type="button" class="go" id="doGenerate">Generate menu</button>
@@ -104,16 +104,45 @@
   <script>
     var STORAGE = 'eb-menus-v2';
     var META_STORAGE = 'eb-menus-meta-v1';
+    var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
+    var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
     var book = load();
     var metaBook = loadMeta();
+    var promoBank = loadPromoBank();
+    var promoTicks = loadPromoTicks();
     var menuId = 'main';
     var mode = 'complete';
     var dishId = '';
     var includes = loadIncludes();
     var pendingReview = null;
+    var editingPromoId = '';
 
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
+    function loadPromoBank() {
+      try {
+        var raw = JSON.parse(localStorage.getItem(PROMO_STORAGE) || 'null');
+        return EBMenus.normalizePromoBank(raw);
+      } catch (e) {
+        return EBMenus.seedPromoBank();
+      }
+    }
+    function savePromoBank() {
+      localStorage.setItem(PROMO_STORAGE, JSON.stringify(promoBank));
+    }
+    function loadPromoTicks() {
+      try { return JSON.parse(localStorage.getItem(PROMO_TICKS) || '{}') || {}; }
+      catch (e) { return {}; }
+    }
+    function savePromoTicks() {
+      localStorage.setItem(PROMO_TICKS, JSON.stringify(promoTicks));
+    }
+    function hostPromoTicks() {
+      return (promoTicks[menuId] && typeof promoTicks[menuId] === 'object') ? promoTicks[menuId] : {};
+    }
+    function pickedPromosForSheet() {
+      return EBMenus.pickPromos(promoBank, hostPromoTicks(), { max: 2 });
+    }
     function load() {
       try {
         var saved = JSON.parse(localStorage.getItem(STORAGE) || localStorage.getItem('eb-menus-v1') || 'null');
@@ -191,7 +220,8 @@
         ['adjust', 'Adjust a dish'],
         ['replace', 'Replace a dish'],
         ['add', 'Add a dish'],
-        ['paste', 'Upload / paste']
+        ['paste', 'Upload / paste'],
+        ['wording', 'Wording / events']
       ].forEach(function (pair) {
         html += '<button type="button" data-mode="' + pair[0] + '" class="' + (mode === pair[0] ? 'on' : '') + '">' + pair[1] + '</button>';
       });
@@ -208,8 +238,14 @@
         html += '</div></div>';
       }
 
+      if (menu.kind === 'long') {
+        html += renderPromoTicksBox();
+      }
+
       if (mode === 'complete') {
         html += renderComplete();
+      } else if (mode === 'wording') {
+        html += renderWordingBank();
       } else if (mode === 'paste') {
         html += '<p class="note">Upload a designed menu <strong>PDF or photo</strong>, or paste text. You will <strong>review</strong> the dishes before they replace <em>' + menu.name + '</em>.</p>';
         html += '<div class="include-box" style="margin-bottom:14px">';
@@ -297,6 +333,65 @@
       return '<label><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '> ' + label + '</label>';
     }
 
+    function renderPromoTicksBox() {
+      var ticks = hostPromoTicks();
+      var any = Object.keys(ticks).some(function (k) { return ticks[k]; });
+      var auto = pickedPromosForSheet();
+      var html = '<div class="include-box"><h3>Events &amp; wording on this sheet</h3>';
+      html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Leave all unticked and we’ll auto-pick (upcoming dates first — never past dates). Edit the bank under <strong>Wording / events</strong>.</p>';
+      html += '<div class="include-row">';
+      promoBank.forEach(function (p) {
+        var past = EBMenus.isPastPromoDate(p.date);
+        var label = p.title;
+        if (p.date) label += ' · ' + (EBMenus.formatPromoDate(p.date) || p.date);
+        if (past) label += ' (past)';
+        html += '<label style="' + (past && !ticks[p.id] ? 'opacity:.55' : '') + '">';
+        html += '<input type="checkbox" data-promo-tick="' + escapeAttr(p.id) + '"' + (ticks[p.id] ? ' checked' : '') + '> ';
+        html += escapeAttr(label) + '</label>';
+      });
+      html += '</div>';
+      if (!any) {
+        html += '<p class="note" style="margin:8px 0 0">Auto for Generate: <strong>' +
+          (auto.length ? auto.map(function (p) { return escapeAttr(p.title); }).join(' · ') : 'nothing eligible') +
+          '</strong></p>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderWordingBank() {
+      var html = '<p class="note">Bank of short blurbs for the menu — rooms, quizzes, events. Add a <strong>date</strong> for one-offs (pub quiz night). Past dates are skipped on auto-pick unless you tick them.</p>';
+      html += '<div class="include-box" style="margin-bottom:14px"><h3>Add or edit</h3>';
+      var edit = null;
+      promoBank.forEach(function (p) { if (p.id === editingPromoId) edit = p; });
+      html += field('Title', 'promoTitle', edit ? edit.title : '');
+      html += '<label class="field">Wording</label><textarea id="promoBody" placeholder="Join us from 8pm…">' + escapeAttr(edit ? edit.body : '') + '</textarea>';
+      html += field('Date (optional, YYYY-MM-DD)', 'promoDate', edit ? (edit.date || '') : '');
+      html += '<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+      html += '<button class="go" id="doSavePromo" type="button">' + (edit ? 'Save wording' : 'Add to bank') + '</button>';
+      if (edit) html += '<button class="link" id="doCancelPromo" type="button">Cancel edit</button>';
+      html += '</div></div>';
+      html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:18px;margin:4px 0 8px">In the bank</h3>';
+      if (!promoBank.length) {
+        html += '<p class="note">Empty — add Stay a While, a pub quiz, etc.</p>';
+        return html;
+      }
+      promoBank.forEach(function (p) {
+        var past = EBMenus.isPastPromoDate(p.date);
+        html += '<div class="dish-row" style="grid-template-columns:1fr auto">';
+        html += '<div><div class="name">' + escapeAttr(p.title);
+        if (p.date) html += ' <span style="font-weight:500">' + escapeAttr(EBMenus.formatPromoDate(p.date) || p.date) + '</span>';
+        if (past) html += ' <span class="from">past</span>';
+        html += '</div>';
+        if (p.body) html += '<div class="meta">' + escapeAttr(p.body) + '</div>';
+        html += '</div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">';
+        html += '<button type="button" class="link" data-edit-promo="' + escapeAttr(p.id) + '">Edit</button>';
+        html += '<button type="button" class="link" data-del-promo="' + escapeAttr(p.id) + '">Remove</button>';
+        html += '</div></div>';
+      });
+      return html;
+    }
+
     function renderComplete() {
       var list = dishes();
       if (!list.length) return '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
@@ -342,6 +437,59 @@
           includes[menuId][box.getAttribute('data-include')] = box.checked;
           save();
           renderPreview();
+        };
+      });
+      document.querySelectorAll('[data-promo-tick]').forEach(function (box) {
+        box.onchange = function () {
+          if (!promoTicks[menuId]) promoTicks[menuId] = {};
+          promoTicks[menuId][box.getAttribute('data-promo-tick')] = box.checked;
+          savePromoTicks();
+          renderPreview();
+        };
+      });
+      var savePromo = document.getElementById('doSavePromo');
+      if (savePromo) {
+        savePromo.onclick = function () {
+          var title = (document.getElementById('promoTitle') || {}).value || '';
+          var body = (document.getElementById('promoBody') || {}).value || '';
+          var date = (document.getElementById('promoDate') || {}).value || '';
+          title = String(title).trim();
+          if (!title) { alert('Add a title for this wording.'); return; }
+          date = String(date).trim();
+          if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            alert('Date must be YYYY-MM-DD, or leave blank.');
+            return;
+          }
+          if (editingPromoId) {
+            promoBank = promoBank.map(function (p) {
+              if (p.id !== editingPromoId) return p;
+              return { id: p.id, title: title, body: String(body).trim(), date: date };
+            });
+          } else {
+            promoBank.push(EBMenus.promoItem(title, body, date));
+          }
+          editingPromoId = '';
+          savePromoBank();
+          render();
+        };
+      }
+      var cancelPromo = document.getElementById('doCancelPromo');
+      if (cancelPromo) cancelPromo.onclick = function () { editingPromoId = ''; render(); };
+      document.querySelectorAll('[data-edit-promo]').forEach(function (b) {
+        b.onclick = function () { editingPromoId = b.getAttribute('data-edit-promo'); mode = 'wording'; render(); };
+      });
+      document.querySelectorAll('[data-del-promo]').forEach(function (b) {
+        b.onclick = function () {
+          var id = b.getAttribute('data-del-promo');
+          if (!confirm('Remove this wording from the bank?')) return;
+          promoBank = promoBank.filter(function (p) { return p.id !== id; });
+          Object.keys(promoTicks).forEach(function (mid) {
+            if (promoTicks[mid]) delete promoTicks[mid][id];
+          });
+          if (editingPromoId === id) editingPromoId = '';
+          savePromoBank();
+          savePromoTicks();
+          render();
         };
       });
       document.querySelectorAll('[data-flag]').forEach(function (box) {
@@ -411,6 +559,21 @@
       html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Review extracted menu</div>';
       html += '<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.45;margin:0 0 12px;color:#3a342c">' +
         escapeAttr(result.warning || 'Check every dish before you accept.') + '</p>';
+      var fixes = result.spellingFixes || [];
+      if (fixes.length) {
+        html += '<div style="margin:0 0 14px;padding:12px 14px;border:2px solid #1c1610;border-radius:12px;background:#fff8e8">';
+        html += '<div style="font-family:system-ui,sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin:0 0 8px">Spelling changes — check these</div>';
+        html += '<ul style="margin:0;padding-left:18px;font-family:system-ui,sans-serif;font-size:14px;line-height:1.45">';
+        fixes.forEach(function (f) {
+          html += '<li style="margin:0 0 6px"><span style="text-decoration:line-through;opacity:.75">' +
+            escapeAttr(f.from) + '</span> → <strong>' + escapeAttr(f.to) + '</strong>';
+          if (f.where) html += ' <span style="opacity:.65;font-size:12px">(' + escapeAttr(f.where) + ')</span>';
+          html += '</li>';
+        });
+        html += '</ul></div>';
+      } else if (result.source === 'ai') {
+        html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 12px;padding:8px 12px;background:#f0ebe3;border-radius:10px">AI reported <strong>no spelling changes</strong>.</p>';
+      }
       if (result.meta && (result.meta.title || result.meta.coursePrices)) {
         html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 10px"><strong>' +
           escapeAttr(result.meta.title || '') + '</strong>';
@@ -608,7 +771,17 @@
     }
 
     function composed() {
-      return EBMenus.sheetPlanFor(book, menuId, hostIncludes());
+      var result = EBMenus.sheetPlanFor(book, menuId, hostIncludes());
+      var menu = EBMenus.menuById(menuId);
+      if (menu.kind === 'long' && typeof EBMenuPrint !== 'undefined' && EBMenuPrint.planFluidLayout) {
+        var promos = pickedPromosForSheet();
+        var layout = EBMenuPrint.planFluidLayout(menu, result.dishes, { promos: promos });
+        result.plan.layout = layout;
+        result.plan.fit = layout.fit;
+        result.plan.text = layout.summary;
+        result.plan.promos = promos;
+      }
+      return result;
     }
 
     function renderPreview() {
@@ -616,15 +789,28 @@
       var plan = result.plan;
       var list = result.dishes;
       var ticks = EBMenus.lunchClubFromTicks(book);
+      var menu = EBMenus.menuById(menuId);
       var el = document.getElementById('preview');
       var html = '<div class="plan ' + plan.fit + '"><strong>' + planTitle(plan.fit) + '</strong>' + plan.text + '</div>';
       if (plan.fit === 'over') {
         html += '<p class="note">Untick an included menu, or remove dishes, before you generate.</p>';
       } else {
-        html += '<p class="note">Generate builds the best layout for this selection. Selling boxes (rooms, sandwiches, lunch club, logo) drop in only when there’s spare room.</p>';
+        html += '<p class="note">Generate fills the page (A4, or 2×A5 on one A4 for guillotine). Selling boxes stay inside their frames and only appear when there’s room.</p>';
       }
       if (plan.layout && plan.layout.fillers && plan.layout.fillers.length) {
         html += '<p class="note"><strong>Will auto-add:</strong> ' + plan.layout.fillers.map(function (f) { return escapeAttr(f); }).join(' · ') + '</p>';
+      }
+      var promos = plan.promos || pickedPromosForSheet();
+      if (menu.kind === 'long') {
+        var anyPromoTick = Object.keys(hostPromoTicks()).some(function (k) { return hostPromoTicks()[k]; });
+        html += '<p class="note"><strong>Wording:</strong> ' +
+          (promos.length
+            ? promos.map(function (p) {
+              return escapeAttr(p.title) + (p.date ? ' (' + escapeAttr(EBMenus.formatPromoDate(p.date) || p.date) + ')' : '');
+            }).join(' · ')
+            : 'none') +
+          (anyPromoTick ? ' — from your ticks.' : ' — auto (no ticks; past dates skipped).') +
+          '</p>';
       }
       if (menuId === 'lunch-club') {
         html += '<p class="note">Printed as its own card. Monday to Thursday.</p>';
@@ -665,12 +851,14 @@
       if (hint) hint.disabled = true;
 
       // Layout brain runs here (order + columns + fillers), then we open a preview sheet.
+      var promos = menu.kind === 'long' ? pickedPromosForSheet() : [];
       var layout = null;
       if (menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
-        layout = EBMenuPrint.planFluidLayout(menu, result.dishes);
+        layout = EBMenuPrint.planFluidLayout(menu, result.dishes, { promos: promos });
         result.plan.layout = layout;
         result.plan.fit = layout.fit;
         result.plan.text = layout.summary;
+        result.plan.promos = promos;
       }
 
       var overlay = document.createElement('div');
@@ -683,7 +871,7 @@
       var steps = [
         'Ordering sections (Nibbles → Starters → Classics → Mains…)',
         'Choosing one or two pages and columns',
-        'Placing Stay a While / sandwiches / logo only if they fit',
+        'Placing wording bank / sandwiches / logo only if they fit',
         'Opening classy print preview'
       ];
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px">Layout</div>';

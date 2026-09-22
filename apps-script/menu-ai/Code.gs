@@ -74,13 +74,20 @@ function readMenuWithGemini_(body) {
     '      "price": "12.95" or "",\n' +
     '      "tags": "gf / v / vg / gf option / av" lowercase as on menu }\n' +
     '  ],\n' +
-    '  "notes": "pre-order / deposit line if present"\n' +
+    '  "notes": "pre-order / deposit line if present",\n' +
+    '  "spellingFixes": [\n' +
+    '    { "from": "exact text as printed/OCR would see", "to": "corrected text used in dishes", "where": "dish name|description|section|title|notes" }\n' +
+    '  ]\n' +
     '}\n' +
     'Rules:\n' +
     '- Ignore logos, holly, decorative text, addresses, allergy keys unless in notes.\n' +
     '- Use kind "party" for set menus (Christmas / party / fixed 2&3 course).\n' +
     '- Do not invent dishes. Prefer fewer clean dishes over OCR junk.\n' +
-    '- Normalise AV / GF AVAILABLE into tags like "gf option" or "gf" as appropriate.\n';
+    '- Normalise AV / GF AVAILABLE into tags like "gf option" or "gf" as appropriate.\n' +
+    '- SPELLING (critical): Correct clear typos and OCR misreads in names and descriptions.\n' +
+    '  List EVERY change in spellingFixes (from → to). Staff must see these in review.\n' +
+    '  If nothing was corrected, return "spellingFixes": [] — never omit the field.\n' +
+    '  Prefer British English only when fixing real errors; do not rename intentional dish styling.\n';
 
   var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||
     'gemini-3.6-flash';
