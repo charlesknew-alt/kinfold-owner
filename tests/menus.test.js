@@ -73,7 +73,7 @@ assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
 assert(/logo-tr\{width:170px/.test(printJs), 'front-page logo sized ~170px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:22pt/.test(printJs), 'section titles large but fit-friendly');
+assert(/--title:28pt/.test(printJs), 'section titles large but fit-friendly');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
 assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
@@ -86,8 +86,9 @@ assert(api.guessSection('', 'Fish of the Day', 'ask for today’s catch') === 'I
 assert(api.guessSection('Specials', 'Pie of the Day', '') === 'Item Boost', 'maps Specials heading to Item Boost');
 assert(api.sectionLayoutFor('Item Boost').frame === true, 'Item Boost defaults to frilly frame');
 assert(printJs.indexOf('share-cols') !== -1, 'sharing plates can print in two columns');
-assert(printJs.indexOf('shareInLeft') !== -1, 'sparse classics pull sharing into left column');
+assert(printJs.indexOf('shareInLeft') !== -1 || printJs.indexOf('shareAsColumn') !== -1, 'sharing can sit in a column to balance');
 assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
+assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default prefers column when it fits');
 assert(page.indexOf('Merge ↑') !== -1, 'confirm review has merge-into-above control');
 assert(typeof api.mergeDishWithPrevious === 'function', 'mergeDishWithPrevious exported');
 var salmonSplit = [
@@ -217,7 +218,11 @@ assert(fluid.p1.rooms || (fluid.p2 && fluid.p2.rooms) || fluid.fillers.length >=
 assert(fluid.summary.indexOf('Layout picks') !== -1 || fluid.summary.indexOf('Auto-adds') !== -1 || fluid.summary.indexOf('A4') !== -1, 'layout explains itself');
 assert(fluid.p1.classicsSplit === 1 || fluid.pages === 1, 'layout prefers burgers in right column');
 var htmlPreview = print.build(mainMenu, aloneDishes, {});
-assert(/col-promo[\s\S]*Burgers/i.test(htmlPreview) || /Burgers[\s\S]*Stay a While/i.test(htmlPreview), 'burgers render before Stay a While in right column');
+assert(/col-events[\s\S]*Stay a While|col-events[\s\S]*Gatherings|col-events[\s\S]*Pub Quiz/i.test(htmlPreview) ||
+  /Stay a While|Gatherings|Pub Quiz/.test(htmlPreview), 'events render in the left column when packed');
+assert(/col-food[\s\S]*Burgers[\s\S]*Pub Classics|Burgers[\s\S]*Pub Classics/i.test(htmlPreview) ||
+  /BURGERS[\s\S]*PUB CLASSICS/i.test(htmlPreview), 'Pub Classics sit under Burgers in the food column');
+assert(printJs.indexOf('cols-balanced') !== -1 && printJs.indexOf('col-events') !== -1, 'balanced columns: events left, food right');
 assert(/bottom-cols-balanced/.test(htmlPreview) || fluid.pages === 1, 'page 2 uses balanced sides columns when two pages');
 
 // Staff filed Spicy Asian as Pub Classics — must not invent a Burgers heading

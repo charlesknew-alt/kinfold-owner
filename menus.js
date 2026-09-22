@@ -842,7 +842,7 @@
    */
   function pickPromos(bank, ticks, opts) {
     opts = opts || {};
-    var max = opts.max != null ? opts.max : 2;
+    var max = opts.max != null ? opts.max : 5;
     var today = opts.today || new Date();
     bank = Array.isArray(bank) ? bank.slice() : [];
     ticks = ticks || {};
@@ -900,7 +900,7 @@
   var DEFAULT_SECTION_LAYOUT = {
     Nibbles: { width: 'column', frame: true },
     Starters: { width: 'full', frame: false },
-    'Sharing Plates': { width: 'full', frame: false },
+    'Sharing Plates': { width: 'both', frame: false },
     'Item Boost': { width: 'full', frame: true },
     'Pub Classics': { width: 'column', frame: false },
     Burgers: { width: 'column', frame: false },
