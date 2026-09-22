@@ -75,15 +75,17 @@ assert(/logo-tr\{width:170px/.test(printJs), 'front-page logo sized ~170px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
 assert(/--title:28pt/.test(printJs), 'section titles large but fit-friendly');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
-assert(printJs.indexOf('ALWAYS start roomiest') !== -1 || printJs.indexOf('always fill') !== -1 ||
-  /for\(var j=0;j<STEPS\.length/.test(printJs), 'fit always starts airy so pages fill');
+assert(printJs.indexOf('n<6') !== -1 || printJs.indexOf('start=n<6') !== -1 ||
+  /var start=n<6/.test(printJs), 'sparse pages start roomy instead of airy-balloon');
 assert(printJs.indexOf('fonts.googleapis.com/css2?family=Cinzel') !== -1, 'print loads Cinzel/Roboto/Crimson via stylesheet link');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
 assert(printJs.indexOf('document.fonts.ready') !== -1, 'print waits for webfonts before PDF');
-assert(/padding:18mm/.test(printJs), 'pages keep a generous top margin');
-assert(printJs.indexOf('lunch-club-mark.png') !== -1, 'lunch club uses branded mark asset');
+assert(/padding:12mm/.test(printJs), 'pages keep a sensible top margin without dumping content');
+assert(printJs.indexOf('data:image/png;base64,') !== -1 && printJs.indexOf('LUNCH_MARK_DATA') !== -1,
+  'lunch club uses embedded branded mark (works in about:blank print)');
 assert(printJs.indexOf('Lunch club mark after the price') !== -1 || printJs.indexOf('after the price so dish titles') !== -1,
   'lunch club mark sits after price, not before the title');
+assert(/\.lc\{width:28px/.test(printJs), 'lunch club mark is large enough beside prices');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
 assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
 assert(printJs.indexOf('Honour staff section picks') !== -1 || printJs.indexOf('do not invent a Burgers title') !== -1, 'print respects staff sections');
@@ -94,12 +96,37 @@ assert(api.guessSection('Item Boost', 'Fish of the Day', '') === 'Item Boost', '
 assert(api.guessSection('', 'Fish of the Day', 'ask for today’s catch') === 'Item Boost', 'guesses Fish of the Day as Item Boost');
 assert(api.guessSection('Specials', 'Pie of the Day', '') === 'Item Boost', 'maps Specials heading to Item Boost');
 assert(api.sectionLayoutFor('Item Boost').frame === true, 'Item Boost defaults to frilly frame');
+assert(api.SECTIONS.indexOf('Little Bells') !== -1, 'Little Bells is a canonical section');
+assert(api.guessSection('Little Bells', 'Beef Burger, Fries & Dressed Salad', '') === 'Little Bells',
+  'Little Bells keeps kids burger (not Burgers)');
+assert(api.guessSection("Children's menu", 'Fish Fingers', '') === 'Little Bells', 'maps kids heading to Little Bells');
+assert(api.sectionLayoutFor('Little Bells').frame === true, 'Little Bells defaults to frilly frame');
+assert(printJs.indexOf('isLittleBells') !== -1 && printJs.indexOf('bag.littleBells') !== -1,
+  'print bags Little Bells for layout');
 assert(printJs.indexOf('share-cols') !== -1, 'sharing plates can print in two columns');
 assert(printJs.indexOf('shareInLeft') !== -1 || printJs.indexOf('shareAsColumn') !== -1, 'sharing can sit in a column to balance');
 assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
 assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default prefers column when it fits');
 assert(page.indexOf('Merge ↑') !== -1, 'confirm review has merge-into-above control');
+assert(page.indexOf('data-review-delete') !== -1 && page.indexOf('Delete') !== -1, 'confirm review has delete control');
+assert(page.indexOf('syncReviewCategories') !== -1, 'review keeps category edits across merge/delete');
 assert(typeof api.mergeDishWithPrevious === 'function', 'mergeDishWithPrevious exported');
+assert(typeof api.deleteDishAt === 'function', 'deleteDishAt exported');
+assert(api.deleteDishAt([api.dish('Starters', 'A', '', '1', ''), api.dish('Starters', 'B', '', '2', '')], 0).length === 1,
+  'deleteDishAt removes one row');
+assert(typeof api.isHeading === 'function' && api.isHeading('STARTERS') === 'Starters', 'ALL-CAPS STARTERS is a heading');
+assert(api.isHeading('Little Bells') === 'Little Bells', 'Little Bells heading recognised');
+var titledPaste = api.parsePaste('STARTERS\nJerusalem Artichoke Soup 7.50\nMAINS\nPie of the Day 17.95\nLittle Bells\nFish Fingers 9.50');
+assert(titledPaste.every(function (d) { return d.name !== 'STARTERS' && d.name !== 'MAINS' && d.name !== 'Little Bells'; }),
+  'section titles are not saved as dishes');
+assert(titledPaste.some(function (d) { return d.section === 'Starters'; }), 'paste assigns Starters from heading');
+assert(titledPaste.some(function (d) { return d.section === 'Little Bells'; }), 'paste assigns Little Bells from heading');
+assert(api.assignSections([{ section: 'Dishes', name: 'Beef Burger', description: '', price: '14', tags: '' }])[0].section === 'Burgers',
+  'assignSections escapes Dishes into a real category');
+assert(fs.existsSync(path.join(root, 'favicon.svg')), 'favicon.svg exists');
+assert(page.indexOf('favicon.svg') !== -1, 'menus page links favicon');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('favicon.svg') !== -1, 'hub links favicon');
+assert(fs.readFileSync(path.join(root, 'staffhub.html'), 'utf8').indexOf('favicon.svg') !== -1, 'staffhub links favicon');
 var salmonSplit = [
   { section: 'Starters', name: 'Smoked Salmon', description: '', price: '', tags: '' },
   { section: 'Starters', name: 'horseradish cream, honey braised leeks, crispy capers & pickled walnuts', description: '', price: '8.95', tags: '' }
@@ -118,6 +145,12 @@ assert(printJs.indexOf('bottom-cols-balanced') === -1 || printJs.indexOf('Sides 
 assert(printJs.indexOf('isItemBoost') !== -1 && printJs.indexOf('bag.boost') !== -1, 'print bags Item Boost for layout');
 assert(ingestJs.indexOf('reviewLayout') !== -1, 'ingest can ask Gemini to review layout balance');
 assert(aiGs.indexOf('reviewLayoutWithGemini_') !== -1, 'Apps Script supports layout review action');
+assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Classics') !== -1,
+  'Gemini layout prompt has Eight Bells golden rules');
+assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
+assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
+assert(page.indexOf('flow15') !== -1, 'menus page cache-bust is flow15');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow15') !== -1, 'hub menus link cache-bust is flow15');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([

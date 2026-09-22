@@ -23,6 +23,7 @@
     'Pub Classics',
     'Burgers',
     'Mains',
+    'Little Bells',
     'Sandwiches',
     'Sides',
     'Sauces',
@@ -64,6 +65,59 @@
     map['puddings'] = 'Desserts';
     map['sunday roasts'] = 'Mains';
     map['roasts'] = 'Mains';
+    map['little bells'] = 'Little Bells';
+    map['littlebells'] = 'Little Bells';
+    map['kids'] = 'Little Bells';
+    map["kid's"] = 'Little Bells';
+    map['kids menu'] = 'Little Bells';
+    map["kid's menu"] = 'Little Bells';
+    map['childrens'] = 'Little Bells';
+    map["children's"] = 'Little Bells';
+    map['childrens menu'] = 'Little Bells';
+    map["children's menu"] = 'Little Bells';
+    return map;
+  })();
+
+  /** Labels that are section titles only — never dish names like “Fish of the Day”. */
+  var HEADING_ALIASES = (function () {
+    var map = {};
+    SECTIONS.forEach(function (s) { map[s.toLowerCase()] = s; });
+    [
+      ['pub classics & burgers', 'Pub Classics'],
+      ['classics', 'Pub Classics'],
+      ['pub classic', 'Pub Classics'],
+      ['sharing', 'Sharing Plates'],
+      ['to share', 'Sharing Plates'],
+      ['light bites', 'Nibbles'],
+      ['nibble', 'Nibbles'],
+      ['starter', 'Starters'],
+      ['main', 'Mains'],
+      ['main courses', 'Mains'],
+      ['sandwich', 'Sandwiches'],
+      ['burger', 'Burgers'],
+      ['side', 'Sides'],
+      ['sides & extras', 'Sides'],
+      ['sauce', 'Sauces'],
+      ['sauces', 'Sauces'],
+      ['item boost', 'Item Boost'],
+      ['item boosts', 'Item Boost'],
+      ['specials', 'Item Boost'],
+      ["today's specials", 'Item Boost'],
+      ['dessert', 'Desserts'],
+      ['puddings', 'Desserts'],
+      ['sunday roasts', 'Mains'],
+      ['roasts', 'Mains'],
+      ['little bells', 'Little Bells'],
+      ['littlebells', 'Little Bells'],
+      ['kids', 'Little Bells'],
+      ["kid's", 'Little Bells'],
+      ['kids menu', 'Little Bells'],
+      ["kid's menu", 'Little Bells'],
+      ['childrens', 'Little Bells'],
+      ["children's", 'Little Bells'],
+      ['childrens menu', 'Little Bells'],
+      ["children's menu", 'Little Bells']
+    ].forEach(function (pair) { map[pair[0]] = pair[1]; });
     return map;
   })();
 
@@ -96,6 +150,7 @@
     if (/item\s*boost|specials?|fish of the day|pie of the day|catch of the day|chef.?s special/.test(lower)) {
       return 'Item Boost';
     }
+    if (/little\s*bells|kids?\s*menu|children.?s/.test(lower)) return 'Little Bells';
     if (/^sauces?$/.test(lower) || /\bsauces?\b/.test(lower) && lower.length < 12) return 'Sauces';
     if (/side/.test(lower)) return 'Sides';
     if (/dessert|pudding|sweet/.test(lower)) return 'Desserts';
@@ -111,6 +166,8 @@
     var n = String(name || '').trim();
     var s = String(section || '').trim();
     var desc = String(description || '');
+    // Kids section wins over burger/sandwich name heuristics
+    if (/little\s*bells|kids?\s*menu|children.?s/i.test(s)) return 'Little Bells';
     if (/^sandwiches?\b/i.test(n)) return 'Sandwiches';
     if (/\bburger\b/i.test(n)) return 'Burgers';
     if (/^(sauce robert|peppercorn|garlic butter|chilli butter|chili butter)\b/i.test(n)) {
@@ -128,6 +185,7 @@
     }
     // Classic pub plates by name when section is vague
     var fromSec = normalizeSectionName(s);
+    if (fromSec === 'Little Bells') return 'Little Bells';
     if (fromSec === 'Pub Classics' || /classic|burger/i.test(s)) {
       if (/\bburger\b/i.test(n)) return 'Burgers';
       return 'Pub Classics';
@@ -141,7 +199,15 @@
 
   function assignSections(dishes) {
     return (dishes || []).map(function (d, i) {
-      var section = guessSection(d.section, d.name, d.description);
+      var rawSec = String(d.section || '').trim();
+      if (!rawSec || /^dishes$/i.test(rawSec)) rawSec = '';
+      var section = guessSection(rawSec, d.name, d.description);
+      if (!section || /^dishes$/i.test(section) || SECTIONS.indexOf(section) === -1) {
+        section = guessSection('', d.name, d.description);
+      }
+      if (!section || /^dishes$/i.test(section) || SECTIONS.indexOf(section) === -1) {
+        section = 'Mains';
+      }
       return {
         id: d.id || slug(section + '-' + (d.name || 'dish') + '-' + i),
         section: section,
@@ -152,6 +218,8 @@
         lunchClub: !!d.lunchClub,
         fromMenu: d.fromMenu
       };
+    }).filter(function (d) {
+      return d.name && !isJunkDishName(d.name);
     });
   }
 
@@ -288,21 +356,15 @@
   }
 
   function isHeading(line) {
-    var bare = String(line).replace(/:$/, '').trim();
+    var bare = String(line || '')
+      .replace(/^[\s·•|–—\-]+|[\s·•|–—\-:]+$/g, '')
+      .trim();
     if (!bare || priceOf(bare)) return '';
-    if (SECTION_NAMES[bare.toLowerCase()]) return SECTION_NAMES[bare.toLowerCase()];
-    // Only short section-like labels — not “and a side salad” / “choice of sauce…”
-    if (bare.length > 32 || /^(served|with|and|choice|see |ask |filled|all served)\b/i.test(bare)) {
-      return '';
-    }
-    var norm = normalizeSectionName(bare);
-    if (SECTIONS.indexOf(norm) === -1) return '';
-    var words = bare.replace(/[^a-zA-Z\s&]/g, '').trim().split(/\s+/).filter(Boolean);
-    if (words.length > 5) return '';
-    if (!/classic|burger|sandwich|nibble|starter|main|side|dessert|shar|sauce|roast|light bite|boost|special|fish of the day|pie of the day/i.test(bare)) {
-      return '';
-    }
-    return norm;
+    var lower = bare.toLowerCase();
+    if (HEADING_ALIASES[lower]) return HEADING_ALIASES[lower];
+    var compact = lower.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (HEADING_ALIASES[compact]) return HEADING_ALIASES[compact];
+    return '';
   }
 
   /** Description wrap lines wrongly stored as dish titles (PDF extract). */
@@ -437,7 +499,7 @@
 
   function parsePaste(text) {
     var lines = String(text || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
-    var section = 'Dishes';
+    var section = '';
     var dishes = [];
     for (var i = 0; i < lines.length; i++) {
       var heading = isHeading(lines[i]);
@@ -488,8 +550,17 @@
       if (!pulled.name) continue;
       pulled.name = cleanDishName(pulled.name);
       if (!pulled.name) continue;
+      // Section titles are categories only — never save them as dishes
+      var nameAsHeading = isHeading(pulled.name);
+      if (nameAsHeading && !price && !description) {
+        section = nameAsHeading;
+        continue;
+      }
       if (typeof isJunkDishName === 'function' && isJunkDishName(pulled.name)) continue;
       var guessed = guessSection(section, pulled.name, description);
+      if (!guessed || /^dishes$/i.test(guessed) || SECTIONS.indexOf(guessed) === -1) {
+        guessed = section && SECTIONS.indexOf(section) !== -1 ? section : 'Mains';
+      }
       dishes.push({
         id: slug(guessed + '-' + pulled.name + '-' + dishes.length),
         section: guessed,
@@ -701,7 +772,17 @@
     (menuJson.dishes || []).forEach(function (d, i) {
       var name = cleanDishName(String(d.name || '').trim());
       if (!name || isJunkDishName(name)) return;
-      var section = guessSection(d.section || 'Dishes', name, d.description || '');
+      // Section headings are categories only — skip title-only rows
+      if (isHeading(name) && !String(d.price || '').trim() && !String(d.description || '').trim()) return;
+      var rawSec = String(d.section || '').trim();
+      if (!rawSec || /^dishes$/i.test(rawSec)) rawSec = isHeading(rawSec) || '';
+      var section = guessSection(rawSec, name, d.description || '');
+      if (!section || /^dishes$/i.test(section) || SECTIONS.indexOf(section) === -1) {
+        section = guessSection('', name, d.description || '');
+      }
+      if (!section || /^dishes$/i.test(section) || SECTIONS.indexOf(section) === -1) {
+        section = 'Mains';
+      }
       var price = String(d.price || '').trim();
       // If AI left "9.5 / 15.95" split across name + price, reunite.
       var dangling = String(d.name || '').match(/(\d+\.\d{1,2})\s*\/\s*$/);
@@ -718,7 +799,7 @@
         lunchClub: false
       });
     });
-    list = tidyOrphanDescriptions(list);
+    list = tidyOrphanDescriptions(assignSections(list));
     return {
       dishes: sortDishesBySection(list),
       meta: meta,
@@ -734,6 +815,15 @@
     return formatMarks(parseMarks(t));
   }
 
+  /** Staff “Delete” — drop index from a review list. */
+  function deleteDishAt(dishes, index) {
+    var list = (dishes || []).slice();
+    var i = index | 0;
+    if (i < 0 || i >= list.length) return list;
+    list.splice(i, 1);
+    return list;
+  }
+
   function isJunkDishName(name) {
     var n = String(name || '').trim();
     if (n.length < 3) return true;
@@ -744,6 +834,8 @@
     if (/^[^\w]*$/.test(n)) return true;
     if (/^[a-z]{1,2}$/i.test(n)) return true;
     if (/please inform|allergen|gluten free\s*[–-]\s*vegetarian/i.test(n)) return true;
+    // Section titles are categories, not dishes
+    if (isHeading(n)) return true;
     return false;
   }
 
@@ -905,6 +997,7 @@
     'Pub Classics': { width: 'column', frame: false },
     Burgers: { width: 'column', frame: false },
     Mains: { width: 'full', frame: false },
+    'Little Bells': { width: 'full', frame: true },
     Sandwiches: { width: 'column', frame: true },
     Sides: { width: 'column', frame: false },
     Sauces: { width: 'column', frame: false },
@@ -1004,6 +1097,8 @@
     shouldMergeOntoPrevious: shouldMergeOntoPrevious,
     mergeDishOnto: mergeDishOnto,
     mergeDishWithPrevious: mergeDishWithPrevious,
-    tidyOrphanDescriptions: tidyOrphanDescriptions
+    deleteDishAt: deleteDishAt,
+    tidyOrphanDescriptions: tidyOrphanDescriptions,
+    isHeading: isHeading
   };
 })(typeof window !== 'undefined' ? window : global);
