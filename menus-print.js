@@ -145,17 +145,28 @@
 
   function dishRow(d, opts) {
     opts = opts || {};
+    var name = d.name;
+    if (root.EBMenus && root.EBMenus.cleanDishName) name = root.EBMenus.cleanDishName(name);
+    var price = d.price;
+    // Reunite "9.5 /" left on the name with a lone trailing price
+    var dang = String(d.name || '').match(/(\d+\.\d{1,2})\s*\/\s*$/);
+    if (dang && price && !/\//.test(String(price))) {
+      price = dang[1] + '/' + String(price).replace(/^£/, '');
+      name = root.EBMenus && root.EBMenus.cleanDishName
+        ? root.EBMenus.cleanDishName(String(d.name).replace(/(\d+\.\d{1,2})\s*\/\s*$/, ''))
+        : name;
+    }
     var html = '<div class="dish">';
     html += '<div class="dish-line">';
     html += '<span class="dish-name">';
     if (d.lunchClub && !opts.hideLunch) html += lunchMark();
-    html += esc(d.name);
+    html += esc(name);
     if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     html += '</span>';
-    if (!opts.hidePrice && d.price) html += '<span class="price">' + esc(cleanPrice(d.price)) + '</span>';
+    html += '<span class="dish-leader" aria-hidden="true"></span>';
+    if (!opts.hidePrice && price) html += '<span class="price">' + esc(cleanPrice(price)) + '</span>';
     html += '</div>';
     if (d.description) {
-      // Always a separate block under the name — never inherit dish-name bold.
       html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
     }
     html += '</div>';
@@ -228,7 +239,8 @@
     return scallop(inner, 'box');
   }
 
-  function sandwichNote(dishes) {
+  function sandwichNote(dishes, opts) {
+    opts = opts || {};
     var price = 'all 9.50';
     var hours = '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)';
     var body = 'Filled ciabatta or farmhouse sandwich, all served with fries and salad.';
@@ -244,6 +256,25 @@
       });
       var keys = Object.keys(prices);
       if (keys.length === 1) price = 'all ' + keys[0];
+    }
+    // Title outside the frame so it lines up with SIDES; box holds the body only.
+    if (opts.alignTitle) {
+      return (
+        '<div class="sandwich-aligned">' +
+          '<div class="promo-head pair-head">' +
+            '<span class="sec-title soft-left">Sandwiches</span>' +
+            '<span class="price">' + esc(price) + '</span>' +
+          '</div>' +
+          scallop(
+            '<div class="promo sandwich-promo">' +
+              '<p class="note-line">' + esc(hours) + '</p>' +
+              '<p class="desc">' + esc(body) + '</p>' +
+              '<p class="note-line">' + esc(foot) + '</p>' +
+            '</div>',
+            'box'
+          ) +
+        '</div>'
+      );
     }
     return scallop(
       '<div class="promo sandwich-promo">' +
@@ -339,9 +370,10 @@
   }
 
   function fillClass(leftover) {
-    if (leftover > 32) return 'fill-airy';
-    if (leftover > 16) return 'fill-roomy';
-    if (leftover < 6) return 'fill-tight';
+    // Prefer airy type so sheets look filled rather than sparse with tiny text.
+    if (leftover > 18) return 'fill-airy';
+    if (leftover > 8) return 'fill-roomy';
+    if (leftover < 3) return 'fill-tight';
     return 'fill-normal';
   }
 
@@ -644,6 +676,12 @@
           layout.fillers.push('Sandwiches + sides (page 1)');
         }
       }
+      // Promo sits in the classics column — sandwiches under it fill the gap
+      // without growing page height when classics/burgers are the tall side.
+      if (wantSandwichNote && layout.p1.rooms && !layout.p1.sandwiches && (bag.classics || bag.burgers)) {
+        layout.p1.sandwiches = true;
+        layout.fillers.push('Sandwiches under promo (page 1)');
+      }
       layout.leftover.p1 = p1left;
 
       var p2used = back + COST.bottomCols;
@@ -745,9 +783,11 @@
     return framedBlock(sectionTitle(title) + listDishes(dishes), rule, kind || 'wide');
   }
 
-  function renderFiller(which, bag, promos) {
+  function renderFiller(which, bag, promos, opts) {
     if (which === 'rooms') return renderPromoBank(promos && promos.length ? promos : (bag && bag.promos));
-    if (which === 'sandwiches') return sandwichNote(bag.sandwiches && bag.sandwiches.dishes);
+    if (which === 'sandwiches') {
+      return sandwichNote(bag.sandwiches && bag.sandwiches.dishes, opts || {});
+    }
     if (which === 'lunch') return lunchClubBox();
     if (which === 'logo') {
       return '<div class="foot-logo"><img src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
@@ -911,14 +951,18 @@
     if (showBottom) {
       var sidesCol = sidesPrint && wantsColumn(sideRule);
       if (sidesCol || p2opts.sandwiches || p2opts.rooms) {
-        p2 += '<div class="cols bottom-cols"><div class="col">';
+        p2 += '<div class="cols bottom-cols"><div class="col col-sides">';
         if (p2opts.sidesOnP2 && sidesPrint) {
-          p2 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+          p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
+          p2 += listDishes(sidesPrint.dishes);
         }
-        if (p2opts.sidesOnP2 && bag.sauces) p2 += sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes);
+        if (p2opts.sidesOnP2 && bag.sauces) {
+          p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
+          p2 += listDishes(bag.sauces.dishes);
+        }
         if (!(p2opts.sidesOnP2 && (sidesPrint || bag.sauces))) p2 += '&nbsp;';
         p2 += '</div><div class="col col-promo">';
-        if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag);
+        if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag, promos, { alignTitle: true });
         else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
         p2 += '</div></div>';
       } else if (p2opts.sidesOnP2 && sidesPrint) {
@@ -991,10 +1035,12 @@
     opts = opts || {};
     var landscape = !!opts.landscape;
     var guillotine = !!opts.guillotine;
+    // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
+    // titles, Crimson Text allergy line. Min body ~10pt; logo ~2× old size.
     return (
-      '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap");' +
-      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Source Sans 3",system-ui,sans-serif;' +
-        '--dish-gap:9px;--sec-gap:12px;--name:13px;--desc:11.5px;--title:14.5px;--promo:12px}' +
+      '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap");' +
+      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,serif;' +
+        '--dish-gap:10px;--sec-gap:16px;--name:11pt;--desc:10pt;--title:13.5pt;--promo:11pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1002,7 +1048,7 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:9mm 12mm 10mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:7mm 11mm 9mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
       '.page-spacer{flex:1 1 auto;min-height:3mm}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
@@ -1011,24 +1057,27 @@
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5a534a;margin:0 0 6px;font-weight:600;flex:0 0 auto}' +
-      '.tracker .roman{font-family:var(--serif);font-size:15px;letter-spacing:.12em;color:var(--ink)}' +
-      '.sec-plain{margin:0 0 8px}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:8pt;letter-spacing:.04em;text-transform:uppercase;color:#8a8278;margin:0 0 2px;font-weight:500;flex:0 0 auto}' +
+      '.tracker .roman{font-family:var(--sans);font-size:7.5pt;font-weight:400;letter-spacing:.04em;color:#9a9288;text-transform:none}' +
+      '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
+      '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:start;margin:0 0 6px}' +
-      '.top-band-logo{grid-template-columns:1fr 92px;min-height:0}' +
+      '.top-band{display:grid;grid-template-columns:1fr 168px;gap:12px;align-items:start;margin:0 0 10px}' +
+      '.top-band-logo{grid-template-columns:1fr 168px;min-height:42mm}' +
       '.top-left .scallop{margin-bottom:0}' +
-      '.logo-tr{width:88px;height:auto;display:block;margin-left:auto}' +
+      '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:2mm}' +
+      '.logo-tr{width:160px;height:auto;display:block;margin-left:auto}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
-      '.foot-logo img{width:96px;height:auto}' +
+      '.foot-logo img{width:110px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      '.sec-title{font-family:var(--serif);font-weight:700;font-size:var(--title);letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px;text-align:center}' +
-      '.scallop .sec-title{text-align:left;font-size:13px;letter-spacing:.1em;margin-bottom:6px}' +
-      '.sec-title.soft{font-size:12px;letter-spacing:.08em}' +
-      '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:10px}' +
-      '.scallop{margin:0 0 10px;background:#fff;position:relative;' +
+      '.sec-title{font-family:var(--serif);font-weight:700;font-size:var(--title);letter-spacing:.14em;text-transform:uppercase;margin:0 0 10px;text-align:center}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 8px}' +
+      '.scallop .sec-title{text-align:left;font-size:12pt;letter-spacing:.12em;margin-bottom:6px}' +
+      '.sec-title.soft{font-size:11pt;letter-spacing:.1em}' +
+      '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
+      '.scallop{margin:0 0 12px;background:#fff;position:relative;' +
         'border-style:solid;border-color:transparent;border-width:16px;' +
         'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:16px;' +
         'overflow:visible}' +
@@ -1037,58 +1086,65 @@
       '.scallop-pad{padding:6px 10px 5px;overflow:visible}' +
       '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
       '.dish{margin:0 0 var(--dish-gap);min-width:0}' +
-      '.dish-line{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;align-items:baseline;min-width:0}' +
-      '.dish-name{font-weight:700;font-size:var(--name);line-height:1.25;min-width:0;overflow-wrap:anywhere}' +
-      '.price{font-weight:600;font-size:var(--name);white-space:nowrap}' +
-      '.desc{font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.35;max-width:100%}' +
+      '.dish-line{display:grid;grid-template-columns:minmax(0,max-content) minmax(12px,1fr) auto;column-gap:0;align-items:baseline;min-width:0}' +
+      '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;overflow-wrap:anywhere}' +
+      '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:12px;height:0}' +
+      '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;padding-left:2px}' +
+      '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.38;max-width:100%}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
-      '.cols{display:grid;grid-template-columns:1.15fr 0.85fr;gap:14px;margin:4px 0 6px;align-items:start}' +
+      '.dish-c .dish-line{grid-template-columns:1fr;justify-items:center}' +
+      '.dish-c .dish-leader{display:none}' +
+      '.cols{display:grid;grid-template-columns:1.15fr 0.85fr;gap:16px;margin:6px 0 8px;align-items:start}' +
       '.cols-classics{grid-template-columns:1.15fr 0.85fr}' +
-      '.col-dishes,.col-promo{min-width:0;max-width:100%}' +
-      '.col-dishes .sec-title{text-align:left;margin-top:2px}' +
+      '.col-dishes,.col-promo,.col-sides{min-width:0;max-width:100%}' +
+      '.col-dishes .sec-title{text-align:left;margin-top:4px}' +
       '.col-dishes .sec-title:first-child{margin-top:0}' +
       '.col-promo .scallop{max-width:100%;width:100%}' +
-      '.col-promo .promo p,.col-promo .promo .desc{font-size:11px;line-height:1.35;margin:0 0 6px;font-weight:400}' +
+      '.col-promo .promo p,.col-promo .promo .desc{font-size:10pt;line-height:1.38;margin:0 0 6px;font-weight:400}' +
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
-      '.bottom-cols{margin-top:10px;margin-bottom:4px}' +
+      '.promo-head.pair-head{margin:0 0 6px}' +
+      '.promo-head.pair-head .sec-title{margin:0}' +
+      '.sandwich-aligned{margin:0}' +
+      '.sandwich-aligned .scallop{margin-top:0}' +
+      '.bottom-cols{margin-top:14px;margin-bottom:4px}' +
       '.bottom-cols .sec-title{text-align:left}' +
-      '.allergy{color:var(--green);font-style:italic;font-size:10px;text-align:center;line-height:1.4;margin-top:8px;flex:0 0 auto}' +
+      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:10pt;text-align:center;line-height:1.4;margin-top:10px;flex:0 0 auto}' +
       '.promo{text-align:left}' +
-      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.06em;text-transform:uppercase;margin:2px 0 2px}' +
-      '.promo-date{font-family:var(--sans);font-weight:600;font-size:10.5px;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
-      '.promo p{font-size:11px;font-weight:400;margin:0 0 6px;line-height:1.35}' +
-      '.sandwich-promo .note-line{font-weight:600}' +
+      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 2px}' +
+      '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
+      '.promo p{font-size:10pt;font-weight:400;margin:0 0 6px;line-height:1.38}' +
+      '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
-      '.lunch-box{display:flex;gap:10px;align-items:center;font-size:12px}' +
+      '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11pt}' +
       '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
       '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
-      '.note-line{font-size:11px;font-weight:600;margin:4px 0}' +
+      '.note-line{font-size:10pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
       '.lc-price{font-family:var(--serif);text-align:center;font-size:12px;line-height:1.45}' +
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density: stretch type/gaps so each page reads full */ +
-      '.fill-airy{--dish-gap:13px;--sec-gap:16px;--name:14px;--desc:12.5px;--title:15.5px;--promo:13px}' +
-      '.fill-roomy{--dish-gap:11px;--sec-gap:14px;--name:13.5px;--desc:12px;--title:15px;--promo:12.5px}' +
-      '.fill-normal{--dish-gap:9px;--sec-gap:12px;--name:13px;--desc:11.5px;--title:14.5px;--promo:12px}' +
-      '.fill-tight{--dish-gap:6px;--sec-gap:8px;--name:12px;--desc:10.5px;--title:13.5px;--promo:11.5px}' +
+      /* Density: stretch type/gaps so each page reads full (floors ≥10pt body) */ +
+      '.fill-airy{--dish-gap:14px;--sec-gap:20px;--name:12pt;--desc:10.5pt;--title:14.5pt;--promo:12pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:18px;--name:11.5pt;--desc:10.25pt;--title:14pt;--promo:11.5pt}' +
+      '.fill-normal{--dish-gap:10px;--sec-gap:16px;--name:11pt;--desc:10pt;--title:13.5pt;--promo:11pt}' +
+      '.fill-tight{--dish-gap:7px;--sec-gap:12px;--name:10.5pt;--desc:10pt;--title:12.5pt;--promo:10.5pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
-      '.a5-face{width:148.5mm;height:210mm;padding:7mm 8mm 8mm;overflow:hidden;display:flex;flex-direction:column}' +
+      '.a5-face{width:148.5mm;height:210mm;padding:6mm 7mm 7mm;overflow:hidden;display:flex;flex-direction:column}' +
       '.a5-face .page-body{flex:0 0 auto}' +
       '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
-      '.a5-face{--dish-gap:7px;--sec-gap:9px;--name:11.5px;--desc:10.5px;--title:12.5px;--promo:11px}' +
-      '.a5-face .logo-tr{width:64px}' +
-      '.a5-face .tracker{font-size:9px;margin-bottom:4px}' +
-      '.a5-face .tracker .roman{font-size:12px}' +
-      '.a5-face .allergy{font-size:8.5px}' +
-      '.a5-face .top-band{grid-template-columns:1fr 68px;gap:6px}' +
+      '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10pt;--desc:9.5pt;--title:11.5pt;--promo:10pt}' +
+      '.a5-face .logo-tr{width:96px}' +
+      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 104px;gap:8px;min-height:28mm}' +
+      '.a5-face .tracker{font-size:7pt;margin-bottom:2px}' +
+      '.a5-face .tracker .roman{font-size:6.5pt}' +
+      '.a5-face .allergy{font-size:8.5pt}' +
       '.a5-face .cols{gap:10px}' +
       '.a5-face .scallop{border-width:10px;border-image-width:10px}' +
       '@media print{body{background:#fff}.toolbar{display:none}' +

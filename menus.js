@@ -271,9 +271,25 @@
   }
 
   function priceOf(line) {
-    var m = String(line).match(/(?:£\s*)?(\d+\.\d{1,2}(?:\s*\/\s*£?\s*\d+\.\d{1,2})?)\s*$/);
+    // Prefer full ranges like "9.5 / 15.95" or "7.95/13.95" so the cheap half
+    // is not left stuck on the dish name.
+    var m = String(line).match(
+      /(?:£\s*)?(\d+\.\d{1,2}\s*\/\s*£?\s*\d+\.\d{1,2}|\d+\.\d{1,2})\s*$/
+    );
     if (!m) return null;
-    return { raw: m[0], value: m[1].replace(/£/g, '').replace(/\s+/g, '') };
+    return {
+      raw: m[0],
+      value: m[1].replace(/£/g, '').replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/')
+    };
+  }
+
+  /** Strip stray mid-line prices left on a name after a bad extract ("Caesar 9.5 /"). */
+  function cleanDishName(name) {
+    var n = String(name || '').trim();
+    n = n.replace(/\s+\d+\.\d{1,2}\s*\/\s*$/g, '');
+    n = n.replace(/\s+\d+\.\d{1,2}\s*$/g, '');
+    n = n.replace(/\s{2,}/g, ' ').replace(/[\s,–-]+$/g, '').trim();
+    return n;
   }
 
   function pullTags(name) {
@@ -307,6 +323,8 @@
         description = lines[i + 1];
         i += 1;
       }
+      if (!pulled.name) continue;
+      pulled.name = cleanDishName(pulled.name);
       if (!pulled.name) continue;
       if (typeof isJunkDishName === 'function' && isJunkDishName(pulled.name)) continue;
       var guessed = guessSection(section, pulled.name, description);
@@ -519,15 +537,21 @@
     meta.notes = menuJson.notes || '';
     var list = [];
     (menuJson.dishes || []).forEach(function (d, i) {
-      var name = String(d.name || '').trim();
+      var name = cleanDishName(String(d.name || '').trim());
       if (!name || isJunkDishName(name)) return;
       var section = guessSection(d.section || 'Dishes', name, d.description || '');
+      var price = String(d.price || '').trim();
+      // If AI left "9.5 / 15.95" split across name + price, reunite.
+      var dangling = String(d.name || '').match(/(\d+\.\d{1,2})\s*\/\s*$/);
+      if (dangling && price && !/\//.test(price)) {
+        price = dangling[1] + '/' + price.replace(/^£/, '');
+      }
       list.push({
         id: slug(section + '-' + name + '-' + i),
         section: section,
         name: name,
         description: d.description || '',
-        price: d.price || '',
+        price: price,
         tags: normalizeAiTags(d.tags || ''),
         lunchClub: false
       });
@@ -808,6 +832,8 @@
     normalizeSectionLayout: normalizeSectionLayout,
     sectionLayoutFor: sectionLayoutFor,
     isColumnWidth: isColumnWidth,
-    isFullWidth: isFullWidth
+    isFullWidth: isFullWidth,
+    cleanDishName: cleanDishName,
+    priceOf: priceOf
   };
 })(typeof window !== 'undefined' ? window : global);
