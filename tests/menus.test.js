@@ -29,11 +29,22 @@ assert(page.indexOf('Adjust a dish') !== -1 && page.indexOf('Replace a dish') !=
 assert(page.indexOf('Add a dish') !== -1, 'add a dish mode');
 assert(page.indexOf('Upload / paste') !== -1, 'upload / paste mode');
 assert(page.indexOf('menus-ingest.js') !== -1, 'ingest script is loaded');
-assert(page.indexOf('menuFile') !== -1 && page.indexOf('Read uploaded file') !== -1, 'PDF/image upload control');
-assert(fs.existsSync(path.join(root, 'menus-ingest.js')), 'menus-ingest.js exists');
-var ingestJs = fs.readFileSync(path.join(root, 'menus-ingest.js'), 'utf8');
-assert(ingestJs.indexOf('EBMenuIngest') !== -1 && ingestJs.indexOf('cleanExtractedText') !== -1, 'ingest cleans extracted text');
-assert(ingestJs.indexOf('pdfjsLib') !== -1 && ingestJs.indexOf('Tesseract') !== -1, 'PDF and OCR readers wired');
+assert(page.indexOf('Review extracted menu') !== -1 || page.indexOf('openReview') !== -1, 'review gate before save');
+assert(page.indexOf('AI reader URL') !== -1, 'AI reader URL field');
+assert(page.indexOf('Party / Christmas') !== -1, 'party menu type in UI');
+assert(ingestJs.indexOf('getAiUrl') !== -1 && ingestJs.indexOf('readWithAi') !== -1, 'AI ingest path');
+assert(fs.existsSync(path.join(root, 'apps-script/menu-ai/Code.gs')), 'menu AI Apps Script exists');
+assert(api.menuById('party').kind === 'party', 'party menu kind');
+assert(api.sheetPlan('party', 12).fit === 'one', 'party fits one page');
+var aiPack = api.dishesFromAiMenu({
+  kind: 'party',
+  title: 'Christmas Party Menu',
+  dishes: [
+    { section: 'Starters', name: 'Soup', description: 'oil', tags: 'GF AV' },
+    { section: 'Dishes', name: 'ak', tags: '' }
+  ]
+});
+assert(aiPack.dishes.length === 1 && aiPack.dishes[0].name === 'Soup', 'AI pack drops junk names');
 assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');

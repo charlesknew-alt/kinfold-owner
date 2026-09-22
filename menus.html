@@ -103,23 +103,36 @@
   <script src="menus-ingest.js"></script>
   <script>
     var STORAGE = 'eb-menus-v2';
+    var META_STORAGE = 'eb-menus-meta-v1';
     var book = load();
+    var metaBook = loadMeta();
     var menuId = 'main';
     var mode = 'complete';
     var dishId = '';
     var includes = loadIncludes();
+    var pendingReview = null;
 
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
     function load() {
       try {
         var saved = JSON.parse(localStorage.getItem(STORAGE) || localStorage.getItem('eb-menus-v1') || 'null');
-        if (saved && saved.main) return saved;
+        if (saved && saved.main) {
+          var seeded = EBMenus.seed();
+          if (!saved.party) saved.party = seeded.party;
+          return saved;
+        }
       } catch (e) {}
       return EBMenus.seed();
     }
+    function loadMeta() {
+      try {
+        return JSON.parse(localStorage.getItem(META_STORAGE) || '{}') || {};
+      } catch (e) { return {}; }
+    }
     function save() {
       localStorage.setItem(STORAGE, JSON.stringify(book));
+      localStorage.setItem(META_STORAGE, JSON.stringify(metaBook));
       localStorage.setItem(STORAGE + '-includes', JSON.stringify(includes));
     }
     function loadIncludes() {
@@ -198,17 +211,32 @@
       if (mode === 'complete') {
         html += renderComplete();
       } else if (mode === 'paste') {
-        html += '<p class="note">Upload a <strong>PDF</strong> or <strong>photo/screenshot</strong> of the menu, or paste the text. This <strong>replaces every dish</strong> on <em>' + menu.name + '</em>.</p>';
+        html += '<p class="note">Upload a designed menu <strong>PDF or photo</strong>, or paste text. You will <strong>review</strong> the dishes before they replace <em>' + menu.name + '</em>.</p>';
+        html += '<div class="include-box" style="margin-bottom:14px">';
+        html += '<h3>AI reader (recommended for Christmas / Canva art)</h3>';
+        html += '<p class="note" style="margin:0 0 8px">Same idea as the website conversion: Gemini reads the picture and returns clean dishes. Needs a one-time Apps Script URL (uses your AI credits). Without it, images fall back to OCR and are often wrong.</p>';
+        html += '<label class="field">AI reader URL</label>';
+        html += '<input type="url" id="aiUrl" placeholder="https://script.google.com/macros/s/…/exec" value="' + escapeAttr((window.EBMenuIngest && EBMenuIngest.getAiUrl()) || '') + '">';
+        html += '<button class="link" id="doSaveAiUrl" type="button" style="margin-top:8px">Save AI URL</button>';
+        html += '<p class="note" id="aiUrlNote" style="margin-top:6px">Setup: see apps-script/menu-ai/README.md in the repo.</p>';
+        html += '</div>';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3>Upload PDF or image</h3>';
-        html += '<p class="note" style="margin:0 0 10px">PDFs are read as text. Images use on-device OCR (needs a clear photo).</p>';
         html += '<input type="file" id="menuFile" accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp" style="display:block;width:100%;font:inherit">';
         html += '<button class="go" id="doUpload" type="button" style="margin-top:12px">Read uploaded file</button>';
         html += '<p class="note" id="uploadNote" style="margin-top:8px"></p>';
         html += '</div>';
-        html += '<label class="field">Or paste / edit text</label><textarea id="paste" placeholder="Nibbles&#10;Bread and Salted Butter 5.95&#10;&#10;Starters&#10;Beef Ragu Arancini 8.25&#10;tomato, red onion salsa"></textarea>';
+        html += '<label class="field">Or paste / edit text</label><textarea id="paste" placeholder="Starters&#10;Jerusalem Artichoke Soup&#10;finished with fragrant black truffle oil"></textarea>';
         html += '<button class="go" id="doPaste" type="button" style="margin-top:12px">Read whole menu</button>';
         html += '<p class="note" id="pasteNote"></p>';
+        if (menu.kind === 'party') {
+          var m = metaBook[menuId] || EBMenus.emptyMeta();
+          html += '<div class="include-box" style="margin-top:14px"><h3>Party sheet details</h3>';
+          html += field('Title', 'metaTitle', m.title || 'Christmas Party Menu');
+          html += field('Course prices', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
+          html += field('Notes (pre-order / deposit)', 'metaNotes', m.notes || '');
+          html += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party details</button></div>';
+        }
       } else if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
         if ((mode === 'adjust' || mode === 'replace') && !dishes().length) {
           html += '<p class="note">This menu is empty. Add a dish, or paste a whole menu.</p>';
@@ -325,6 +353,24 @@
       if (doPaste) doPaste.onclick = onPaste;
       var doUpload = document.getElementById('doUpload');
       if (doUpload) doUpload.onclick = onUpload;
+      var doSaveAi = document.getElementById('doSaveAiUrl');
+      if (doSaveAi) doSaveAi.onclick = function () {
+        var v = (document.getElementById('aiUrl') || {}).value || '';
+        EBMenuIngest.setAiUrl(v.trim());
+        var n = document.getElementById('aiUrlNote');
+        if (n) n.textContent = v.trim() ? 'AI reader URL saved on this browser.' : 'AI reader cleared — uploads will use OCR/PDF text only.';
+      };
+      var doSaveMeta = document.getElementById('doSaveMeta');
+      if (doSaveMeta) doSaveMeta.onclick = function () {
+        metaBook[menuId] = {
+          title: (document.getElementById('metaTitle') || {}).value || '',
+          subtitle: '',
+          coursePrices: (document.getElementById('metaPrices') || {}).value || '',
+          notes: (document.getElementById('metaNotes') || {}).value || ''
+        };
+        save();
+        renderPreview();
+      };
       var doSave = document.getElementById('doSave');
       if (doSave) doSave.onclick = onSave;
       var doRemove = document.getElementById('doRemove');
@@ -341,9 +387,83 @@
       document.getElementById('doReset').onclick = function () {
         if (!confirm('Replace all menus with the sample set?')) return;
         book = EBMenus.seed();
+        metaBook = {};
         includes = {};
         save();
         dishId = (dishes()[0] && dishes()[0].id) || '';
+        mode = 'complete';
+        render();
+      };
+    }
+
+    function openReview(result) {
+      pendingReview = result;
+      var existing = document.getElementById('reviewOverlay');
+      if (existing) existing.parentNode.removeChild(existing);
+      var overlay = document.createElement('div');
+      overlay.id = 'reviewOverlay';
+      overlay.setAttribute('style',
+        'position:fixed;inset:0;z-index:50;background:rgba(28,22,16,.55);display:flex;align-items:flex-start;justify-content:center;padding:24px;overflow:auto');
+      var card = document.createElement('div');
+      card.setAttribute('style',
+        'background:#fffaf4;color:#1c1610;max-width:560px;width:100%;border-radius:16px;padding:22px 24px;margin:24px 0;box-shadow:0 18px 40px rgba(0,0,0,.25)');
+      var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:6px;font-family:system-ui,sans-serif">Check before saving</div>';
+      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Review extracted menu</div>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.45;margin:0 0 12px;color:#3a342c">' +
+        escapeAttr(result.warning || 'Check every dish before you accept.') + '</p>';
+      if (result.meta && (result.meta.title || result.meta.coursePrices)) {
+        html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 10px"><strong>' +
+          escapeAttr(result.meta.title || '') + '</strong>';
+        if (result.meta.coursePrices) html += '<br>' + escapeAttr(result.meta.coursePrices);
+        html += '</p>';
+      }
+      html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 8px">' +
+        (result.dishes || []).length + ' dishes · untick any junk lines</p>';
+      html += '<div id="reviewList" style="max-height:42vh;overflow:auto;border:1px solid #e4d9cc;border-radius:10px;padding:8px 10px;background:#fff;font-family:system-ui,sans-serif;font-size:13px">';
+      (result.dishes || []).forEach(function (d, i) {
+        html += '<label style="display:flex;gap:8px;align-items:flex-start;margin:0 0 8px;cursor:pointer">';
+        html += '<input type="checkbox" data-review-i="' + i + '" checked style="margin-top:3px">';
+        html += '<span><strong>' + escapeAttr(d.section) + '</strong> — ' + escapeAttr(d.name);
+        if (d.price) html += ' <span style="opacity:.7">' + escapeAttr(d.price) + '</span>';
+        if (d.tags) html += ' <em style="color:#538135">' + escapeAttr(d.tags) + '</em>';
+        if (d.description) html += '<br><span style="color:#555">' + escapeAttr(d.description) + '</span>';
+        html += '</span></label>';
+      });
+      html += '</div>';
+      if (result.kind === 'party' && menuId !== 'party') {
+        html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:12px 0 0;color:#5a2a2a">AI thinks this is a <strong>party / Christmas</strong> set menu. Use the <strong>Party / Christmas</strong> tab for the standardised centred layout.</p>';
+      }
+      html += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px">';
+      html += '<button type="button" id="reviewAccept" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Looks good — save to ' + escapeAttr(EBMenus.menuById(menuId).name) + '</button>';
+      html += '<button type="button" id="reviewCancel" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Cancel</button>';
+      html += '</div>';
+      card.innerHTML = html;
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      document.getElementById('reviewCancel').onclick = function () {
+        overlay.parentNode.removeChild(overlay);
+        pendingReview = null;
+      };
+      document.getElementById('reviewAccept').onclick = function () {
+        var keep = [];
+        overlay.querySelectorAll('[data-review-i]').forEach(function (box) {
+          if (box.checked) {
+            var d = pendingReview.dishes[parseInt(box.getAttribute('data-review-i'), 10)];
+            if (d) keep.push(d);
+          }
+        });
+        if (!keep.length) {
+          alert('Tick at least one dish, or cancel.');
+          return;
+        }
+        book[menuId] = keep;
+        if (pendingReview.meta && (pendingReview.meta.title || pendingReview.meta.coursePrices || pendingReview.meta.notes)) {
+          metaBook[menuId] = pendingReview.meta;
+        }
+        dishId = keep[0].id;
+        save();
+        overlay.parentNode.removeChild(overlay);
+        pendingReview = null;
         mode = 'complete';
         render();
       };
@@ -368,19 +488,10 @@
         if (note) note.textContent = status;
       }).then(function (result) {
         var area = document.getElementById('paste');
-        if (area) area.value = result.text;
-        if (!result.dishes.length) {
-          if (note) note.textContent = 'Got text from ' + (result.fileName || 'the file') + ', but could not spot dishes. Edit the text below, then press Read whole menu.';
-          mode = 'paste';
-          if (btn) { btn.disabled = false; btn.textContent = 'Read uploaded file'; }
-          return;
-        }
-        book[menuId] = result.dishes;
-        dishId = result.dishes[0].id;
-        save();
-        mode = 'complete';
-        render();
-        // brief confirmation after re-render isn't visible — ok
+        if (area && result.source !== 'ai') area.value = result.text;
+        if (btn) { btn.disabled = false; btn.textContent = 'Read uploaded file'; }
+        if (note) note.textContent = (result.warning || 'Ready to review.') + ' (' + result.dishes.length + ' dishes)';
+        openReview(result);
       }).catch(function (err) {
         if (note) note.textContent = (err && err.message) ? err.message : 'Could not read that file.';
         if (btn) { btn.disabled = false; btn.textContent = 'Read uploaded file'; }
@@ -468,17 +579,25 @@
       render();
     }
     function onPaste() {
-      var parsed = EBMenus.parsePaste(document.getElementById('paste').value);
+      var text = document.getElementById('paste').value;
+      var parsed = EBMenus.parsePaste(text).filter(function (d) {
+        return !EBMenus.isJunkDishName(d.name);
+      });
       var note = document.getElementById('pasteNote');
       if (!parsed.length) {
-        if (note) note.textContent = 'Nothing to read. Put each dish on its own line, with the price at the end. Use headings like Starters / Mains.';
+        if (note) note.textContent = 'Nothing to read. Put each dish on its own line. Use headings like Starters / Mains.';
         return;
       }
-      book[menuId] = parsed;
-      dishId = parsed[0].id;
-      save();
-      mode = 'complete';
-      render();
+      openReview({
+        text: text,
+        dishes: parsed,
+        meta: metaBook[menuId] || EBMenus.emptyMeta(),
+        kind: '',
+        source: 'paste',
+        fileName: '',
+        needsReview: true,
+        warning: 'Pasted text — check the list before saving to the menu.'
+      });
     }
 
     function planTitle(fit) {
@@ -603,6 +722,11 @@
           if (!w) {
             alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
             return;
+          }
+          result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
+          if (menu.kind === 'party' && !result.plan.meta.title) {
+            result.plan.meta.title = 'Christmas Party Menu';
+            result.plan.meta.coursePrices = result.plan.meta.coursePrices || '2 courses £32.95 · 3 courses £39.95';
           }
           w.document.open();
           w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));

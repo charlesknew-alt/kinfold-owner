@@ -1,15 +1,20 @@
-/* Read a whole menu from a PDF or image (browser-side).
-   PDFs: extract text with pdf.js. Images: OCR with Tesseract.
-   Then staff parsePaste turns the text into dishes. */
+/* Read a whole menu from PDF/image.
+   Prefer Gemini via Apps Script (AI credits) when an AI reader URL is set.
+   Otherwise fall back to PDF text / Tesseract OCR — always review before save. */
 (function (root) {
   'use strict';
 
   var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
   var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   var TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+  var AI_URL_KEY = 'eb-menu-ai-url';
 
   function loadScript(src) {
     return new Promise(function (resolve, reject) {
+      if (typeof document === 'undefined') {
+        reject(new Error('No document'));
+        return;
+      }
       if (document.querySelector('script[src="' + src + '"]')) {
         resolve();
         return;
@@ -43,6 +48,30 @@
     });
   }
 
+  function getAiUrl() {
+    try {
+      return String(localStorage.getItem(AI_URL_KEY) || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function setAiUrl(url) {
+    try {
+      if (url) localStorage.setItem(AI_URL_KEY, String(url).trim());
+      else localStorage.removeItem(AI_URL_KEY);
+    } catch (e) {}
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || '')); };
+      reader.onerror = function () { reject(new Error('Could not read file')); };
+      reader.readAsDataURL(file);
+    });
+  }
+
   /** Tidies PDF/OCR text so parsePaste can read headings, prices, descriptions. */
   function cleanExtractedText(raw) {
     var lines = String(raw || '')
@@ -58,15 +87,17 @@
         if (out.length && out[out.length - 1] !== '') out.push('');
         continue;
       }
-      // Skip allergy / key footers that pollute dish lists
       if (/please inform us of any allergies/i.test(line)) continue;
       if (/^gf\s*[–-].*vegetarian/i.test(line)) continue;
       if (/bolney\s*[·•-]\s*west sussex/i.test(line)) continue;
+      if (/bolney\s*[·•-]\s*est\.?\s*1740/i.test(line)) continue;
       if (/^the eight bells$/i.test(line)) continue;
       if (/^week of\b/i.test(line)) continue;
       if (/^all\s+\d+\.\d{2}$/i.test(line)) continue;
+      if (/email choices to/i.test(line)) continue;
+      if (/deposit per person/i.test(line)) continue;
+      if (/^[^\w£]{1,4}$/.test(line)) continue;
 
-      // Price alone on a line → stick onto previous dish name
       if (/^(?:£\s*)?\d+\.\d{2}(?:\s*\/\s*(?:£\s*)?\d+\.\d{2})?$/.test(line) && out.length) {
         var prev = out[out.length - 1];
         if (!/(?:£\s*)?\d+\.\d{2}\s*$/.test(prev)) {
@@ -115,16 +146,14 @@
     });
   }
 
-  function readImage(file, onProgress) {
+  function readImageOcr(file, onProgress) {
     return ensureTesseract().then(function (Tesseract) {
-      if (onProgress) onProgress('Reading image (OCR)… first time may take a moment');
+      if (onProgress) onProgress('OCR only (no AI URL) — results need careful review…');
       return Tesseract.recognize(file, 'eng', {
         logger: function (m) {
           if (!onProgress || !m || !m.status) return;
           if (m.status === 'recognizing text' && m.progress != null) {
-            onProgress('Reading image… ' + Math.round(m.progress * 100) + '%');
-          } else if (m.status) {
-            onProgress(m.status + (m.progress != null ? ' ' + Math.round(m.progress * 100) + '%' : ''));
+            onProgress('OCR… ' + Math.round(m.progress * 100) + '%');
           }
         }
       }).then(function (result) {
@@ -133,27 +162,101 @@
     });
   }
 
+  function readWithAi(file, onProgress) {
+    var url = getAiUrl();
+    if (!url) return Promise.reject(new Error('No AI reader URL'));
+    if (onProgress) onProgress('Sending to AI reader (uses Gemini credits)…');
+    return fileToDataUrl(file).then(function (dataUrl) {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          imageBase64: dataUrl,
+          mimeType: file.type || 'image/jpeg',
+          fileName: file.name || ''
+        })
+      });
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        var data;
+        try { data = JSON.parse(t); } catch (e) {
+          throw new Error('AI reader returned a non-JSON response. Check the Apps Script deploy.');
+        }
+        if (!data.ok) throw new Error(data.error || 'AI reader failed');
+        return data;
+      });
+    });
+  }
+
+  function dishesFromText(text) {
+    if (!root.EBMenus) return [];
+    return root.EBMenus.parsePaste(text).filter(function (d) {
+      return !root.EBMenus.isJunkDishName || !root.EBMenus.isJunkDishName(d.name);
+    });
+  }
+
+  /**
+   * @returns {Promise<{
+   *   text, dishes, meta, kind, source: 'ai'|'pdf'|'ocr',
+   *   fileName, needsReview: true, warning?: string
+   * }>}
+   */
   function readFile(file, onProgress) {
     if (!file) return Promise.reject(new Error('No file chosen'));
     var type = (file.type || '').toLowerCase();
     var name = (file.name || '').toLowerCase();
     var isPdf = type === 'application/pdf' || /\.pdf$/.test(name);
     var isImage = /^image\//.test(type) || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/.test(name);
+    if (!isPdf && !isImage) {
+      return Promise.reject(new Error('Use a PDF or an image (PNG, JPG, WebP).'));
+    }
 
-    var job = isPdf ? readPdf(file, onProgress)
-      : isImage ? readImage(file, onProgress)
-      : Promise.reject(new Error('Use a PDF or an image (PNG, JPG, WebP).'));
+    var aiUrl = getAiUrl();
+    // Images (and PDFs rendered poorly) → AI when configured
+    if (aiUrl && isImage) {
+      return readWithAi(file, onProgress).then(function (data) {
+        var packed = root.EBMenus.dishesFromAiMenu(data.menu || {});
+        return {
+          text: JSON.stringify(data.menu || {}, null, 2),
+          dishes: packed.dishes,
+          meta: packed.meta,
+          kind: packed.kind || (data.menu && data.menu.kind) || '',
+          source: 'ai',
+          fileName: file.name || '',
+          needsReview: true,
+          warning: packed.dishes.length
+            ? 'AI read this image. Check every dish before you accept.'
+            : 'AI returned no dishes. Try a clearer photo or paste the text.'
+        };
+      });
+    }
 
+    var job = isPdf ? readPdf(file, onProgress) : readImageOcr(file, onProgress);
     return job.then(function (raw) {
       var text = cleanExtractedText(raw);
       if (!text) throw new Error('No readable text found in that file.');
-      var dishes = root.EBMenus ? root.EBMenus.parsePaste(text) : [];
-      return { text: text, dishes: dishes, source: isPdf ? 'pdf' : 'image', fileName: file.name || '' };
+      var dishes = dishesFromText(text);
+      var warning = isPdf
+        ? 'PDF text extract — check dishes before accepting (not AI).'
+        : 'OCR only — decorative Christmas art often misreads. Set an AI reader URL for proper extraction.';
+      return {
+        text: text,
+        dishes: dishes,
+        meta: root.EBMenus ? root.EBMenus.emptyMeta() : {},
+        kind: '',
+        source: isPdf ? 'pdf' : 'ocr',
+        fileName: file.name || '',
+        needsReview: true,
+        warning: warning
+      };
     });
   }
 
   root.EBMenuIngest = {
     readFile: readFile,
-    cleanExtractedText: cleanExtractedText
+    cleanExtractedText: cleanExtractedText,
+    getAiUrl: getAiUrl,
+    setAiUrl: setAiUrl,
+    AI_URL_KEY: AI_URL_KEY
   };
 })(typeof window !== 'undefined' ? window : global);
