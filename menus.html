@@ -492,14 +492,76 @@
         return;
       }
       var menu = EBMenus.menuById(menuId);
-      var w = window.open('', '_blank');
-      if (!w) {
-        alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
-        return;
+      var btn = document.getElementById('doGenerate');
+      var hint = document.getElementById('doPrintHint');
+      if (btn) { btn.disabled = true; btn.textContent = 'Arranging…'; }
+      if (hint) hint.disabled = true;
+
+      // Layout brain runs here (order + columns + fillers), then we open a preview sheet.
+      var layout = null;
+      if (menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
+        layout = EBMenuPrint.planFluidLayout(menu, result.dishes);
+        result.plan.layout = layout;
+        result.plan.fit = layout.fit;
+        result.plan.text = layout.summary;
       }
-      w.document.open();
-      w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
-      w.document.close();
+
+      var overlay = document.createElement('div');
+      overlay.id = 'arrangeOverlay';
+      overlay.setAttribute('style',
+        'position:fixed;inset:0;z-index:40;background:rgba(28,22,16,.55);display:flex;align-items:center;justify-content:center;padding:24px');
+      var card = document.createElement('div');
+      card.setAttribute('style',
+        'background:#fffaf4;color:#1c1610;max-width:420px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);font-family:Georgia,serif');
+      var steps = [
+        'Ordering sections (Nibbles → Starters → Classics → Mains…)',
+        'Choosing one or two pages and columns',
+        'Placing Stay a While / sandwiches / logo only if they fit',
+        'Opening classy print preview'
+      ];
+      var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px">Layout</div>';
+      html += '<div style="font-size:22px;font-weight:600;margin-bottom:12px">Arranging your menu</div>';
+      html += '<ul id="arrangeSteps" style="margin:0;padding-left:18px;line-height:1.55;font-family:system-ui,sans-serif;font-size:14px;color:#333">';
+      steps.forEach(function (s, i) {
+        html += '<li data-step="' + i + '" style="opacity:.35;margin:0 0 6px">' + s + '</li>';
+      });
+      html += '</ul>';
+      if (layout && layout.summary) {
+        html += '<p id="arrangeSummary" style="display:none;margin:14px 0 0;font-family:system-ui,sans-serif;font-size:13px;line-height:1.45;color:#3a342c"></p>';
+      }
+      card.innerHTML = html;
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      var i = 0;
+      function tick() {
+        var li = overlay.querySelector('[data-step="' + i + '"]');
+        if (li) li.style.opacity = '1';
+        i += 1;
+        if (i < steps.length) {
+          setTimeout(tick, 280);
+          return;
+        }
+        var sum = document.getElementById('arrangeSummary');
+        if (sum && layout) {
+          sum.style.display = 'block';
+          sum.textContent = layout.summary;
+        }
+        setTimeout(function () {
+          var w = window.open('', '_blank');
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+          if (hint) hint.disabled = false;
+          if (!w) {
+            alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
+            return;
+          }
+          w.document.open();
+          w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
+          w.document.close();
+        }, 450);
+      }
+      setTimeout(tick, 200);
     }
 
     document.getElementById('doGenerate').onclick = generateMenu;
