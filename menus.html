@@ -1356,13 +1356,12 @@
       return result;
     }
 
-    function renderPreview() {
+    function renderPlanHtml() {
       var result = composed();
       var plan = result.plan;
       var list = result.dishes;
       var ticks = EBMenus.lunchClubFromTicks(book);
       var menu = EBMenus.menuById(menuId);
-      var el = document.getElementById('preview');
       var html = '<div class="plan ' + plan.fit + '"><strong>' + planTitle(plan.fit) + '</strong>' + plan.text + '</div>';
       if (plan.fit === 'over') {
         html += '<p class="note">Untick an included menu, or remove dishes, before you generate.</p>';
@@ -1407,7 +1406,13 @@
         html += '</li>';
       });
       html += '</ul>';
-      el.innerHTML = html;
+      return html;
+    }
+
+    function renderPreview() {
+      var el = document.getElementById('preview');
+      if (!el) return;
+      el.innerHTML = renderPlanHtml();
     }
 
     function generateMenu() {
