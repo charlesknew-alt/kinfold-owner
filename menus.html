@@ -21,7 +21,7 @@
     .ps-header-inner { max-width: 1180px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
     .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
     .ps-venue-name { font-family: var(--serif); font-size: 22px; font-weight: 500; }
-    html.iframed .ps-header { display: none; }
+    html.iframed .ps-header { display: none; } /* HARD: never restore display:block for iframed/varlo-header — shell already has the chrome */
     main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 64px; }
     h1 { font-family: var(--serif); font-weight: 500; font-size: 32px; }
     .lede { color: var(--ink-soft); max-width: 720px; margin: 6px 0 18px; font-size: 15px; }
