@@ -83,7 +83,7 @@ function readMenuWithGemini_(body) {
     '- Normalise AV / GF AVAILABLE into tags like "gf option" or "gf" as appropriate.\n';
 
   var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||
-    'gemini-2.0-flash';
+    'gemini-3.6-flash';
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
     model + ':generateContent?key=' + encodeURIComponent(key);
 
