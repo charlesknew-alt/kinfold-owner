@@ -18,5 +18,11 @@ In `Templates_Serve.js`:
 - Fall back `week` / `weekKey` / `sheetName` when substituting `__WEEK_SHEET__`
 
 ## Deploy
-- Push PubSystemLib via clasp and create a new version
-- Pin Windmill + Eight Bells to that version and redeploy `/exec`
+- PubSystemLib **v82** — `Owner review bake week into __WEEK_SHEET__`
+- **Windmill** pinned to **82**, `/exec` redeployed @66
+  (`AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP`)
+- **Eight Bells** pinned to **82**, `/exec` redeployed @214
+  (`AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww`)
+
+Verified both venue `/exec` responses embed
+`var weekSheetName = 'WEEK_…'` when `?week=` is present.
