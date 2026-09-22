@@ -48,15 +48,31 @@
     return mon;
   }
 
-  function weekLabel(d) {
-    var mon = weekStart(d);
-    var day = mon.getDate();
+  function nextSunday(d) {
+    d = d ? new Date(d) : new Date();
+    var day = d.getDay(); // 0 = Sunday already
+    var add = day === 0 ? 0 : 7 - day;
+    var sun = new Date(d.getFullYear(), d.getMonth(), d.getDate() + add);
+    sun.setHours(0, 0, 0, 0);
+    return sun;
+  }
+
+  function ordinalDate(dt) {
+    var day = dt.getDate();
     var ord = (day % 10 === 1 && day !== 11) ? 'st'
       : (day % 10 === 2 && day !== 12) ? 'nd'
       : (day % 10 === 3 && day !== 13) ? 'rd' : 'th';
     var months = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
-    return 'Week of ' + day + ord + ' ' + months[mon.getMonth()] + ' ' + mon.getFullYear();
+    return day + ord + ' ' + months[dt.getMonth()] + ' ' + dt.getFullYear();
+  }
+
+  function weekLabel(d) {
+    return 'Week of ' + ordinalDate(weekStart(d));
+  }
+
+  function sundayLabel(d) {
+    return 'Sunday ' + ordinalDate(nextSunday(d));
   }
 
   function weekKey(d) {
@@ -64,17 +80,39 @@
     return mon.getFullYear() + '-' + (mon.getMonth() + 1) + '-' + mon.getDate();
   }
 
-  /** Next Roman print number for this menu in the current week. */
+  function sundayKey(d) {
+    var sun = nextSunday(d);
+    return sun.getFullYear() + '-' + (sun.getMonth() + 1) + '-' + sun.getDate();
+  }
+
+  /** Next Roman print number for this menu in the current week (or Sunday date). */
   function nextPrintVersion(menuId) {
-    var key = 'eb-print-ver-' + menuId + '-' + weekKey();
+    var isSunday = menuId === 'sunday';
+    var key = 'eb-print-ver-' + menuId + '-' + (isSunday ? sundayKey() : weekKey());
     var n = 0;
     try { n = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) {}
     n += 1;
     try { localStorage.setItem(key, String(n)); } catch (e) {}
-    return { n: n, roman: toRoman(n), week: weekLabel(), weekKey: weekKey() };
+    return {
+      n: n,
+      roman: toRoman(n),
+      week: isSunday ? sundayLabel() : weekLabel(),
+      weekKey: isSunday ? sundayKey() : weekKey(),
+      hideDate: false
+    };
   }
 
-  function trackerBar(ver) {
+  /** Date / version strip — party/Christmas: Roman only, no week line. */
+  function trackerBar(ver, opts) {
+    opts = opts || {};
+    if (opts.hideDate) {
+      return (
+        '<div class="tracker tracker-roman-only">' +
+          '<span></span>' +
+          '<span class="roman">' + esc(ver.roman) + '</span>' +
+        '</div>'
+      );
+    }
     return (
       '<div class="tracker">' +
         '<span>' + esc(ver.week) + '</span>' +
@@ -101,6 +139,10 @@
     );
   }
 
+  function cleanPrice(p) {
+    return String(p == null ? '' : p).replace(/\s+/g, '').replace(/^£/, '');
+  }
+
   function dishRow(d, opts) {
     opts = opts || {};
     var html = '<div class="dish">';
@@ -110,7 +152,7 @@
     html += esc(d.name);
     if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     html += '</span>';
-    if (!opts.hidePrice && d.price) html += '<span class="price">' + esc(d.price) + '</span>';
+    if (!opts.hidePrice && d.price) html += '<span class="price">' + esc(cleanPrice(d.price)) + '</span>';
     html += '</div>';
     if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
     html += '</div>';
@@ -157,28 +199,46 @@
   }
 
   function promoRooms() {
-    return scallop(
-      '<div class="promo">' +
-        '<div class="promo-title">Stay a While</div>' +
-        '<p>we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.</p>' +
-        '<div class="promo-title">Gatherings</div>' +
-        '<p>whether it’s a quiet supper or a special get together, we’re always happy to host your event</p>' +
-      '</div>',
-      'box'
-    );
+    return renderPromoBank([
+      { title: 'Stay a While', body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.' },
+      { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
+    ]);
+  }
+
+  function formatBankDate(dateStr) {
+    if (root.EBMenus && root.EBMenus.formatPromoDate) return root.EBMenus.formatPromoDate(dateStr);
+    return String(dateStr || '');
+  }
+
+  function renderPromoBank(promos) {
+    promos = promos || [];
+    if (!promos.length) return '';
+    var inner = '<div class="promo">';
+    promos.forEach(function (p) {
+      if (!p || !p.title) return;
+      inner += '<div class="promo-title">' + esc(p.title);
+      if (p.date) inner += ' <span class="promo-date">' + esc(formatBankDate(p.date)) + '</span>';
+      inner += '</div>';
+      if (p.body) inner += '<p>' + esc(p.body) + '</p>';
+    });
+    inner += '</div>';
+    return scallop(inner, 'box');
   }
 
   function sandwichNote(dishes) {
     var price = 'all 9.50';
     if (dishes && dishes.length) {
       var prices = {};
-      dishes.forEach(function (d) { if (d.price) prices[d.price] = true; });
+      dishes.forEach(function (d) {
+        var p = cleanPrice(d.price);
+        if (p) prices[p] = true;
+      });
       var keys = Object.keys(prices);
       if (keys.length === 1) price = 'all ' + keys[0];
     }
     return scallop(
       '<div class="promo sandwich-promo">' +
-        '<div class="dish-line"><span class="sec-title" style="margin:0;text-align:left">Sandwiches</span>' +
+        '<div class="promo-head"><span class="promo-title">Sandwiches</span>' +
         '<span class="price">' + esc(price) + '</span></div>' +
         '<p class="note-line">(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)</p>' +
         '<p>filled ciabatta or farmhouse sandwich<br>all served with fries and salad.</p>' +
@@ -186,6 +246,23 @@
       '</div>',
       'box'
     );
+  }
+
+  /** Sides list must not repeat the sandwiches selling box. */
+  function sidesForPrint(bag) {
+    if (!bag.sides || !bag.sides.dishes) return null;
+    var dishes = bag.sides.dishes.filter(function (d) {
+      return !isSandwich(d.name) && !/^sandwiches?\b/i.test(d.name || '');
+    });
+    if (!dishes.length) return null;
+    return { name: bag.sides.name, dishes: dishes };
+  }
+
+  function fillClass(leftover) {
+    if (leftover > 32) return 'fill-airy';
+    if (leftover > 16) return 'fill-roomy';
+    if (leftover < 6) return 'fill-tight';
+    return 'fill-normal';
   }
 
   function lunchClubBox() {
@@ -329,7 +406,17 @@
    * Decide page split + which optional selling boxes fit.
    * Promo never forces an extra page.
    */
-  function planFluidLayout(menu, dishes) {
+  function planFluidLayout(menu, dishes, opts) {
+    opts = opts || {};
+    var promos = Array.isArray(opts.promos) ? opts.promos : null;
+    var promoCost = promos && promos.length
+      ? Math.min(14, 5 + promos.length * 3.5)
+      : COST.rooms;
+    var wantPromoBox = promos ? promos.length > 0 : true;
+    var promoLabel = promos && promos.length
+      ? promos.map(function (p) { return p.title; }).filter(Boolean).join(' / ')
+      : 'Stay a While / Gatherings';
+
     dishes = orderDishesForPrint(dishes || []);
     var bag = pickSections(dishes);
     var chrome = COST.tracker + COST.allergy + COST.logoTop;
@@ -350,14 +437,12 @@
     var wantSandwichNote = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
     var hasBackContent = !!(bag.mains || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
 
-    var totalDishUnits = 0;
-    (dishes || []).forEach(function (d) { totalDishUnits += dishUnits(d); });
-
     var layout = {
       pages: 1,
       fit: 'one',
       mode: 'single',
       bag: bag,
+      promos: promos || [],
       p1: { rooms: false, sandwiches: false, lunchClub: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
       p2: null,
       leftover: { p1: 0, p2: 0 },
@@ -383,8 +468,11 @@
       layout.mode = 'single';
       var left1 = PAGE - oneNeed;
       // Pack fillers into leftover — never push over PAGE
-      var add = tryAdd(left1, COST.rooms);
-      if (add.ok) { layout.p1.rooms = true; left1 = add.left; layout.fillers.push('Stay a While / Gatherings'); }
+      var add;
+      if (wantPromoBox) {
+        add = tryAdd(left1, promoCost);
+        if (add.ok) { layout.p1.rooms = true; left1 = add.left; layout.fillers.push(promoLabel); }
+      }
       if (wantSandwichNote) {
         add = tryAdd(left1, COST.sandwiches + (bag.sides ? 0 : 0));
         if (add.ok) { layout.p1.sandwiches = true; left1 = add.left; layout.fillers.push('Sandwiches box'); }
@@ -397,9 +485,8 @@
       add = tryAdd(left1, COST.footLogo);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = left1;
-      if (bag.classics && bag.classics.dishes.length >= 3 && layout.p1.rooms) {
-        layout.p1.classicsSplit = 1;
-      }
+      // Keep classics as one list; promo sits in its own column (never split burgers into a narrow right col).
+      layout.p1.classicsSplit = 0;
     } else if (hasBackContent || oneNeed > PAGE) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
@@ -410,20 +497,31 @@
       var p1used = front;
       var p1left = PAGE - p1used;
       // Selling bits on page 1 beside classics when they fit (Nov)
-      var addR = tryAdd(p1left, COST.rooms);
-      if (addR.ok) {
-        layout.p1.rooms = true;
-        p1left = addR.left;
-        layout.fillers.push('Stay a While / Gatherings (page 1)');
-        if (bag.classics && bag.classics.dishes.length >= 3) layout.p1.classicsSplit = 1;
+      if (wantPromoBox) {
+        var addR = tryAdd(p1left, promoCost);
+        if (addR.ok) {
+          layout.p1.rooms = true;
+          p1left = addR.left;
+          layout.fillers.push(promoLabel + ' (page 1)');
+          layout.p1.classicsSplit = 0;
+        } else if (wantSandwichNote && bag.sides) {
+          // Jul fallback: sandwiches + sides on page 1 right if rooms don't fit
+          var addS = tryAdd(p1left, COST.sandwiches);
+          if (addS.ok) {
+            layout.p1.sandwiches = true;
+            layout.p1.sidesOnP1 = true;
+            layout.p2.sidesOnP2 = false;
+            p1left = addS.left;
+            layout.fillers.push('Sandwiches + sides (page 1)');
+          }
+        }
       } else if (wantSandwichNote && bag.sides) {
-        // Jul fallback: sandwiches + sides on page 1 right if rooms don't fit
-        var addS = tryAdd(p1left, COST.sandwiches);
-        if (addS.ok) {
+        var addS2 = tryAdd(p1left, COST.sandwiches);
+        if (addS2.ok) {
           layout.p1.sandwiches = true;
           layout.p1.sidesOnP1 = true;
           layout.p2.sidesOnP2 = false;
-          p1left = addS.left;
+          p1left = addS2.left;
           layout.fillers.push('Sandwiches + sides (page 1)');
         }
       }
@@ -443,12 +541,12 @@
           layout.fillers.push('Sandwiches box (page 2)');
         }
       }
-      if (!layout.p1.rooms) {
-        var addRooms2 = tryAdd(p2left, COST.rooms + (tightBack ? 3 : 0));
+      if (wantPromoBox && !layout.p1.rooms) {
+        var addRooms2 = tryAdd(p2left, promoCost + (tightBack ? 3 : 0));
         if (addRooms2.ok) {
           layout.p2.rooms = true;
           p2left = addRooms2.left;
-          layout.fillers.push('Stay a While / Gatherings (page 2)');
+          layout.fillers.push(promoLabel + ' (page 2)');
         }
       }
       if (bag.hasLunch && !tightBack) {
@@ -478,8 +576,8 @@
       ? ' Auto-adds where they fit: ' + layout.fillers.join('; ') + '.'
       : ' Sheet is full — no room for extra selling boxes.';
     layout.summary =
-      (layout.fit === 'one' ? 'Fits on one A4.' :
-        layout.fit === 'two' ? 'Runs to two A4 pages. Type stays the same size.' :
+      (layout.fit === 'one' ? 'Fills one A4 (or 2×A5 for guillotine).' :
+        layout.fit === 'two' ? 'Fills two A4 pages (each page can also print as 2×A5).' :
           'Too full for two pages. Take dishes off. A promo never opens another page.') +
       ' Layout picks columns and dish order from ' + bag.count + ' dishes.' + bits;
 
@@ -491,8 +589,8 @@
     return (list || []).map(function (d) { return dishRow(d); }).join('');
   }
 
-  function renderFiller(which, bag) {
-    if (which === 'rooms') return promoRooms();
+  function renderFiller(which, bag, promos) {
+    if (which === 'rooms') return renderPromoBank(promos && promos.length ? promos : (bag && bag.promos));
     if (which === 'sandwiches') return sandwichNote(bag.sandwiches && bag.sandwiches.dishes);
     if (which === 'lunch') return lunchClubBox();
     if (which === 'logo') {
@@ -502,33 +600,21 @@
   }
 
   function buildLong(menu, dishes, plan, ver) {
-    var layout = (plan && plan.layout) || planFluidLayout(menu, dishes);
+    var layout = (plan && plan.layout) || planFluidLayout(menu, dishes, { promos: (plan && plan.promos) || [] });
     dishes = layout.orderedDishes || orderDishesForPrint(dishes);
     var bag = layout.bag || pickSections(dishes);
+    var promos = (plan && plan.promos) || layout.promos || [];
+    bag.promos = promos;
     var p1opts = layout.p1 || {};
     var p2opts = layout.p2;
+    var sidesPrint = sidesForPrint(bag);
+    var hideDate = menu.id === 'party' || menu.kind === 'party';
+    var fill1 = fillClass((layout.leftover && layout.leftover.p1) || 12);
+    var fill2 = fillClass((layout.leftover && layout.leftover.p2) || 12);
 
-    // Classics: put non-burgers left, burgers right above selling box (Nov style)
-    if (bag.classics && bag.classics.dishes.length >= 2) {
-      var nonBurgers = [];
-      var burgers = [];
-      bag.classics.dishes.forEach(function (d) {
-        if (isBurgerDish(d)) burgers.push(d);
-        else nonBurgers.push(d);
-      });
-      if (burgers.length && nonBurgers.length) {
-        bag.classics = {
-          name: bag.classics.name,
-          dishes: nonBurgers.concat(burgers)
-        };
-        p1opts.classicsSplit = burgers.length;
-      } else if (bag.classics.dishes.length >= 4) {
-        p1opts.classicsSplit = p1opts.classicsSplit || 1;
-      }
-    }
-
-    var p1 = '<div class="page">';
-    p1 += trackerBar(ver);
+    var p1 = '<div class="page fill-page ' + fill1 + '">';
+    p1 += trackerBar(ver, { hideDate: hideDate });
+    p1 += '<div class="page-body">';
     p1 += '<div class="top-band">';
     p1 += '<div class="top-left">';
     if (bag.nibbles) {
@@ -542,74 +628,69 @@
       p1 += '<section class="sec">' + sectionTitle(bag.starters.name) + listDishes(bag.starters.dishes) + '</section>';
     }
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name)) {
+      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name)) {
         p1 += '<section class="sec">' + sectionTitle(s.name) + listDishes(s.dishes) + '</section>';
       }
     });
 
-    // Classics / selling column — fluid: split + rooms, or Jul-style sandwiches+sides
+    // Classics left (full list) + selling column right — never squeeze burgers + promo into one narrow col
     if (bag.classics || p1opts.rooms || p1opts.sandwiches) {
-      var rightBits = '';
-      if (bag.classics) {
-        var split = p1opts.classicsSplit || 0;
-        var left = bag.classics.dishes.slice(0, bag.classics.dishes.length - split);
-        var right = bag.classics.dishes.slice(bag.classics.dishes.length - split);
-        p1 += '<section class="sec">' + sectionTitle(bag.classics.name);
-        p1 += '<div class="cols"><div class="col">' + listDishes(left) + '</div><div class="col">';
-        if (right.length) p1 += listDishes(right);
-        if (p1opts.rooms) p1 += renderFiller('rooms', bag);
-        if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
-        if (p1opts.sidesOnP1 && bag.sides) {
-          p1 += sectionTitle(bag.sides.name) + listDishes(bag.sides.dishes);
-        }
-        p1 += '</div></div></section>';
-      } else {
-        p1 += '<div class="cols"><div class="col"></div><div class="col">';
-        if (p1opts.rooms) p1 += renderFiller('rooms', bag);
-        if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
-        p1 += '</div></div>';
+      p1 += '<section class="sec classics-block">';
+      if (bag.classics) p1 += sectionTitle(bag.classics.name);
+      p1 += '<div class="cols cols-classics"><div class="col col-dishes">';
+      if (bag.classics) p1 += listDishes(bag.classics.dishes);
+      p1 += '</div><div class="col col-promo">';
+      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+      if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
+      if (p1opts.sidesOnP1 && sidesPrint) {
+        p1 += sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes);
       }
+      p1 += '</div></div></section>';
     }
 
-    // Single-page: also place mains/desserts/sides on page 1
     if (layout.pages === 1) {
       if (bag.mains) p1 += '<section class="sec">' + sectionTitle(bag.mains.name) + listDishes(bag.mains.dishes) + '</section>';
       if (bag.desserts) p1 += '<section class="sec">' + sectionTitle(bag.desserts.name) + listDishes(bag.desserts.dishes) + '</section>';
-      if (bag.sides && !p1opts.sidesOnP1) {
-        p1 += '<section class="sec">' + sectionTitle(bag.sides.name) + listDishes(bag.sides.dishes) + '</section>';
+      if (sidesPrint && !p1opts.sidesOnP1) {
+        p1 += '<section class="sec">' + sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes) + '</section>';
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
-      if (p1opts.sandwiches && !bag.classics) p1 += renderFiller('sandwiches', bag);
+      if (p1opts.sandwiches && !bag.classics && !(p1opts.rooms)) p1 += renderFiller('sandwiches', bag);
       if (p1opts.lunchClub) p1 += renderFiller('lunch', bag);
       if (p1opts.footLogo) p1 += renderFiller('logo', bag);
     }
 
+    p1 += '</div>'; // page-body content ends; spacer fills leftover
+    p1 += '<div class="page-spacer" aria-hidden="true"></div>';
     p1 += allergy();
     p1 += '</div>';
 
     if (layout.pages < 2 || !p2opts) return p1;
 
-    var p2 = '<div class="page">';
-    p2 += trackerBar(ver);
+    var p2 = '<div class="page fill-page ' + fill2 + '">';
+    p2 += trackerBar(ver, { hideDate: hideDate });
+    p2 += '<div class="page-body">';
     if (bag.mains) p2 += '<section class="sec">' + sectionTitle(bag.mains.name) + listDishes(bag.mains.dishes) + '</section>';
     if (bag.desserts) p2 += '<section class="sec">' + sectionTitle(bag.desserts.name) + listDishes(bag.desserts.dishes) + '</section>';
 
-    var showBottom = (p2opts.sidesOnP2 && (bag.sides || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
+    var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {
       p2 += '<div class="cols bottom-cols"><div class="col">';
-      if (p2opts.sidesOnP2 && bag.sides) p2 += sectionTitle(bag.sides.name) + listDishes(bag.sides.dishes);
+      if (p2opts.sidesOnP2 && sidesPrint) p2 += sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes);
       if (p2opts.sidesOnP2 && bag.sauces) p2 += sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes);
-      if (!(p2opts.sidesOnP2 && (bag.sides || bag.sauces))) p2 += '&nbsp;';
-      p2 += '</div><div class="col">';
+      if (!(p2opts.sidesOnP2 && (sidesPrint || bag.sauces))) p2 += '&nbsp;';
+      p2 += '</div><div class="col col-promo">';
       if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag);
-      else if (p2opts.rooms) p2 += renderFiller('rooms', bag);
+      else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
       p2 += '</div></div>';
     } else if (p2opts.rooms) {
-      p2 += renderFiller('rooms', bag);
+      p2 += renderFiller('rooms', bag, promos);
     }
 
     if (p2opts.lunchClub) p2 += renderFiller('lunch', bag);
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
+    p2 += '</div>'; // page-body
+    p2 += '<div class="page-spacer" aria-hidden="true"></div>';
     p2 += allergy();
     p2 += '</div>';
 
@@ -665,72 +746,126 @@
     return '<div class="sheet landscape"><div class="sheet-inner">' + face() + face() + '</div></div>';
   }
 
-  function css(landscape) {
+  function css(opts) {
+    opts = opts || {};
+    var landscape = !!opts.landscape;
+    var guillotine = !!opts.guillotine;
     return (
       '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap");' +
-      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Source Sans 3",system-ui,sans-serif}' +
+      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Source Sans 3",system-ui,sans-serif;' +
+        '--dish-gap:9px;--sec-gap:12px;--name:13px;--desc:11.5px;--title:14.5px;--promo:12px}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
-      '.toolbar button{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
+      '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
+      '.toolbar label.paper-opt{display:inline-flex;align-items:center;gap:6px;background:#3a342c;color:#f4eae3}' +
+      '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
-      '.page,.sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;min-height:297mm;padding:10mm 14mm 12mm;position:relative;display:flex;flex-direction:column}' +
-      '.page{page-break-inside:auto}' +
-      '.scallop,.sec,.cols,.foot-logo,.lunch-box{page-break-inside:avoid}' +
-      '.sheet.landscape{width:297mm;min-height:210mm}' +
+      '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
+      '.page{width:210mm;height:297mm;padding:9mm 12mm 10mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
+      '.page-spacer{flex:1 1 auto;min-height:3mm}' +
+      '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
+      '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo{page-break-inside:avoid}' +
+      '.sheet.landscape{width:297mm;min-height:210mm;height:auto}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#5a534a;margin:0 0 8px;font-weight:600}' +
-      '.tracker .roman{font-family:var(--serif);font-size:14px;letter-spacing:.14em;color:var(--ink)}' +
-      '.top-band{display:grid;grid-template-columns:1fr 88px;gap:10px;align-items:start;margin:0 0 8px}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5a534a;margin:0 0 6px;font-weight:600;flex:0 0 auto}' +
+      '.tracker .roman{font-family:var(--serif);font-size:15px;letter-spacing:.12em;color:var(--ink)}' +
+      '.top-band{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:start;margin:0 0 6px}' +
       '.top-left .scallop{margin-bottom:0}' +
-      '.logo-tr{width:84px;height:auto;display:block;margin-left:auto}' +
+      '.logo-tr{width:88px;height:auto;display:block;margin-left:auto}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
-      '.foot-logo{text-align:center;margin:14px 0 6px;margin-top:auto}' +
-      '.foot-logo img{width:100px;height:auto}' +
-      'h1{font-family:var(--serif);font-weight:700;font-size:16px;letter-spacing:.08em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
-      '.sec{margin:0 0 10px}' +
-      '.sec-title{font-family:var(--serif);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase;margin:0 0 8px;text-align:center}' +
-      '.scallop .sec-title{text-align:left;font-size:12px;letter-spacing:.14em;margin-bottom:6px}' +
-      '.sec-title.soft{font-size:11px;letter-spacing:.1em}' +
+      '.foot-logo{text-align:center;margin:10px 0 4px}' +
+      '.foot-logo img{width:96px;height:auto}' +
+      'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
+      '.sec{margin:0 0 var(--sec-gap)}' +
+      '.sec-title{font-family:var(--serif);font-weight:700;font-size:var(--title);letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px;text-align:center}' +
+      '.scallop .sec-title{text-align:left;font-size:13px;letter-spacing:.1em;margin-bottom:6px}' +
+      '.sec-title.soft{font-size:12px;letter-spacing:.08em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:10px}' +
-      '.scallop{margin:0 0 12px;background:#fff;' +
-        'border-style:solid;border-color:transparent;border-width:16px;' +
-        'border-image-slice:42 fill;border-image-repeat:stretch;border-image-width:16px}' +
+      '.scallop{margin:0 0 10px;background:#fff;' +
+        'border-style:solid;border-color:transparent;border-width:14px;' +
+        'border-image-slice:42 fill;border-image-repeat:stretch;border-image-width:14px;' +
+        'overflow:hidden}' +
       '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '")}' +
-      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:38 fill}' +
-      '.scallop-pad{padding:6px 10px 4px}' +
-      '.scallop-box .scallop-pad{padding:4px 8px 2px}' +
-      '.dish{margin:0 0 8px}' +
-      '.dish-line{display:flex;justify-content:space-between;gap:10px;align-items:baseline}' +
-      '.dish-name{font-weight:700;font-size:11.5px}' +
-      '.price{font-weight:600;font-size:11.5px;white-space:nowrap}' +
-      '.desc{font-weight:300;font-size:10.5px;color:#333;margin-top:1px;padding-right:36px;line-height:1.3}' +
-      '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:10.5px}' +
-      '.dish-c{text-align:center;margin:0 0 8px}' +
-      '.dish-c .dish-name{font-family:var(--serif);font-size:11.5px;letter-spacing:.02em}' +
-      '.cols{display:grid;grid-template-columns:1.08fr 0.92fr;gap:18px;margin:4px 0 8px;align-items:start}' +
-      '.bottom-cols{margin-top:18px;margin-bottom:8px}' +
+      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:38 fill}' +
+      '.scallop-pad{padding:5px 8px 3px;overflow:hidden}' +
+      '.scallop-box .scallop-pad{padding:4px 7px 2px}' +
+      '.dish{margin:0 0 var(--dish-gap)}' +
+      '.dish-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline}' +
+      '.dish-name{font-weight:700;font-size:var(--name);line-height:1.25}' +
+      '.price{font-weight:600;font-size:var(--name);white-space:nowrap;flex:0 0 auto}' +
+      '.desc{font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;padding-right:28px;line-height:1.35}' +
+      '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
+      '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
+      '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
+      '.cols{display:grid;grid-template-columns:1.15fr 0.85fr;gap:16px;margin:4px 0 6px;align-items:start}' +
+      '.cols-classics{grid-template-columns:1.2fr 0.8fr}' +
+      '.col-promo{min-width:0;max-width:100%}' +
+      '.col-promo .scallop{max-width:100%}' +
+      '.col-promo .promo p{font-size:11px;line-height:1.35;margin:0 0 6px}' +
+      '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
+      '.bottom-cols{margin-top:10px;margin-bottom:4px}' +
       '.bottom-cols .sec-title{text-align:left}' +
-      '.allergy{color:var(--green);font-style:italic;font-size:9px;text-align:center;line-height:1.35;margin-top:10px}' +
+      '.allergy{color:var(--green);font-style:italic;font-size:10px;text-align:center;line-height:1.4;margin-top:8px;flex:0 0 auto}' +
       '.promo{text-align:left}' +
-      '.promo-title{font-family:var(--serif);font-weight:700;font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:4px 0 2px}' +
-      '.promo p{font-size:10.5px;font-weight:300;margin:0 0 8px;line-height:1.35}' +
-      '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11px}' +
+      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.06em;text-transform:uppercase;margin:2px 0 2px}' +
+      '.promo-date{font-family:var(--sans);font-weight:600;font-size:10.5px;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
+      '.promo p{font-size:11px;font-weight:400;margin:0 0 6px;line-height:1.35}' +
+      '.lunch-box{display:flex;gap:10px;align-items:center;font-size:12px}' +
       '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
       '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
-      '.note-line{font-size:10px;font-weight:600;margin:4px 0}' +
-      '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:8.5px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
-      '.lc-title{font-family:var(--serif);font-weight:700;font-size:17px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
-      '.lc-price{font-family:var(--serif);text-align:center;font-size:11.5px;line-height:1.45}' +
+      '.note-line{font-size:11px;font-weight:600;margin:4px 0}' +
+      '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
+      '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
+      '.lc-price{font-family:var(--serif);text-align:center;font-size:12px;line-height:1.45}' +
       '.lb-foot{text-align:center;margin-top:8px}' +
-      '.lb-ice{font-family:var(--serif);font-weight:700;font-size:12px}' +
-      '.lb-price{font-family:var(--serif);font-weight:700;font-size:15px;margin:5px 0}' +
-      '@media print{body{background:#fff}.toolbar{display:none}.page,.sheet{margin:0;box-shadow:none}' +
-      (landscape ? '@page{size:A4 landscape;margin:0}' : '@page{size:A4 portrait;margin:0}') +
-      '.page{page-break-after:always}.page:last-child{page-break-after:auto}}'
+      '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
+      '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
+      /* Density: stretch type/gaps so each page reads full */ +
+      '.fill-airy{--dish-gap:13px;--sec-gap:16px;--name:14px;--desc:12.5px;--title:15.5px;--promo:13px}' +
+      '.fill-roomy{--dish-gap:11px;--sec-gap:14px;--name:13.5px;--desc:12px;--title:15px;--promo:12.5px}' +
+      '.fill-normal{--dish-gap:9px;--sec-gap:12px;--name:13px;--desc:11.5px;--title:14.5px;--promo:12px}' +
+      '.fill-tight{--dish-gap:6px;--sec-gap:8px;--name:12px;--desc:10.5px;--title:13.5px;--promo:11.5px}' +
+      /* 2×A5 on A4 landscape — cut down the middle */ +
+      '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
+      '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
+      '.a5-face{width:148.5mm;height:210mm;padding:7mm 8mm 8mm;overflow:hidden;display:flex;flex-direction:column}' +
+      '.a5-face .page-body{flex:0 0 auto}' +
+      '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
+      '.a5-face{--dish-gap:7px;--sec-gap:9px;--name:11.5px;--desc:10.5px;--title:12.5px;--promo:11px}' +
+      '.a5-face .logo-tr{width:64px}' +
+      '.a5-face .tracker{font-size:9px;margin-bottom:4px}' +
+      '.a5-face .tracker .roman{font-size:12px}' +
+      '.a5-face .allergy{font-size:8.5px}' +
+      '.a5-face .top-band{grid-template-columns:1fr 68px;gap:6px}' +
+      '.a5-face .cols{gap:10px}' +
+      '.a5-face .scallop{border-width:10px;border-image-width:10px}' +
+      '@media print{body{background:#fff}.toolbar{display:none}' +
+      '.page,.sheet,.cut-sheet{margin:0;box-shadow:none}' +
+      (guillotine
+        ? '@page{size:A4 landscape;margin:0}.cut-sheet{page-break-after:always}.cut-sheet:last-child{page-break-after:auto}'
+        : (landscape ? '@page{size:A4 landscape;margin:0}' : '@page{size:A4 portrait;margin:0}') +
+          '.page{page-break-after:always}.page:last-child{page-break-after:auto}') +
+      '}'
     );
+  }
+
+  function wrapGuillotine(pagesHtml) {
+    // Each A4 page becomes two identical A5 faces on landscape A4 for cutting.
+    var parts = String(pagesHtml || '').split(/(?=<div class="page\b)/).filter(function (s) {
+      return /class="page\b/.test(s);
+    });
+    if (!parts.length) return pagesHtml;
+    return parts.map(function (pageHtml) {
+      var openEnd = pageHtml.indexOf('>');
+      var close = pageHtml.lastIndexOf('</div>');
+      if (openEnd < 0 || close < 0) return pageHtml;
+      var content = pageHtml.slice(openEnd + 1, close);
+      var face = '<div class="a5-face fill-page fill-roomy">' + content + '</div>';
+      return '<div class="cut-sheet">' + face + face + '</div>';
+    }).join('');
   }
 
   function buildParty(menu, dishes, plan, ver) {
@@ -743,8 +878,9 @@
     var byName = {};
     sections.forEach(function (s) { byName[s.name.toLowerCase()] = s; });
 
-    var html = '<div class="page party-page">';
-    html += trackerBar(ver);
+    var html = '<div class="page party-page fill-page fill-roomy">';
+    html += trackerBar(ver, { hideDate: true });
+    html += '<div class="page-body">';
     html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
     html += '<h1 class="party-title">' + esc(title) + '</h1>';
     if (prices) html += '<div class="party-prices">' + esc(prices) + '</div>';
@@ -764,7 +900,6 @@
       });
       html += '</section>';
     });
-    // any other sections
     sections.forEach(function (s) {
       if (order.indexOf(s.name) !== -1) return;
       if (/starter|main|dessert/i.test(s.name)) return;
@@ -776,47 +911,67 @@
     });
 
     if (notes) html += '<div class="party-notes">' + esc(notes) + '</div>';
+    html += '</div>'; // page-body
+    html += '<div class="page-spacer" aria-hidden="true"></div>';
     html += allergy();
     html += '</div>';
     return html;
   }
 
   function build(menu, dishes, plan) {
-    var ver = nextPrintVersion(menu.id);
-    var landscape = menu.kind === 'card';
-    var layout = null;
     plan = plan || {};
+    var ver = nextPrintVersion(menu.id);
+    if (menu.id === 'party' || menu.kind === 'party') ver.hideDate = true;
+    var landscape = menu.kind === 'card';
+    var guillotine = !!plan.guillotine && !landscape;
+    var layout = null;
     if (menu.kind === 'long') {
-      layout = planFluidLayout(menu, dishes);
+      layout = planFluidLayout(menu, dishes, { promos: plan.promos || [] });
       plan.layout = layout;
       plan.fit = layout.fit;
       plan.text = layout.summary;
+      if (!plan.promos) plan.promos = layout.promos || [];
     }
     var body;
     if (landscape) {
       body = buildCard(menu, dishes, plan, ver);
     } else if (menu.kind === 'party') {
-      body = '<div class="sheet-stack">' + buildParty(menu, dishes, plan, ver) + '</div>';
+      body = buildParty(menu, dishes, plan, ver);
     } else {
-      body = '<div class="sheet-stack">' + buildLong(menu, dishes, plan, ver) + '</div>';
+      body = buildLong(menu, dishes, plan, ver);
     }
 
+    var a4Stack = landscape ? body : '<div class="sheet-stack mode-panel mode-a4">' + body + '</div>';
+    var a5Stack = '';
+    if (!landscape) {
+      a5Stack = '<div class="sheet-stack mode-panel mode-a5">' + wrapGuillotine(body) + '</div>';
+    }
+
+    var dateHint = ver.hideDate ? ('print ' + ver.roman) : (ver.week + ' · print ' + ver.roman);
     var fillerHint = layout && layout.fillers && layout.fillers.length
       ? ' Auto: ' + layout.fillers.join(' · ') + '.'
-      : (menu.kind === 'party' ? ' Standardised party layout (website Christmas style).' : '');
+      : (menu.kind === 'party' ? ' Standardised party layout.' : '');
 
     return (
       '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(menu.name) + ' — ' + esc(ver.roman) + '</title>' +
-      '<style>' + css(landscape) + partyCss() + '</style></head><body>' +
+      '<style>' + css({ landscape: landscape, guillotine: guillotine }) + partyCss() +
+      'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
+      'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
+      '</style></head><body class="paper-a4">' +
       '<div class="toolbar">' +
-        '<button onclick="window.print()">Print / save as PDF</button>' +
-        '<span class="hint">' + esc(ver.week) + ' · print ' + esc(ver.roman) +
-        ' — ' + (menu.kind === 'party'
-          ? 'centred party sheet for staff check before sharing.'
-          : 'fluid layout for what’s selected; selling boxes only if they fit.') +
+        '<button type="button" onclick="window.print()">Print / save as PDF</button>' +
+        (landscape ? '' :
+          '<label class="paper-opt"><input type="radio" name="paper" value="a4" checked onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
+          '<label class="paper-opt"><input type="radio" name="paper" value="a5" onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
+        '<span class="hint">' + esc(dateHint) +
+        ' — type scales to fill the sheet; selling boxes stay inside their frames.' +
         esc(fillerHint) + '</span>' +
       '</div>' +
-      body +
+      a4Stack + a5Stack +
+      '<script>(function(){function sync(){var a5=document.body.classList.contains("paper-a5");' +
+        'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
+        'if(old)old.remove();s.textContent=a5?"@media print{@page{size:A4 landscape;margin:0}}":"@media print{@page{size:A4 portrait;margin:0}}";' +
+        'document.head.appendChild(s);}document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});})();<\/script>' +
       '</body></html>'
     );
   }
@@ -824,14 +979,14 @@
   function partyCss() {
     return (
       '.party-page{text-align:center;padding-top:8mm}' +
-      '.party-logo{width:72px;margin:0 auto 8px;display:block}' +
-      '.party-title{font-family:var(--serif);font-size:22px;letter-spacing:.12em;margin:4px 0 6px;font-weight:700}' +
-      '.party-prices{font-weight:700;font-size:13px;margin:0 0 16px;letter-spacing:.04em}' +
-      '.party-sec{margin:0 0 14px}' +
+      '.party-logo{width:76px;margin:0 auto 8px;display:block}' +
+      '.party-title{font-family:var(--serif);font-size:24px;letter-spacing:.1em;margin:4px 0 6px;font-weight:700}' +
+      '.party-prices{font-weight:700;font-size:14px;margin:0 0 14px;letter-spacing:.04em}' +
+      '.party-sec{margin:0 0 12px}' +
       '.party-sec .sec-title{margin-bottom:10px}' +
-      '.party-dish{margin:0 0 10px;padding:0 18mm}' +
+      '.party-dish{margin:0 0 10px;padding:0 14mm}' +
       '.party-dish .desc{padding-right:0;font-style:normal;color:#444}' +
-      '.party-notes{font-size:10px;color:#5a534a;margin:18px 14mm 8px;line-height:1.4}'
+      '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}'
     );
   }
 
@@ -841,7 +996,9 @@
     orderDishesForPrint: orderDishesForPrint,
     toRoman: toRoman,
     weekLabel: weekLabel,
+    sundayLabel: sundayLabel,
     weekKey: weekKey,
-    nextPrintVersion: nextPrintVersion
+    nextPrintVersion: nextPrintVersion,
+    wrapGuillotine: wrapGuillotine
   };
 })(typeof window !== 'undefined' ? window : global);

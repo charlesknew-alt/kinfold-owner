@@ -216,17 +216,27 @@
     if (aiUrl && isImage) {
       return readWithAi(file, onProgress).then(function (data) {
         var packed = root.EBMenus.dishesFromAiMenu(data.menu || {});
+        var fixes = packed.spellingFixes || [];
+        var warn;
+        if (!packed.dishes.length) {
+          warn = 'AI returned no dishes. Try a clearer photo or paste the text.';
+        } else if (fixes.length) {
+          warn = 'AI read this image and made ' + fixes.length +
+            ' spelling change' + (fixes.length === 1 ? '' : 's') +
+            ' — check the list below, then every dish.';
+        } else {
+          warn = 'AI read this image (no spelling changes reported). Check every dish before you accept.';
+        }
         return {
           text: JSON.stringify(data.menu || {}, null, 2),
           dishes: packed.dishes,
           meta: packed.meta,
           kind: packed.kind || (data.menu && data.menu.kind) || '',
+          spellingFixes: fixes,
           source: 'ai',
           fileName: file.name || '',
           needsReview: true,
-          warning: packed.dishes.length
-            ? 'AI read this image. Check every dish before you accept.'
-            : 'AI returned no dishes. Try a clearer photo or paste the text.'
+          warning: warn
         };
       });
     }
@@ -244,6 +254,7 @@
         dishes: dishes,
         meta: root.EBMenus ? root.EBMenus.emptyMeta() : {},
         kind: '',
+        spellingFixes: [],
         source: isPdf ? 'pdf' : 'ocr',
         fileName: file.name || '',
         needsReview: true,

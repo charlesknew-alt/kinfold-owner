@@ -24,3 +24,7 @@ The API key never goes in the GitHub Pages site.
 ## Cost
 
 Uses your Gemini API quota (often free tier is enough for staff menu updates). Each upload = one vision request.
+
+## Spelling changes
+
+Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix it made. The Menus review screen shows these **before** you save.

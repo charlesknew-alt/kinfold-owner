@@ -32,8 +32,13 @@ assert(page.indexOf('menus-ingest.js') !== -1, 'ingest script is loaded');
 assert(page.indexOf('Review extracted menu') !== -1 || page.indexOf('openReview') !== -1, 'review gate before save');
 assert(page.indexOf('AI reader URL') !== -1, 'AI reader URL field');
 assert(page.indexOf('Party / Christmas') !== -1, 'party menu type in UI');
+assert(page.indexOf('Spelling changes') !== -1, 'review shows spelling changes');
+var ingestJs = fs.readFileSync(path.join(root, 'menus-ingest.js'), 'utf8');
 assert(ingestJs.indexOf('getAiUrl') !== -1 && ingestJs.indexOf('readWithAi') !== -1, 'AI ingest path');
+assert(ingestJs.indexOf('spellingFixes') !== -1, 'ingest passes spellingFixes');
 assert(fs.existsSync(path.join(root, 'apps-script/menu-ai/Code.gs')), 'menu AI Apps Script exists');
+var aiGs = fs.readFileSync(path.join(root, 'apps-script/menu-ai/Code.gs'), 'utf8');
+assert(aiGs.indexOf('spellingFixes') !== -1, 'Gemini prompt asks for spellingFixes');
 assert(api.menuById('party').kind === 'party', 'party menu kind');
 assert(api.sheetPlan('party', 12).fit === 'one', 'party fits one page');
 var aiPack = api.dishesFromAiMenu({
@@ -42,9 +47,15 @@ var aiPack = api.dishesFromAiMenu({
   dishes: [
     { section: 'Starters', name: 'Soup', description: 'oil', tags: 'GF AV' },
     { section: 'Dishes', name: 'ak', tags: '' }
+  ],
+  spellingFixes: [
+    { from: 'Soupp', to: 'Soup', where: 'dish name' },
+    { from: 'Soupp', to: 'Soup', where: 'dup' },
+    { from: 'same', to: 'same' }
   ]
 });
 assert(aiPack.dishes.length === 1 && aiPack.dishes[0].name === 'Soup', 'AI pack drops junk names');
+assert(aiPack.spellingFixes.length === 1 && aiPack.spellingFixes[0].to === 'Soup', 'spellingFixes normalised');
 assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
@@ -70,6 +81,28 @@ require(path.join(root, 'menus-print.js'));
 var print = global.EBMenuPrint;
 assert(print.toRoman(1) === 'I' && print.toRoman(2) === 'II' && print.toRoman(4) === 'IV', 'Roman numerals');
 assert(/Week of \d/.test(print.weekLabel(new Date('2026-09-21T12:00:00Z'))), 'week label');
+assert(print.sundayLabel, 'sundayLabel exported');
+assert(/^Sunday \d/.test(print.sundayLabel(new Date('2026-09-22T12:00:00Z'))), 'sunday label uses next/current Sunday');
+var sunVer = print.nextPrintVersion('sunday');
+assert(/^Sunday /.test(sunVer.week), 'Sunday print uses Sunday date not Week of');
+assert(printJs.indexOf('2×A5') !== -1 || printJs.indexOf('guillotine') !== -1, 'A5 guillotine print mode');
+assert(printJs.indexOf('fill-page') !== -1 && printJs.indexOf('page-spacer') !== -1, 'pages fill with spacer');
+assert(printJs.indexOf('col-promo') !== -1, 'promo sits in its own column');
+assert(typeof api.pickPromos === 'function', 'pickPromos exported');
+assert(api.seedPromoBank().length >= 2, 'promo bank has seed wording');
+var bank = [
+  api.promoItem('Stay a While', 'rooms', '', 'stay'),
+  api.promoItem('Old quiz', 'done', '2020-01-01', 'old'),
+  api.promoItem('Pub Quiz', 'tonight', '2099-06-15', 'quiz')
+];
+var auto = api.pickPromos(bank, {}, { today: new Date('2026-09-22'), max: 2 });
+assert(auto.length === 2 && auto[0].id === 'quiz' && auto[1].id === 'stay', 'auto-pick prefers upcoming date then evergreen');
+assert(auto.every(function (p) { return p.id !== 'old'; }), 'auto-pick skips past dates');
+var forced = api.pickPromos(bank, { old: true }, { today: new Date('2026-09-22'), max: 2 });
+assert(forced.length === 1 && forced[0].id === 'old', 'manual tick can force a past-dated line');
+assert(api.formatPromoDate('2026-09-30').indexOf('September') !== -1, 'promo date formats for print');
+assert(page.indexOf('Wording / events') !== -1, 'wording bank mode in UI');
+assert(page.indexOf('data-promo-tick') !== -1, 'promo ticks on long menus');
 var v1 = print.nextPrintVersion('main');
 var v2 = print.nextPrintVersion('main');
 assert(v1.roman === 'I' && v2.roman === 'II', 'print version increments per generate');
