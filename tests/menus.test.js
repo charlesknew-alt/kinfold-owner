@@ -71,8 +71,25 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:200px/.test(printJs), 'front-page logo ~2×+ (200px)');
+assert(/logo-tr\{width:260px/.test(printJs), 'front-page logo larger (260px)');
 assert(/tracker \.roman\{[^}]*font-size:5\.5pt/.test(printJs), 'Roman version mark is staff-small');
+assert(/--title:17pt/.test(printJs), 'section titles much larger');
+assert(printJs.indexOf('bottom-cols-balanced') !== -1, 'page-2 sides split for balance');
+assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
+assert(api.tidyOrphanDescriptions([
+  { section: 'Pub Classics', name: 'Fish & Chips', description: 'served with chips, garden peas', price: '17.95', tags: '' },
+  { section: 'Pub Classics', name: 'and tartare sauce.', description: '', price: '', tags: '' }
+]).length === 1, 'orphan desc lines merge before review/print');
+assert(/tartare/.test(api.tidyOrphanDescriptions([
+  { section: 'Pub Classics', name: 'Fish & Chips', description: 'served with chips, garden peas', price: '17.95', tags: '' },
+  { section: 'Pub Classics', name: 'and tartare sauce.', description: '', price: '', tags: '' }
+])[0].description), 'merged orphan lands on previous description');
+var steakPaste = api.parsePaste(
+  'Pub Classics\n8oz Trenchmore Farm Flat Iron Steak gf 24.95\nserved with chips, mushroom, tomato &\nchoice of sauce (see options)\nFish & Chips 17.95\nserved with chips, garden peas\nand tartare sauce.'
+);
+assert(steakPaste.length === 2, 'paste joins multi-line steak/fish descriptions');
+assert(/choice of sauce/i.test(steakPaste[0].description), 'steak wrap lines become description');
+assert(/tartare/i.test(steakPaste[1].description), 'fish wrap lines become description');
 assert(printJs.indexOf('dish-leader') !== -1, 'dish lines use leaders toward prices');
 assert(printJs.indexOf('sandwich-aligned') !== -1, 'sandwiches title aligns with sides');
 assert(api.cleanDishName('Chicken Caesar Salad 9.5 /') === 'Chicken Caesar Salad', 'strips dangling half-range from dish name');
@@ -149,6 +166,10 @@ assert(fluid.pages === 1 || fluid.pages === 2, 'fluid picks one or two pages');
 assert(fluid.fit === 'one' || fluid.fit === 'two', 'fluid fit is printable');
 assert(fluid.p1.rooms || (fluid.p2 && fluid.p2.rooms) || fluid.fillers.length >= 0, 'rooms considered');
 assert(fluid.summary.indexOf('Layout picks') !== -1 || fluid.summary.indexOf('Auto-adds') !== -1 || fluid.summary.indexOf('A4') !== -1, 'layout explains itself');
+assert(fluid.p1.classicsSplit === 1 || fluid.pages === 1, 'layout prefers burgers in right column');
+var htmlPreview = print.build(mainMenu, aloneDishes, {});
+assert(/col-promo[\s\S]*Burgers/i.test(htmlPreview) || /Burgers[\s\S]*Stay a While/i.test(htmlPreview), 'burgers render before Stay a While in right column');
+assert(/bottom-cols-balanced/.test(htmlPreview) || fluid.pages === 1, 'page 2 uses balanced sides columns when two pages');
 
 var shuffled = [
   api.dish('Mains', 'Pie', 'mash', '14.95', ''),

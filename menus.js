@@ -262,12 +262,59 @@
 
   function isHeading(line) {
     var bare = String(line).replace(/:$/, '').trim();
-    if (!bare) return '';
-    if (SECTION_NAMES[bare.toLowerCase()]) return normalizeSectionName(bare);
-    // Allow “PUB CLASSICS” etc.
+    if (!bare || priceOf(bare)) return '';
+    if (SECTION_NAMES[bare.toLowerCase()]) return SECTION_NAMES[bare.toLowerCase()];
+    // Only short section-like labels — not “and a side salad” / “choice of sauce…”
+    if (bare.length > 32 || /^(served|with|and|choice|see |ask |filled|all served)\b/i.test(bare)) {
+      return '';
+    }
     var norm = normalizeSectionName(bare);
-    if (SECTIONS.indexOf(norm) !== -1 && !priceOf(bare)) return norm;
-    return '';
+    if (SECTIONS.indexOf(norm) === -1) return '';
+    var words = bare.replace(/[^a-zA-Z\s&]/g, '').trim().split(/\s+/).filter(Boolean);
+    if (words.length > 5) return '';
+    if (!/classic|burger|sandwich|nibble|starter|main|side|dessert|shar|sauce|roast|light bite/i.test(bare)) {
+      return '';
+    }
+    return norm;
+  }
+
+  /** Description wrap lines wrongly stored as dish titles (PDF extract). */
+  function looksLikeDescFragment(name) {
+    var n = String(name || '').trim();
+    if (!n || n.length > 90) return false;
+    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter|choice of|tomato|garden peas|tartare|dressed)\b/i.test(n)) {
+      return true;
+    }
+    if (/^[a-z]/.test(n) && !/burger|haddock|pie|fish|steak|salad|arancini|cocktail/i.test(n)) {
+      return true;
+    }
+    return false;
+  }
+
+  /** Merge orphan description rows back onto the previous dish (review + paste). */
+  function tidyOrphanDescriptions(dishes) {
+    var out = [];
+    (dishes || []).forEach(function (raw) {
+      var d = {
+        id: raw.id,
+        section: raw.section,
+        name: raw.name,
+        description: raw.description || '',
+        price: raw.price || '',
+        tags: raw.tags || '',
+        lunchClub: !!raw.lunchClub,
+        fromMenu: raw.fromMenu
+      };
+      var hasPrice = !!(d.price && String(d.price).trim());
+      if (out.length && !hasPrice && looksLikeDescFragment(d.name)) {
+        var prev = out[out.length - 1];
+        var bit = d.name + (d.description ? ' ' + d.description : '');
+        prev.description = prev.description ? (prev.description + ' ' + bit) : bit;
+        return;
+      }
+      out.push(d);
+    });
+    return out;
   }
 
   function priceOf(line) {
@@ -319,9 +366,23 @@
       var lunch = /\[lunch\]|\blunch\s*club\b/i.test(lines[i]);
       var pulled = pullTags(rawName);
       var description = '';
-      if (price && lines[i + 1] && !priceOf(lines[i + 1]) && !isHeading(lines[i + 1])) {
-        description = lines[i + 1];
-        i += 1;
+      // Keep joining wrap lines (PDF often splits “served with…” across rows).
+      if (price) {
+        while (i + 1 < lines.length && !priceOf(lines[i + 1]) && !isHeading(lines[i + 1])) {
+          var next = lines[i + 1];
+          if (description && !looksLikeDescFragment(next) && /^[A-ZÀ-Ý]/.test(next)) break;
+          description = description ? description + ' ' + next : next;
+          i += 1;
+          if (!looksLikeDescFragment(next) && description.indexOf(' ') !== -1) {
+            // Took one normal desc line; still absorb further fragments.
+            while (i + 1 < lines.length && !priceOf(lines[i + 1]) && !isHeading(lines[i + 1]) &&
+              looksLikeDescFragment(lines[i + 1])) {
+              description += ' ' + lines[i + 1];
+              i += 1;
+            }
+            break;
+          }
+        }
       }
       if (!pulled.name) continue;
       pulled.name = cleanDishName(pulled.name);
@@ -338,7 +399,7 @@
         lunchClub: lunch
       });
     }
-    return sortDishesBySection(dishes);
+    return sortDishesBySection(tidyOrphanDescriptions(dishes));
   }
 
   function sheetPlan(menuId, count) {
@@ -556,6 +617,7 @@
         lunchClub: false
       });
     });
+    list = tidyOrphanDescriptions(list);
     return {
       dishes: sortDishesBySection(list),
       meta: meta,
@@ -834,6 +896,8 @@
     isColumnWidth: isColumnWidth,
     isFullWidth: isFullWidth,
     cleanDishName: cleanDishName,
-    priceOf: priceOf
+    priceOf: priceOf,
+    looksLikeDescFragment: looksLikeDescFragment,
+    tidyOrphanDescriptions: tidyOrphanDescriptions
   };
 })(typeof window !== 'undefined' ? window : global);

@@ -575,9 +575,10 @@
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name)) front += sectionUnits(s, false);
+      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name)) front += sectionUnits(s, false);
     });
     if (bag.classics) front += sectionUnits(bag.classics, false);
+    if (bag.burgers) front += sectionUnits(bag.burgers, false);
 
     var back = chrome;
     if (bag.mains) back += sectionUnits(bag.mains, false);
@@ -636,51 +637,26 @@
       add = tryAdd(left1, COST.footLogo);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = left1;
-      // Keep classics as one list; promo sits in its own column (never split burgers into a narrow right col).
-      layout.p1.classicsSplit = 0;
+      // Burgers sit in the right column with Stay a While below (Jul-style).
+      layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
     } else if (hasBackContent || oneNeed > PAGE) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
       layout.mode = 'jul-nov';
       layout.p2 = { rooms: false, sandwiches: false, lunchClub: false, footLogo: false, sidesOnP2: true };
+      layout.p1.classicsSplit = 1;
 
       var p1used = front;
       var p1left = PAGE - p1used;
-      // Selling bits on page 1 beside classics when they fit (Nov)
+      // Stay a While / Gatherings under burgers on page 1; sandwiches keep page 2 balanced with sides
       if (wantPromoBox) {
         var addR = tryAdd(p1left, promoCost);
         if (addR.ok) {
           layout.p1.rooms = true;
           p1left = addR.left;
           layout.fillers.push(promoLabel + ' (page 1)');
-          layout.p1.classicsSplit = 0;
-        } else if (wantSandwichNote && bag.sides) {
-          // Jul fallback: sandwiches + sides on page 1 right if rooms don't fit
-          var addS = tryAdd(p1left, COST.sandwiches);
-          if (addS.ok) {
-            layout.p1.sandwiches = true;
-            layout.p1.sidesOnP1 = true;
-            layout.p2.sidesOnP2 = false;
-            p1left = addS.left;
-            layout.fillers.push('Sandwiches + sides (page 1)');
-          }
         }
-      } else if (wantSandwichNote && bag.sides) {
-        var addS2 = tryAdd(p1left, COST.sandwiches);
-        if (addS2.ok) {
-          layout.p1.sandwiches = true;
-          layout.p1.sidesOnP1 = true;
-          layout.p2.sidesOnP2 = false;
-          p1left = addS2.left;
-          layout.fillers.push('Sandwiches + sides (page 1)');
-        }
-      }
-      // Promo sits in the classics column — sandwiches under it fill the gap
-      // without growing page height when classics/burgers are the tall side.
-      if (wantSandwichNote && layout.p1.rooms && !layout.p1.sandwiches && (bag.classics || bag.burgers)) {
-        layout.p1.sandwiches = true;
-        layout.fillers.push('Sandwiches under promo (page 1)');
       }
       layout.leftover.p1 = p1left;
 
@@ -689,13 +665,23 @@
       var p2left = PAGE - p2used;
       // Desserts + a full mains list leave little room — be stricter about fillers
       var tightBack = !!(bag.desserts && bag.mains && bag.mains.dishes.length >= 6);
-      if (wantSandwichNote && !layout.p1.sandwiches) {
+      if (wantSandwichNote) {
         var sandCost = tightBack ? COST.sandwiches + 2 : COST.sandwiches;
         var addSx = tryAdd(p2left, sandCost);
         if (addSx.ok) {
           layout.p2.sandwiches = true;
           p2left = addSx.left;
           layout.fillers.push('Sandwiches box (page 2)');
+        } else if (bag.sides) {
+          // Fallback: sandwiches + sides on page 1 right if page 2 is packed
+          var addS = tryAdd(p1left, COST.sandwiches);
+          if (addS.ok) {
+            layout.p1.sandwiches = true;
+            layout.p1.sidesOnP1 = true;
+            layout.p2.sidesOnP2 = false;
+            layout.leftover.p1 = addS.left;
+            layout.fillers.push('Sandwiches + sides (page 1)');
+          }
         }
       }
       if (wantPromoBox && !layout.p1.rooms) {
@@ -856,7 +842,7 @@
       }
     });
 
-    // Column block: Pub Classics + Burgers (left) | promo + Sandwiches + optional sides (right)
+    // Column block: Pub Classics (left) | Burgers + Stay a While below (right)
     var split = splitClassicsBag(bag.classics);
     var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
       ? bag.burgers.dishes.slice()
@@ -874,8 +860,9 @@
     var classicDishes = split.classics;
     var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms || p1opts.sandwiches ||
       (p1opts.sidesOnP1 && sidesPrint);
-    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule);
+    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length;
     var sandwichesAsColumn = wantsColumn(sandRule);
+    var burgersOnRight = !!(layout.p1 && layout.p1.classicsSplit) || !!burgerDishes.length;
 
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
@@ -884,10 +871,14 @@
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
-      if (burgerDishes.length) {
+      if (burgerDishes.length && !burgersOnRight) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
       }
+      if (!classicDishes.length && !(burgerDishes.length && !burgersOnRight)) p1 += '&nbsp;';
       p1 += '</div><div class="col col-promo">';
+      if (burgerDishes.length && burgersOnRight) {
+        p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
+      }
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches && sandwichesAsColumn) {
         // sandwichNote already frames; honour “no frilly” by stripping to plain if needed
@@ -950,20 +941,38 @@
     var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {
       var sidesCol = sidesPrint && wantsColumn(sideRule);
-      if (sidesCol || p2opts.sandwiches || p2opts.rooms) {
-        p2 += '<div class="cols bottom-cols"><div class="col col-sides">';
-        if (p2opts.sidesOnP2 && sidesPrint) {
+      var sideList = (p2opts.sidesOnP2 && sidesPrint) ? sidesPrint.dishes.slice() : [];
+      var mid = Math.ceil(sideList.length / 2);
+      var sidesLeft = sideList.slice(0, mid);
+      var sidesRight = sideList.slice(mid);
+      // Split sides across two columns; sandwiches share the right for balance + bigger type room above.
+      if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms)) {
+        p2 += '<div class="cols bottom-cols bottom-cols-balanced">';
+        p2 += '<div class="col col-sides">';
+        if (sideList.length) {
           p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-          p2 += listDishes(sidesPrint.dishes);
+          p2 += listDishes(sidesLeft.length ? sidesLeft : sideList);
+        } else if (p2opts.sidesOnP2 && bag.sauces) {
+          p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
+          p2 += listDishes(bag.sauces.dishes);
+        } else {
+          p2 += '&nbsp;';
         }
-        if (p2opts.sidesOnP2 && bag.sauces) {
+        p2 += '</div><div class="col col-sides-b">';
+        if (sidesRight.length) {
+          if (!sidesLeft.length) p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
+          else p2 += '<div class="sec-title soft-left sec-title-spacer" aria-hidden="true">&nbsp;</div>';
+          p2 += listDishes(sidesRight);
+        }
+        if (p2opts.sidesOnP2 && bag.sauces && sideList.length) {
           p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
           p2 += listDishes(bag.sauces.dishes);
         }
-        if (!(p2opts.sidesOnP2 && (sidesPrint || bag.sauces))) p2 += '&nbsp;';
-        p2 += '</div><div class="col col-promo">';
         if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag, promos, { alignTitle: true });
         else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
+        if (!sidesRight.length && !p2opts.sandwiches && !p2opts.rooms && !(p2opts.sidesOnP2 && bag.sauces)) {
+          p2 += '&nbsp;';
+        }
         p2 += '</div></div>';
       } else if (p2opts.sidesOnP2 && sidesPrint) {
         p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
@@ -1036,11 +1045,11 @@
     var landscape = !!opts.landscape;
     var guillotine = !!opts.guillotine;
     // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
-    // titles, Crimson Text allergy line. Min body ~10pt; logo ~2× old size.
+    // titles, Crimson Text allergy line. Generous titles/logo; roomy dish type.
     return (
       '@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap");' +
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,serif;' +
-        '--dish-gap:10px;--sec-gap:16px;--name:11pt;--desc:10pt;--title:13.5pt;--promo:11pt}' +
+        '--dish-gap:12px;--sec-gap:18px;--name:12pt;--desc:10.5pt;--title:17pt;--promo:12pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1048,9 +1057,9 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:7mm 11mm 9mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:6mm 10mm 8mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
-      '.page-spacer{flex:1 1 auto;min-height:3mm}' +
+      '.page-spacer{flex:1 1 auto;min-height:2mm}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
       '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;min-height:210mm;height:auto}' +
@@ -1062,22 +1071,23 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:1fr 210px;gap:14px;align-items:start;margin:0 0 12px}' +
-      '.top-band-logo{grid-template-columns:1fr 210px;min-height:52mm}' +
+      '.top-band{display:grid;grid-template-columns:1fr 270px;gap:14px;align-items:start;margin:0 0 14px}' +
+      '.top-band-logo{grid-template-columns:1fr 270px;min-height:58mm}' +
       '.top-left .scallop{margin-bottom:0}' +
-      '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:1mm}' +
-      '.logo-tr{width:200px;height:auto;display:block;margin-left:auto}' +
+      '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
+      '.logo-tr{width:260px;height:auto;display:block;margin-left:auto}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
-      '.foot-logo img{width:110px;height:auto}' +
+      '.foot-logo img{width:120px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      '.sec-title{font-family:var(--serif);font-weight:700;font-size:var(--title);letter-spacing:.14em;text-transform:uppercase;margin:0 0 10px;text-align:center}' +
-      '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 8px}' +
-      '.scallop .sec-title{text-align:left;font-size:12pt;letter-spacing:.12em;margin-bottom:6px}' +
-      '.sec-title.soft{font-size:11pt;letter-spacing:.1em}' +
+      '.sec-title{font-family:var(--serif);font-weight:700;font-size:var(--title);letter-spacing:.16em;text-transform:uppercase;margin:0 0 12px;text-align:center}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.14em;margin:0 0 10px}' +
+      '.sec-title-spacer{visibility:hidden;margin:0 0 10px}' +
+      '.scallop .sec-title{text-align:left;font-size:calc(var(--title) - 2pt);letter-spacing:.14em;margin-bottom:8px}' +
+      '.sec-title.soft{font-size:calc(var(--title) - 3pt);letter-spacing:.12em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
-      '.scallop{margin:0 0 12px;background:#fff;position:relative;' +
+      '.scallop{margin:0 0 14px;background:#fff;position:relative;' +
         'border-style:solid;border-color:transparent;border-width:16px;' +
         'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:16px;' +
         'overflow:visible}' +
@@ -1090,58 +1100,59 @@
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;overflow-wrap:anywhere}' +
       '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:12px;height:0}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;padding-left:2px}' +
-      '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.38;max-width:100%}' +
+      '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{grid-template-columns:1fr;justify-items:center}' +
       '.dish-c .dish-leader{display:none}' +
-      '.cols{display:grid;grid-template-columns:1.15fr 0.85fr;gap:16px;margin:6px 0 8px;align-items:start}' +
-      '.cols-classics{grid-template-columns:1.15fr 0.85fr}' +
-      '.col-dishes,.col-promo,.col-sides{min-width:0;max-width:100%}' +
-      '.col-dishes .sec-title{text-align:left;margin-top:4px}' +
-      '.col-dishes .sec-title:first-child{margin-top:0}' +
+      '.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 10px;align-items:start}' +
+      '.cols-classics{grid-template-columns:1fr 1fr}' +
+      '.col-dishes,.col-promo,.col-sides,.col-sides-b{min-width:0;max-width:100%}' +
+      '.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:4px}' +
+      '.col-dishes .sec-title:first-child,.col-promo .sec-title:first-child{margin-top:0}' +
       '.col-promo .scallop{max-width:100%;width:100%}' +
-      '.col-promo .promo p,.col-promo .promo .desc{font-size:10pt;line-height:1.38;margin:0 0 6px;font-weight:400}' +
+      '.col-promo .promo p,.col-promo .promo .desc{font-size:10.5pt;line-height:1.4;margin:0 0 6px;font-weight:400}' +
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
-      '.sandwich-aligned{margin:0}' +
+      '.sandwich-aligned{margin:10px 0 0}' +
       '.sandwich-aligned .scallop{margin-top:0}' +
-      '.bottom-cols{margin-top:14px;margin-bottom:4px}' +
+      '.bottom-cols{margin-top:16px;margin-bottom:4px}' +
+      '.bottom-cols-balanced{grid-template-columns:1fr 1fr;gap:20px}' +
       '.bottom-cols .sec-title{text-align:left}' +
-      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:10pt;text-align:center;line-height:1.4;margin-top:10px;flex:0 0 auto}' +
+      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:10.5pt;text-align:center;line-height:1.4;margin-top:10px;flex:0 0 auto}' +
       '.promo{text-align:left}' +
-      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 2px}' +
+      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:2px 0 2px}' +
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
-      '.promo p{font-size:10pt;font-weight:400;margin:0 0 6px;line-height:1.38}' +
+      '.promo p{font-size:10.5pt;font-weight:400;margin:0 0 6px;line-height:1.4}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
       '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11pt}' +
       '.lc{width:14px;height:14px;vertical-align:-2px;margin-right:4px;display:inline-block}' +
       '.lunch-box .lc{width:22px;height:22px;flex:0 0 auto}' +
-      '.note-line{font-size:10pt;font-weight:500;margin:4px 0}' +
+      '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
       '.lc-price{font-family:var(--serif);text-align:center;font-size:12px;line-height:1.45}' +
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density: stretch type/gaps so each page reads full (floors ≥10pt body) */ +
-      '.fill-airy{--dish-gap:14px;--sec-gap:20px;--name:12pt;--desc:10.5pt;--title:14.5pt;--promo:12pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:18px;--name:11.5pt;--desc:10.25pt;--title:14pt;--promo:11.5pt}' +
-      '.fill-normal{--dish-gap:10px;--sec-gap:16px;--name:11pt;--desc:10pt;--title:13.5pt;--promo:11pt}' +
-      '.fill-tight{--dish-gap:7px;--sec-gap:12px;--name:10.5pt;--desc:10pt;--title:12.5pt;--promo:10.5pt}' +
+      /* Density floors stay large — balanced columns free space for bigger type */ +
+      '.fill-airy{--dish-gap:16px;--sec-gap:22px;--name:13pt;--desc:11pt;--title:18.5pt;--promo:13pt}' +
+      '.fill-roomy{--dish-gap:14px;--sec-gap:20px;--name:12.5pt;--desc:10.75pt;--title:18pt;--promo:12.5pt}' +
+      '.fill-normal{--dish-gap:12px;--sec-gap:18px;--name:12pt;--desc:10.5pt;--title:17pt;--promo:12pt}' +
+      '.fill-tight{--dish-gap:9px;--sec-gap:14px;--name:11pt;--desc:10pt;--title:15pt;--promo:11pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
       '.a5-face{width:148.5mm;height:210mm;padding:6mm 7mm 7mm;overflow:hidden;display:flex;flex-direction:column}' +
       '.a5-face .page-body{flex:0 0 auto}' +
       '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
-      '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10pt;--desc:9.5pt;--title:11.5pt;--promo:10pt}' +
-      '.a5-face .logo-tr{width:118px}' +
-      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 126px;gap:8px;min-height:32mm}' +
+      '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
+      '.a5-face .logo-tr{width:130px}' +
+      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 138px;gap:8px;min-height:34mm}' +
       '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
       '.a5-face .tracker .roman{font-size:5pt}' +
       '.a5-face .allergy{font-size:8.5pt}' +

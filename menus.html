@@ -200,9 +200,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260922-flow7"></script>
-  <script src="menus-print.js?v=20260922-flow7"></script>
-  <script src="menus-ingest.js?v=20260922-flow7"></script>
+  <script src="menus.js?v=20260922-flow8"></script>
+  <script src="menus-print.js?v=20260922-flow8"></script>
+  <script src="menus-ingest.js?v=20260922-flow8"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1086,8 +1086,10 @@
 
     function openReview(result) {
       pendingReview = result;
-      // Auto-guess sections before staff confirms
-      pendingReview.dishes = EBMenus.assignSections(result.dishes || []);
+      // Auto-guess sections before staff confirms; merge PDF wrap-line orphans
+      pendingReview.dishes = EBMenus.tidyOrphanDescriptions(
+        EBMenus.assignSections(result.dishes || [])
+      );
       var existing = document.getElementById('reviewOverlay');
       if (existing) existing.parentNode.removeChild(existing);
       var overlay = document.createElement('div');
