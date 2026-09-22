@@ -73,13 +73,19 @@ assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
 assert(/logo-tr\{width:140px/.test(printJs), 'front-page logo sized ~140px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:22pt/.test(printJs) || /--title:24pt/.test(printJs),
-  'section titles restore readable size (~22–24pt)');
-assert(printJs.indexOf('min(var(--title),24pt)') !== -1, 'title size has hard CSS ceiling at 24pt');
+assert(/--title:26pt/.test(printJs) || /--title:28pt/.test(printJs),
+  'section titles large and readable (~26–28pt)');
+assert(printJs.indexOf('min(var(--title),28pt)') !== -1, 'title size has hard CSS ceiling at 28pt');
+assert(printJs.indexOf('margin:0 0 14px') !== -1 || printJs.indexOf('margin-bottom:12px') !== -1,
+  'section titles leave a gap before dishes');
 assert(printJs.indexOf('startersInTop') !== -1, 'starters can sit frilly beside the logo');
-assert(printJs.indexOf('minmax(0,1fr) minmax(8px,1fr) auto auto') !== -1,
-  'dish lines stay inside their column (no ghost prices)');
+assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') !== -1,
+  'dish lines use flex leaders that start after the name');
 assert(printJs.indexOf('hideTitle') !== -1, 'Item Boost can print without the bucket title');
+assert(printJs.indexOf('just before the price') !== -1 || printJs.indexOf('sits just before the price') !== -1,
+  'lunch club mark sits just before the price');
+assert(/\.lc\{width:16px/.test(printJs) || printJs.indexOf('width="16"') !== -1,
+  'lunch club mark is compact on dish lines');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('n<6') !== -1 || printJs.indexOf('start=n<6') !== -1 ||
   /var start=n<6/.test(printJs), 'sparse pages start roomy instead of airy-balloon');
@@ -89,9 +95,6 @@ assert(printJs.indexOf('document.fonts.ready') !== -1, 'print waits for webfonts
 assert(/padding:12mm/.test(printJs), 'pages keep a sensible top margin without dumping content');
 assert(printJs.indexOf('data:image/png;base64,') !== -1 && printJs.indexOf('LUNCH_MARK_DATA') !== -1,
   'lunch club uses embedded branded mark (works in about:blank print)');
-assert(printJs.indexOf('Lunch club mark after the price') !== -1 || printJs.indexOf('after the price so dish titles') !== -1,
-  'lunch club mark sits after price, not before the title');
-assert(/\.lc\{width:28px/.test(printJs), 'lunch club mark is large enough beside prices');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
 assert(printJs.indexOf('party-theme-christmas') !== -1 && printJs.indexOf('party-theme-valentine') !== -1, 'party menus get occasion themes');
 assert(printJs.indexOf('Peel obvious burgers') !== -1 || printJs.indexOf('split.burgers') !== -1,
@@ -156,8 +159,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow17') !== -1, 'menus page cache-bust is flow17');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow17') !== -1, 'hub menus link cache-bust is flow17');
+assert(page.indexOf('flow18') !== -1, 'menus page cache-bust is flow18');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow18') !== -1, 'hub menus link cache-bust is flow18');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
