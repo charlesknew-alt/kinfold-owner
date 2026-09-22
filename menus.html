@@ -87,7 +87,7 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Show the complete menu and tick lunch club, gluten free, vegetarian or vegan on each dish. On Main or Sunday, tick other menus (for example Sandwiches) to see if they still fit on one sheet. <strong>Generate menu</strong> opens the branded sheet — logo, wavy frames, green marks — ready to print or save as PDF.</p>
+    <p class="lede">Build each menu (paste a whole list, add/adjust dishes, or clear and start again). Tick lunch club / gf / v / vg. On Main or Sunday, tick other menus to try on the same sheet. <strong>Generate</strong> chooses column layout and dish order, and only adds Stay a While / sandwiches / logo when they fit. Each print gets <strong>Week of …</strong> and a Roman numeral (I, II…).</p>
     <div class="menus" id="menuPicker"></div>
     <div class="top-actions no-print">
       <button type="button" class="go" id="doGenerate">Generate menu</button>
@@ -154,7 +154,7 @@
         b.onclick = function () {
           menuId = menu.id;
           dishId = (dishes()[0] && dishes()[0].id) || '';
-          if (mode !== 'complete' && mode !== 'change' && mode !== 'add' && mode !== 'paste') mode = 'complete';
+          if (mode !== 'complete' && mode !== 'adjust' && mode !== 'replace' && mode !== 'add' && mode !== 'paste') mode = 'complete';
           render();
         };
         box.appendChild(b);
@@ -172,7 +172,13 @@
       var el = document.getElementById('editor');
       var html = '<h2 style="font-family:var(--serif);font-weight:500;font-size:24px">' + menu.name + '</h2>';
       html += '<div class="modes">';
-      [['complete', 'Show complete menu'], ['change', 'Change one dish'], ['add', 'Add a dish'], ['paste', 'Paste a list']].forEach(function (pair) {
+      [
+        ['complete', 'Show complete menu'],
+        ['adjust', 'Adjust a dish'],
+        ['replace', 'Replace a dish'],
+        ['add', 'Add a dish'],
+        ['paste', 'Paste whole menu']
+      ].forEach(function (pair) {
         html += '<button type="button" data-mode="' + pair[0] + '" class="' + (mode === pair[0] ? 'on' : '') + '">' + pair[1] + '</button>';
       });
       html += '</div>';
@@ -191,32 +197,43 @@
       if (mode === 'complete') {
         html += renderComplete();
       } else if (mode === 'paste') {
-        html += '<label class="field">Paste from ChatGPT or Canva</label><textarea id="paste" placeholder="Starters&#10;Beef Ragu Arancini 8.25&#10;tomato, red onion salsa"></textarea>';
-        html += '<button class="go" id="doPaste" type="button" style="margin-top:12px">Read the list</button>';
+        html += '<p class="note">Paste the full menu as text (from ChatGPT, Canva, or a PDF copy). This <strong>replaces every dish</strong> on <em>' + menu.name + '</em>.</p>';
+        html += '<label class="field">Whole menu text</label><textarea id="paste" placeholder="Nibbles&#10;Bread and Salted Butter 5.95&#10;&#10;Starters&#10;Beef Ragu Arancini 8.25&#10;tomato, red onion salsa"></textarea>';
+        html += '<button class="go" id="doPaste" type="button" style="margin-top:12px">Read whole menu</button>';
         html += '<p class="note" id="pasteNote"></p>';
-      } else if (mode === 'add' || mode === 'change') {
-        if (mode === 'change' && !dishes().length) {
-          html += '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
+      } else if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
+        if ((mode === 'adjust' || mode === 'replace') && !dishes().length) {
+          html += '<p class="note">This menu is empty. Add a dish, or paste a whole menu.</p>';
         } else {
-          var item = mode === 'change' ? currentDish() : blank();
+          var item = (mode === 'adjust' || mode === 'replace') ? currentDish() : blank();
           if (!item) item = blank();
-          if (mode === 'change') {
+          if (mode === 'replace') {
+            html += '<p class="note">Pick the dish to swap out, then type the new one. Same slot on the menu.</p>';
+          }
+          if (mode === 'adjust' || mode === 'replace') {
             html += '<label class="field">Dish</label><select id="pick">';
             dishes().forEach(function (d) {
               html += '<option value="' + d.id + '"' + (d.id === dishId ? ' selected' : '') + '>' + d.section + ' — ' + d.name + '</option>';
             });
             html += '</select>';
           }
-          html += field('Section', 'section', item.section);
-          html += field('Name', 'name', item.name);
-          html += field('Description', 'description', item.description);
-          html += field('Price', 'price', item.price);
-          html += marksEditor(item, 'form');
-          html += '<button class="go" id="doSave" type="button" style="margin-top:14px">' + (mode === 'add' ? 'Add dish' : 'Save dish') + '</button>';
-          if (mode === 'change' && item.id) html += ' <button class="link" id="doRemove" type="button">Remove this dish</button>';
+          var formItem = mode === 'replace' ? blank() : item;
+          if (mode === 'replace') formItem.section = item.section;
+          html += field('Section', 'section', formItem.section);
+          html += field('Name', 'name', formItem.name);
+          html += field('Description', 'description', formItem.description);
+          html += field('Price', 'price', formItem.price);
+          html += marksEditor(mode === 'replace' ? formItem : item, 'form');
+          var saveLabel = mode === 'add' ? 'Add dish' : (mode === 'replace' ? 'Replace dish' : 'Save changes');
+          html += '<button class="go" id="doSave" type="button" style="margin-top:14px">' + saveLabel + '</button>';
+          if (mode === 'adjust' && item.id) html += ' <button class="link" id="doRemove" type="button">Remove this dish</button>';
         }
       }
-      html += '<p class="note"><button class="link" id="doReset" type="button">Put the sample menus back</button></p>';
+      html += '<div class="note" style="margin-top:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+      html += '<button class="link" id="doClear" type="button">Clear this menu (start again)</button>';
+      html += '<span>·</span>';
+      html += '<button class="link" id="doReset" type="button">Put all sample menus back</button>';
+      html += '</div>';
       el.innerHTML = html;
       bindEditor();
     }
@@ -302,7 +319,17 @@
       if (doSave) doSave.onclick = onSave;
       var doRemove = document.getElementById('doRemove');
       if (doRemove) doRemove.onclick = onRemove;
+      var doClear = document.getElementById('doClear');
+      if (doClear) doClear.onclick = function () {
+        if (!confirm('Clear every dish on ' + EBMenus.menuById(menuId).name + ' and start again?')) return;
+        book[menuId] = [];
+        dishId = '';
+        save();
+        mode = 'paste';
+        render();
+      };
       document.getElementById('doReset').onclick = function () {
+        if (!confirm('Replace all menus with the sample set?')) return;
         book = EBMenus.seed();
         includes = {};
         save();
@@ -376,7 +403,7 @@
         dishes().push(next);
         dishId = next.id;
         mode = 'complete';
-      } else {
+      } else if (mode === 'replace' || mode === 'adjust') {
         var item = currentDish();
         if (!item) return;
         Object.keys(next).forEach(function (k) { item[k] = next[k]; });
@@ -396,7 +423,7 @@
       var parsed = EBMenus.parsePaste(document.getElementById('paste').value);
       var note = document.getElementById('pasteNote');
       if (!parsed.length) {
-        note.textContent = 'Nothing to read. Put each dish on its own line, with the price at the end.';
+        note.textContent = 'Nothing to read. Put each dish on its own line, with the price at the end. Use headings like Starters / Mains.';
         return;
       }
       book[menuId] = parsed;
@@ -427,7 +454,10 @@
       if (plan.fit === 'over') {
         html += '<p class="note">Untick an included menu, or remove dishes, before you generate.</p>';
       } else {
-        html += '<p class="note">When it looks right, press Generate menu. That opens the branded sheet (logo, wavy frames, green marks) — Print to save a PDF.</p>';
+        html += '<p class="note">Generate builds the best layout for this selection. Selling boxes (rooms, sandwiches, lunch club, logo) drop in only when there’s spare room.</p>';
+      }
+      if (plan.layout && plan.layout.fillers && plan.layout.fillers.length) {
+        html += '<p class="note"><strong>Will auto-add:</strong> ' + plan.layout.fillers.map(function (f) { return escapeAttr(f); }).join(' · ') + '</p>';
       }
       if (menuId === 'lunch-club') {
         html += '<p class="note">Printed as its own card. Monday to Thursday.</p>';
@@ -462,14 +492,76 @@
         return;
       }
       var menu = EBMenus.menuById(menuId);
-      var w = window.open('', '_blank');
-      if (!w) {
-        alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
-        return;
+      var btn = document.getElementById('doGenerate');
+      var hint = document.getElementById('doPrintHint');
+      if (btn) { btn.disabled = true; btn.textContent = 'Arranging…'; }
+      if (hint) hint.disabled = true;
+
+      // Layout brain runs here (order + columns + fillers), then we open a preview sheet.
+      var layout = null;
+      if (menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
+        layout = EBMenuPrint.planFluidLayout(menu, result.dishes);
+        result.plan.layout = layout;
+        result.plan.fit = layout.fit;
+        result.plan.text = layout.summary;
       }
-      w.document.open();
-      w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
-      w.document.close();
+
+      var overlay = document.createElement('div');
+      overlay.id = 'arrangeOverlay';
+      overlay.setAttribute('style',
+        'position:fixed;inset:0;z-index:40;background:rgba(28,22,16,.55);display:flex;align-items:center;justify-content:center;padding:24px');
+      var card = document.createElement('div');
+      card.setAttribute('style',
+        'background:#fffaf4;color:#1c1610;max-width:420px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);font-family:Georgia,serif');
+      var steps = [
+        'Ordering sections (Nibbles → Starters → Classics → Mains…)',
+        'Choosing one or two pages and columns',
+        'Placing Stay a While / sandwiches / logo only if they fit',
+        'Opening classy print preview'
+      ];
+      var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px">Layout</div>';
+      html += '<div style="font-size:22px;font-weight:600;margin-bottom:12px">Arranging your menu</div>';
+      html += '<ul id="arrangeSteps" style="margin:0;padding-left:18px;line-height:1.55;font-family:system-ui,sans-serif;font-size:14px;color:#333">';
+      steps.forEach(function (s, i) {
+        html += '<li data-step="' + i + '" style="opacity:.35;margin:0 0 6px">' + s + '</li>';
+      });
+      html += '</ul>';
+      if (layout && layout.summary) {
+        html += '<p id="arrangeSummary" style="display:none;margin:14px 0 0;font-family:system-ui,sans-serif;font-size:13px;line-height:1.45;color:#3a342c"></p>';
+      }
+      card.innerHTML = html;
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      var i = 0;
+      function tick() {
+        var li = overlay.querySelector('[data-step="' + i + '"]');
+        if (li) li.style.opacity = '1';
+        i += 1;
+        if (i < steps.length) {
+          setTimeout(tick, 280);
+          return;
+        }
+        var sum = document.getElementById('arrangeSummary');
+        if (sum && layout) {
+          sum.style.display = 'block';
+          sum.textContent = layout.summary;
+        }
+        setTimeout(function () {
+          var w = window.open('', '_blank');
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+          if (hint) hint.disabled = false;
+          if (!w) {
+            alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
+            return;
+          }
+          w.document.open();
+          w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
+          w.document.close();
+        }, 450);
+      }
+      setTimeout(tick, 200);
     }
 
     document.getElementById('doGenerate').onclick = generateMenu;
