@@ -12,17 +12,17 @@ but **not** `weekSheet`. `_applyBranding` only filled `__WEEK_SHEET__` from
 
 > Error: No week sheet specified
 
-## Fix (PubSystemLib — shared by Windmill + Eight Bells)
-In `Templates_Serve.js`:
-- Map `params.week` → `weekSheet` in `_buildServeParams`
-- Fall back `week` / `weekKey` / `sheetName` when substituting `__WEEK_SHEET__`
+A later PubSystemLib push (v83) overwrote the first fix; restored in v85.
+
+Also: when iframed in the owner portal, `navigateApp` must **not** also do
+`window.location.href` — that reloads inside the HtmlService sandbox and
+drops `?week=`. Parent `postMessage` navigation alone is enough.
+
+## Fix (PubSystemLib)
+- `Templates_Serve.js`: map `params.week` → `weekSheet` / `__WEEK_SHEET__`
+- `Templates_Menus.js`: skip iframe self-navigation after `postMessage`
 
 ## Deploy
-- PubSystemLib **v82** — `Owner review bake week into __WEEK_SHEET__`
-- **Windmill** pinned to **82**, `/exec` redeployed @66
-  (`AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP`)
-- **Eight Bells** pinned to **82**, `/exec` redeployed @214
-  (`AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww`)
-
-Verified both venue `/exec` responses embed
-`var weekSheetName = 'WEEK_…'` when `?week=` is present.
+- PubSystemLib **v85**
+- **Eight Bells** pinned to **85**, `/exec` @216
+- **Windmill** pinned to **85**, `/exec` @68
