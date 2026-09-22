@@ -73,12 +73,13 @@ assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
 assert(/logo-tr\{width:140px/.test(printJs), 'front-page logo sized ~140px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:1[4-8]pt/.test(printJs) || /min\(var\(--title\),18pt\)/.test(printJs),
-  'section titles capped at 18pt ceiling');
-assert(printJs.indexOf('min(var(--title),18pt)') !== -1, 'title size has hard CSS ceiling');
+assert(/--title:22pt/.test(printJs) || /--title:24pt/.test(printJs),
+  'section titles restore readable size (~22–24pt)');
+assert(printJs.indexOf('min(var(--title),24pt)') !== -1, 'title size has hard CSS ceiling at 24pt');
 assert(printJs.indexOf('startersInTop') !== -1, 'starters can sit frilly beside the logo');
 assert(printJs.indexOf('minmax(0,1fr) minmax(8px,1fr) auto auto') !== -1,
   'dish lines stay inside their column (no ghost prices)');
+assert(printJs.indexOf('hideTitle') !== -1, 'Item Boost can print without the bucket title');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('n<6') !== -1 || printJs.indexOf('start=n<6') !== -1 ||
   /var start=n<6/.test(printJs), 'sparse pages start roomy instead of airy-balloon');
@@ -155,8 +156,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow16') !== -1, 'menus page cache-bust is flow16');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow16') !== -1, 'hub menus link cache-bust is flow16');
+assert(page.indexOf('flow17') !== -1, 'menus page cache-bust is flow17');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow17') !== -1, 'hub menus link cache-bust is flow17');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([
@@ -310,10 +311,11 @@ var withBoost = [
 var boostLayout = print.planFluidLayout(mainMenu, withBoost);
 assert(boostLayout.bag.boost && /Fish of the Day/i.test(boostLayout.bag.boost.dishes[0].name), 'bags Item Boost for Fish of the Day');
 var boostHtml = print.build(mainMenu, withBoost, {});
-assert(/ITEM BOOST|Item Boost/i.test(boostHtml), 'prints Item Boost section title');
 assert(/Fish of the Day/i.test(boostHtml), 'prints Fish of the Day dish');
-assert(/scallop[\s\S]*Fish of the Day|Fish of the Day[\s\S]*scallop/i.test(boostHtml) ||
-  /scallop[\s\S]*ITEM BOOST/i.test(boostHtml), 'Item Boost uses frilly scallop frame');
+assert(!/<div class="sec-title">Item Boost<\/div>/i.test(boostHtml),
+  'Item Boost bucket title is hidden on print');
+assert(/scallop[\s\S]*Fish of the Day|Fish of the Day[\s\S]*scallop/i.test(boostHtml),
+  'Item Boost uses frilly scallop frame');
 var seedMain = api.seed().main;
 assert(seedMain.some(function (d) { return d.section === 'Item Boost' && /Fish of the Day/i.test(d.name); }),
   'sample main menu includes Item Boost Fish of the Day');
