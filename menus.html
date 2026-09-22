@@ -200,9 +200,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260922-flow3"></script>
-  <script src="menus-print.js?v=20260922-flow3"></script>
-  <script src="menus-ingest.js?v=20260922-flow3"></script>
+  <script src="menus.js?v=20260922-flow4"></script>
+  <script src="menus-print.js?v=20260922-flow4"></script>
+  <script src="menus-ingest.js?v=20260922-flow4"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -233,10 +233,17 @@
 
     function loadSectionLayout() {
       try {
+        if (!window.EBMenus || typeof EBMenus.normalizeSectionLayout !== 'function') {
+          return (EBMenus && EBMenus.defaultSectionLayout) ? EBMenus.defaultSectionLayout() : {};
+        }
         var raw = JSON.parse(localStorage.getItem(LAYOUT_STORAGE) || 'null');
         return EBMenus.normalizeSectionLayout(raw);
       } catch (e) {
-        return EBMenus.defaultSectionLayout();
+        try {
+          return (window.EBMenus && EBMenus.defaultSectionLayout) ? EBMenus.defaultSectionLayout() : {};
+        } catch (e2) {
+          return {};
+        }
       }
     }
     function saveSectionLayout() {
@@ -1493,11 +1500,19 @@
       setTimeout(tick, 200);
     }
 
-    document.getElementById('doGenerate').onclick = generateMenu;
-    document.getElementById('doPrintHint').onclick = generateMenu;
-
+    // Generate buttons live inside step 4 — bind in bindEditor after render, not here.
     dishId = (dishes()[0] && dishes()[0].id) || '';
-    render();
+    try {
+      render();
+    } catch (bootErr) {
+      var ed = document.getElementById('editor');
+      if (ed) {
+        ed.innerHTML = '<div class="plan over"><strong>Menus failed to load</strong>' +
+          escapeAttr(String(bootErr && bootErr.message ? bootErr.message : bootErr)) +
+          '</div><p class="note">Hard-refresh, or clear site data for this page and try again.</p>';
+      }
+      if (window.console && console.error) console.error(bootErr);
+    }
   </script>
 </body>
 </html>
