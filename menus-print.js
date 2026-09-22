@@ -783,7 +783,9 @@
     if (!dishes || !dishes.length) return '';
     opts = opts || {};
     var body = opts.twoCol ? listDishesCols(dishes) : listDishes(dishes);
-    return framedBlock(sectionTitle(title) + body, rule, kind || 'wide');
+    // Item Boost is a staff filing bucket — print the dish in the frilly box, not the label
+    var head = opts.hideTitle ? '' : sectionTitle(title);
+    return framedBlock(head + body, rule, kind || 'wide');
   }
 
   function layoutMap(plan) {
@@ -952,7 +954,9 @@
         '</section>';
     }
     if (bag.boost) {
-      p1 += '<section class="sec">' + sectionBlock(bag.boost.name, bag.boost.dishes, boostRule) + '</section>';
+      p1 += '<section class="sec">' +
+        sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
+        '</section>';
     }
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
@@ -1157,7 +1161,7 @@
     // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
-        '--dish-gap:10px;--sec-gap:12px;--name:11.5pt;--desc:10pt;--title:17pt;--promo:11pt}' +
+        '--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1191,12 +1195,12 @@
       '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      /* Ceiling: section titles never exceed 18pt */ +
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),18pt)!important;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px;text-align:center;line-height:1.15}' +
-      '.sec-title.soft-left{text-align:left;letter-spacing:.06em;margin:0 0 8px}' +
-      '.sec-title-spacer{visibility:hidden;margin:0 0 8px}' +
-      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),17pt);letter-spacing:.05em;margin-bottom:6px}' +
-      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),15pt);letter-spacing:.05em}' +
+      /* Ceiling: section titles never exceed 24pt (still clearly larger than dish names) */ +
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),24pt)!important;letter-spacing:.1em;text-transform:uppercase;margin:0 0 10px;text-align:center;line-height:1.15}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.1em;margin:0 0 10px}' +
+      '.sec-title-spacer{visibility:hidden;margin:0 0 10px}' +
+      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),22pt);letter-spacing:.09em;margin-bottom:8px}' +
+      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),20pt);letter-spacing:.08em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
       '.classics-block{margin-top:4px}' +
       '.scallop{margin:0 0 10px;background:#fff;position:relative;height:fit-content;' +
@@ -1261,11 +1265,11 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — ALWAYS start airy and only tighten if the page overflows */ +
-      '.fill-airy{--dish-gap:12px;--sec-gap:14px;--name:12pt;--desc:10.25pt;--title:18pt;--promo:11.5pt}' +
-      '.fill-roomy{--dish-gap:10px;--sec-gap:12px;--name:11.5pt;--desc:10pt;--title:17pt;--promo:11pt}' +
-      '.fill-normal{--dish-gap:9px;--sec-gap:11px;--name:11pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
-      '.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10.5pt;--desc:9.5pt;--title:15pt;--promo:10pt}' +
-      '.fill-compact{--dish-gap:5px;--sec-gap:7px;--name:10pt;--desc:9pt;--title:14pt;--promo:9.5pt}' +
+      '.fill-airy{--dish-gap:12px;--sec-gap:16px;--name:12pt;--desc:10.25pt;--title:24pt;--promo:12pt}' +
+      '.fill-roomy{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
+      '.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:11pt;--desc:9.75pt;--title:20pt;--promo:11pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:10px;--name:10.5pt;--desc:9.5pt;--title:18pt;--promo:10.5pt}' +
+      '.fill-compact{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:16pt;--promo:10pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
