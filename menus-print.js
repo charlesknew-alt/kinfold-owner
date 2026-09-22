@@ -127,9 +127,9 @@
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAACpklEQVR42u3d0XHiMBCAYWDSUipJQUwKohKKSl4zDEmEZUur3e97vuOY+D9pZczkdAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAbD4+37/8FGK4VI1PhDGcq696t+v9LAMr4OFWDy3rip06wMeL9izCFS5s5rHhkj2+losW+cL+fG8Zx4VLxvAeg2q5iBEjrHBQShdgyyqxwkrSMj4IcKEIV5oHK90iShFg6wVbYR589u9nvlV0yRJf65YVeR6sFt/SAf532OidB0dHWPWTmWUDbF0Zts6DEeKr8CnN0ltwz0EiyqGk+keEKU/BW+bBGVujByISBNgaV7RDyV+vWekBiRQrYM88WPniC3DCPBjhJrXVL/kMuMeh5KitWHyJA4w+Dzp0FFgBeyPc6/T86t+pOnuWeRhh69y4RxjiKzgDRrlJbdstfgjZYx7cGlfLa1S/7ZM6wJmHEiufALvnwVf/zKtfHnLTu/j3grfevN5jdRNf0RnQQUKAaedBq58AD41wjxVRfMW34N6b1LZjAR4S4YiwrH4CfOmwIRgBTp8HrX4CnLYljnoItTL/KwfHYSW0AoY/gQtQGOITYJ4tWHwC3CUQIQlwWoS36/28ZaUU7d/e/AjaAhKfFXD4KtgTHwLsinCP+IQrwMNPrSM/TRFgMa3f5zXrCXBafLZiAQ6Pz1YswKnx/RabCAU4/YAiQgGGmPtEKMBpUTgVC3DY3GcrFmC4+EQowOnxmQcFGGKWa3mNyhGWDdAXkQRYaus1DwowzNwnwqIBzo7PPFg4wCgrnwjNgClO1wK0+pkHBbhufLbiIgH2Pj5V9b2NUmoWaf1VDbPfl9+YXmQ1jHihHVAcSrwnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/3+UCIOGQl831AAAAAElFTkSuQmCC';
 
   function lunchMark() {
-    // Lunch club mark after the price so dish titles stay left-aligned
+    // Compact mark — sits just before the price on dish lines
     return (
-      '<img class="lc" src="' + LUNCH_MARK_DATA + '" alt="" width="28" height="28">'
+      '<img class="lc" src="' + LUNCH_MARK_DATA + '" alt="" width="16" height="16">'
     );
   }
 
@@ -173,10 +173,12 @@
     html += '</span>';
     if (!opts.hidePrice && price) {
       html += '<span class="dish-leader" aria-hidden="true"></span>';
+      // Lunch-club mark sits just before the price (≈ two spaces)
+      if (d.lunchClub && !opts.hideLunch) html += lunchMark();
       html += '<span class="price">' + esc(cleanPrice(price)) + '</span>';
+    } else if (d.lunchClub && !opts.hideLunch) {
+      html += lunchMark();
     }
-    // Lunch club mark after the price so dish titles stay left-aligned
-    if (d.lunchClub && !opts.hideLunch) html += lunchMark();
     html += '</div>';
     if (d.description) {
       html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
@@ -1161,7 +1163,7 @@
     // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
-        '--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
+        '--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:26pt;--promo:12pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1195,12 +1197,12 @@
       '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      /* Ceiling: section titles never exceed 24pt (still clearly larger than dish names) */ +
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),24pt)!important;letter-spacing:.1em;text-transform:uppercase;margin:0 0 10px;text-align:center;line-height:1.15}' +
-      '.sec-title.soft-left{text-align:left;letter-spacing:.1em;margin:0 0 10px}' +
-      '.sec-title-spacer{visibility:hidden;margin:0 0 10px}' +
-      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),22pt);letter-spacing:.09em;margin-bottom:8px}' +
-      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),20pt);letter-spacing:.08em}' +
+      /* Titles clearly larger than dishes; gap before the first item */ +
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),28pt)!important;letter-spacing:.12em;text-transform:uppercase;margin:0 0 14px;text-align:center;line-height:1.15}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 14px}' +
+      '.sec-title-spacer{visibility:hidden;margin:0 0 14px}' +
+      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),26pt);letter-spacing:.11em;margin-bottom:12px}' +
+      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),24pt);letter-spacing:.1em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
       '.classics-block{margin-top:4px}' +
       '.scallop{margin:0 0 10px;background:#fff;position:relative;height:fit-content;' +
@@ -1212,21 +1214,23 @@
       '.scallop-pad{padding:6px 10px 5px;overflow:hidden;min-width:0}' +
       '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
       '.dish{margin:0 0 var(--dish-gap);min-width:0;max-width:100%}' +
-      '.dish-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(8px,1fr) auto auto;column-gap:0;align-items:baseline;min-width:0;max-width:100%}' +
-      '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;overflow-wrap:anywhere}' +
-      '.dish-leader{display:block;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:8px;height:0}' +
-      '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;padding-left:2px}' +
+      /* Leader starts immediately after name+tags, then mark, then price */ +
+      '.dish-line{display:flex;align-items:baseline;min-width:0;max-width:100%;gap:0}' +
+      '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
+      '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:10px;height:0;align-self:center}' +
+      '.dish-line .lc{width:16px;height:16px;margin:0 0.35em 0 0.15em;flex:0 0 auto;align-self:center}' +
+      '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;flex:0 0 auto;padding-left:0}' +
       '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
-      '.dish-c .dish-line{grid-template-columns:1fr;justify-items:center}' +
+      '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
-      '.lc{width:28px;height:28px;vertical-align:middle;margin-left:6px;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
-      '.lunch-box .lc{width:36px;height:36px;margin-left:0;flex:0 0 auto}' +
+      '.lc{width:16px;height:16px;vertical-align:middle;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lunch-box .lc{width:28px;height:28px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:20px;height:20px;margin:0}' +
+      '.allergy-lc .lc{width:18px;height:18px;margin:0}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       /* Golden rule: both columns start on the same baseline */ +
@@ -1265,11 +1269,11 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — ALWAYS start airy and only tighten if the page overflows */ +
-      '.fill-airy{--dish-gap:12px;--sec-gap:16px;--name:12pt;--desc:10.25pt;--title:24pt;--promo:12pt}' +
-      '.fill-roomy{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
-      '.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:11pt;--desc:9.75pt;--title:20pt;--promo:11pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:10px;--name:10.5pt;--desc:9.5pt;--title:18pt;--promo:10.5pt}' +
-      '.fill-compact{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:16pt;--promo:10pt}' +
+      '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12pt;--desc:10.5pt;--title:28pt;--promo:12.5pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:26pt;--promo:12pt}' +
+      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:24pt;--promo:11.5pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:20pt;--promo:10.5pt}' +
+      '.fill-compact{--dish-gap:6px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:18pt;--promo:10pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */ +
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
