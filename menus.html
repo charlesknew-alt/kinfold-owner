@@ -87,7 +87,7 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">Build each menu (paste a whole list, add/adjust dishes, or clear and start again). Tick lunch club / gf / v / vg. On Main or Sunday, tick other menus to try on the same sheet. <strong>Generate</strong> chooses column layout and dish order, and only adds Stay a While / sandwiches / logo when they fit. Each print gets <strong>Week of …</strong> and a Roman numeral (I, II…).</p>
+    <p class="lede">Build each menu — <strong>upload a PDF or image</strong>, paste a list, or add/adjust dishes. Tick lunch club / gf / v / vg. On Main or Sunday, tick other menus to try on the same sheet. <strong>Generate</strong> chooses layout and dish order, and only adds Stay a While / sandwiches / logo when they fit.</p>
     <div class="menus" id="menuPicker"></div>
     <div class="top-actions no-print">
       <button type="button" class="go" id="doGenerate">Generate menu</button>
@@ -100,6 +100,7 @@
   </main>
   <script src="menus.js"></script>
   <script src="menus-print.js"></script>
+  <script src="menus-ingest.js"></script>
   <script>
     var STORAGE = 'eb-menus-v2';
     var book = load();
@@ -177,7 +178,7 @@
         ['adjust', 'Adjust a dish'],
         ['replace', 'Replace a dish'],
         ['add', 'Add a dish'],
-        ['paste', 'Paste whole menu']
+        ['paste', 'Upload / paste']
       ].forEach(function (pair) {
         html += '<button type="button" data-mode="' + pair[0] + '" class="' + (mode === pair[0] ? 'on' : '') + '">' + pair[1] + '</button>';
       });
@@ -197,8 +198,15 @@
       if (mode === 'complete') {
         html += renderComplete();
       } else if (mode === 'paste') {
-        html += '<p class="note">Paste the full menu as text (from ChatGPT, Canva, or a PDF copy). This <strong>replaces every dish</strong> on <em>' + menu.name + '</em>.</p>';
-        html += '<label class="field">Whole menu text</label><textarea id="paste" placeholder="Nibbles&#10;Bread and Salted Butter 5.95&#10;&#10;Starters&#10;Beef Ragu Arancini 8.25&#10;tomato, red onion salsa"></textarea>';
+        html += '<p class="note">Upload a <strong>PDF</strong> or <strong>photo/screenshot</strong> of the menu, or paste the text. This <strong>replaces every dish</strong> on <em>' + menu.name + '</em>.</p>';
+        html += '<div class="include-box" style="margin-bottom:14px">';
+        html += '<h3>Upload PDF or image</h3>';
+        html += '<p class="note" style="margin:0 0 10px">PDFs are read as text. Images use on-device OCR (needs a clear photo).</p>';
+        html += '<input type="file" id="menuFile" accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp" style="display:block;width:100%;font:inherit">';
+        html += '<button class="go" id="doUpload" type="button" style="margin-top:12px">Read uploaded file</button>';
+        html += '<p class="note" id="uploadNote" style="margin-top:8px"></p>';
+        html += '</div>';
+        html += '<label class="field">Or paste / edit text</label><textarea id="paste" placeholder="Nibbles&#10;Bread and Salted Butter 5.95&#10;&#10;Starters&#10;Beef Ragu Arancini 8.25&#10;tomato, red onion salsa"></textarea>';
         html += '<button class="go" id="doPaste" type="button" style="margin-top:12px">Read whole menu</button>';
         html += '<p class="note" id="pasteNote"></p>';
       } else if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
@@ -315,6 +323,8 @@
       if (pick) pick.onchange = function () { dishId = pick.value; render(); };
       var doPaste = document.getElementById('doPaste');
       if (doPaste) doPaste.onclick = onPaste;
+      var doUpload = document.getElementById('doUpload');
+      if (doUpload) doUpload.onclick = onUpload;
       var doSave = document.getElementById('doSave');
       if (doSave) doSave.onclick = onSave;
       var doRemove = document.getElementById('doRemove');
@@ -337,6 +347,44 @@
         mode = 'complete';
         render();
       };
+    }
+
+    function onUpload() {
+      var input = document.getElementById('menuFile');
+      var note = document.getElementById('uploadNote');
+      var btn = document.getElementById('doUpload');
+      if (!input || !input.files || !input.files[0]) {
+        if (note) note.textContent = 'Choose a PDF or image first.';
+        return;
+      }
+      if (!window.EBMenuIngest) {
+        if (note) note.textContent = 'Upload reader failed to load. Refresh the page and try again.';
+        return;
+      }
+      var file = input.files[0];
+      if (btn) { btn.disabled = true; btn.textContent = 'Reading…'; }
+      if (note) note.textContent = 'Starting…';
+      EBMenuIngest.readFile(file, function (status) {
+        if (note) note.textContent = status;
+      }).then(function (result) {
+        var area = document.getElementById('paste');
+        if (area) area.value = result.text;
+        if (!result.dishes.length) {
+          if (note) note.textContent = 'Got text from ' + (result.fileName || 'the file') + ', but could not spot dishes. Edit the text below, then press Read whole menu.';
+          mode = 'paste';
+          if (btn) { btn.disabled = false; btn.textContent = 'Read uploaded file'; }
+          return;
+        }
+        book[menuId] = result.dishes;
+        dishId = result.dishes[0].id;
+        save();
+        mode = 'complete';
+        render();
+        // brief confirmation after re-render isn't visible — ok
+      }).catch(function (err) {
+        if (note) note.textContent = (err && err.message) ? err.message : 'Could not read that file.';
+        if (btn) { btn.disabled = false; btn.textContent = 'Read uploaded file'; }
+      });
     }
 
     function findDish(id) {
@@ -423,7 +471,7 @@
       var parsed = EBMenus.parsePaste(document.getElementById('paste').value);
       var note = document.getElementById('pasteNote');
       if (!parsed.length) {
-        note.textContent = 'Nothing to read. Put each dish on its own line, with the price at the end. Use headings like Starters / Mains.';
+        if (note) note.textContent = 'Nothing to read. Put each dish on its own line, with the price at the end. Use headings like Starters / Mains.';
         return;
       }
       book[menuId] = parsed;
