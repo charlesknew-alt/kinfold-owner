@@ -27,6 +27,13 @@ assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
 assert(page.indexOf('Adjust a dish') !== -1 && page.indexOf('Replace a dish') !== -1, 'adjust and replace modes');
 assert(page.indexOf('Add a dish') !== -1, 'add a dish mode');
+assert(page.indexOf('Upload / paste') !== -1, 'upload / paste mode');
+assert(page.indexOf('menus-ingest.js') !== -1, 'ingest script is loaded');
+assert(page.indexOf('menuFile') !== -1 && page.indexOf('Read uploaded file') !== -1, 'PDF/image upload control');
+assert(fs.existsSync(path.join(root, 'menus-ingest.js')), 'menus-ingest.js exists');
+var ingestJs = fs.readFileSync(path.join(root, 'menus-ingest.js'), 'utf8');
+assert(ingestJs.indexOf('EBMenuIngest') !== -1 && ingestJs.indexOf('cleanExtractedText') !== -1, 'ingest cleans extracted text');
+assert(ingestJs.indexOf('pdfjsLib') !== -1 && ingestJs.indexOf('Tesseract') !== -1, 'PDF and OCR readers wired');
 assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
@@ -128,6 +135,21 @@ var crowded = api.sheetPlanFor(book, 'main', { sandwiches: true, desserts: true,
 assert(crowded.dishes.length >= withSandwiches.dishes.length, 'more includes add more dishes');
 
 assert(api.lunchClubFromTicks(book).length > 0, 'sample menus include lunch club dishes');
+
+global.document = {
+  querySelector: function () { return null; },
+  createElement: function () { return { onload: null, onerror: null }; },
+  head: { appendChild: function () {} }
+};
+require(path.join(root, 'menus-ingest.js'));
+var ingest = global.EBMenuIngest;
+var cleaned = ingest.cleanExtractedText(
+  'THE EIGHT BELLS\nBolney · West Sussex\nNibbles\nBread and Salted Butter\n5.95\nStarters\nBeef Ragu Arancini gf 8.25\ntomato salsa\nPlease inform us of any allergies'
+);
+var fromPdf = api.parsePaste(cleaned);
+assert(fromPdf.length >= 2, 'cleaned PDF-like text parses dishes');
+assert(fromPdf[0].name === 'Bread and Salted Butter' && fromPdf[0].price === '5.95', 'price-only line joins previous name');
+assert(cleaned.indexOf('Please inform') === -1, 'allergy footer stripped from extract');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
