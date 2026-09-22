@@ -121,10 +121,15 @@
     );
   }
 
+  // Branded crossed knife & fork (green) as data-URI so the print popup
+  // (about:blank) still shows it — relative images/lunch-club-mark.png 404s there.
+  var LUNCH_MARK_DATA =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAACpklEQVR42u3d0XHiMBCAYWDSUipJQUwKohKKSl4zDEmEZUur3e97vuOY+D9pZczkdAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAbD4+37/8FGK4VI1PhDGcq696t+v9LAMr4OFWDy3rip06wMeL9izCFS5s5rHhkj2+losW+cL+fG8Zx4VLxvAeg2q5iBEjrHBQShdgyyqxwkrSMj4IcKEIV5oHK90iShFg6wVbYR589u9nvlV0yRJf65YVeR6sFt/SAf532OidB0dHWPWTmWUDbF0Zts6DEeKr8CnN0ltwz0EiyqGk+keEKU/BW+bBGVujByISBNgaV7RDyV+vWekBiRQrYM88WPniC3DCPBjhJrXVL/kMuMeh5KitWHyJA4w+Dzp0FFgBeyPc6/T86t+pOnuWeRhh69y4RxjiKzgDRrlJbdstfgjZYx7cGlfLa1S/7ZM6wJmHEiufALvnwVf/zKtfHnLTu/j3grfevN5jdRNf0RnQQUKAaedBq58AD41wjxVRfMW34N6b1LZjAR4S4YiwrH4CfOmwIRgBTp8HrX4CnLYljnoItTL/KwfHYSW0AoY/gQtQGOITYJ4tWHwC3CUQIQlwWoS36/28ZaUU7d/e/AjaAhKfFXD4KtgTHwLsinCP+IQrwMNPrSM/TRFgMa3f5zXrCXBafLZiAQ6Pz1YswKnx/RabCAU4/YAiQgGGmPtEKMBpUTgVC3DY3GcrFmC4+EQowOnxmQcFGGKWa3mNyhGWDdAXkQRYaus1DwowzNwnwqIBzo7PPFg4wCgrnwjNgClO1wK0+pkHBbhufLbiIgH2Pj5V9b2NUmoWaf1VDbPfl9+YXmQ1jHihHVAcSrwnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/3+UCIOGQl831AAAAAElFTkSuQmCC';
+
   function lunchMark() {
-    // Branded crossed knife & fork — sized to read clearly beside dish names
+    // Lunch club mark after the price so dish titles stay left-aligned
     return (
-      '<img class="lc" src="' + esc(asset('lunch-club-mark.png')) + '" alt="" width="28" height="28">'
+      '<img class="lc" src="' + LUNCH_MARK_DATA + '" alt="" width="28" height="28">'
     );
   }
 
@@ -433,6 +438,9 @@
   function isMains(name) {
     return /^mains?$/i.test(name || '');
   }
+  function isLittleBells(name) {
+    return /little\s*bells|kids?\s*menu|children.?s/i.test(String(name || '').trim());
+  }
   function isStarters(name) {
     return /starter/i.test(name || '');
   }
@@ -446,6 +454,7 @@
     { test: isClassics, rank: 30 },
     { test: isBurgers, rank: 32 },
     { test: isMains, rank: 40 },
+    { test: isLittleBells, rank: 45 },
     { test: isSides, rank: 50 },
     { test: isSauce, rank: 55 },
     { test: isSandwich, rank: 60 },
@@ -516,7 +525,7 @@
     var sections = groupBySection(dishes);
     var bag = {
       nibbles: null, starters: null, sharing: null, boost: null, classics: null, burgers: null,
-      mains: null, desserts: null, sides: null, sandwiches: null, sauces: null,
+      mains: null, littleBells: null, desserts: null, sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
     var straySandwiches = [];
@@ -530,7 +539,9 @@
         // Keep every staff-assigned classic here — including a lone burger filed as classic.
         bag.classics = { name: 'Pub Classics', dishes: (s.dishes || []).slice() };
       } else if (isMains(s.name) && !bag.mains) bag.mains = s;
-      else if (isDessert(s.name) && !bag.desserts) bag.desserts = s;
+      else if (isLittleBells(s.name) && !bag.littleBells) {
+        bag.littleBells = { name: 'Little Bells', dishes: (s.dishes || []).slice() };
+      } else if (isDessert(s.name) && !bag.desserts) bag.desserts = s;
       else if (isSides(s.name) && !bag.sides) bag.sides = s;
       else if (isSandwich(s.name) && !bag.sandwiches) bag.sandwiches = s;
       else if (isSauce(s.name) && !bag.sauces) bag.sauces = s;
@@ -592,19 +603,22 @@
     // Item Boost defaults to a frilly frame (Fish of the Day, etc.)
     if (bag.boost) front += sectionUnits(bag.boost, true);
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name)) front += sectionUnits(s, false);
+      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name)) {
+        front += sectionUnits(s, false);
+      }
     });
     if (bag.classics) front += sectionUnits(bag.classics, false);
     if (bag.burgers) front += sectionUnits(bag.burgers, false);
 
     var back = chrome;
     if (bag.mains) back += sectionUnits(bag.mains, false);
+    if (bag.littleBells) back += sectionUnits(bag.littleBells, true);
     if (bag.desserts) back += sectionUnits(bag.desserts, false);
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
     // sandwich dish list is replaced by a note box when printed on Main/Sunday
     var wantSandwichNote = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
-    var hasBackContent = !!(bag.mains || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
+    var hasBackContent = !!(bag.mains || bag.littleBells || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
 
     var layout = {
       pages: 1,
@@ -622,12 +636,13 @@
     // —— One page if everything (minus optional fillers) fits ——
     var oneNeed = front;
     if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
+    if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
     if (bag.desserts) oneNeed += sectionUnits(bag.desserts, false);
     if (bag.sides) oneNeed += sectionUnits(bag.sides, false);
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
     // If we have a natural back half (mains + sides), prefer two pages like Jul/Nov
     // when the front alone is already chunky, or one page would be cramped.
-    var preferTwo = hasBackContent && (bag.mains || bag.desserts) && (
+    var preferTwo = hasBackContent && (bag.mains || bag.littleBells || bag.desserts) && (
       front > 55 || oneNeed > PAGE - 4 || bag.count >= 18
     );
 
@@ -840,6 +855,7 @@
     var classRule = ruleFor('Pub Classics', plan);
     var burgRule = ruleFor('Burgers', plan);
     var mainRule = ruleFor('Mains', plan);
+    var littleRule = ruleFor('Little Bells', plan);
     var sandRule = ruleFor('Sandwiches', plan);
     var sideRule = ruleFor('Sides', plan);
     var dessRule = ruleFor('Desserts', plan);
@@ -908,7 +924,8 @@
       p1 += '<section class="sec">' + sectionBlock(bag.boost.name, bag.boost.dishes, boostRule) + '</section>';
     }
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) && !isItemBoost(s.name)) {
+      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
+          !isItemBoost(s.name) && !isLittleBells(s.name)) {
         var otherRule = ruleFor(s.name, plan);
         p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
       }
@@ -983,6 +1000,9 @@
 
     if (layout.pages === 1) {
       if (bag.mains) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+      if (bag.littleBells) {
+        p1 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
+      }
       if (bag.desserts) p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
       if (sidesPrint && !p1opts.sidesOnP1) {
         p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
@@ -1004,6 +1024,9 @@
     p2 += trackerBar(ver, { hideDate: hideDate });
     p2 += '<div class="page-body page-body-start">';
     if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+    if (bag.littleBells) {
+      p2 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
+    }
     if (bag.desserts) p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
 
     var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
@@ -1111,9 +1134,9 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:18mm 10mm 11mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:12mm 10mm 10mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
-      '.page-body-start{padding-top:4mm}' +
+      '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
       '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
@@ -1121,7 +1144,7 @@
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
       '.card-face:last-child{border-right:0}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 10px;font-weight:400;flex:0 0 auto}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
@@ -1162,20 +1185,23 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{grid-template-columns:1fr;justify-items:center}' +
       '.dish-c .dish-leader{display:none}' +
-      '.lc{width:22px;height:22px;vertical-align:middle;margin-left:8px;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
-      '.lunch-box .lc{width:28px;height:28px;margin-left:0;flex:0 0 auto}' +
+      '.lc{width:28px;height:28px;vertical-align:middle;margin-left:6px;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lunch-box .lc{width:36px;height:36px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:16px;height:16px;margin:0}' +
+      '.allergy-lc .lc{width:20px;height:20px;margin:0}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
-      '.cols-balanced{align-items:stretch}' +
-      '.cols-balanced .col-events,.cols-balanced .col-food{display:flex;flex-direction:column;min-height:100%}' +
+      /* Golden rule: both columns start on the same baseline */ +
+      '.cols-balanced{align-items:start}' +
+      '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
       '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%}' +
-      '.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:4px}' +
+      '.col-events > :first-child,.col-food > :first-child{margin-top:0}' +
+      '.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,.col-promo .sec-title{text-align:left;margin-top:10px}' +
       '.col-events .sec-title:first-child,.col-food .sec-title:first-child,.col-dishes .sec-title:first-child,.col-promo .sec-title:first-child{margin-top:0}' +
-      '.col-events .scallop,.col-food .scallop,.col-promo .scallop{max-width:100%;width:100%}' +
+      '.col-events .scallop,.col-food .scallop,.col-promo .scallop{max-width:100%;width:100%;margin-top:0}' +
+      '.col-events .scallop + .scallop,.col-food .scallop + .scallop{margin-top:10px}' +
       '.col-events .promo p,.col-promo .promo p,.col-promo .promo .desc{font-size:10.5pt;line-height:1.4;margin:0 0 6px;font-weight:400}' +
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
@@ -1371,9 +1397,12 @@
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
         'function overflows(page){return page.scrollHeight>page.clientHeight+2;}' +
-        // Golden rule: always fill the page — start roomiest, tighten only if overflowing.
+        // Fill the page without ballooning sparse pages (e.g. short Mains page).
+        // <6 dishes → start roomy; otherwise start airy. Then tighten only if overflow.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
-          'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+          'var n=page.querySelectorAll(".dish").length;' +
+          'var start=n<6?1:0;' +
+          'for(var j=start;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
           'if(!overflows(page))break;}});}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +

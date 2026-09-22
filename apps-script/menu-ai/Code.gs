@@ -72,8 +72,8 @@ function readMenuWithGemini_(body) {
     '  "subtitle": "",\n' +
     '  "coursePrices": "e.g. 2 courses £32.95 · 3 courses £39.95" or "",\n' +
     '  "dishes": [\n' +
-    '    { "section": "Starters"|"Mains"|"Desserts"|"Nibbles"|"Pub classics & Burgers"|"Sides"|"Sandwiches",\n' +
-    '      "name": "Dish name",\n' +
+    '    { "section": "Nibbles"|"Starters"|"Sharing Plates"|"Item Boost"|"Pub Classics"|"Burgers"|"Mains"|"Little Bells"|"Sandwiches"|"Sides"|"Sauces"|"Desserts",\n' +
+    '      "name": "Dish name only — never a section title",\n' +
     '      "description": "short description",\n' +
     '      "price": "12.95" or "",\n' +
     '      "tags": "gf / v / vg / gf option / av" lowercase as on menu }\n' +
@@ -85,6 +85,8 @@ function readMenuWithGemini_(body) {
     '}\n' +
     'Rules:\n' +
     '- Ignore logos, holly, decorative text, addresses, allergy keys unless in notes.\n' +
+    '- Section headings (STARTERS, MAINS, LITTLE BELLS, etc.) set the "section" field only — never invent a dish named after a heading.\n' +
+    '- Put every dish in the section it sits under on the page. Use Little Bells for kids dishes.\n' +
     '- Use kind "party" for set menus (Christmas / party / fixed 2&3 course).\n' +
     '- Do not invent dishes. Prefer fewer clean dishes over OCR junk.\n' +
     '- Normalise AV / GF AVAILABLE into tags like "gf option" or "gf" as appropriate.\n' +
@@ -165,9 +167,14 @@ function reviewLayoutWithGemini_(body) {
     '  "okToPrint": true|false,\n' +
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
-    'Goals: both pages look filled without huge blank regions; columns roughly balanced;\n' +
-    'allergy footer must remain; type must not go unreadably small (prefer tight over compact).\n' +
-    'Only invent sections that staff already listed. Prefer sandwichesOn page2 beside sides.\n' +
+    'GOLDEN RULES (do not invent sections staff did not list):\n' +
+    '1. Page 1 columns: LEFT = Stay a While / Gatherings / Sharing when used as a column; ' +
+    'RIGHT = Burgers then Pub Classics under them. Both columns share the same top baseline.\n' +
+    '2. Always fill the page, but do not airy-balloon a sparse page (e.g. short Mains on page 2) — ' +
+    'prefer roomy/normal over huge top gaps. Prefer tight over compact; never unreadably small.\n' +
+    '3. Allergy footer must remain. If any lunch-club ticks exist, keep the lunch-club key in the footer.\n' +
+    '4. Prefer sandwichesOn page2 beside sides/sauces. Drop the foot logo only if it forces overflow.\n' +
+    '5. Item Boost (e.g. Fish of the Day) stays where staff put it; Sharing may sit left to balance food.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
 
   var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||

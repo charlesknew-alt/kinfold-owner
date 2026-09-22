@@ -1,12 +1,13 @@
-/* Read a whole menu from PDF/image.
+/* Read a whole menu from PDF / image / Word (.docx).
    Prefer Gemini via Apps Script (AI credits) when an AI reader URL is set.
-   Otherwise fall back to PDF text / Tesseract OCR — always review before save. */
+   Otherwise fall back to PDF text / Tesseract OCR / mammoth — always review before save. */
 (function (root) {
   'use strict';
 
   var PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
   var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   var TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+  var MAMMOTH_URL = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
   var AI_URL_KEY = 'eb-menu-ai-url';
 
   function loadScript(src) {
@@ -45,6 +46,14 @@
     return loadScript(TESSERACT_URL).then(function () {
       if (!root.Tesseract) throw new Error('OCR library did not load');
       return root.Tesseract;
+    });
+  }
+
+  function ensureMammoth() {
+    if (root.mammoth) return Promise.resolve(root.mammoth);
+    return loadScript(MAMMOTH_URL).then(function () {
+      if (!root.mammoth) throw new Error('Word reader did not load');
+      return root.mammoth;
     });
   }
 
@@ -162,6 +171,18 @@
     });
   }
 
+  /** Word .docx → plain text via mammoth (legacy .doc must be re-saved as .docx). */
+  function readDocx(file, onProgress) {
+    return ensureMammoth().then(function (mammoth) {
+      if (onProgress) onProgress('Reading Word document…');
+      return file.arrayBuffer().then(function (buf) {
+        return mammoth.extractRawText({ arrayBuffer: buf });
+      }).then(function (result) {
+        return (result && result.value) || '';
+      });
+    });
+  }
+
   function readWithAi(file, onProgress) {
     var url = getAiUrl();
     if (!url) return Promise.reject(new Error('No AI reader URL'));
@@ -219,7 +240,7 @@
 
   /**
    * @returns {Promise<{
-   *   text, dishes, meta, kind, source: 'ai'|'pdf'|'ocr',
+   *   text, dishes, meta, kind, source: 'ai'|'pdf'|'ocr'|'docx',
    *   fileName, needsReview: true, warning?: string
    * }>}
    */
@@ -229,8 +250,14 @@
     var name = (file.name || '').toLowerCase();
     var isPdf = type === 'application/pdf' || /\.pdf$/.test(name);
     var isImage = /^image\//.test(type) || /\.(png|jpe?g|webp|gif|bmp|tiff?)$/.test(name);
-    if (!isPdf && !isImage) {
-      return Promise.reject(new Error('Use a PDF or an image (PNG, JPG, WebP).'));
+    var isDocx = type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      /\.docx$/.test(name);
+    var isLegacyDoc = type === 'application/msword' || (/\.doc$/.test(name) && !/\.docx$/.test(name));
+    if (isLegacyDoc) {
+      return Promise.reject(new Error('Save the Word file as .docx (File → Save As), then upload again.'));
+    }
+    if (!isPdf && !isImage && !isDocx) {
+      return Promise.reject(new Error('Use a PDF, Word (.docx), or image (PNG, JPG, WebP).'));
     }
 
     var aiUrl = getAiUrl();
@@ -263,21 +290,33 @@
       });
     }
 
-    var job = isPdf ? readPdf(file, onProgress) : readImageOcr(file, onProgress);
+    var job;
+    var source;
+    var warning;
+    if (isDocx) {
+      job = readDocx(file, onProgress);
+      source = 'docx';
+      warning = 'Word (.docx) text extract — check dishes before accepting.';
+    } else if (isPdf) {
+      job = readPdf(file, onProgress);
+      source = 'pdf';
+      warning = 'PDF text extract — check dishes before accepting (not AI).';
+    } else {
+      job = readImageOcr(file, onProgress);
+      source = 'ocr';
+      warning = 'OCR only — decorative Christmas art often misreads. Set an AI reader URL for proper extraction.';
+    }
     return job.then(function (raw) {
       var text = cleanExtractedText(raw);
       if (!text) throw new Error('No readable text found in that file.');
       var dishes = dishesFromText(text);
-      var warning = isPdf
-        ? 'PDF text extract — check dishes before accepting (not AI).'
-        : 'OCR only — decorative Christmas art often misreads. Set an AI reader URL for proper extraction.';
       return {
         text: text,
         dishes: dishes,
         meta: root.EBMenus ? root.EBMenus.emptyMeta() : {},
         kind: '',
         spellingFixes: [],
-        source: isPdf ? 'pdf' : 'ocr',
+        source: source,
         fileName: file.name || '',
         needsReview: true,
         warning: warning
