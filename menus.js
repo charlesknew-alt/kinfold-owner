@@ -240,9 +240,9 @@
     return list;
   }
 
-  /** Meta for set menus (Christmas / party) — title + course prices. */
+  /** Meta for set menus (Christmas / party) — title + course prices + paper. */
   function emptyMeta() {
-    return { title: '', subtitle: '', coursePrices: '', notes: '' };
+    return { title: '', subtitle: '', coursePrices: '', notes: '', paper: 'a4' };
   }
 
   function dish(section, name, description, price, tags, lunchClub) {
@@ -591,29 +591,33 @@
       if (count > menu.comfortable) {
         return {
           fit: 'over',
-          text: 'This card holds about ' + menu.comfortable + ' dishes. There are ' + count + '. Take something off before it is printed. The type stays the same size.'
+          text: 'This card holds about ' + menu.comfortable + ' dishes. There are ' + count +
+            '. Take something off — type stays readable (never shrinks to fit). Prints as two A5 copies on one landscape A4 for the guillotine.'
         };
       }
       return {
         fit: 'two-up',
-        text: 'Two identical copies on one A4, cut down the middle.'
+        text: 'Two identical A5 copies on one landscape A4 — cut down the middle.'
       };
     }
     if (menu.kind === 'party') {
       if (count > 18) {
-        return { fit: 'over', text: 'Party menus stay on one centred A4. Take a few dishes off.' };
+        return {
+          fit: 'over',
+          text: 'Too much for one readable party sheet. Remove some dishes, or move desserts / extras onto a separate menu.'
+        };
       }
       return {
         fit: 'one',
-        text: 'Standardised party sheet — centred title, starters / mains / desserts, one A4 (website Christmas style).'
+        text: 'Party / occasion sheet — centred courses. Choose full A4 or 2×A5 (guillotine) in Party sheet details.'
       };
     }
     // Long menus: coarse gate — fluid layout (with fillers) runs at Generate.
-    if (count <= 16) return { fit: 'one', text: 'Looks like one A4. Generate places columns and any selling boxes that fit.' };
-    if (count <= 36) return { fit: 'two', text: 'Looks like two A4 pages. Generate keeps type the same size and only adds rooms/sandwiches/logo if they fit.' };
+    if (count <= 16) return { fit: 'one', text: 'Looks like one full A4. Generate fills top to bottom; columns start and finish level.' };
+    if (count <= 36) return { fit: 'two', text: 'Looks like two full A4 pages. Generate fills each page; never opens a third.' };
     return {
       fit: 'over',
-      text: 'Too full for two pages. Take dishes off. A promo does not open another page.'
+      text: 'Too much information for two readable A4 pages. Remove some sections or put Desserts / Little Bells / Sandwiches on their own menus, then try again.'
     };
   }
 

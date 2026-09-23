@@ -168,17 +168,24 @@ function reviewLayoutWithGemini_(body) {
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
     'GOLDEN RULES (do not invent sections staff did not list):\n' +
-    '1. Page 1 columns: LEFT = Stay a While / events / Sharing when used as a column; ' +
-    'RIGHT = Burgers then Pub Classics under them. Both columns MUST start on the same top baseline ' +
-    'AND finish at approximately the same point — never leave one column hanging long with empty space on the other.\n' +
-    '2. If there are several event / feature panels, prefer TWO (or more) separate boxes split across the columns ' +
+    '1. COLUMNS: when there are two columns, both MUST start on the same top baseline AND finish at ' +
+    'approximately the same point — never leave one column hanging long with empty space on the other.\n' +
+    '2. PAGE COUNT: only ever ONE full page, or TWO full pages if needed. Never a third page. ' +
+    'If content fits on one page, use one page. Always fill each used page top to bottom — ' +
+    'if a page looks sparse, open spacing between categories (airy/roomy) rather than leaving a big empty footer.\n' +
+    '3. READABILITY: never shrink type below a comfortable customer-readable size. Prefer tight over compact. ' +
+    'If it still will not fit on two readable pages, set okToPrint false and say so in notes — ' +
+    'staff should remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.\n' +
+    '4. EVENT / FEATURE PANELS: if there are several, prefer TWO (or more) separate boxes split across the columns ' +
     'rather than one tall box crammed with everything.\n' +
-    '3. Always fill the page, but do not airy-balloon a sparse page (e.g. short Mains on page 2) — ' +
-    'prefer roomy/normal over huge top gaps. Prefer tight over compact; never unreadably small.\n' +
-    '4. Allergy footer (gf / v / vg key) must remain fully visible — never cropped. ' +
-    'If any lunch-club ticks exist, keep the Bells Lunch Club knife-and-fork key in the footer.\n' +
-    '5. Prefer sandwichesOn page2 beside sides/sauces. Drop the foot logo only if it forces overflow.\n' +
-    '6. Item Boost (e.g. Fish of the Day) stays where staff put it; Sharing may sit left to balance food.\n' +
+    '5. PAGE 1 FOOD COLUMNS: LEFT = Stay a While / events / Sharing when used as a column; ' +
+    'RIGHT = Burgers then Pub Classics under them.\n' +
+    '6. Allergy footer (gf / v / vg) must remain fully visible. If any lunch-club ticks exist, keep the ' +
+    'Bells Lunch Club knife-and-fork key in the footer.\n' +
+    '7. Prefer sandwichesOn page2 beside sides/sauces on long menus. Drop the foot logo only if it forces overflow.\n' +
+    '8. Item Boost (e.g. Fish of the Day / specials) stays where staff put it on the long sheet. ' +
+    'Sandwiches, Desserts and Little Bells as their own menus print as two A5 copies on one landscape A4 (guillotine).\n' +
+    '9. Party / occasion menus: staff choose full A4 or 2×A5 — respect that paper choice; do not invent a third format.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
 
   var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||

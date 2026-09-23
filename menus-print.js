@@ -795,10 +795,10 @@
       ? ' Auto-adds where they fit: ' + layout.fillers.join('; ') + '.'
       : ' Sheet is full — no room for extra selling boxes.';
     layout.summary =
-      (layout.fit === 'one' ? 'Fills one A4 (or 2×A5 for guillotine).' :
-        layout.fit === 'two' ? 'Fills two A4 pages (each page can also print as 2×A5).' :
-          'Too full for two pages. Take dishes off. A promo never opens another page.') +
-      ' Layout picks columns and dish order from ' + bag.count + ' dishes.' + bits;
+      (layout.fit === 'one' ? 'Fills one A4 top to bottom (spread gaps if sparse).' :
+        layout.fit === 'two' ? 'Fills two A4 pages top to bottom — never a third page.' :
+          'Too much for two readable pages. Remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.') +
+      ' Columns start and finish level. Layout from ' + bag.count + ' dishes.' + bits;
 
     layout.orderedDishes = dishes;
     return layout;
@@ -1423,6 +1423,12 @@
     if (menu.id === 'party' || menu.kind === 'party') ver.hideDate = true;
     var landscape = menu.kind === 'card';
     var guillotine = !!plan.guillotine && !landscape;
+    var meta = plan.meta || {};
+    var defaultPaper = 'a4';
+    if (landscape) defaultPaper = 'a4'; // card sheets are landscape two-up already
+    else if (menu.kind === 'party' && meta.paper === 'a5') defaultPaper = 'a5';
+    else if (plan.defaultPaper === 'a5') defaultPaper = 'a5';
+    var bodyClass = 'paper-' + defaultPaper;
     var layout = null;
     if (menu.kind === 'long') {
       layout = planFluidLayout(menu, dishes, {
@@ -1462,17 +1468,21 @@
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
-      '<style>' + css({ landscape: landscape, guillotine: guillotine }) + partyCss() +
+      '<style>' + css({ landscape: landscape, guillotine: guillotine || defaultPaper === 'a5' }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
-      '</style></head><body class="paper-a4">' +
+      '</style></head><body class="' + bodyClass + '">' +
       '<div class="toolbar">' +
         '<button type="button" onclick="window.print()">Print / save as PDF</button>' +
-        (landscape ? '' :
-          '<label class="paper-opt"><input type="radio" name="paper" value="a4" checked onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
-          '<label class="paper-opt"><input type="radio" name="paper" value="a5" onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
+        (landscape ? '<span class="hint">Card menu — two identical copies on landscape A4 for the guillotine.</span>' :
+          '<label class="paper-opt"><input type="radio" name="paper" value="a4"' +
+            (defaultPaper === 'a4' ? ' checked' : '') +
+            ' onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
+          '<label class="paper-opt"><input type="radio" name="paper" value="a5"' +
+            (defaultPaper === 'a5' ? ' checked' : '') +
+            ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint">' + esc(dateHint) +
-        ' — pages always fill (type opens out, then shrinks only if needed); allergy line kept clear.' +
+        ' — fill top to bottom; readable type only; allergy line kept clear.' +
         esc(fillerHint) + '</span>' +
       '</div>' +
       a4Stack + a5Stack +
@@ -1480,12 +1490,10 @@
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
         'function overflows(page){return page.scrollHeight>page.clientHeight+2;}' +
-        // Fill the page without ballooning sparse pages (e.g. short Mains page).
-        // <6 dishes → start roomy; otherwise start airy. Then tighten only if overflow.
+        // Always start airy so sparse pages fill top→bottom (more gaps), then tighten only if overflow.
+        // Never invent a third page — compact is the floor for readable type.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
-          'var n=page.querySelectorAll(".dish").length;' +
-          'var start=n<6?1:0;' +
-          'for(var j=start;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+          'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
           'if(!overflows(page))break;}});}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +

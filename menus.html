@@ -201,9 +201,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260923-flow23"></script>
-  <script src="menus-print.js?v=20260923-flow23"></script>
-  <script src="menus-ingest.js?v=20260923-flow23"></script>
+  <script src="menus.js?v=20260923-flow24"></script>
+  <script src="menus-print.js?v=20260923-flow24"></script>
+  <script src="menus-ingest.js?v=20260923-flow24"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -653,10 +653,17 @@
       html += '</div>';
       if (menu.kind === 'party') {
         var m = metaBook[menuId] || EBMenus.emptyMeta();
+        var paper = m.paper === 'a5' ? 'a5' : 'a4';
         html += '<div class="include-box" style="margin-top:14px;background:#fff"><h3>Party sheet details</h3>';
         html += field('Title', 'metaTitle', m.title || 'Christmas Party Menu');
         html += field('Course prices', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
         html += field('Notes (pre-order / deposit)', 'metaNotes', m.notes || '');
+        html += '<label class="field" style="margin-top:12px">Paper size</label>';
+        html += '<div class="opt-row">';
+        html += '<label><input type="radio" name="partyPaper" value="a4"' + (paper === 'a4' ? ' checked' : '') + '> Full A4</label>';
+        html += '<label><input type="radio" name="partyPaper" value="a5"' + (paper === 'a5' ? ' checked' : '') + '> 2×A5 on A4 (guillotine)</label>';
+        html += '</div>';
+        html += '<p class="note" style="margin-top:6px">Pick this when you set up the occasion menu — Generate opens with that size selected.</p>';
         html += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party details</button></div>';
       }
       html += '</div>';
@@ -1070,11 +1077,13 @@
       };
       var doSaveMeta = document.getElementById('doSaveMeta');
       if (doSaveMeta) doSaveMeta.onclick = function () {
+        var paperEl = document.querySelector('input[name="partyPaper"]:checked');
         metaBook[menuId] = {
           title: (document.getElementById('metaTitle') || {}).value || '',
           subtitle: '',
           coursePrices: (document.getElementById('metaPrices') || {}).value || '',
-          notes: (document.getElementById('metaNotes') || {}).value || ''
+          notes: (document.getElementById('metaNotes') || {}).value || '',
+          paper: (paperEl && paperEl.value === 'a5') ? 'a5' : 'a4'
         };
         save();
         renderPreview();
@@ -1460,9 +1469,10 @@
       var menu = EBMenus.menuById(menuId);
       var html = '<div class="plan ' + plan.fit + '"><strong>' + planTitle(plan.fit) + '</strong>' + plan.text + '</div>';
       if (plan.fit === 'over') {
-        html += '<p class="note">Untick an included menu, or remove dishes, before you generate.</p>';
+        html += '<p class="note" style="border:2px solid #8a3d28;border-radius:10px;padding:10px 12px;background:#fff5f2;color:#5a2a2a">' +
+          '<strong>Warning — too much for two readable pages.</strong> Remove some sections, or put Desserts / Little Bells / Sandwiches on their own menus, then generate again. Type will not shrink below a readable size.</p>';
       } else {
-        html += '<p class="note">Generate fills the page (A4, or 2×A5 on one A4 for guillotine). Selling boxes stay inside their frames and only appear when there’s room.</p>';
+        html += '<p class="note">Generate fills each page top to bottom (one page if it fits, otherwise two). Card menus (Sandwiches, Desserts, Little Bells) print as two A5 copies on landscape A4.</p>';
       }
       if (plan.layout && plan.layout.fillers && plan.layout.fillers.length) {
         html += '<p class="note"><strong>Will auto-add:</strong> ' + plan.layout.fillers.map(function (f) { return escapeAttr(f); }).join(' · ') + '</p>';
@@ -1514,7 +1524,7 @@
     function generateMenu() {
       var result = composed();
       if (result.plan.fit === 'over') {
-        alert('This sheet is too full. Untick an included menu or remove dishes, then try again.');
+        alert('Too much information for two readable pages.\n\nRemove some sections, or put Desserts / Little Bells / Sandwiches on their own menus, then try again.\n\nWe will not shrink the type below a size customers can read.');
         return;
       }
       var menu = EBMenus.menuById(menuId);
@@ -1536,7 +1546,15 @@
         result.plan.text = layout.summary;
         result.plan.promos = promos;
         result.plan.sectionLayout = sectionLayout;
+        if (layout.fit === 'over') {
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+          if (hint) hint.disabled = false;
+          alert('Too much information for two readable pages.\n\nRemove some sections, or put Desserts / Little Bells / Sandwiches on their own menus, then try again.\n\nWe will not shrink the type below a size customers can read.');
+          return;
+        }
       }
+      result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
+      if (result.plan.meta.paper === 'a5') result.plan.defaultPaper = 'a5';
 
       var overlay = document.createElement('div');
       overlay.id = 'arrangeOverlay';
@@ -1616,6 +1634,7 @@
           result.plan.meta.title = 'Christmas Party Menu';
           result.plan.meta.coursePrices = result.plan.meta.coursePrices || '2 courses £32.95 · 3 courses £39.95';
         }
+        if (result.plan.meta.paper === 'a5') result.plan.defaultPaper = 'a5';
         w.document.open();
         w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
         w.document.close();

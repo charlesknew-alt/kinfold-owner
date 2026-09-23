@@ -102,8 +102,18 @@ assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can ex
 assert(printJs.indexOf('flex-shrink:0') !== -1 || printJs.indexOf('allergy stays pinned') !== -1 ||
   /page-body\{flex:1 1 auto/.test(printJs), 'page body yields space so allergy footer is not cropped');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
-assert(printJs.indexOf('n<6') !== -1 || printJs.indexOf('start=n<6') !== -1 ||
-  /var start=n<6/.test(printJs), 'sparse pages start roomy instead of airy-balloon');
+assert(printJs.indexOf('Always start airy') !== -1 || /for\(var j=0;j<STEPS\.length/.test(printJs),
+  'fit always starts airy so sparse pages fill top to bottom');
+assert(page.indexOf('partyPaper') !== -1 && page.indexOf('2×A5 on A4') !== -1,
+  'party sheet can choose full A4 or 2×A5 guillotine');
+assert(page.indexOf('Too much information for two readable pages') !== -1,
+  'generate warns when sheet is over capacity');
+assert(api.emptyMeta().paper === 'a4', 'party meta defaults to full A4 paper');
+assert(api.sheetPlan('desserts', 3).fit === 'two-up', 'desserts card is two-up A5');
+assert(api.sheetPlan('sandwiches', 4).fit === 'two-up', 'sandwiches card is two-up A5');
+assert(api.sheetPlan('little-bells', 4).fit === 'two-up', 'Little Bells card is two-up A5');
+assert(/Too much information for two readable/.test(api.sheetPlan('main', 40).text),
+  'main menu over capacity message steers staff to separate menus');
 assert(printJs.indexOf('fonts.googleapis.com/css2?family=Cinzel') !== -1, 'print loads Cinzel/Roboto/Crimson via stylesheet link');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
 assert(printJs.indexOf('document.fonts.ready') !== -1, 'print waits for webfonts before PDF');
@@ -194,10 +204,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow23') !== -1, 'menus page cache-bust is flow23');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow23') !== -1, 'hub menus link cache-bust is flow23');
-assert(aiGs.indexOf('finish at approximately the same point') !== -1,
+assert(page.indexOf('flow24') !== -1, 'menus page cache-bust is flow24');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow24') !== -1, 'hub menus link cache-bust is flow24');
+assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
+assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
+  'Gemini golden rules cap at two pages');
+assert(aiGs.indexOf('two A5 copies') !== -1, 'Gemini knows card menus are 2×A5');
+assert(aiGs.indexOf('full A4 or 2×A5') !== -1, 'Gemini respects party paper choice');
 assert(aiGs.indexOf('separate boxes') !== -1,
   'Gemini prefers multiple event boxes over one tall panel');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
