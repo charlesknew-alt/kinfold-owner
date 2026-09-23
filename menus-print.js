@@ -695,11 +695,13 @@
       layout.fit = 'one';
       layout.mode = 'single';
       var left1 = PAGE - oneNeed;
-      // Pack Stay a While / events into leftover — never push over PAGE
+      // Pack Stay a While / events into leftover — leave a safety margin so
+      // browser density steps are not forced into clipping on page 1.
       var add;
+      var safety = 6;
       if (wantPromoBox) {
-        add = tryAdd(left1, promoCost);
-        if (add.ok) { layout.p1.rooms = true; left1 = add.left; layout.fillers.push(promoLabel); }
+        add = tryAdd(left1, promoCost + safety);
+        if (add.ok) { layout.p1.rooms = true; left1 = add.left + safety; layout.fillers.push(promoLabel); }
       }
       if (wantSandwichNote) {
         add = tryAdd(left1, COST.sandwiches + (bag.sides ? 0 : 0));
@@ -725,12 +727,15 @@
 
       var p1used = front;
       var p1left = PAGE - p1used;
-      // Events / feature panels on the left; Burgers + Pub Classics stack on the right
+      // Events / feature panels on the left; Burgers + Pub Classics stack on the right.
+      // Keep a generous safety margin — unit estimates run optimistic vs real type,
+      // and a clipped page-1 column is worse than moving events to page 2 / omitting.
+      var p1Safety = 14;
       if (wantPromoBox) {
-        var addR = tryAdd(p1left, promoCost);
+        var addR = tryAdd(p1left, promoCost + p1Safety);
         if (addR.ok) {
           layout.p1.rooms = true;
-          p1left = addR.left;
+          p1left = addR.left + p1Safety;
           layout.fillers.push(promoLabel + ' (page 1)');
         }
       }
@@ -910,9 +915,11 @@
     p1 += trackerBar(ver, { hideDate: hideDate });
     p1 += '<div class="page-body">';
 
-    // Top band: frilly Nibbles and/or Starters beside the logo (Canva-style).
-    var startersInTop = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full');
+    // Top band: frilly Nibbles beside the logo (Canva-style). Starters only share
+    // that column when Nibbles is absent — stacking both beside a short logo
+    // wastes the right gutter and routinely overflows page 1.
     var nibblesInTop = !!(bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full');
+    var startersInTop = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full' && !nibblesInTop);
     if (nibblesInTop || startersInTop) {
       p1 += '<div class="top-band">';
       p1 += '<div class="top-left">';
@@ -1211,7 +1218,7 @@
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
-      '.page{width:210mm;height:297mm;padding:12mm 10mm 10mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
+      '.page{width:210mm;height:297mm;padding:11mm 10mm 9mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
@@ -1313,9 +1320,15 @@
       /* Density ladder — ALWAYS start airy and only tighten if the page overflows */
       '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12pt;--desc:10.5pt;--title:28pt;--promo:12.5pt}' +
       '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:26pt;--promo:12pt}' +
-      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:24pt;--promo:11.5pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:20pt;--promo:10.5pt}' +
-      '.fill-compact{--dish-gap:6px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:18pt;--promo:10pt}' +
+      '.fill-normal{--dish-gap:10px;--sec-gap:13px;--name:11pt;--desc:9.75pt;--title:22pt;--promo:11pt}' +
+      '.fill-tight{--dish-gap:7px;--sec-gap:10px;--name:10.25pt;--desc:9.25pt;--title:18pt;--promo:10pt}' +
+      '.fill-compact{--dish-gap:5px;--sec-gap:8px;--name:9.75pt;--desc:8.75pt;--title:16pt;--promo:9.5pt}' +
+      '.fill-dense{--dish-gap:3px;--sec-gap:5px;--name:9pt;--desc:8pt;--title:13.5pt;--promo:8.75pt}' +
+      '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
+      '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
+      '.fill-dense .scallop-pad{padding:2px 8px 1px}' +
+      '.fill-dense .sec-title,.fill-compact .sec-title{letter-spacing:.08em}' +
+      '.fill-dense .allergy{margin-top:2mm;padding-top:1mm;font-size:9pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
@@ -1488,7 +1501,7 @@
       '</div>' +
       a4Stack + a5Stack +
       '<script>(function(){' +
-        'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
+        'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact","fill-dense"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
         // page-body clips with overflow:hidden, so page.scrollHeight alone never sees overflow —
         // measure the body (and allergy sibling) so density steps actually fire.
@@ -1499,7 +1512,7 @@
           'return false;' +
         '}' +
         // Always start airy so sparse pages fill top→bottom (more gaps), then tighten only if overflow.
-        // Never invent a third page — compact is the floor for readable type.
+        // Never invent a third page — dense is the floor for readable type.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
           'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
           'if(!overflows(page))break;}});}' +

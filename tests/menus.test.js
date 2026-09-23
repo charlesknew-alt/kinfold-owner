@@ -106,6 +106,9 @@ assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can ex
 assert(printJs.indexOf('flex-shrink:0') !== -1 || printJs.indexOf('allergy stays pinned') !== -1 ||
   /page-body\{flex:1 1 auto/.test(printJs), 'page body yields space so allergy footer is not cropped');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
+assert(printJs.indexOf('fill-dense') !== -1, 'density ladder includes fill-dense floor');
+assert(printJs.indexOf('!nibblesInTop') !== -1,
+  'starters only share the logo column when nibbles are not already there');
 assert(printJs.indexOf('Always start airy') !== -1 || /for\(var j=0;j<STEPS\.length/.test(printJs),
   'fit always starts airy so sparse pages fill top to bottom');
 assert(page.indexOf('partyPaper') !== -1 && page.indexOf('2×A5 on A4') !== -1,
@@ -121,7 +124,7 @@ assert(/Too much information for two readable/.test(api.sheetPlan('main', 40).te
 assert(printJs.indexOf('fonts.googleapis.com/css2?family=Cinzel') !== -1, 'print loads Cinzel/Roboto/Crimson via stylesheet link');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
 assert(printJs.indexOf('document.fonts.ready') !== -1, 'print waits for webfonts before PDF');
-assert(/padding:12mm/.test(printJs), 'pages keep a sensible top margin without dumping content');
+assert(/padding:1[12]mm/.test(printJs), 'pages keep a sensible top margin without dumping content');
 assert(printJs.indexOf('data:image/png;base64,') !== -1 && printJs.indexOf('LUNCH_MARK_DATA') !== -1,
   'lunch club uses embedded branded mark (works in about:blank print)');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
