@@ -194,8 +194,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow22') !== -1, 'menus page cache-bust is flow22');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow22') !== -1, 'hub menus link cache-bust is flow22');
+assert(page.indexOf('flow23') !== -1, 'menus page cache-bust is flow23');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow23') !== -1, 'hub menus link cache-bust is flow23');
 assert(aiGs.indexOf('finish at approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('separate boxes') !== -1,
