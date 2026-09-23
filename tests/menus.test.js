@@ -211,8 +211,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow25') !== -1, 'menus page cache-bust is flow25');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow25') !== -1, 'hub menus link cache-bust is flow25');
+assert(page.indexOf('flow26') !== -1, 'menus page cache-bust is flow26');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow26') !== -1, 'hub menus link cache-bust is flow26');
 assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
@@ -222,7 +222,12 @@ assert(aiGs.indexOf('full A4 or 2×A5') !== -1, 'Gemini respects party paper cho
 assert(aiGs.indexOf('separate boxes') !== -1,
   'Gemini prefers multiple event boxes over one tall panel');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
-assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
+assert(printJs.indexOf('cols-balanced') !== -1 && printJs.indexOf('col-feature') !== -1,
+  'paired columns pin feature panels in col-feature');
+assert(printJs.indexOf('balanceFeatures') !== -1,
+  'print equalises paired feature panel heights after fit');
+assert(printJs.indexOf('cols-features') !== -1,
+  'feature column layout marked cols-features');
 assert(api.tidyOrphanDescriptions([
   { section: 'Pub Classics', name: 'Fish & Chips', description: 'served with chips, garden peas', price: '17.95', tags: '' },
   { section: 'Pub Classics', name: 'and tartare sauce.', description: '', price: '', tags: '' }

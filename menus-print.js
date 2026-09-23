@@ -1023,33 +1023,39 @@
 
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
-      p1 += '<div class="cols cols-classics cols-balanced">';
+      p1 += '<div class="cols cols-classics cols-balanced cols-features">';
       var promoCols = p1opts.rooms ? splitPromosForColumns(promos) : { left: '', right: '' };
-      // LEFT — Sharing + event box(es); columns start level and finish level
+      var leftFeature = p1opts.rooms ? (promoCols.left || renderFiller('rooms', bag, promos)) : '';
+      var rightFeature = '';
+      if (p1opts.rooms && promoCols.right) rightFeature = promoCols.right;
+      // LEFT — dishes in col-body; feature box(es) pinned to column foot so both
+      // columns finish level (gap sits above the panels, not below).
       p1 += '<div class="col col-events">';
+      p1 += '<div class="col-body">';
       if (shareInLeft) {
         p1 += framedBlock(
           sectionTitle(bag.sharing.name) + listDishes(shareDishes),
           shareRule
         );
       }
-      if (p1opts.rooms) p1 += promoCols.left || renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches && sandwichesAsColumn && !burgerDishes.length && !classicDishes.length) {
         p1 += renderFiller('sandwiches', bag);
       }
-      if (!shareInLeft && !p1opts.rooms && !(p1opts.sandwiches && sandwichesAsColumn)) {
+      if (!shareInLeft && !leftFeature && !(p1opts.sandwiches && sandwichesAsColumn)) {
         p1 += '&nbsp;';
       }
       p1 += '</div>';
-      // RIGHT — Burgers, Pub Classics, then remaining event box(es) to match left height
+      if (leftFeature) p1 += '<div class="col-feature">' + leftFeature + '</div>';
+      p1 += '</div>';
+      // RIGHT — Burgers / Classics in col-body; matching feature panel at the foot
       p1 += '<div class="col col-food">';
+      p1 += '<div class="col-body">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
       }
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
-      if (p1opts.rooms && promoCols.right) p1 += '<div class="col-fill">' + promoCols.right + '</div>';
       if (p1opts.sandwiches && sandwichesAsColumn && (burgerDishes.length || classicDishes.length)) {
         if (sandRule.frame) p1 += renderFiller('sandwiches', bag);
         else {
@@ -1063,7 +1069,9 @@
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
-      if (!burgerDishes.length && !classicDishes.length && !promoCols.right) p1 += '&nbsp;';
+      if (!burgerDishes.length && !classicDishes.length && !rightFeature) p1 += '&nbsp;';
+      p1 += '</div>';
+      if (rightFeature) p1 += '<div class="col-feature">' + rightFeature + '</div>';
       p1 += '</div></div></section>';
     } else if (classicDishes.length || burgerDishes.length) {
       if (burgerDishes.length) {
@@ -1075,12 +1083,12 @@
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
     } else if (p1opts.rooms || p1opts.sandwiches) {
-      p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced">';
-      p1 += '<div class="col col-events">';
-      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
-      p1 += '</div><div class="col col-food">';
-      if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
-      else p1 += '&nbsp;';
+      // Pair of selling boxes alone — pin both to the column foot so they line up
+      p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced cols-features">';
+      p1 += '<div class="col col-events"><div class="col-body">&nbsp;</div>';
+      if (p1opts.rooms) p1 += '<div class="col-feature">' + renderFiller('rooms', bag, promos) + '</div>';
+      p1 += '</div><div class="col col-food"><div class="col-body">&nbsp;</div>';
+      if (p1opts.sandwiches) p1 += '<div class="col-feature">' + renderFiller('sandwiches', bag) + '</div>';
       p1 += '</div></div></section>';
     }
 
@@ -1281,10 +1289,15 @@
       '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
-      /* Columns start level; stretch containers so both sides share one height band */
+      /* Columns start level; stretch so both sides share one height band.
+         Feature panels sit in .col-feature with margin-top:auto so they finish
+         on the same baseline; a short JS pass equalises their heights so tops
+         line up sideways too (gap lives above the panels). */
       '.cols-balanced{align-items:stretch}' +
       '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}' +
-      '.cols-balanced .col-fill{margin-top:auto}' +
+      '.cols-balanced .col-body{flex:0 0 auto;min-width:0}' +
+      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end}' +
+      '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:1 1 auto}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
       '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%;overflow:hidden}' +
@@ -1511,11 +1524,21 @@
           'if(body&&body.scrollHeight>body.clientHeight+2)return true;' +
           'return false;' +
         '}' +
+        // Pin paired feature panels to the same height so tops and bottoms line up
+        // across columns (slack gap sits above the panels in the shorter dish stack).
+        'function balanceFeatures(){' +
+          'document.querySelectorAll(".cols-balanced.cols-features,.cols-balanced").forEach(function(cols){' +
+            'var feats=[].slice.call(cols.querySelectorAll(":scope > .col > .col-feature, :scope > .col > .col-fill"));' +
+            'if(feats.length<2)return;' +
+            'feats.forEach(function(f){f.style.minHeight="";});' +
+            'var max=0;feats.forEach(function(f){max=Math.max(max,f.offsetHeight);});' +
+            'if(max>0)feats.forEach(function(f){f.style.minHeight=max+"px";});' +
+          '});}' +
         // Always start airy so sparse pages fill top→bottom (more gaps), then tighten only if overflow.
         // Never invent a third page — dense is the floor for readable type.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
           'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
-          'if(!overflows(page))break;}});}' +
+          'if(!overflows(page))break;}});balanceFeatures();}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
         'if(old)old.remove();s.textContent=a5?"@media print{@page{size:A4 landscape;margin:0}}":"@media print{@page{size:A4 portrait;margin:0}}";' +
