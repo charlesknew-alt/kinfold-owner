@@ -91,10 +91,16 @@ assert(sampleCss.indexOf('NaN') === -1, 'generated print CSS has no NaN from bro
 assert(sampleCss.indexOf('.dish-line{display:flex') !== -1, 'generated print CSS keeps dish-line flex leaders');
 assert(sampleCss.indexOf('.sec-title{') !== -1, 'generated print CSS keeps sec-title rule');
 assert(printJs.indexOf('hideTitle') !== -1, 'Item Boost can print without the bucket title');
-assert(printJs.indexOf('just before the price') !== -1 || printJs.indexOf('sits just before the price') !== -1,
+assert(printJs.indexOf('just before the price') !== -1 || printJs.indexOf('sits just before the price') !== -1 ||
+  printJs.indexOf('Match dish price size') !== -1,
   'lunch club mark sits just before the price');
-assert(/\.lc\{width:16px/.test(printJs) || printJs.indexOf('width="16"') !== -1,
-  'lunch club mark is compact on dish lines');
+assert(/\.lc\{width:1em/.test(printJs) || printJs.indexOf('font-size:var(--name)') !== -1,
+  'lunch club mark matches price size on dish lines');
+assert(printJs.indexOf('splitPromosForColumns') !== -1, 'event panels can split across columns');
+assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as separate boxes');
+assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
+assert(printJs.indexOf('flex-shrink:0') !== -1 || printJs.indexOf('allergy stays pinned') !== -1 ||
+  /page-body\{flex:1 1 auto/.test(printJs), 'page body yields space so allergy footer is not cropped');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('n<6') !== -1 || printJs.indexOf('start=n<6') !== -1 ||
   /var start=n<6/.test(printJs), 'sparse pages start roomy instead of airy-balloon');
@@ -188,8 +194,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow20') !== -1, 'menus page cache-bust is flow20');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow20') !== -1, 'hub menus link cache-bust is flow20');
+assert(page.indexOf('flow21') !== -1, 'menus page cache-bust is flow21');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow21') !== -1, 'hub menus link cache-bust is flow21');
+assert(aiGs.indexOf('finish at approximately the same point') !== -1,
+  'Gemini golden rules require columns to finish level');
+assert(aiGs.indexOf('separate boxes') !== -1,
+  'Gemini prefers multiple event boxes over one tall panel');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([

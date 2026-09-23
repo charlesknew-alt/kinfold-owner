@@ -127,9 +127,9 @@
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAACpklEQVR42u3d0XHiMBCAYWDSUipJQUwKohKKSl4zDEmEZUur3e97vuOY+D9pZczkdAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAbD4+37/8FGK4VI1PhDGcq696t+v9LAMr4OFWDy3rip06wMeL9izCFS5s5rHhkj2+losW+cL+fG8Zx4VLxvAeg2q5iBEjrHBQShdgyyqxwkrSMj4IcKEIV5oHK90iShFg6wVbYR589u9nvlV0yRJf65YVeR6sFt/SAf532OidB0dHWPWTmWUDbF0Zts6DEeKr8CnN0ltwz0EiyqGk+keEKU/BW+bBGVujByISBNgaV7RDyV+vWekBiRQrYM88WPniC3DCPBjhJrXVL/kMuMeh5KitWHyJA4w+Dzp0FFgBeyPc6/T86t+pOnuWeRhh69y4RxjiKzgDRrlJbdstfgjZYx7cGlfLa1S/7ZM6wJmHEiufALvnwVf/zKtfHnLTu/j3grfevN5jdRNf0RnQQUKAaedBq58AD41wjxVRfMW34N6b1LZjAR4S4YiwrH4CfOmwIRgBTp8HrX4CnLYljnoItTL/KwfHYSW0AoY/gQtQGOITYJ4tWHwC3CUQIQlwWoS36/28ZaUU7d/e/AjaAhKfFXD4KtgTHwLsinCP+IQrwMNPrSM/TRFgMa3f5zXrCXBafLZiAQ6Pz1YswKnx/RabCAU4/YAiQgGGmPtEKMBpUTgVC3DY3GcrFmC4+EQowOnxmQcFGGKWa3mNyhGWDdAXkQRYaus1DwowzNwnwqIBzo7PPFg4wCgrnwjNgClO1wK0+pkHBbhufLbiIgH2Pj5V9b2NUmoWaf1VDbPfl9+YXmQ1jHihHVAcSrwnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOA/3+UCIOGQl831AAAAAElFTkSuQmCC';
 
   function lunchMark() {
-    // Compact mark — sits just before the price on dish lines
+    // Match dish price size (1em of --name); sits just before the price
     return (
-      '<img class="lc" src="' + LUNCH_MARK_DATA + '" alt="" width="16" height="16">'
+      '<img class="lc" src="' + LUNCH_MARK_DATA + '" alt="" width="22" height="22">'
     );
   }
 
@@ -238,12 +238,12 @@
     return String(dateStr || '');
   }
 
-  function renderPromoBank(promos) {
-    promos = promos || [];
+  /** One scalloped event/selling box. */
+  function renderOnePromoBox(promos) {
+    promos = (promos || []).filter(function (p) { return p && p.title; });
     if (!promos.length) return '';
     var inner = '<div class="promo">';
     promos.forEach(function (p) {
-      if (!p || !p.title) return;
       inner += '<div class="promo-title">' + esc(p.title);
       if (p.date) inner += ' <span class="promo-date">' + esc(formatBankDate(p.date)) + '</span>';
       inner += '</div>';
@@ -251,6 +251,46 @@
     });
     inner += '</div>';
     return scallop(inner, 'box');
+  }
+
+  /**
+   * Event panels: never cram a long bank into one tall box.
+   * 1–2 items → one box; 3+ → multiple boxes of up to 2.
+   */
+  function renderPromoBank(promos) {
+    promos = (promos || []).filter(function (p) { return p && p.title; });
+    if (!promos.length) return '';
+    if (promos.length <= 2) return renderOnePromoBox(promos);
+    var html = '';
+    for (var i = 0; i < promos.length; i += 2) {
+      html += renderOnePromoBox(promos.slice(i, i + 2));
+    }
+    return html;
+  }
+
+  /**
+   * Split event wording across the two columns so both columns finish
+   * at roughly the same height (start aligned, end aligned).
+   */
+  function splitPromosForColumns(promos) {
+    var list = (promos || []).filter(function (p) { return p && p.title; });
+    if (!list.length) {
+      list = [
+        { title: 'Stay a While', body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.' },
+        { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
+      ];
+    }
+    if (list.length === 1) {
+      return { left: renderOnePromoBox(list), right: '' };
+    }
+    if (list.length === 2) {
+      return { left: renderOnePromoBox([list[0]]), right: renderOnePromoBox([list[1]]) };
+    }
+    var mid = Math.ceil(list.length / 2);
+    return {
+      left: renderPromoBank(list.slice(0, mid)),
+      right: renderPromoBank(list.slice(mid))
+    };
   }
 
   function sandwichNote(dishes, opts) {
@@ -977,7 +1017,8 @@
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
       p1 += '<div class="cols cols-classics cols-balanced">';
-      // LEFT — events + optional Sharing (fills to match the food column)
+      var promoCols = p1opts.rooms ? splitPromosForColumns(promos) : { left: '', right: '' };
+      // LEFT — Sharing + event box(es); columns start level and finish level
       p1 += '<div class="col col-events">';
       if (shareInLeft) {
         p1 += framedBlock(
@@ -985,7 +1026,7 @@
           shareRule
         );
       }
-      if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+      if (p1opts.rooms) p1 += promoCols.left || renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches && sandwichesAsColumn && !burgerDishes.length && !classicDishes.length) {
         p1 += renderFiller('sandwiches', bag);
       }
@@ -993,7 +1034,7 @@
         p1 += '&nbsp;';
       }
       p1 += '</div>';
-      // RIGHT — Burgers, then Pub Classics under them
+      // RIGHT — Burgers, Pub Classics, then remaining event box(es) to match left height
       p1 += '<div class="col col-food">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
@@ -1001,6 +1042,7 @@
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
+      if (p1opts.rooms && promoCols.right) p1 += '<div class="col-fill">' + promoCols.right + '</div>';
       if (p1opts.sandwiches && sandwichesAsColumn && (burgerDishes.length || classicDishes.length)) {
         if (sandRule.frame) p1 += renderFiller('sandwiches', bag);
         else {
@@ -1014,7 +1056,7 @@
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
-      if (!burgerDishes.length && !classicDishes.length) p1 += '&nbsp;';
+      if (!burgerDishes.length && !classicDishes.length && !promoCols.right) p1 += '&nbsp;';
       p1 += '</div></div></section>';
     } else if (classicDishes.length || burgerDishes.length) {
       if (burgerDishes.length) {
@@ -1050,8 +1092,7 @@
       if (p1opts.footLogo) p1 += renderFiller('logo', bag);
     }
 
-    p1 += '</div>'; // page-body content ends; spacer fills leftover
-    p1 += '<div class="page-spacer" aria-hidden="true"></div>';
+    p1 += '</div>'; // page-body — grows so allergy stays pinned to the page foot
     p1 += allergy({ lunchClub: !!(bag.hasLunch) });
     p1 += '</div>';
 
@@ -1097,8 +1138,7 @@
 
     if (p2opts.lunchClub) p2 += renderFiller('lunch', bag);
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
-    p2 += '</div>'; // page-body
-    p2 += '<div class="page-spacer" aria-hidden="true"></div>';
+    p2 += '</div>'; // page-body — grows so allergy stays pinned to the page foot
     p2 += allergy({ lunchClub: !!(bag.hasLunch) });
     p2 += '</div>';
 
@@ -1172,7 +1212,7 @@
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
       '.page{width:210mm;height:297mm;padding:12mm 10mm 10mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
-      '.page-body{flex:0 0 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0}' +
+      '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
@@ -1218,7 +1258,7 @@
       '.dish-line{display:flex;flex-wrap:nowrap;align-items:baseline;min-width:0;max-width:100%;gap:0}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
       '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px 0.2em;min-width:10px;height:0;align-self:baseline}' +
-      '.dish-line .lc{width:16px;height:16px;margin:0 0.35em 0 0.15em;flex:0 0 auto;align-self:baseline}' +
+      '.dish-line .lc{width:1.2em;height:1.2em;margin:0 0.3em 0 0.1em;flex:0 0 auto;align-self:baseline;font-size:var(--name);object-fit:contain}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;flex:0 0 auto;padding-left:0}' +
       '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
@@ -1227,15 +1267,16 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
-      '.lc{width:16px;height:16px;vertical-align:middle;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
-      '.lunch-box .lc{width:28px;height:28px;margin-left:0;flex:0 0 auto}' +
+      '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.12em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lunch-box .lc{width:28px;height:28px;font-size:28px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:18px;height:18px;margin:0}' +
+      '.allergy-lc .lc{width:1em;height:1em;font-size:11pt;margin:0;vertical-align:middle}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
-      /* Golden rule: both columns start on the same baseline */
-      '.cols-balanced{align-items:start}' +
-      '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden}' +
+      /* Columns start level; stretch containers so both sides share one height band */
+      '.cols-balanced{align-items:stretch}' +
+      '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}' +
+      '.cols-balanced .col-fill{margin-top:auto}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
       '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%;overflow:hidden}' +
@@ -1253,7 +1294,7 @@
       '.bottom-cols{margin-top:16px;margin-bottom:4px}' +
       '.bottom-cols-balanced{grid-template-columns:1fr 1fr;gap:20px}' +
       '.bottom-cols .sec-title{text-align:left}' +
-      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:4mm;padding-top:2mm;flex:0 0 auto}' +
+      '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:3mm;padding-top:2mm;flex:0 0 auto;flex-shrink:0}' +
       '.promo{text-align:left}' +
       '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:2px 0 2px}' +
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
@@ -1278,8 +1319,9 @@
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
       '.a5-face{width:148.5mm;height:210mm;padding:6mm 7mm 7mm;overflow:hidden;display:flex;flex-direction:column}' +
-      '.a5-face .page-body{flex:0 0 auto}' +
-      '.a5-face .page-spacer{flex:1 1 auto;min-height:2mm}' +
+      '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden}' +
+      '.a5-face .page-spacer{display:none}' +
+      '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
       '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
       '.a5-face .logo-tr{width:96px!important}' +
       '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 118px;gap:8px;min-height:28mm}' +
@@ -1370,7 +1412,6 @@
 
     if (notes) html += '<div class="party-notes">' + esc(notes) + '</div>';
     html += '</div>'; // page-body
-    html += '<div class="page-spacer" aria-hidden="true"></div>';
     html += allergy();
     html += '</div>';
     return html;

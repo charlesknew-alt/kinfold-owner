@@ -168,13 +168,17 @@ function reviewLayoutWithGemini_(body) {
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
     'GOLDEN RULES (do not invent sections staff did not list):\n' +
-    '1. Page 1 columns: LEFT = Stay a While / Gatherings / Sharing when used as a column; ' +
-    'RIGHT = Burgers then Pub Classics under them. Both columns share the same top baseline.\n' +
-    '2. Always fill the page, but do not airy-balloon a sparse page (e.g. short Mains on page 2) — ' +
+    '1. Page 1 columns: LEFT = Stay a While / events / Sharing when used as a column; ' +
+    'RIGHT = Burgers then Pub Classics under them. Both columns MUST start on the same top baseline ' +
+    'AND finish at approximately the same point — never leave one column hanging long with empty space on the other.\n' +
+    '2. If there are several event / feature panels, prefer TWO (or more) separate boxes split across the columns ' +
+    'rather than one tall box crammed with everything.\n' +
+    '3. Always fill the page, but do not airy-balloon a sparse page (e.g. short Mains on page 2) — ' +
     'prefer roomy/normal over huge top gaps. Prefer tight over compact; never unreadably small.\n' +
-    '3. Allergy footer must remain. If any lunch-club ticks exist, keep the lunch-club key in the footer.\n' +
-    '4. Prefer sandwichesOn page2 beside sides/sauces. Drop the foot logo only if it forces overflow.\n' +
-    '5. Item Boost (e.g. Fish of the Day) stays where staff put it; Sharing may sit left to balance food.\n' +
+    '4. Allergy footer (gf / v / vg key) must remain fully visible — never cropped. ' +
+    'If any lunch-club ticks exist, keep the Bells Lunch Club knife-and-fork key in the footer.\n' +
+    '5. Prefer sandwichesOn page2 beside sides/sauces. Drop the foot logo only if it forces overflow.\n' +
+    '6. Item Boost (e.g. Fish of the Day) stays where staff put it; Sharing may sit left to balance food.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
 
   var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||
