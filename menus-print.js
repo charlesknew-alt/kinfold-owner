@@ -1267,10 +1267,10 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
-      '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.12em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lc{width:1.2em;height:1.2em;font-size:var(--name);vertical-align:-0.15em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
       '.lunch-box .lc{width:28px;height:28px;font-size:28px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:1em;height:1em;font-size:11pt;margin:0;vertical-align:middle}' +
+      '.allergy-lc .lc{width:1.1em;height:1.1em;font-size:11pt;margin:0;vertical-align:middle}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       /* Columns start level; stretch containers so both sides share one height band */
