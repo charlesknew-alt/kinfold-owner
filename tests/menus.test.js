@@ -211,8 +211,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow27') !== -1, 'menus page cache-bust is flow27');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow27') !== -1, 'hub menus link cache-bust is flow27');
+assert(page.indexOf('flow28') !== -1, 'menus page cache-bust is flow28');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow28') !== -1, 'hub menus link cache-bust is flow28');
+assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
+  'generate plan preview uses tidy sheet checklist markup');
+assert(page.indexOf('ul class="dishes"') === -1,
+  'generate plan preview no longer uses a raw bullet list');
 assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
