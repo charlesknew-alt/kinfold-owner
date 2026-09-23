@@ -1258,7 +1258,7 @@
       '.dish-line{display:flex;flex-wrap:nowrap;align-items:baseline;min-width:0;max-width:100%;gap:0}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
       '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px 0.2em;min-width:10px;height:0;align-self:baseline}' +
-      '.dish-line .lc{width:1em;height:1em;margin:0 0.3em 0 0.1em;flex:0 0 auto;align-self:baseline;font-size:var(--name);object-fit:contain}' +
+      '.dish-line .lc{width:1.25em;height:1.25em;margin:0 0.25em 0 0.1em;flex:0 0 auto;align-self:baseline;font-size:var(--name);object-fit:contain}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;flex:0 0 auto;padding-left:0}' +
       '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
@@ -1267,10 +1267,10 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
-      '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.12em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lc{width:1.25em;height:1.25em;font-size:var(--name);vertical-align:-0.2em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
       '.lunch-box .lc{width:28px;height:28px;font-size:28px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:1em;height:1em;font-size:11pt;margin:0;vertical-align:middle}' +
+      '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       /* Columns start level; stretch containers so both sides share one height band */
