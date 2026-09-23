@@ -71,13 +71,13 @@ assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
-assert(/logo-tr\{width:140px/.test(printJs), 'front-page logo sized ~140px');
+assert(/logo-tr\{width:180px/.test(printJs), 'front-page logo sized ~180px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
 assert(/--title:26pt/.test(printJs) || /--title:28pt/.test(printJs),
   'section titles large and readable (~26–28pt)');
 assert(printJs.indexOf('min(var(--title),28pt)') !== -1, 'title size has hard CSS ceiling at 28pt');
-assert(printJs.indexOf('margin:0 0 14px') !== -1 || printJs.indexOf('margin-bottom:12px') !== -1,
-  'section titles leave a gap before dishes');
+assert(printJs.indexOf('margin:0 0 var(--sec-gap)') !== -1 || printJs.indexOf('margin-bottom:calc(var(--sec-gap)') !== -1,
+  'section titles leave a density-aware gap before dishes');
 assert(printJs.indexOf('startersInTop') !== -1, 'starters can sit frilly beside the logo');
 assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') !== -1,
   'dish lines use flex leaders that start after the name');
@@ -94,8 +94,12 @@ assert(printJs.indexOf('hideTitle') !== -1, 'Item Boost can print without the bu
 assert(printJs.indexOf('just before the price') !== -1 || printJs.indexOf('sits just before the price') !== -1 ||
   printJs.indexOf('Match dish price size') !== -1,
   'lunch club mark sits just before the price');
-assert(/\.lc\{width:1em/.test(printJs) || printJs.indexOf('font-size:var(--name)') !== -1,
-  'lunch club mark matches price size on dish lines');
+assert(/\.dish-line \.lc\{width:1em/.test(printJs) || /\.lc\{width:1em/.test(printJs),
+  'lunch club mark is 1em so it does not stretch dish-line height');
+assert(printJs.indexOf('align-items:center') !== -1 && printJs.indexOf('no lunch-gap stretch') !== -1,
+  'dish-line centers mark so lunch/non-lunch gaps stay even');
+assert(printJs.indexOf('body.scrollHeight>body.clientHeight') !== -1,
+  'fitPages measures page-body overflow (not only the clipped page)');
 assert(printJs.indexOf('splitPromosForColumns') !== -1, 'event panels can split across columns');
 assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as separate boxes');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
@@ -204,8 +208,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow24') !== -1, 'menus page cache-bust is flow24');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow24') !== -1, 'hub menus link cache-bust is flow24');
+assert(page.indexOf('flow25') !== -1, 'menus page cache-bust is flow25');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow25') !== -1, 'hub menus link cache-bust is flow25');
 assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,

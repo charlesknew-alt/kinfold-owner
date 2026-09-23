@@ -1199,7 +1199,7 @@
     var landscape = !!opts.landscape;
     var guillotine = !!opts.guillotine;
     // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
-    // titles, Crimson Text allergy. Logo ~220px; type steps down to fit the page.
+    // titles, Crimson Text allergy. Logo ~180px on A4; type steps down to fit the page.
     // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
@@ -1226,40 +1226,41 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;align-items:start;margin:0 0 6px;overflow:hidden}' +
-      '.top-band-logo{grid-template-columns:1fr 150px;min-height:0}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:8px;align-items:start;margin:0 0 6px;overflow:hidden}' +
+      '.top-band-logo{grid-template-columns:1fr 190px;min-height:0}' +
       '.top-left{min-width:0;overflow:hidden;align-self:start}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
-      '.logo-tr{width:140px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
+      '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      /* Titles clearly larger than dishes; gap before the first item */
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),28pt)!important;letter-spacing:.12em;text-transform:uppercase;margin:0 0 14px;text-align:center;line-height:1.15}' +
-      '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 14px}' +
-      '.sec-title-spacer{visibility:hidden;margin:0 0 14px}' +
-      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),26pt);letter-spacing:.11em;margin-bottom:12px}' +
+      /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),28pt)!important;letter-spacing:.12em;text-transform:uppercase;margin:0 0 var(--sec-gap);text-align:center;line-height:1.15}' +
+      '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 var(--sec-gap)}' +
+      '.sec-title-spacer{visibility:hidden;margin:0 0 var(--sec-gap)}' +
+      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),26pt);letter-spacing:.11em;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),24pt);letter-spacing:.1em}' +
-      '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:12px}' +
+      '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:var(--sec-gap)}' +
       '.classics-block{margin-top:4px}' +
-      '.scallop{margin:0 0 10px;background:#fff;position:relative;height:fit-content;' +
+      '.scallop{margin:0 0 8px;background:#fff;position:relative;height:fit-content;' +
         'border-style:solid;border-color:transparent;border-width:12px;' +
         'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:12px;' +
         'overflow:hidden;max-width:100%}' +
       '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
       '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
-      '.scallop-pad{padding:6px 10px 5px;overflow:hidden;min-width:0}' +
-      '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
+      '.scallop-pad{padding:4px 10px 3px;overflow:hidden;min-width:0}' +
+      '.scallop-box .scallop-pad{padding:4px 10px 4px}' +
       '.dish{margin:0 0 var(--dish-gap);min-width:0;max-width:100%}' +
       /* Leaders only between name and price on one row — never under the description */
-      '.dish-line{display:flex;flex-wrap:nowrap;align-items:baseline;min-width:0;max-width:100%;gap:0}' +
+      /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
+      '.dish-line{display:flex;flex-wrap:nowrap;align-items:center;min-width:0;max-width:100%;gap:0;line-height:1.28}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
-      '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px 0.2em;min-width:10px;height:0;align-self:baseline}' +
-      '.dish-line .lc{width:1.25em;height:1.25em;margin:0 0.25em 0 0.1em;flex:0 0 auto;align-self:baseline;font-size:var(--name);object-fit:contain}' +
-      '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;flex:0 0 auto;padding-left:0}' +
+      '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px;min-width:10px;height:0;align-self:center;transform:translateY(0.35em)}' +
+      '.dish-line .lc{width:1em;height:1em;margin:0 0.2em 0 0.08em;flex:0 0 auto;align-self:center;font-size:var(--name);object-fit:contain;display:block}' +
+      '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);line-height:1.28;white-space:nowrap;flex:0 0 auto;padding-left:0}' +
       '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
@@ -1267,7 +1268,7 @@
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
-      '.lc{width:1.25em;height:1.25em;font-size:var(--name);vertical-align:-0.2em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
+      '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.15em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
       '.lunch-box .lc{width:28px;height:28px;font-size:28px;margin-left:0;flex:0 0 auto}' +
       '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
       '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle}' +
@@ -1323,8 +1324,8 @@
       '.a5-face .page-spacer{display:none}' +
       '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
       '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
-      '.a5-face .logo-tr{width:96px!important}' +
-      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 118px;gap:8px;min-height:28mm}' +
+      '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 120px;gap:8px;min-height:0}' +
       '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
       '.a5-face .tracker .roman{font-size:3.5pt!important}' +
       '.a5-face .allergy{font-size:8.5pt}' +
@@ -1489,7 +1490,14 @@
       '<script>(function(){' +
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
-        'function overflows(page){return page.scrollHeight>page.clientHeight+2;}' +
+        // page-body clips with overflow:hidden, so page.scrollHeight alone never sees overflow —
+        // measure the body (and allergy sibling) so density steps actually fire.
+        'function overflows(page){' +
+          'if(page.scrollHeight>page.clientHeight+2)return true;' +
+          'var body=page.querySelector(".page-body");' +
+          'if(body&&body.scrollHeight>body.clientHeight+2)return true;' +
+          'return false;' +
+        '}' +
         // Always start airy so sparse pages fill top→bottom (more gaps), then tighten only if overflow.
         // Never invent a third page — compact is the floor for readable type.
         'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
