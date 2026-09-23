@@ -1106,20 +1106,25 @@
    *   column — sits in a column (beside promo / another column section)
    *   both   — prefer column when a partner fits, otherwise full width
    * frame: scalloped “frilly” box around the section
+   * note: optional spiel printed under the title (hours, “all served with…”, etc.)
    */
   var DEFAULT_SECTION_LAYOUT = {
-    Nibbles: { width: 'column', frame: true },
-    Starters: { width: 'column', frame: true },
-    'Sharing Plates': { width: 'both', frame: false },
-    'Item Boost': { width: 'full', frame: true },
-    'Pub Classics': { width: 'column', frame: false },
-    Burgers: { width: 'column', frame: false },
-    Mains: { width: 'full', frame: false },
-    'Little Bells': { width: 'full', frame: true },
-    Sandwiches: { width: 'column', frame: true },
-    Sides: { width: 'column', frame: false },
-    Sauces: { width: 'column', frame: false },
-    Desserts: { width: 'full', frame: false }
+    Nibbles: { width: 'column', frame: true, note: '' },
+    Starters: { width: 'column', frame: true, note: '' },
+    'Sharing Plates': { width: 'both', frame: false, note: '' },
+    'Item Boost': { width: 'full', frame: true, note: '' },
+    'Pub Classics': { width: 'column', frame: false, note: '' },
+    Burgers: { width: 'column', frame: false, note: '' },
+    Mains: { width: 'full', frame: false, note: '' },
+    'Little Bells': { width: 'full', frame: true, note: '' },
+    Sandwiches: {
+      width: 'column',
+      frame: true,
+      note: '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.'
+    },
+    Sides: { width: 'column', frame: false, note: '' },
+    Sauces: { width: 'column', frame: false, note: '' },
+    Desserts: { width: 'full', frame: false, note: '' }
   };
 
   var WIDTH_OPTIONS = [
@@ -1131,8 +1136,8 @@
   function defaultSectionLayout() {
     var out = {};
     SECTIONS.forEach(function (s) {
-      var d = DEFAULT_SECTION_LAYOUT[s] || { width: 'full', frame: false };
-      out[s] = { width: d.width, frame: !!d.frame };
+      var d = DEFAULT_SECTION_LAYOUT[s] || { width: 'full', frame: false, note: '' };
+      out[s] = { width: d.width, frame: !!d.frame, note: String(d.note || '') };
     });
     return out;
   }
@@ -1145,9 +1150,11 @@
       if (!row || typeof row !== 'object') return;
       var width = String(row.width || base[s].width).toLowerCase();
       if (width !== 'full' && width !== 'column' && width !== 'both') width = base[s].width;
+      var note = row.note != null ? String(row.note) : base[s].note;
       base[s] = {
         width: width,
-        frame: row.frame === true || row.frame === 'yes' || row.frame === 1
+        frame: row.frame === true || row.frame === 'yes' || row.frame === 1,
+        note: String(note || '').replace(/\r\n/g, '\n').trim()
       };
     });
     return base;
@@ -1157,8 +1164,8 @@
     var canon = normalizeSectionName(name);
     var map = normalizeSectionLayout(layouts);
     if (map[canon]) return map[canon];
-    // Unknown sections: full, no frame
-    return { width: 'full', frame: false };
+    // Unknown sections: full, no frame, no note
+    return { width: 'full', frame: false, note: '' };
   }
 
   function isColumnWidth(width) {

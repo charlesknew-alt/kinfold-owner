@@ -310,51 +310,82 @@
   function sandwichNote(dishes, opts) {
     opts = opts || {};
     var frameKind = opts.frame === 'wide' ? 'wide' : 'box';
-    var price = 'all 9.50';
-    var hours = '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)';
-    var body = 'Filled ciabatta or farmhouse sandwich, all served with fries and salad.';
-    var foot = 'Ask waiting staff for today’s fillings';
-    if (dishes && dishes.length) {
-      var prices = {};
-      dishes.forEach(function (d) {
-        var p = cleanPrice(d.price);
-        if (p) prices[p] = true;
-        var blob = ((d.name || '') + ' ' + (d.description || '')).trim();
-        var hm = blob.match(/\(\s*12[^)]+\)/);
-        if (hm) hours = hm[0].replace(/\s+/g, ' ');
-      });
-      var keys = Object.keys(prices);
-      if (keys.length === 1) price = 'all ' + keys[0];
+    var spiel = String(opts.note || '').trim();
+    if (!spiel) {
+      spiel = '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.';
     }
-    // Title outside the frame so it lines up with SIDES; box holds the body only.
+    var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var inner = '<div class="promo sandwich-promo">';
+    inner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
+    lines.forEach(function (line, i) {
+      inner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
+    });
+    inner += '</div>';
     if (opts.alignTitle) {
       return (
         '<div class="sandwich-aligned">' +
           '<div class="promo-head pair-head">' +
             '<span class="sec-title soft-left">Sandwiches</span>' +
-            '<span class="price">' + esc(price) + '</span>' +
           '</div>' +
-          scallop(
-            '<div class="promo sandwich-promo">' +
-              '<p class="note-line">' + esc(hours) + '</p>' +
-              '<p class="desc">' + esc(body) + '</p>' +
-              '<p class="note-line">' + esc(foot) + '</p>' +
-            '</div>',
-            frameKind
-          ) +
+          scallop(inner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, ''), frameKind) +
         '</div>'
       );
     }
-    return scallop(
-      '<div class="promo sandwich-promo">' +
-        '<div class="promo-head"><span class="promo-title">Sandwiches</span>' +
-        '<span class="price">' + esc(price) + '</span></div>' +
-        '<p class="note-line">' + esc(hours) + '</p>' +
-        '<p class="desc">' + esc(body) + '</p>' +
-        '<p class="note-line">' + esc(foot) + '</p>' +
-      '</div>',
-      frameKind
-    );
+    return scallop(inner, frameKind);
+  }
+
+  /** Named sandwich fillings (skip a lone “Sandwiches” heading row). */
+  function sandwichDishesOf(bag) {
+    var list = (bag && bag.sandwiches && bag.sandwiches.dishes) || [];
+    return list.filter(function (d) {
+      return d && d.name && !/^sandwiches?\s*$/i.test(String(d.name).trim());
+    });
+  }
+
+  function sandwichesPackCost(bag) {
+    var dishes = sandwichDishesOf(bag);
+    if (dishes.length) {
+      return Math.max(COST.sandwiches, sectionUnits({ name: 'Sandwiches', dishes: dishes }, true));
+    }
+    return COST.sandwiches;
+  }
+
+  /**
+   * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list
+   * inside the frilly box. Falls back to spiel-only when there are no fillings.
+   */
+  function sandwichesBlock(bag, opts) {
+    opts = opts || {};
+    var dishes = sandwichDishesOf(bag);
+    var rule = opts.rule || { frame: true, note: '' };
+    var frameKind = opts.frame === 'wide' ? 'wide' : (opts.frame === 'box' || rule.frame ? 'box' : 'wide');
+    if (opts.frame === 'box') frameKind = 'box';
+    if (opts.frame === 'wide') frameKind = 'wide';
+    var note = (opts.note != null && String(opts.note).trim())
+      ? String(opts.note).trim()
+      : String(rule.note || '').trim();
+    if (!dishes.length) {
+      return sandwichNote(dishes, {
+        frame: frameKind,
+        alignTitle: !!opts.alignTitle,
+        note: note
+      });
+    }
+    var noteHtml = note
+      ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
+      : '';
+    var body = noteHtml + listDishes(dishes);
+    if (opts.alignTitle) {
+      return (
+        '<div class="sandwich-aligned">' +
+          '<div class="promo-head pair-head">' +
+            '<span class="sec-title soft-left">Sandwiches</span>' +
+          '</div>' +
+          scallop(body, frameKind) +
+        '</div>'
+      );
+    }
+    return scallop(sectionTitle('Sandwiches') + body, frameKind);
   }
 
   /** Prefer shared tidy from menus.js when available (priced desc orphans too). */
@@ -675,8 +706,10 @@
     if (bag.desserts) back += sectionUnits(bag.desserts, false);
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
-    // sandwich dish list is replaced by a note box when printed on Main/Sunday
-    var wantSandwichNote = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
+    // sandwich dish list + spiel when fillings exist; otherwise the short selling note
+    var wantSandwiches = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
+    var sandDishCount = sandwichDishesOf(bag).length;
+    var sandCost = sandwichesPackCost(bag);
     var hasBackContent = !!(bag.mains || bag.littleBells || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
 
     var layout = {
@@ -718,9 +751,13 @@
         add = tryAdd(left1, promoCost + safety);
         if (add.ok) { layout.p1.rooms = true; left1 = add.left + safety; layout.fillers.push(promoLabel); }
       }
-      if (wantSandwichNote) {
-        add = tryAdd(left1, COST.sandwiches + (bag.sides ? 0 : 0));
-        if (add.ok) { layout.p1.sandwiches = true; left1 = add.left; layout.fillers.push('Sandwiches box'); }
+      if (wantSandwiches) {
+        add = tryAdd(left1, sandCost + (bag.sides ? 0 : 0));
+        if (add.ok) {
+          layout.p1.sandwiches = true;
+          left1 = add.left;
+          layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches box (page 1)');
+        }
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
       if (bag.hasLunch) {
@@ -761,22 +798,31 @@
       var p2left = PAGE - p2used;
       // Desserts + a full mains list leave little room — be stricter about fillers
       var tightBack = !!(bag.desserts && bag.mains && bag.mains.dishes.length >= 6);
-      if (wantSandwichNote) {
-        var sandCost = tightBack ? COST.sandwiches + 2 : COST.sandwiches;
-        var addSx = tryAdd(p2left, sandCost);
-        if (addSx.ok) {
-          layout.p2.sandwiches = true;
-          p2left = addSx.left;
-          layout.fillers.push('Sandwiches box (page 2)');
-        } else if (bag.sides) {
-          // Fallback: sandwiches + sides on page 1 right if page 2 is packed
-          var addS = tryAdd(p1left, COST.sandwiches);
-          if (addS.ok) {
-            layout.p1.sandwiches = true;
-            layout.p1.sidesOnP1 = true;
-            layout.p2.sidesOnP2 = false;
-            layout.leftover.p1 = addS.left;
-            layout.fillers.push('Sandwiches + sides (page 1)');
+      if (wantSandwiches) {
+        // Named fillings belong on page 1 beside Burgers/Classics; spiel-only note can sit on page 2.
+        var preferSandP1 = sandDishCount > 0;
+        var addSandP1 = tryAdd(p1left, sandCost + (preferSandP1 ? 0 : 2));
+        if (preferSandP1 && addSandP1.ok) {
+          layout.p1.sandwiches = true;
+          p1left = addSandP1.left;
+          layout.leftover.p1 = p1left;
+          layout.fillers.push('Sandwiches (page 1)');
+        } else {
+          var p2SandCost = tightBack ? sandCost + 2 : sandCost;
+          var addSx = tryAdd(p2left, p2SandCost);
+          if (addSx.ok) {
+            layout.p2.sandwiches = true;
+            p2left = addSx.left;
+            layout.fillers.push(sandDishCount ? 'Sandwiches (page 2)' : 'Sandwiches box (page 2)');
+          } else if (bag.sides || sandDishCount) {
+            var addS = tryAdd(p1left, sandCost);
+            if (addS.ok) {
+              layout.p1.sandwiches = true;
+              layout.p1.sidesOnP1 = !!bag.sides;
+              layout.p2.sidesOnP2 = !bag.sides;
+              layout.leftover.p1 = addS.left;
+              layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches + sides (page 1)');
+            }
           }
         }
       }
@@ -847,7 +893,12 @@
     var body = opts.twoCol ? listDishesCols(dishes) : listDishes(dishes);
     // Item Boost is a staff filing bucket — print the dish in the frilly box, not the label
     var head = opts.hideTitle ? '' : sectionTitle(title);
-    return framedBlock(head + body, rule, kind || 'wide');
+    var note = opts.note != null ? String(opts.note) : String((rule && rule.note) || '');
+    note = note.trim();
+    var noteHtml = note
+      ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
+      : '';
+    return framedBlock(head + noteHtml + body, rule, kind || 'wide');
   }
 
   function layoutMap(plan) {
@@ -863,7 +914,7 @@
     }
     var map = layoutMap(plan);
     var key = sectionName || '';
-    return map[key] || { width: 'full', frame: false };
+    return map[key] || { width: 'full', frame: false, note: '' };
   }
 
   function wantsColumn(rule) {
@@ -890,7 +941,7 @@
       return promoRooms();
     }
     if (which === 'sandwiches') {
-      return sandwichNote(bag.sandwiches && bag.sandwiches.dishes, opts);
+      return sandwichesBlock(bag, opts);
     }
     if (which === 'lunch') return lunchClubBox();
     if (which === 'logo') {
@@ -931,40 +982,9 @@
     p1 += trackerBar(ver, { hideDate: hideDate });
     p1 += '<div class="page-body">';
 
-    // Top band: frilly Nibbles beside the logo (Canva-style). Starters only share
-    // that column when Nibbles is absent — stacking both beside a short logo
-    // wastes the right gutter and routinely overflows page 1.
-    var nibblesInTop = !!(bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full');
-    var startersInTop = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full' && !nibblesInTop);
-    if (nibblesInTop || startersInTop) {
-      p1 += '<div class="top-band">';
-      p1 += '<div class="top-left">';
-      if (nibblesInTop) {
-        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
-      }
-      if (startersInTop) {
-        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
-      }
-      p1 += '</div>';
-      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
-      p1 += '</div>';
-    } else {
-      p1 += '<div class="top-band top-band-logo">';
-      p1 += '<div class="top-left"></div>';
-      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
-      p1 += '</div>';
-      if (bag.nibbles) {
-        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
-      }
-    }
-
-    if (bag.starters && !startersInTop) {
-      p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
-    }
-
     // —— Column block (golden rule: both columns start on the same baseline) ——
-    // Left  = Sharing (when set to column) + events / feature panels
-    // Right = Burgers, then Pub Classics underneath
+    // Left  = Nibbles OR Starters (beside logo), Sharing, Sandwiches (spiel + dishes)
+    // Right = Logo (top) then Burgers, then Pub Classics; event panels pin to both feet
     var split = splitClassicsBag(bag.classics);
     var burgerDishes = (bag.burgers && bag.burgers.dishes && bag.burgers.dishes.length)
       ? bag.burgers.dishes.slice()
@@ -1003,13 +1023,38 @@
     }
     var classicDishes = split.classics;
     var shareDishes = (bag.sharing && bag.sharing.dishes) ? bag.sharing.dishes.slice() : [];
-    // Honour staff width: column/both → left column; full → band above (2-col when ≥2)
     var shareAsColumn = !!(shareDishes.length && wantsColumn(shareRule));
     var shareAsFull = !!(shareDishes.length && !shareAsColumn);
-    // Sparse food on the right: also pull full-width Sharing into the left column to balance
     var foodUnits = classicDishes.length + burgerDishes.length;
     var shareInLeft = shareAsColumn ||
       (!!shareDishes.length && foodUnits > 0 && foodUnits <= 4 && (burgerDishes.length || p1opts.rooms));
+
+    var sandList = sandwichDishesOf(bag);
+    var nibblesInCol = !!(bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full');
+    // No nibbles → Starters take the logo-side column (same spot nibbles would occupy)
+    var startersInCol = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full' && !nibblesInCol);
+    var sandwichesInCol = !!(p1opts.sandwiches && (wantsColumn(sandRule) || sandList.length));
+
+    var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms ||
+      p1opts.sandwiches || (p1opts.sidesOnP1 && sidesPrint) || shareInLeft ||
+      nibblesInCol || startersInCol;
+    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length ||
+      !!p1opts.rooms || shareInLeft || classicDishes.length > 0 ||
+      nibblesInCol || startersInCol || sandwichesInCol;
+
+    // Logo-only strip when we are NOT putting food beside it in the column grid
+    if (!showColBlock || !classicsAsColumn) {
+      p1 += '<div class="top-band top-band-logo">';
+      p1 += '<div class="top-left"></div>';
+      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '</div>';
+      if (bag.nibbles && !nibblesInCol) {
+        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
+      }
+      if (bag.starters && !startersInCol) {
+        p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
+      }
+    }
 
     if (shareAsFull && !shareInLeft) {
       p1 += '<section class="sec">' +
@@ -1031,50 +1076,48 @@
       }
     });
 
-    var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms || p1opts.sandwiches ||
-      (p1opts.sidesOnP1 && sidesPrint) || shareInLeft;
-    var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length ||
-      !!p1opts.rooms || shareInLeft || classicDishes.length > 0;
-    var sandwichesAsColumn = wantsColumn(sandRule);
-
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
-      p1 += '<div class="cols cols-classics cols-balanced cols-features">';
-      // Opposite frames when panels sit side by side (rect box vs oval wide).
-      // If a rectangular Sandwiches box sits in the right column, start left on wide.
-      var besideSandwichBox = !!(p1opts.sandwiches && sandwichesAsColumn &&
-        (burgerDishes.length || classicDishes.length) && sandRule.frame !== false);
-      var promoFrameOpts = besideSandwichBox
+      p1 += '<div class="cols cols-classics cols-balanced cols-features cols-with-logo">';
+      var sandOnRightNote = !!(sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length));
+      var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box' }
         : { leftFrame: 'box', rightFrame: 'wide' };
       var promoCols = p1opts.rooms ? splitPromosForColumns(promos, promoFrameOpts) : { left: '', right: '' };
       var leftFeature = p1opts.rooms
         ? (promoCols.left || renderFiller('rooms', bag, promos, { frame: promoFrameOpts.leftFrame }))
         : '';
-      var rightFeature = '';
-      if (p1opts.rooms && promoCols.right) rightFeature = promoCols.right;
-      // LEFT — dishes in col-body; feature box(es) pinned to column foot so both
-      // columns finish level (gap sits above the panels, not below).
+      var rightFeature = (p1opts.rooms && promoCols.right) ? promoCols.right : '';
+
+      // LEFT — Nibbles or Starters (logo partner), Sharing, Sandwiches with spiel + dishes
       p1 += '<div class="col col-events">';
       p1 += '<div class="col-body">';
+      if (nibblesInCol) {
+        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
+      }
+      if (startersInCol) {
+        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
+      }
       if (shareInLeft) {
         p1 += framedBlock(
           sectionTitle(bag.sharing.name) + listDishes(shareDishes),
           shareRule
         );
       }
-      if (p1opts.sandwiches && sandwichesAsColumn && !burgerDishes.length && !classicDishes.length) {
-        // Alone in left column beside a right feature — keep sandwiches rectangular
-        p1 += renderFiller('sandwiches', bag, promos, { frame: 'box' });
+      if (sandwichesInCol && (sandList.length || !(burgerDishes.length || classicDishes.length))) {
+        p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
       }
-      if (!shareInLeft && !leftFeature && !(p1opts.sandwiches && sandwichesAsColumn)) {
+      if (!nibblesInCol && !startersInCol && !shareInLeft &&
+          !(sandwichesInCol && sandList.length) && !leftFeature) {
         p1 += '&nbsp;';
       }
       p1 += '</div>';
       if (leftFeature) p1 += '<div class="col-feature">' + leftFeature + '</div>';
       p1 += '</div>';
-      // RIGHT — Burgers / Classics in col-body; matching feature panel at the foot
+
+      // RIGHT — Logo at the top of this column so both sides start level, then food
       p1 += '<div class="col col-food">';
+      p1 += '<div class="col-logo"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
       p1 += '<div class="col-body">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
@@ -1082,23 +1125,27 @@
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
-      if (p1opts.sandwiches && sandwichesAsColumn && (burgerDishes.length || classicDishes.length)) {
-        if (sandRule.frame) p1 += renderFiller('sandwiches', bag, promos, { frame: 'box' });
-        else {
-          p1 += '<div class="promo sandwich-promo sec-plain">' +
-            '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>' +
-            '<p class="note-line">(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)</p>' +
-            '<p class="desc">Filled ciabatta or farmhouse sandwich, all served with fries and salad.</p>' +
-            '<p class="note-line">Ask waiting staff for today’s fillings</p></div>';
-        }
+      if (sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length)) {
+        p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
       }
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
-      if (!burgerDishes.length && !classicDishes.length && !rightFeature) p1 += '&nbsp;';
+      if (!burgerDishes.length && !classicDishes.length && !rightFeature &&
+          !(sandwichesInCol && !sandList.length)) {
+        p1 += '&nbsp;';
+      }
       p1 += '</div>';
       if (rightFeature) p1 += '<div class="col-feature">' + rightFeature + '</div>';
       p1 += '</div></div></section>';
+
+      // Starters that did not join the logo column (e.g. nibbles already there, or full width)
+      if (bag.starters && !startersInCol) {
+        p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
+      }
+      if (bag.nibbles && !nibblesInCol) {
+        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
+      }
     } else if (classicDishes.length || burgerDishes.length) {
       if (burgerDishes.length) {
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule) + '</section>';
@@ -1107,9 +1154,8 @@
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
       }
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
-      if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
+      if (p1opts.sandwiches) p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
     } else if (p1opts.rooms || p1opts.sandwiches) {
-      // Pair of selling boxes alone — opposite frames, both pinned to column foot
       p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced cols-features">';
       p1 += '<div class="col col-events"><div class="col-body">&nbsp;</div>';
       if (p1opts.rooms) {
@@ -1119,7 +1165,9 @@
       }
       p1 += '</div><div class="col col-food"><div class="col-body">&nbsp;</div>';
       if (p1opts.sandwiches) {
-        p1 += '<div class="col-feature">' + renderFiller('sandwiches', bag, promos, { frame: 'box' }) + '</div>';
+        p1 += '<div class="col-feature">' +
+          sandwichesBlock(bag, { frame: 'box', rule: sandRule }) +
+          '</div>';
       }
       p1 += '</div></div></section>';
     }
@@ -1172,8 +1220,9 @@
         }
         if (!sideList.length && !(p2opts.sidesOnP2 && bag.sauces)) p2 += '&nbsp;';
         p2 += '</div><div class="col col-promo">';
-        if (p2opts.sandwiches) p2 += renderFiller('sandwiches', bag, promos);
-        else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
+        if (p2opts.sandwiches) {
+          p2 += sandwichesBlock(bag, { frame: 'box', rule: sandRule, alignTitle: true });
+        } else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
         else p2 += '&nbsp;';
         p2 += '</div></div>';
       } else if (p2opts.sidesOnP2 && sidesPrint) {
@@ -1218,7 +1267,6 @@
             '<div class="desc">Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options</div>' +
           '</div>';
       } else if (menu.id === 'sandwiches') {
-        // group by price bands
         inner = scallop(
           dishes.map(function (d) { return dishCentered(d, { hidePrice: true }); }).join('') +
           '<div class="lb-price" style="margin-top:8px">' + esc((dishes[0] && dishes[0].price) || '') + '</div>' +
@@ -1229,11 +1277,13 @@
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
       }
       return (
-        '<article class="card-face">' +
-          trackerBar(ver) +
-          '<img class="logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="">' +
-          (menu.id === 'lunch-club' ? '' : '<h1>' + esc(title) + '</h1>') +
-          inner +
+        '<article class="card-face fill-page fill-airy">' +
+          '<div class="card-top">' +
+            trackerBar(ver) +
+            '<img class="logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="">' +
+            (menu.id === 'lunch-club' ? '' : '<h1>' + esc(title) + '</h1>') +
+          '</div>' +
+          '<div class="card-mid">' + inner + '</div>' +
           allergy() +
         '</article>'
       );
@@ -1264,10 +1314,22 @@
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
       '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
-      '.sheet.landscape{width:297mm;min-height:210mm;height:auto}' +
-      '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;min-height:210mm}' +
-      '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative}' +
+      '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
+      '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;height:100%}' +
+      '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative;display:flex;flex-direction:column;height:210mm;box-sizing:border-box;overflow:hidden}' +
       '.card-face:last-child{border-right:0}' +
+      '.card-top{flex:0 0 auto}' +
+      '.card-mid{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}' +
+      '.card-face .allergy{flex:0 0 auto;margin-top:auto}' +
+      '.card-face.fill-airy{--dish-gap:16px;--sec-gap:18px;--name:11.5pt;--desc:10pt;--title:18pt}' +
+      '.card-face.fill-roomy{--dish-gap:13px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:16pt}' +
+      '.card-face.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:15pt}' +
+      '.card-face.fill-tight,.card-face.fill-compact,.card-face.fill-dense{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:14pt}' +
+      '.card-face.fill-tight .card-mid,.card-face.fill-compact .card-mid,.card-face.fill-dense .card-mid{justify-content:flex-start}' +
+      '.card-face .dish-c{margin:0 0 var(--dish-gap)}' +
+      '.card-face .scallop{margin:0}' +
+      '.card-face .logo{width:64px;margin:0 auto 6px}' +
+      '.card-face h1{margin:2px 0 10px;font-size:18px}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
@@ -1328,8 +1390,13 @@
       '.cols-balanced{align-items:stretch}' +
       '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}' +
       '.cols-balanced .col-body{flex:0 0 auto;min-width:0}' +
+      '.cols-balanced .col-logo{flex:0 0 auto;display:flex;justify-content:flex-end;margin:0 0 8px}' +
+      '.cols-balanced .col-logo .logo-tr{width:160px!important;margin:0}' +
+      '.cols-with-logo{align-items:stretch;margin-top:0}' +
       '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end}' +
       '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:1 1 auto}' +
+      '.sec-note{font-family:var(--sans);font-size:var(--desc);color:#3a342c;line-height:1.35;margin:0 0 8px;font-weight:400}' +
+      '.scallop .sec-note{margin-top:0}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
       '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%;overflow:hidden}' +
@@ -1554,6 +1621,8 @@
           'if(page.scrollHeight>page.clientHeight+2)return true;' +
           'var body=page.querySelector(".page-body");' +
           'if(body&&body.scrollHeight>body.clientHeight+2)return true;' +
+          'var mid=page.querySelector(".card-mid");' +
+          'if(mid&&mid.scrollHeight>mid.clientHeight+2)return true;' +
           'return false;' +
         '}' +
         // Pin paired feature panels to the same height so tops and bottoms line up
@@ -1568,7 +1637,7 @@
           '});}' +
         // Always start airy so sparse pages fill top→bottom (more gaps), then tighten only if overflow.
         // Never invent a third page — dense is the floor for readable type.
-        'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page").forEach(function(page){' +
+        'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page,.card-face.fill-page").forEach(function(page){' +
           'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
           'if(!overflows(page))break;}});balanceFeatures();}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +

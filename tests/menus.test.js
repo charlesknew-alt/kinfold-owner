@@ -78,7 +78,7 @@ assert(/--title:26pt/.test(printJs) || /--title:28pt/.test(printJs),
 assert(printJs.indexOf('min(var(--title),28pt)') !== -1, 'title size has hard CSS ceiling at 28pt');
 assert(printJs.indexOf('margin:0 0 var(--sec-gap)') !== -1 || printJs.indexOf('margin-bottom:calc(var(--sec-gap)') !== -1,
   'section titles leave a density-aware gap before dishes');
-assert(printJs.indexOf('startersInTop') !== -1, 'starters can sit frilly beside the logo');
+assert(printJs.indexOf('startersInCol') !== -1, 'starters can sit frilly beside the logo');
 assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') !== -1,
   'dish lines use flex leaders that start after the name');
 assert(printJs.indexOf('.dish-line{display:flex') !== -1, 'dish-line flex rule present in source');
@@ -107,7 +107,7 @@ assert(printJs.indexOf('flex-shrink:0') !== -1 || printJs.indexOf('allergy stays
   /page-body\{flex:1 1 auto/.test(printJs), 'page body yields space so allergy footer is not cropped');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('fill-dense') !== -1, 'density ladder includes fill-dense floor');
-assert(printJs.indexOf('!nibblesInTop') !== -1,
+assert(printJs.indexOf('!nibblesInCol') !== -1,
   'starters only share the logo column when nibbles are not already there');
 assert(printJs.indexOf('Always start airy') !== -1 || /for\(var j=0;j<STEPS\.length/.test(printJs),
   'fit always starts airy so sparse pages fill top to bottom');
@@ -211,12 +211,20 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow28') !== -1, 'menus page cache-bust is flow28');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow28') !== -1, 'hub menus link cache-bust is flow28');
+assert(page.indexOf('flow29') !== -1, 'menus page cache-bust is flow29');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow29') !== -1, 'hub menus link cache-bust is flow29');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
   'generate plan preview no longer uses a raw bullet list');
+assert(page.indexOf('data-layout-note') !== -1,
+  'Blocks step has extra-info field per category');
+assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') !== -1,
+  'sandwiches print spiel plus dish list');
+assert(printJs.indexOf('startersInCol') !== -1 && printJs.indexOf('cols-with-logo') !== -1,
+  'starters sit beside logo when nibbles absent');
+assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
+  'sparse card menus spread to fill the A5 face');
 assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
