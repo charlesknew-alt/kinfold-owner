@@ -81,6 +81,15 @@ assert(printJs.indexOf('margin:0 0 14px') !== -1 || printJs.indexOf('margin-bott
 assert(printJs.indexOf('startersInTop') !== -1, 'starters can sit frilly beside the logo');
 assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') !== -1,
   'dish lines use flex leaders that start after the name');
+assert(printJs.indexOf('.dish-line{display:flex') !== -1, 'dish-line flex rule present in source');
+assert(!/\*\/\s*\+/.test(printJs), 'print CSS has no comment-plus that becomes NaN');
+require(path.join(root, 'menus-print.js'));
+var printApi = global.EBMenuPrint;
+assert(typeof printApi.build === 'function', 'EBMenuPrint.build exported');
+var sampleCss = printApi.build(api.menuById('main'), api.seed().main, { pages: 1, forceFillClass: 'fill-roomy' });
+assert(sampleCss.indexOf('NaN') === -1, 'generated print CSS has no NaN from broken concatenations');
+assert(sampleCss.indexOf('.dish-line{display:flex') !== -1, 'generated print CSS keeps dish-line flex leaders');
+assert(sampleCss.indexOf('.sec-title{') !== -1, 'generated print CSS keeps sec-title rule');
 assert(printJs.indexOf('hideTitle') !== -1, 'Item Boost can print without the bucket title');
 assert(printJs.indexOf('just before the price') !== -1 || printJs.indexOf('sits just before the price') !== -1,
   'lunch club mark sits just before the price');
@@ -179,8 +188,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow19') !== -1, 'menus page cache-bust is flow19');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow19') !== -1, 'hub menus link cache-bust is flow19');
+assert(page.indexOf('flow20') !== -1, 'menus page cache-bust is flow20');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow20') !== -1, 'hub menus link cache-bust is flow20');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
 assert(printJs.indexOf('burgersOnRight') !== -1 || printJs.indexOf('classicsSplit') !== -1, 'burgers can sit in right column');
 assert(api.tidyOrphanDescriptions([

@@ -1197,7 +1197,7 @@
       '.foot-logo img{width:96px;height:auto}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
-      /* Titles clearly larger than dishes; gap before the first item */ +
+      /* Titles clearly larger than dishes; gap before the first item */
       '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),28pt)!important;letter-spacing:.12em;text-transform:uppercase;margin:0 0 14px;text-align:center;line-height:1.15}' +
       '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 14px}' +
       '.sec-title-spacer{visibility:hidden;margin:0 0 14px}' +
@@ -1214,11 +1214,11 @@
       '.scallop-pad{padding:6px 10px 5px;overflow:hidden;min-width:0}' +
       '.scallop-box .scallop-pad{padding:6px 10px 6px}' +
       '.dish{margin:0 0 var(--dish-gap);min-width:0;max-width:100%}' +
-      /* Leader starts immediately after name+tags, then mark, then price */ +
-      '.dish-line{display:flex;align-items:baseline;min-width:0;max-width:100%;gap:0}' +
+      /* Leaders only between name and price on one row — never under the description */
+      '.dish-line{display:flex;flex-wrap:nowrap;align-items:baseline;min-width:0;max-width:100%;gap:0}' +
       '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
-      '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px 3px;min-width:10px;height:0;align-self:center}' +
-      '.dish-line .lc{width:16px;height:16px;margin:0 0.35em 0 0.15em;flex:0 0 auto;align-self:center}' +
+      '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px 0.2em;min-width:10px;height:0;align-self:baseline}' +
+      '.dish-line .lc{width:16px;height:16px;margin:0 0.35em 0 0.15em;flex:0 0 auto;align-self:baseline}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);white-space:nowrap;flex:0 0 auto;padding-left:0}' +
       '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
@@ -1233,7 +1233,7 @@
       '.allergy-lc .lc{width:18px;height:18px;margin:0}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
-      /* Golden rule: both columns start on the same baseline */ +
+      /* Golden rule: both columns start on the same baseline */
       '.cols-balanced{align-items:start}' +
       '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
@@ -1268,13 +1268,13 @@
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density ladder — ALWAYS start airy and only tighten if the page overflows */ +
+      /* Density ladder — ALWAYS start airy and only tighten if the page overflows */
       '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12pt;--desc:10.5pt;--title:28pt;--promo:12.5pt}' +
       '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:26pt;--promo:12pt}' +
       '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:24pt;--promo:11.5pt}' +
       '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:20pt;--promo:10.5pt}' +
       '.fill-compact{--dish-gap:6px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:18pt;--promo:10pt}' +
-      /* 2×A5 on A4 landscape — cut down the middle */ +
+      /* 2×A5 on A4 landscape — cut down the middle */
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
       '.a5-face{width:148.5mm;height:210mm;padding:6mm 7mm 7mm;overflow:hidden;display:flex;flex-direction:column}' +
@@ -1478,7 +1478,7 @@
       '.party-dish{margin:0 0 10px;padding:0 14mm}' +
       '.party-dish .desc{padding-right:0;font-style:normal;color:#444}' +
       '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
-      /* Light occasion flourishes — classy, not cartoon */ +
+      /* Light occasion flourishes — classy, not cartoon */
       '.party-theme-christmas{box-shadow:inset 0 0 0 1.5px #2f5d3a}' +
       '.party-theme-christmas .party-title,.party-theme-christmas .sec-title{color:#1e3d28}' +
       '.party-theme-christmas .party-prices{color:#6b2b2b}' +
