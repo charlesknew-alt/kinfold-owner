@@ -177,7 +177,8 @@ function reviewLayoutWithGemini_(body) {
     'If it still will not fit on two readable pages, set okToPrint false and say so in notes — ' +
     'staff should remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.\n' +
     '4. EVENT / FEATURE PANELS: if there are several, prefer TWO (or more) separate boxes split across the columns ' +
-    'rather than one tall box crammed with everything.\n' +
+    'rather than one tall box crammed with everything. Side-by-side panels should contrast — one rectangular box ' +
+    'frame beside one oval/wide scallop — never two matching rectangles next to each other.\n' +
     '5. PAGE 1 FOOD COLUMNS: LEFT = Stay a While / events / Sharing when used as a column; ' +
     'RIGHT = Burgers then Pub Classics under them.\n' +
     '6. Allergy footer (gf / v / vg) must remain fully visible. If any lunch-club ticks exist, keep the ' +

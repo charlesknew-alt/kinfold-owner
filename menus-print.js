@@ -238,8 +238,8 @@
     return String(dateStr || '');
   }
 
-  /** One scalloped event/selling box. */
-  function renderOnePromoBox(promos) {
+  /** One scalloped event/selling box. frameKind: 'box' (rect) or 'wide' (oval). */
+  function renderOnePromoBox(promos, frameKind) {
     promos = (promos || []).filter(function (p) { return p && p.title; });
     if (!promos.length) return '';
     var inner = '<div class="promo">';
@@ -250,20 +250,24 @@
       if (p.body) inner += '<p>' + esc(p.body) + '</p>';
     });
     inner += '</div>';
-    return scallop(inner, 'box');
+    return scallop(inner, frameKind === 'wide' ? 'wide' : 'box');
   }
 
   /**
    * Event panels: never cram a long bank into one tall box.
    * 1–2 items → one box; 3+ → multiple boxes of up to 2.
    */
-  function renderPromoBank(promos) {
+  function renderPromoBank(promos, frameKind) {
     promos = (promos || []).filter(function (p) { return p && p.title; });
     if (!promos.length) return '';
-    if (promos.length <= 2) return renderOnePromoBox(promos);
+    if (promos.length <= 2) return renderOnePromoBox(promos, frameKind);
     var html = '';
     for (var i = 0; i < promos.length; i += 2) {
-      html += renderOnePromoBox(promos.slice(i, i + 2));
+      // Alternate frame within a tall stack so consecutive panels don’t match
+      var kind = frameKind === 'wide'
+        ? (i % 4 === 0 ? 'wide' : 'box')
+        : (i % 4 === 0 ? 'box' : 'wide');
+      html += renderOnePromoBox(promos.slice(i, i + 2), kind);
     }
     return html;
   }
@@ -271,8 +275,15 @@
   /**
    * Split event wording across the two columns so both columns finish
    * at roughly the same height (start aligned, end aligned).
+   * Paired panels always use opposite frames (rect box vs oval wide) so
+   * two matching rectangles never sit side by side.
    */
-  function splitPromosForColumns(promos) {
+  function splitPromosForColumns(promos, opts) {
+    opts = opts || {};
+    var leftKind = opts.leftFrame === 'wide' ? 'wide' : 'box';
+    var rightKind = opts.rightFrame
+      ? (opts.rightFrame === 'wide' ? 'wide' : 'box')
+      : (leftKind === 'box' ? 'wide' : 'box');
     var list = (promos || []).filter(function (p) { return p && p.title; });
     if (!list.length) {
       list = [
@@ -281,20 +292,24 @@
       ];
     }
     if (list.length === 1) {
-      return { left: renderOnePromoBox(list), right: '' };
+      return { left: renderOnePromoBox(list, leftKind), right: '' };
     }
     if (list.length === 2) {
-      return { left: renderOnePromoBox([list[0]]), right: renderOnePromoBox([list[1]]) };
+      return {
+        left: renderOnePromoBox([list[0]], leftKind),
+        right: renderOnePromoBox([list[1]], rightKind)
+      };
     }
     var mid = Math.ceil(list.length / 2);
     return {
-      left: renderPromoBank(list.slice(0, mid)),
-      right: renderPromoBank(list.slice(mid))
+      left: renderPromoBank(list.slice(0, mid), leftKind),
+      right: renderPromoBank(list.slice(mid), rightKind)
     };
   }
 
   function sandwichNote(dishes, opts) {
     opts = opts || {};
+    var frameKind = opts.frame === 'wide' ? 'wide' : 'box';
     var price = 'all 9.50';
     var hours = '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)';
     var body = 'Filled ciabatta or farmhouse sandwich, all served with fries and salad.';
@@ -325,7 +340,7 @@
               '<p class="desc">' + esc(body) + '</p>' +
               '<p class="note-line">' + esc(foot) + '</p>' +
             '</div>',
-            'box'
+            frameKind
           ) +
         '</div>'
       );
@@ -338,7 +353,7 @@
         '<p class="desc">' + esc(body) + '</p>' +
         '<p class="note-line">' + esc(foot) + '</p>' +
       '</div>',
-      'box'
+      frameKind
     );
   }
 
@@ -868,13 +883,14 @@
   }
 
   function renderFiller(which, bag, promos, opts) {
+    opts = opts || {};
     if (which === 'rooms') {
       var list = (promos && promos.length) ? promos : (bag && bag.promos);
-      if (list && list.length) return renderPromoBank(list);
+      if (list && list.length) return renderPromoBank(list, opts.frame);
       return promoRooms();
     }
     if (which === 'sandwiches') {
-      return sandwichNote(bag.sandwiches && bag.sandwiches.dishes, opts || {});
+      return sandwichNote(bag.sandwiches && bag.sandwiches.dishes, opts);
     }
     if (which === 'lunch') return lunchClubBox();
     if (which === 'logo') {
@@ -1024,8 +1040,17 @@
     if (showColBlock && classicsAsColumn) {
       p1 += '<section class="sec classics-block">';
       p1 += '<div class="cols cols-classics cols-balanced cols-features">';
-      var promoCols = p1opts.rooms ? splitPromosForColumns(promos) : { left: '', right: '' };
-      var leftFeature = p1opts.rooms ? (promoCols.left || renderFiller('rooms', bag, promos)) : '';
+      // Opposite frames when panels sit side by side (rect box vs oval wide).
+      // If a rectangular Sandwiches box sits in the right column, start left on wide.
+      var besideSandwichBox = !!(p1opts.sandwiches && sandwichesAsColumn &&
+        (burgerDishes.length || classicDishes.length) && sandRule.frame !== false);
+      var promoFrameOpts = besideSandwichBox
+        ? { leftFrame: 'wide', rightFrame: 'box' }
+        : { leftFrame: 'box', rightFrame: 'wide' };
+      var promoCols = p1opts.rooms ? splitPromosForColumns(promos, promoFrameOpts) : { left: '', right: '' };
+      var leftFeature = p1opts.rooms
+        ? (promoCols.left || renderFiller('rooms', bag, promos, { frame: promoFrameOpts.leftFrame }))
+        : '';
       var rightFeature = '';
       if (p1opts.rooms && promoCols.right) rightFeature = promoCols.right;
       // LEFT — dishes in col-body; feature box(es) pinned to column foot so both
@@ -1039,7 +1064,8 @@
         );
       }
       if (p1opts.sandwiches && sandwichesAsColumn && !burgerDishes.length && !classicDishes.length) {
-        p1 += renderFiller('sandwiches', bag);
+        // Alone in left column beside a right feature — keep sandwiches rectangular
+        p1 += renderFiller('sandwiches', bag, promos, { frame: 'box' });
       }
       if (!shareInLeft && !leftFeature && !(p1opts.sandwiches && sandwichesAsColumn)) {
         p1 += '&nbsp;';
@@ -1057,7 +1083,7 @@
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
       if (p1opts.sandwiches && sandwichesAsColumn && (burgerDishes.length || classicDishes.length)) {
-        if (sandRule.frame) p1 += renderFiller('sandwiches', bag);
+        if (sandRule.frame) p1 += renderFiller('sandwiches', bag, promos, { frame: 'box' });
         else {
           p1 += '<div class="promo sandwich-promo sec-plain">' +
             '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>' +
@@ -1083,12 +1109,18 @@
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
       if (p1opts.sandwiches) p1 += renderFiller('sandwiches', bag);
     } else if (p1opts.rooms || p1opts.sandwiches) {
-      // Pair of selling boxes alone — pin both to the column foot so they line up
+      // Pair of selling boxes alone — opposite frames, both pinned to column foot
       p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced cols-features">';
       p1 += '<div class="col col-events"><div class="col-body">&nbsp;</div>';
-      if (p1opts.rooms) p1 += '<div class="col-feature">' + renderFiller('rooms', bag, promos) + '</div>';
+      if (p1opts.rooms) {
+        p1 += '<div class="col-feature">' +
+          renderFiller('rooms', bag, promos, { frame: p1opts.sandwiches ? 'wide' : 'box' }) +
+          '</div>';
+      }
       p1 += '</div><div class="col col-food"><div class="col-body">&nbsp;</div>';
-      if (p1opts.sandwiches) p1 += '<div class="col-feature">' + renderFiller('sandwiches', bag) + '</div>';
+      if (p1opts.sandwiches) {
+        p1 += '<div class="col-feature">' + renderFiller('sandwiches', bag, promos, { frame: 'box' }) + '</div>';
+      }
       p1 += '</div></div></section>';
     }
 
