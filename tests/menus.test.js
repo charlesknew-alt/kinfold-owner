@@ -104,7 +104,7 @@ assert(printJs.indexOf('body.scrollHeight>body.clientHeight') !== -1,
 assert(printJs.indexOf('splitPromosForColumns') !== -1, 'event panels can split across columns');
 assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as separate boxes');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
-assert(printJs.indexOf('smaller options for smaller appetites') !== -1,
+assert(printJs.indexOf('smaller plates for smaller appetites') !== -1,
   'lunch club spiel sits in the allergy footer');
 assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
   'layout plan notes lunch club lives with allergens');
