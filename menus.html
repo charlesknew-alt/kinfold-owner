@@ -244,9 +244,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260923-flow32"></script>
-  <script src="menus-print.js?v=20260923-flow32"></script>
-  <script src="menus-ingest.js?v=20260923-flow32"></script>
+  <script src="menus.js?v=20260923-flow33"></script>
+  <script src="menus-print.js?v=20260923-flow33"></script>
+  <script src="menus-ingest.js?v=20260923-flow33"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -552,7 +552,7 @@
         html += flowNav(1, 3, 'Next · Wording');
         return html;
       }
-      html += '<p class="step-lede">Treat each category as a block on the page. Full width for mains/starters by default; columns for nibbles, burgers, sandwiches, sides. Frilly box = scalloped frame. Changes save for next time.</p>';
+      html += '<p class="step-lede">Treat each category as a block on the page. <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit for this page (AI chooses)</strong> lets layout pick whichever suits this sheet. Frilly box = scalloped frame. Changes save for next time.</p>';
 
       // Quick cards for sections that have dishes
       var bySec = {};

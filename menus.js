@@ -1116,8 +1116,8 @@
    * Per-section print layout rules.
    * width: 'full' | 'column' | 'both'
    *   full   — always full page width
-   *   column — sits in a column (beside promo / another column section)
-   *   both   — prefer column when a partner fits, otherwise full width
+   *   column — always sits in a column
+   *   both   — “best fit”: layout / AI picks column or full for this page
    * frame: scalloped “frilly” box around the section
    * note: optional spiel printed under the title (hours, “all served with…”, etc.)
    */
@@ -1145,7 +1145,7 @@
   var WIDTH_OPTIONS = [
     { id: 'full', label: 'Full width' },
     { id: 'column', label: 'Column' },
-    { id: 'both', label: 'Both (column if it fits)' }
+    { id: 'both', label: 'Best fit for this page (AI chooses)' }
   ];
 
   function defaultSectionLayout() {

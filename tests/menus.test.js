@@ -157,7 +157,13 @@ assert(printJs.indexOf('isLittleBells') !== -1 && printJs.indexOf('bag.littleBel
 assert(printJs.indexOf('share-cols') !== -1, 'sharing plates can print in two columns');
 assert(printJs.indexOf('shareInLeft') !== -1 || printJs.indexOf('shareAsColumn') !== -1, 'sharing can sit in a column to balance');
 assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
-assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default prefers column when it fits');
+assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default is best-fit (AI chooses)');
+assert(api.WIDTH_OPTIONS.some(function (w) {
+  return w.id === 'both' && /best fit/i.test(w.label) && /AI chooses/i.test(w.label);
+}), 'width “both” is labelled best fit / AI chooses, not column-if-it-fits');
+assert(api.WIDTH_OPTIONS.every(function (w) {
+  return !/column if it fits/i.test(w.label || '');
+}), 'no width option says column if it fits');
 assert(page.indexOf('Merge ↑') !== -1, 'confirm review has merge-into-above control');
 assert(page.indexOf('data-review-split') !== -1 && page.indexOf('Split') !== -1, 'confirm review has split control');
 assert(page.indexOf('data-review-delete') !== -1 && page.indexOf('Delete') !== -1, 'confirm review has delete control');
@@ -220,8 +226,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow32') !== -1, 'menus page cache-bust is flow32');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow32') !== -1, 'hub menus link cache-bust is flow32');
+assert(page.indexOf('flow33') !== -1, 'menus page cache-bust is flow33');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow33') !== -1, 'hub menus link cache-bust is flow33');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
