@@ -234,19 +234,23 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow40') !== -1, 'menus page cache-bust is flow40');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow40') !== -1, 'hub menus link cache-bust is flow40');
+assert(page.indexOf('flow41') !== -1, 'menus page cache-bust is flow41');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow41') !== -1, 'hub menus link cache-bust is flow41');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
 assert(page.indexOf('metaTopKind') !== -1 && page.indexOf('metaBottomKind') !== -1,
   'party blurbs have title/paragraph/text style');
+assert(page.indexOf('Heading (between title') !== -1, 'party blurbs offer heading between title and paragraph');
 assert(api.PROMO_NONE_ID === '__none__', 'promo none tick id exported');
 assert(api.pickPromos(api.seedPromoBank(), { __none__: true }).length === 0,
   'no-events tick yields zero promos');
 assert(api.normalizeMeta({ title: 'X', notes: 'Y', topKind: 'text' }).topKind === 'text',
   'normalizeMeta keeps blurb kinds');
+assert(api.normalizeMeta({ bottomKind: 'heading' }).bottomKind === 'heading',
+  'normalizeMeta accepts heading blurb kind');
 assert(printJs.indexOf('partyBlurbBlock') !== -1, 'party print uses blurb kinds');
+assert(printJs.indexOf('party-blurb-heading') !== -1, 'party print has heading blurb size');
 assert(ingestJs.indexOf('fetchWithTimeout') !== -1 && ingestJs.indexOf('imageFileForAi') !== -1,
   'AI reader shrinks images and times out instead of hanging');
 assert(aiGs.indexOf('gemini-2.5-flash') !== -1 && aiGs.indexOf('callGemini_') !== -1,

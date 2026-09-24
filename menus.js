@@ -249,7 +249,7 @@
       notes: '',
       paper: 'a4',
       topKind: 'title',
-      bottomKind: 'paragraph'
+      bottomKind: 'heading'
     };
   }
 
@@ -258,8 +258,8 @@
     if (!raw || typeof raw !== 'object') return base;
     var topKind = String(raw.topKind || base.topKind).toLowerCase();
     var bottomKind = String(raw.bottomKind || base.bottomKind).toLowerCase();
-    if (['title', 'paragraph', 'text'].indexOf(topKind) === -1) topKind = 'title';
-    if (['title', 'paragraph', 'text'].indexOf(bottomKind) === -1) bottomKind = 'paragraph';
+    if (['title', 'heading', 'paragraph', 'text'].indexOf(topKind) === -1) topKind = 'title';
+    if (['title', 'heading', 'paragraph', 'text'].indexOf(bottomKind) === -1) bottomKind = 'heading';
     return {
       title: String(raw.title != null ? raw.title : ''),
       subtitle: String(raw.subtitle != null ? raw.subtitle : ''),

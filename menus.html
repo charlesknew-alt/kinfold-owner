@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260924-flow40"></script>
-  <script src="menus-print.js?v=20260924-flow40"></script>
-  <script src="menus-ingest.js?v=20260924-flow40"></script>
+  <script src="menus.js?v=20260924-flow41"></script>
+  <script src="menus-print.js?v=20260924-flow41"></script>
+  <script src="menus-ingest.js?v=20260924-flow41"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -776,6 +776,7 @@
     function blurbKindSelect(id, value) {
       var kinds = [
         { id: 'title', label: 'Title (large heading)' },
+        { id: 'heading', label: 'Heading (between title & paragraph)' },
         { id: 'paragraph', label: 'Paragraph (centred body)' },
         { id: 'text', label: 'Text (smaller plain line)' }
       ];
@@ -1368,7 +1369,7 @@
           notes: notesEl ? notesEl.value : '',
           paper: (paperEl && paperEl.value === 'a5') ? 'a5' : 'a4',
           topKind: (document.getElementById('metaTopKind') || {}).value || 'title',
-          bottomKind: (document.getElementById('metaBottomKind') || {}).value || 'paragraph'
+          bottomKind: (document.getElementById('metaBottomKind') || {}).value || 'heading'
         });
         save();
         renderPreview();

@@ -1662,13 +1662,17 @@
     if (!text) return '';
     kind = String(kind || 'paragraph').toLowerCase();
     var body = esc(text).replace(/\n/g, '<br>');
+    var place = where || 'top';
     if (kind === 'title') {
-      return '<h1 class="party-title party-blurb-' + (where || 'top') + '">' + body + '</h1>';
+      return '<h1 class="party-title party-blurb-' + place + '">' + body + '</h1>';
+    }
+    if (kind === 'heading') {
+      return '<div class="party-blurb-heading party-blurb-' + place + '">' + body + '</div>';
     }
     if (kind === 'text') {
-      return '<div class="party-blurb-text party-blurb-' + (where || 'top') + '">' + body + '</div>';
+      return '<div class="party-blurb-text party-blurb-' + place + '">' + body + '</div>';
     }
-    return '<div class="party-notes party-blurb-para party-blurb-' + (where || 'top') + '">' + body + '</div>';
+    return '<div class="party-notes party-blurb-para party-blurb-' + place + '">' + body + '</div>';
   }
 
   function partyOccasion(title, meta) {
@@ -2273,9 +2277,11 @@
       '.party-dish{margin:0 0 10px;padding:0 14mm}' +
       '.party-dish .desc{text-align:center;padding-right:0;font-style:normal;color:#444}' +
       '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
-      '.party-blurb-para{font-size:11.5px;line-height:1.45}' +
+      '.party-blurb-heading{font-family:var(--serif);font-size:13pt;font-weight:600;letter-spacing:.04em;line-height:1.35;color:#1e3d28;margin:12px 12mm 8px}' +
+      '.party-blurb-para{font-size:12px;line-height:1.45}' +
       '.party-blurb-text{font-family:var(--sans);font-size:10.5pt;color:#3a342c;margin:10px 14mm 8px;line-height:1.4;font-weight:400}' +
       '.party-blurb-bottom.party-title{font-size:16px;margin-top:14px}' +
+      '.party-blurb-bottom.party-blurb-heading{margin-top:16px;font-size:12.5pt}' +
       '.party-promos{margin:10px 10mm 4px;text-align:center}' +
       '.party-promo{margin:0 0 8px}' +
       '.party-promo .promo-title{font-size:var(--promo);margin:0 0 2px}' +
