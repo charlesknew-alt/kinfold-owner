@@ -703,7 +703,8 @@
   function dishUnits(d) {
     var u = 1.35;
     if (d.description) {
-      u += 0.85 + Math.floor(String(d.description).length / 78) * 0.45;
+      // Long burger/classic spiels are taller than a short sandwich note — weight them
+      u += 0.85 + Math.floor(String(d.description).length / 55) * 0.55;
     }
     return u;
   }
@@ -1200,7 +1201,12 @@
       var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box', leftFood: leftFoodU, rightFood: rightFoodU }
         : { leftFrame: 'box', rightFrame: 'wide', leftFood: leftFoodU, rightFood: rightFoodU };
-      var promoCols = p1opts.rooms
+      // CRITICAL: opposite columns must finish level. If leftover allows (or rooms
+      // already packed), ask planPromoFill to put a panel under the shorter stack.
+      var canBalance = !!(promos && promos.length) && (
+        !!p1opts.rooms || !!(layout.leftover && layout.leftover.p1 >= 3)
+      );
+      var promoCols = canBalance
         ? planPromoFill(leftFoodU, rightFoodU, promos, promoFrameOpts)
         : { left: '', right: '' };
       var leftFeature = promoCols.left || '';
