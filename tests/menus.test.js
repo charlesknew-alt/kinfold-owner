@@ -219,8 +219,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow30') !== -1, 'menus page cache-bust is flow30');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow30') !== -1, 'hub menus link cache-bust is flow30');
+assert(page.indexOf('flow31') !== -1, 'menus page cache-bust is flow31');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow31') !== -1, 'hub menus link cache-bust is flow31');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
@@ -233,6 +233,20 @@ assert(printJs.indexOf('startersInCol') !== -1 && printJs.indexOf('cols-with-log
   'starters sit beside logo when nibbles absent');
 assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
   'sparse card menus spread to fill the A5 face');
+assert(printJs.indexOf('cardSandwichesInner') !== -1,
+  'sandwich A5 cards group fillings by price');
+assert(/\.card-face\.fill-airy\{[^}]*--name:14pt/.test(printJs),
+  'A5 card faces start with larger dish type to fill the page');
+assert(printJs.indexOf('justify-content:space-evenly') !== -1 && printJs.indexOf('card-face .scallop-pad') !== -1,
+  'card scallop pad spreads dishes to fill the frilly box');
+assert(printJs.indexOf('party-promos') !== -1,
+  'party sheets can print wording from the bank');
+assert(printJs.indexOf('keep party-page') !== -1 || printJs.indexOf('party-page / theme classes') !== -1,
+  'A5 guillotine keeps party-page so descriptions stay centred');
+assert(!/\.a5-face\{--dish-gap:8px/.test(printJs),
+  'A5 faces are not locked to a tiny type size');
+assert(page.indexOf('including 2×A5') !== -1 || page.indexOf('Party sheets') !== -1,
+  'wording step allows bank picks on party / A5 sheets');
 assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,

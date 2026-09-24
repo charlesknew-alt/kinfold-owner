@@ -244,9 +244,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260923-flow30"></script>
-  <script src="menus-print.js?v=20260923-flow30"></script>
-  <script src="menus-ingest.js?v=20260923-flow30"></script>
+  <script src="menus.js?v=20260923-flow31"></script>
+  <script src="menus-print.js?v=20260923-flow31"></script>
+  <script src="menus-ingest.js?v=20260923-flow31"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -324,7 +324,9 @@
     }
     function pickedPromosForSheet() {
       if (!window.EBMenus || typeof EBMenus.pickPromos !== 'function') return [];
-      return EBMenus.pickPromos(promoBank, hostPromoTicks(), { max: 5 });
+      var menu = EBMenus.menuById(menuId);
+      var max = menu && menu.kind === 'party' ? 2 : 5;
+      return EBMenus.pickPromos(promoBank, hostPromoTicks(), { max: max });
     }
     function load() {
       try {
@@ -608,8 +610,8 @@
     function renderWordingStep(menu) {
       var html = '';
       html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want, or leave blank and we’ll auto-pick (never past dates).</p>';
-      if (menu.kind === 'long') html += renderPromoTicksBox();
-      else html += '<p class="note">Wording boxes are for Main and Sunday sheets.</p>';
+      if (menu.kind === 'long' || menu.kind === 'party') html += renderPromoTicksBox();
+      else html += '<p class="note">Event wording from the bank is for Main, Sunday, and Party sheets (including 2×A5).</p>';
       html += renderWordingBank();
       html += flowNav(2, 4, 'Next · Generate');
       return html;
@@ -1514,6 +1516,8 @@
         result.plan.fit = layout.fit;
         result.plan.text = layout.summary;
         result.plan.promos = promos;
+      } else if (menu.kind === 'party') {
+        result.plan.promos = pickedPromosForSheet();
       }
       return result;
     }
@@ -1536,7 +1540,7 @@
         html += '<p><strong>Will auto-add</strong> — ' + plan.layout.fillers.map(function (f) { return escapeAttr(f); }).join(' · ') + '</p>';
       }
       var promos = plan.promos || pickedPromosForSheet();
-      if (menu.kind === 'long') {
+      if (menu.kind === 'long' || menu.kind === 'party') {
         var anyPromoTick = Object.keys(hostPromoTicks()).some(function (k) { return hostPromoTicks()[k]; });
         html += '<p><strong>Wording</strong> — ' +
           (promos.length
@@ -1614,7 +1618,7 @@
       if (hint) hint.disabled = true;
 
       // Layout brain runs here (order + columns + fillers), then we open a preview sheet.
-      var promos = menu.kind === 'long' ? pickedPromosForSheet() : [];
+      var promos = (menu.kind === 'long' || menu.kind === 'party') ? pickedPromosForSheet() : [];
       var layout = null;
       if (menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
         layout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
@@ -1632,6 +1636,8 @@
           alert('Too much information for two readable pages.\n\nRemove some sections, or put Desserts / Little Bells / Sandwiches on their own menus, then try again.\n\nWe will not shrink the type below a size customers can read.');
           return;
         }
+      } else if (menu.kind === 'party') {
+        result.plan.promos = promos;
       }
       result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
       if (result.plan.meta.paper === 'a5') result.plan.defaultPaper = 'a5';

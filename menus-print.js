@@ -194,13 +194,41 @@
     var html = '<div class="dish dish-c">';
     html += '<div class="dish-name">';
     html += esc(d.name);
+    // Tags sit with the name so the description line stays a clean centred block
+    if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     if (!opts.hidePrice && d.price) html += ' <span class="price">' + esc(d.price) + '</span>';
     if (d.lunchClub && !opts.hideLunch) html += ' ' + lunchMark();
     html += '</div>';
-    if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
-    if (d.tags) html += '<div class="tags">' + esc(d.tags) + '</div>';
+    if (d.description) {
+      html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
+    }
     html += '</div>';
     return html;
+  }
+
+  /** Group sandwich fillings by price for A5 card faces. */
+  function cardSandwichesInner(dishes) {
+    var groups = {};
+    var order = [];
+    (dishes || []).forEach(function (d) {
+      var p = cleanPrice(d.price);
+      if (!groups[p]) {
+        groups[p] = [];
+        order.push(p);
+      }
+      groups[p].push(d);
+    });
+    var html = '';
+    order.forEach(function (p) {
+      groups[p].forEach(function (d) {
+        html += dishCentered(d, { hidePrice: true });
+      });
+      if (p) html += '<div class="lb-price">£' + esc(p) + '</div>';
+    });
+    html +=
+      '<div class="desc card-spiel">Served on either Ciabatta vg, Farmhouse White or Granary<br>' +
+      'All served with Fries and Salad</div>';
+    return scallop(html);
   }
 
   function groupBySection(dishes) {
@@ -1247,11 +1275,7 @@
             '<div class="desc">Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options</div>' +
           '</div>';
       } else if (menu.id === 'sandwiches') {
-        inner = scallop(
-          dishes.map(function (d) { return dishCentered(d, { hidePrice: true }); }).join('') +
-          '<div class="lb-price" style="margin-top:8px">' + esc((dishes[0] && dishes[0].price) || '') + '</div>' +
-          '<div class="desc" style="margin-top:10px">Served on either Ciabatta vg, Farmhouse White or Granary<br>All served with Fries and Salad</div>'
-        );
+        inner = cardSandwichesInner(dishes);
       } else {
         // desserts etc
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
@@ -1296,20 +1320,27 @@
       '.scallop,.sec,.cols,.foot-logo,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;height:100%}' +
-      '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative;display:flex;flex-direction:column;height:210mm;box-sizing:border-box;overflow:hidden}' +
+      '.card-face{padding:7mm 7mm 6mm;border-right:1px dashed #cfc7bb;position:relative;display:flex;flex-direction:column;height:210mm;box-sizing:border-box;overflow:hidden}' +
       '.card-face:last-child{border-right:0}' +
       '.card-top{flex:0 0 auto}' +
-      '.card-mid{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}' +
-      '.card-face .allergy{flex:0 0 auto;margin-top:auto}' +
-      '.card-face.fill-airy{--dish-gap:16px;--sec-gap:18px;--name:11.5pt;--desc:10pt;--title:18pt}' +
-      '.card-face.fill-roomy{--dish-gap:13px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:16pt}' +
-      '.card-face.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:15pt}' +
-      '.card-face.fill-tight,.card-face.fill-compact,.card-face.fill-dense{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:14pt}' +
-      '.card-face.fill-tight .card-mid,.card-face.fill-compact .card-mid,.card-face.fill-dense .card-mid{justify-content:flex-start}' +
-      '.card-face .dish-c{margin:0 0 var(--dish-gap)}' +
-      '.card-face .scallop{margin:0}' +
-      '.card-face .logo{width:64px;margin:0 auto 6px}' +
-      '.card-face h1{margin:2px 0 10px;font-size:18px}' +
+      /* Grow the frilly box to fill the A5 face; spread dishes inside with large type */
+      '.card-mid{flex:1 1 auto;display:flex;flex-direction:column;justify-content:stretch;min-height:0;gap:8px}' +
+      '.card-face .allergy{flex:0 0 auto;margin-top:4px}' +
+      '.card-face.fill-airy{--dish-gap:20px;--sec-gap:20px;--name:14pt;--desc:11.5pt;--title:22pt}' +
+      '.card-face.fill-roomy{--dish-gap:16px;--sec-gap:16px;--name:13pt;--desc:11pt;--title:20pt}' +
+      '.card-face.fill-normal{--dish-gap:12px;--sec-gap:13px;--name:12pt;--desc:10.5pt;--title:18pt}' +
+      '.card-face.fill-tight{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:9.75pt;--title:16pt}' +
+      '.card-face.fill-compact,.card-face.fill-dense{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:14pt}' +
+      '.card-face .dish-c{margin:0;padding:2px 0;text-align:center}' +
+      '.card-face .dish-c .desc,.card-face .card-spiel{text-align:center;max-width:34em;margin-left:auto;margin-right:auto}' +
+      '.card-face .scallop{margin:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:0;width:100%}' +
+      '.card-face .scallop-pad{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}' +
+      '.card-face.fill-tight .scallop-pad,.card-face.fill-compact .scallop-pad,.card-face.fill-dense .scallop-pad{justify-content:flex-start}' +
+      '.card-face .lb-foot{flex:0 0 auto;text-align:center}' +
+      '.card-face .lb-price{text-align:center;margin:6px 0 10px}' +
+      '.card-face .card-spiel{margin-top:8px}' +
+      '.card-face .logo{width:86px;margin:0 auto 8px}' +
+      '.card-face h1{margin:2px 0 10px;font-size:min(var(--title),22pt)}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
@@ -1355,6 +1386,7 @@
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
+      '.dish-c .desc,.dish-c .tags{text-align:center}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
       '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.15em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
@@ -1423,17 +1455,27 @@
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
       '.a5-face{width:148.5mm;height:210mm;padding:6mm 7mm 7mm;overflow:hidden;display:flex;flex-direction:column}' +
-      '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden}' +
+      '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start}' +
       '.a5-face .page-spacer{display:none}' +
       '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
-      '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
+      /* Density ladder drives A5 type — do not lock a tiny size that leaves the face sparse */
+      '.a5-face.fill-airy{--dish-gap:14px;--sec-gap:16px;--name:12.5pt;--desc:11pt;--title:22pt;--promo:12pt}' +
+      '.a5-face.fill-roomy{--dish-gap:11px;--sec-gap:13px;--name:11.5pt;--desc:10.25pt;--title:18pt;--promo:11pt}' +
+      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:11px;--name:10.75pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
+      '.a5-face.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9.25pt;--title:14pt;--promo:10pt}' +
+      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:5px;--sec-gap:7px;--name:9.25pt;--desc:8.5pt;--title:12.5pt;--promo:9pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .party-logo{width:72px}' +
+      '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
       '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 120px;gap:8px;min-height:0}' +
       '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
       '.a5-face .tracker .roman{font-size:3.5pt!important}' +
       '.a5-face .allergy{font-size:8.5pt}' +
       '.a5-face .cols{gap:10px}' +
       '.a5-face .scallop{border-width:10px;border-image-width:10px}' +
+      '.a5-face.party-page{text-align:center}' +
+      '.a5-face .party-dish .desc{text-align:center}' +
+      '.a5-face .party-promos{text-align:center;margin-top:auto;padding-top:6px}' +
       '@media print{body{background:#fff}.toolbar{display:none}' +
       '.page,.sheet,.cut-sheet{margin:0;box-shadow:none}' +
       (guillotine
@@ -1446,6 +1488,7 @@
 
   function wrapGuillotine(pagesHtml) {
     // Each A4 page becomes two identical A5 faces on landscape A4 for cutting.
+    // Keep party-page / theme classes so centred type and occasion styles survive.
     var parts = String(pagesHtml || '').split(/(?=<div class="page\b)/).filter(function (s) {
       return /class="page\b/.test(s);
     });
@@ -1454,8 +1497,22 @@
       var openEnd = pageHtml.indexOf('>');
       var close = pageHtml.lastIndexOf('</div>');
       if (openEnd < 0 || close < 0) return pageHtml;
+      var openTag = pageHtml.slice(0, openEnd + 1);
+      var classMatch = openTag.match(/class="([^"]*)"/);
+      var keep = '';
+      if (classMatch) {
+        keep = classMatch[1]
+          .split(/\s+/)
+          .filter(function (c) {
+            return c && c !== 'page' && c !== 'fill-page' && !/^fill-/.test(c);
+          })
+          .join(' ');
+      }
       var content = pageHtml.slice(openEnd + 1, close);
-      var face = '<div class="a5-face fill-page fill-roomy">' + content + '</div>';
+      var face =
+        '<div class="a5-face fill-page fill-airy' + (keep ? ' ' + keep : '') + '">' +
+        content +
+        '</div>';
       return '<div class="cut-sheet">' + face + face + '</div>';
     }).join('');
   }
@@ -1476,13 +1533,14 @@
     var title = meta.title || menu.name || 'Party Menu';
     var prices = meta.coursePrices || '';
     var notes = meta.notes || '';
+    var promos = (plan && plan.promos) || [];
     var sections = groupBySection(dishes);
     var order = ['Starters', 'Mains', 'Desserts'];
     var byName = {};
     sections.forEach(function (s) { byName[s.name.toLowerCase()] = s; });
 
     var occasion = partyOccasion(title, meta);
-    var html = '<div class="page party-page party-theme-' + occasion + ' fill-page fill-roomy">';
+    var html = '<div class="page party-page party-theme-' + occasion + ' fill-page fill-airy">';
     html += trackerBar(ver, { hideDate: true });
     html += '<div class="page-body">';
     html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
@@ -1499,7 +1557,9 @@
         html += '<div class="dish-name">' + esc(d.name);
         if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
         html += '</div>';
-        if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
+        if (d.description) {
+          html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
+        }
         html += '</div>';
       });
       html += '</section>';
@@ -1515,6 +1575,23 @@
     });
 
     if (notes) html += '<div class="party-notes">' + esc(notes) + '</div>';
+    if (promos.length) {
+      html += '<div class="party-promos">';
+      promos.forEach(function (p) {
+        if (!p || !p.title) return;
+        html += '<div class="party-promo">';
+        html += '<div class="promo-title">' + esc(p.title) + '</div>';
+        if (p.date) {
+          var when = root.EBMenus && root.EBMenus.formatPromoDate
+            ? root.EBMenus.formatPromoDate(p.date)
+            : p.date;
+          if (when) html += '<div class="promo-date">' + esc(when) + '</div>';
+        }
+        if (p.body) html += '<p class="desc">' + esc(p.body) + '</p>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
     html += '</div>'; // page-body
     html += allergy();
     html += '</div>';
@@ -1648,8 +1725,12 @@
       '.party-sec{margin:0 0 12px}' +
       '.party-sec .sec-title{margin-bottom:10px}' +
       '.party-dish{margin:0 0 10px;padding:0 14mm}' +
-      '.party-dish .desc{padding-right:0;font-style:normal;color:#444}' +
+      '.party-dish .desc{text-align:center;padding-right:0;font-style:normal;color:#444}' +
       '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
+      '.party-promos{margin:10px 10mm 4px;text-align:center}' +
+      '.party-promo{margin:0 0 8px}' +
+      '.party-promo .promo-title{font-size:var(--promo);margin:0 0 2px}' +
+      '.party-promo .desc{font-size:var(--desc);margin:0;color:#3a342c}' +
       /* Light occasion flourishes — classy, not cartoon */
       '.party-theme-christmas{box-shadow:inset 0 0 0 1.5px #2f5d3a}' +
       '.party-theme-christmas .party-title,.party-theme-christmas .sec-title{color:#1e3d28}' +
