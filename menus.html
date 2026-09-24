@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260924-flow39"></script>
-  <script src="menus-print.js?v=20260924-flow39"></script>
-  <script src="menus-ingest.js?v=20260924-flow39"></script>
+  <script src="menus.js?v=20260924-flow40"></script>
+  <script src="menus-print.js?v=20260924-flow40"></script>
+  <script src="menus-ingest.js?v=20260924-flow40"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -363,7 +363,12 @@
     }
     function loadMeta() {
       try {
-        return JSON.parse(localStorage.getItem(META_STORAGE) || '{}') || {};
+        var raw = JSON.parse(localStorage.getItem(META_STORAGE) || '{}') || {};
+        var out = {};
+        Object.keys(raw).forEach(function (k) {
+          out[k] = EBMenus.normalizeMeta ? EBMenus.normalizeMeta(raw[k]) : raw[k];
+        });
+        return out;
       } catch (e) { return {}; }
     }
     function save() {
@@ -759,11 +764,49 @@
 
     function renderWordingStep(menu) {
       var html = '';
-      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want, or leave blank and we’ll auto-pick (never past dates).</p>';
+      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want, tick <strong>No events</strong> for none, or leave blank and we’ll auto-pick (never past dates).</p>';
+      if (menu.kind === 'party') html += renderPartyBlurbsBox();
       if (menu.kind === 'long' || menu.kind === 'party') html += renderPromoTicksBox();
       else html += '<p class="note">Event wording from the bank is for Main, Sunday, and Party sheets (including 2×A5).</p>';
       html += renderWordingBank();
       html += flowNav(2, 4, 'Next · Generate');
+      return html;
+    }
+
+    function blurbKindSelect(id, value) {
+      var kinds = [
+        { id: 'title', label: 'Title (large heading)' },
+        { id: 'paragraph', label: 'Paragraph (centred body)' },
+        { id: 'text', label: 'Text (smaller plain line)' }
+      ];
+      var html = '<select id="' + id + '">';
+      kinds.forEach(function (k) {
+        html += '<option value="' + k.id + '"' + (value === k.id ? ' selected' : '') + '>' + escapeAttr(k.label) + '</option>';
+      });
+      html += '</select>';
+      return html;
+    }
+
+    function renderPartyBlurbsBox() {
+      var m = EBMenus.normalizeMeta(metaBook[menuId] || EBMenus.emptyMeta());
+      var html = '<div class="include-box" style="margin-bottom:14px"><h3>Top &amp; bottom blurbs</h3>';
+      html += '<p class="note" style="margin:0 0 10px">These are the <strong>Christmas / party sheet</strong> lines — not the pub-quiz bank below. ' +
+        '<strong>Top</strong> is the menu name under the logo. <strong>Bottom</strong> is the pre-order / deposit note under the dishes. ' +
+        'Course prices sit under the top blurb. Event selling lines are controlled separately.</p>';
+      html += '<label class="field" style="margin-top:0">Top blurb style</label>' + blurbKindSelect('metaTopKind', m.topKind);
+      html += '<label class="field">Top blurb</label>';
+      html += '<textarea id="metaTitle" rows="2" placeholder="Christmas Party Menu">' + escapeAttr(m.title || 'Christmas Party Menu') + '</textarea>';
+      html += field('Course prices (under top blurb)', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
+      html += '<label class="field">Bottom blurb style</label>' + blurbKindSelect('metaBottomKind', m.bottomKind);
+      html += '<label class="field">Bottom blurb</label>';
+      html += '<textarea id="metaNotes" rows="3" placeholder="Choices must be pre-ordered…">' + escapeAttr(m.notes || '') + '</textarea>';
+      html += '<label class="field" style="margin-top:12px">Paper size</label>';
+      html += '<div class="opt-row">';
+      html += '<label><input type="radio" name="partyPaper" value="a4"' + (m.paper === 'a4' ? ' checked' : '') + '> Full A4</label>';
+      html += '<label><input type="radio" name="partyPaper" value="a5"' + (m.paper === 'a5' ? ' checked' : '') + '> 2×A5 on A4 (guillotine)</label>';
+      html += '</div>';
+      html += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party blurbs</button>';
+      html += '</div>';
       return html;
     }
 
@@ -851,12 +894,17 @@
       html += '<button class="link" data-mode="complete" type="button">Cancel</button>';
       html += '</div>';
       if (menu.kind === 'party') {
-        var m = metaBook[menuId] || EBMenus.emptyMeta();
+        var m = EBMenus.normalizeMeta(metaBook[menuId] || EBMenus.emptyMeta());
         var paper = m.paper === 'a5' ? 'a5' : 'a4';
         html += '<div class="include-box" style="margin-top:14px;background:#fff"><h3>Party sheet details</h3>';
-        html += field('Title', 'metaTitle', m.title || 'Christmas Party Menu');
+        html += '<p class="note" style="margin:0 0 8px">Same top/bottom blurbs as on the <strong>Wording</strong> step. AI import fills these from the poster.</p>';
+        html += '<label class="field" style="margin-top:0">Top blurb style</label>' + blurbKindSelect('metaTopKind', m.topKind);
+        html += '<label class="field">Top blurb</label>';
+        html += '<textarea id="metaTitle" rows="2">' + escapeAttr(m.title || 'Christmas Party Menu') + '</textarea>';
         html += field('Course prices', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
-        html += field('Notes (pre-order / deposit)', 'metaNotes', m.notes || '');
+        html += '<label class="field">Bottom blurb style</label>' + blurbKindSelect('metaBottomKind', m.bottomKind);
+        html += '<label class="field">Bottom blurb (pre-order / deposit)</label>';
+        html += '<textarea id="metaNotes" rows="3">' + escapeAttr(m.notes || '') + '</textarea>';
         html += '<label class="field" style="margin-top:12px">Paper size</label>';
         html += '<div class="opt-row">';
         html += '<label><input type="radio" name="partyPaper" value="a4"' + (paper === 'a4' ? ' checked' : '') + '> Full A4</label>';
@@ -969,22 +1017,31 @@
 
     function renderPromoTicksBox() {
       var ticks = hostPromoTicks();
-      var any = Object.keys(ticks).some(function (k) { return ticks[k]; });
+      var noneId = EBMenus.PROMO_NONE_ID || '__none__';
+      var noneOn = !!ticks[noneId];
+      var anyBank = Object.keys(ticks).some(function (k) { return k !== noneId && ticks[k]; });
       var auto = pickedPromosForSheet();
-      var html = '<div class="include-box"><h3>Events &amp; wording on this sheet</h3>';
-      html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Leave all unticked and we’ll auto-pick up to four (upcoming dates first, then evergreen lines that <strong>rotate each calendar day</strong>). Print places at most <strong>one box per column</strong> so the sheet stays tidy. Edit the bank under <strong>Wording / events</strong>.</p>';
+      var html = '<div class="include-box"><h3>Events &amp; selling lines on this sheet</h3>';
+      html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Tick <strong>No events or selling lines</strong> for a clean sheet (Christmas party menus often want this). ' +
+        'Leave everything unticked and we’ll auto-pick up to four. Edit the bank further down.</p>';
       html += '<div class="include-row">';
+      html += '<label style="font-weight:700">';
+      html += '<input type="checkbox" data-promo-tick="' + escapeAttr(noneId) + '"' + (noneOn ? ' checked' : '') + '> ';
+      html += 'No events or selling lines</label>';
       promoBank.forEach(function (p) {
         var past = EBMenus.isPastPromoDate(p.date);
         var label = p.title;
         if (p.date) label += ' · ' + (EBMenus.formatPromoDate(p.date) || p.date);
         if (past) label += ' (past)';
-        html += '<label style="' + (past && !ticks[p.id] ? 'opacity:.55' : '') + '">';
-        html += '<input type="checkbox" data-promo-tick="' + escapeAttr(p.id) + '"' + (ticks[p.id] ? ' checked' : '') + '> ';
+        html += '<label style="' + (past && !ticks[p.id] ? 'opacity:.55' : '') + (noneOn ? ';opacity:.45' : '') + '">';
+        html += '<input type="checkbox" data-promo-tick="' + escapeAttr(p.id) + '"' + (ticks[p.id] && !noneOn ? ' checked' : '') +
+          (noneOn ? ' disabled' : '') + '> ';
         html += escapeAttr(label) + '</label>';
       });
       html += '</div>';
-      if (!any) {
+      if (noneOn) {
+        html += '<p class="note" style="margin:8px 0 0">Generate will print <strong>no</strong> event / selling boxes from the bank.</p>';
+      } else if (!anyBank) {
         html += '<p class="note" style="margin:8px 0 0">Auto for Generate: <strong>' +
           (auto.length ? auto.map(function (p) { return escapeAttr(p.title); }).join(' · ') : 'nothing eligible') +
           '</strong></p>';
@@ -1181,9 +1238,20 @@
       document.querySelectorAll('[data-promo-tick]').forEach(function (box) {
         box.onchange = function () {
           if (!promoTicks[menuId]) promoTicks[menuId] = {};
-          promoTicks[menuId][box.getAttribute('data-promo-tick')] = box.checked;
+          var id = box.getAttribute('data-promo-tick');
+          var noneId = EBMenus.PROMO_NONE_ID || '__none__';
+          if (id === noneId && box.checked) {
+            promoTicks[menuId] = {};
+            promoTicks[menuId][noneId] = true;
+          } else if (id === noneId && !box.checked) {
+            delete promoTicks[menuId][noneId];
+          } else {
+            promoTicks[menuId][id] = box.checked;
+            if (box.checked) delete promoTicks[menuId][noneId];
+          }
           savePromoTicks();
           renderPreview();
+          if (flowStep === 3) render();
         };
       });
       function persistLayoutFromDom() {
@@ -1291,13 +1359,17 @@
       var doSaveMeta = document.getElementById('doSaveMeta');
       if (doSaveMeta) doSaveMeta.onclick = function () {
         var paperEl = document.querySelector('input[name="partyPaper"]:checked');
-        metaBook[menuId] = {
-          title: (document.getElementById('metaTitle') || {}).value || '',
+        var titleEl = document.getElementById('metaTitle');
+        var notesEl = document.getElementById('metaNotes');
+        metaBook[menuId] = EBMenus.normalizeMeta({
+          title: titleEl ? titleEl.value : '',
           subtitle: '',
           coursePrices: (document.getElementById('metaPrices') || {}).value || '',
-          notes: (document.getElementById('metaNotes') || {}).value || '',
-          paper: (paperEl && paperEl.value === 'a5') ? 'a5' : 'a4'
-        };
+          notes: notesEl ? notesEl.value : '',
+          paper: (paperEl && paperEl.value === 'a5') ? 'a5' : 'a4',
+          topKind: (document.getElementById('metaTopKind') || {}).value || 'title',
+          bottomKind: (document.getElementById('metaBottomKind') || {}).value || 'paragraph'
+        });
         save();
         renderPreview();
       };

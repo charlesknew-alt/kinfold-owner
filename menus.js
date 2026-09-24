@@ -240,10 +240,39 @@
     return list;
   }
 
-  /** Meta for set menus (Christmas / party) — title + course prices + paper. */
+  /** Meta for set menus (Christmas / party) — title + course prices + paper + blurb kinds. */
   function emptyMeta() {
-    return { title: '', subtitle: '', coursePrices: '', notes: '', paper: 'a4' };
+    return {
+      title: '',
+      subtitle: '',
+      coursePrices: '',
+      notes: '',
+      paper: 'a4',
+      topKind: 'title',
+      bottomKind: 'paragraph'
+    };
   }
+
+  function normalizeMeta(raw) {
+    var base = emptyMeta();
+    if (!raw || typeof raw !== 'object') return base;
+    var topKind = String(raw.topKind || base.topKind).toLowerCase();
+    var bottomKind = String(raw.bottomKind || base.bottomKind).toLowerCase();
+    if (['title', 'paragraph', 'text'].indexOf(topKind) === -1) topKind = 'title';
+    if (['title', 'paragraph', 'text'].indexOf(bottomKind) === -1) bottomKind = 'paragraph';
+    return {
+      title: String(raw.title != null ? raw.title : ''),
+      subtitle: String(raw.subtitle != null ? raw.subtitle : ''),
+      coursePrices: String(raw.coursePrices != null ? raw.coursePrices : ''),
+      notes: String(raw.notes != null ? raw.notes : ''),
+      paper: raw.paper === 'a5' ? 'a5' : 'a4',
+      topKind: topKind,
+      bottomKind: bottomKind
+    };
+  }
+
+  /** Special tick id — force no event / selling lines on Generate. */
+  var PROMO_NONE_ID = '__none__';
 
   function dish(section, name, description, price, tags, lunchClub) {
     return {
@@ -1047,7 +1076,8 @@
 
   /**
    * Choose bank wording for Generate.
-   * If staff ticked any: use those (manual override, past dates allowed).
+   * If staff ticked “No events”: nothing.
+   * If staff ticked any bank line: use those (manual override, past dates allowed).
    * If none ticked: auto-pick upcoming/evergreen only — never past-dated.
    * Evergreen lines rotate by calendar day so each day’s sheet feels different.
    */
@@ -1058,8 +1088,12 @@
     var today = opts.today || new Date();
     bank = Array.isArray(bank) ? bank.slice() : [];
     ticks = ticks || {};
+    if (ticks[PROMO_NONE_ID]) return [];
+
     var anyTick = false;
-    Object.keys(ticks).forEach(function (k) { if (ticks[k]) anyTick = true; });
+    Object.keys(ticks).forEach(function (k) {
+      if (k !== PROMO_NONE_ID && ticks[k]) anyTick = true;
+    });
 
     var chosen;
     if (anyTick) {
@@ -1224,6 +1258,8 @@
     dish: dish,
     emptyMarks: emptyMarks,
     emptyMeta: emptyMeta,
+    normalizeMeta: normalizeMeta,
+    PROMO_NONE_ID: PROMO_NONE_ID,
     parseMarks: parseMarks,
     formatMarks: formatMarks,
     dishesFromAiMenu: dishesFromAiMenu,

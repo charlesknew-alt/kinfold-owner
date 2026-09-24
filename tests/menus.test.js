@@ -234,8 +234,19 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow39') !== -1, 'menus page cache-bust is flow39');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow39') !== -1, 'hub menus link cache-bust is flow39');
+assert(page.indexOf('flow40') !== -1, 'menus page cache-bust is flow40');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow40') !== -1, 'hub menus link cache-bust is flow40');
+assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
+assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
+  'party wording has top/bottom blurb section');
+assert(page.indexOf('metaTopKind') !== -1 && page.indexOf('metaBottomKind') !== -1,
+  'party blurbs have title/paragraph/text style');
+assert(api.PROMO_NONE_ID === '__none__', 'promo none tick id exported');
+assert(api.pickPromos(api.seedPromoBank(), { __none__: true }).length === 0,
+  'no-events tick yields zero promos');
+assert(api.normalizeMeta({ title: 'X', notes: 'Y', topKind: 'text' }).topKind === 'text',
+  'normalizeMeta keeps blurb kinds');
+assert(printJs.indexOf('partyBlurbBlock') !== -1, 'party print uses blurb kinds');
 assert(ingestJs.indexOf('fetchWithTimeout') !== -1 && ingestJs.indexOf('imageFileForAi') !== -1,
   'AI reader shrinks images and times out instead of hanging');
 assert(aiGs.indexOf('gemini-2.5-flash') !== -1 && aiGs.indexOf('callGemini_') !== -1,
@@ -388,7 +399,7 @@ assert(printJs.indexOf('Frilly box only when') !== -1 || printJs.indexOf('not ha
 var forced = api.pickPromos(bank, { old: true }, { today: new Date('2026-09-22'), max: 2 });
 assert(forced.length === 1 && forced[0].id === 'old', 'manual tick can force a past-dated line');
 assert(api.formatPromoDate('2026-09-30').indexOf('September') !== -1, 'promo date formats for print');
-assert(page.indexOf('Wording / events') !== -1, 'wording bank mode in UI');
+assert(page.indexOf('Events &amp; selling lines') !== -1 || page.indexOf('In the bank') !== -1, 'wording bank mode in UI');
 assert(page.indexOf('data-promo-tick') !== -1, 'promo ticks on long menus');
 var v1 = print.nextPrintVersion('main');
 var v2 = print.nextPrintVersion('main');

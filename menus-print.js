@@ -1657,6 +1657,20 @@
     }).join('');
   }
 
+  function partyBlurbBlock(text, kind, where) {
+    text = String(text || '').trim();
+    if (!text) return '';
+    kind = String(kind || 'paragraph').toLowerCase();
+    var body = esc(text).replace(/\n/g, '<br>');
+    if (kind === 'title') {
+      return '<h1 class="party-title party-blurb-' + (where || 'top') + '">' + body + '</h1>';
+    }
+    if (kind === 'text') {
+      return '<div class="party-blurb-text party-blurb-' + (where || 'top') + '">' + body + '</div>';
+    }
+    return '<div class="party-notes party-blurb-para party-blurb-' + (where || 'top') + '">' + body + '</div>';
+  }
+
   function partyOccasion(title, meta) {
     var blob = [title, meta && meta.subtitle, meta && meta.notes, meta && meta.coursePrices]
       .filter(Boolean).join(' ').toLowerCase();
@@ -1684,7 +1698,7 @@
     html += trackerBar(ver, { hideDate: true });
     html += '<div class="page-body">';
     html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
-    html += '<h1 class="party-title">' + esc(title) + '</h1>';
+    html += partyBlurbBlock(title, meta.topKind || 'title', 'top');
     if (prices) html += '<div class="party-prices">' + esc(prices) + '</div>';
 
     order.forEach(function (want) {
@@ -1714,7 +1728,7 @@
       html += '</section>';
     });
 
-    if (notes) html += '<div class="party-notes">' + esc(notes) + '</div>';
+    if (notes) html += partyBlurbBlock(notes, meta.bottomKind || 'paragraph', 'bottom');
     if (promos.length) {
       html += '<div class="party-promos">';
       promos.forEach(function (p) {
@@ -2259,6 +2273,9 @@
       '.party-dish{margin:0 0 10px;padding:0 14mm}' +
       '.party-dish .desc{text-align:center;padding-right:0;font-style:normal;color:#444}' +
       '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
+      '.party-blurb-para{font-size:11.5px;line-height:1.45}' +
+      '.party-blurb-text{font-family:var(--sans);font-size:10.5pt;color:#3a342c;margin:10px 14mm 8px;line-height:1.4;font-weight:400}' +
+      '.party-blurb-bottom.party-title{font-size:16px;margin-top:14px}' +
       '.party-promos{margin:10px 10mm 4px;text-align:center}' +
       '.party-promo{margin:0 0 8px}' +
       '.party-promo .promo-title{font-size:var(--promo);margin:0 0 2px}' +
