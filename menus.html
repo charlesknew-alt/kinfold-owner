@@ -822,7 +822,7 @@
       var any = Object.keys(ticks).some(function (k) { return ticks[k]; });
       var auto = pickedPromosForSheet();
       var html = '<div class="include-box"><h3>Events &amp; wording on this sheet</h3>';
-      html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Leave all unticked and we’ll auto-pick (upcoming dates first — never past dates). Edit the bank under <strong>Wording / events</strong>.</p>';
+      html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Leave all unticked and we’ll auto-pick up to four (upcoming dates first, then evergreen lines that <strong>rotate each calendar day</strong>). Print places at most <strong>one box per column</strong> so the sheet stays tidy. Edit the bank under <strong>Wording / events</strong>.</p>';
       html += '<div class="include-row">';
       promoBank.forEach(function (p) {
         var past = EBMenus.isPastPromoDate(p.date);
