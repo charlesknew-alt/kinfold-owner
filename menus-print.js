@@ -447,20 +447,28 @@
 
   /**
    * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list.
+   * With 0 fillings + Tip on: selling box (sell words, then optional note/hours).
    * Frilly box only when Blocks → Sandwiches → Frilly is Yes (not hard-coded).
    */
   function sandwichesBlock(bag, opts) {
     opts = opts || {};
     var dishes = sandwichDishesOf(bag);
-    var rule = opts.rule || { frame: true, note: '' };
+    var rule = opts.rule || { frame: true, note: '', tip: true, sell: '' };
     var wantFrame = !!rule.frame;
     var frameKind = opts.frame === 'wide' ? 'wide' : 'box';
     var note = (opts.note != null && String(opts.note).trim())
       ? String(opts.note).trim()
       : String(rule.note || '').trim();
+    var sell = (opts.sell != null && String(opts.sell).trim())
+      ? String(opts.sell).trim()
+      : String(rule.sell || '').trim();
     if (!dishes.length) {
-      var spiel = note ||
-        '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.';
+      // Tip box: selling words first, then hours / “all served with…” under the title
+      var spielParts = [];
+      if (sell) spielParts.push(sell);
+      else spielParts.push('A selection of sandwiches is available — ask the team.');
+      if (note) spielParts.push(note);
+      var spiel = spielParts.join('\n');
       var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
       var noteInner = '<div class="promo sandwich-promo">';
       noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
@@ -812,9 +820,22 @@
     if (bag.desserts) back += sectionUnits(bag.desserts, false);
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
-    // sandwich dish list + spiel when fillings exist; otherwise the short selling note
-    var wantSandwiches = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
+    // Named fillings always print on Main/Sunday; 0 dishes → Tip box only when tip is on
     var sandDishCount = sandwichDishesOf(bag).length;
+    var sandRule = { tip: true, sell: '', note: '', frame: true };
+    if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+      sandRule = root.EBMenus.sectionLayoutFor('Sandwiches', opts.sectionLayout);
+    } else if (opts.sectionLayout && opts.sectionLayout.Sandwiches) {
+      sandRule = opts.sectionLayout.Sandwiches;
+    }
+    var wantSandwiches;
+    if (sandDishCount > 0) {
+      wantSandwiches = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
+    } else if (menu.id === 'main' || menu.id === 'sunday') {
+      wantSandwiches = sandRule.tip !== false && sandRule.tip !== 'no' && sandRule.tip !== 0;
+    } else {
+      wantSandwiches = !!bag.sandwiches;
+    }
     var sandCost = sandwichesPackCost(bag);
     var hasBackContent = !!(bag.mains || bag.littleBells || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
 
@@ -1009,7 +1030,7 @@
     }
     var map = layoutMap(plan);
     var key = sectionName || '';
-    return map[key] || { width: 'full', frame: false, note: '' };
+    return map[key] || { width: 'full', frame: false, note: '', tip: false, sell: '' };
   }
 
   function wantsColumn(rule) {
@@ -1902,6 +1923,7 @@
   root.EBMenuPrint = {
     build: build,
     planFluidLayout: planFluidLayout,
+    sandwichesBlock: sandwichesBlock,
     partyOccasion: partyOccasion,
     orderDishesForPrint: orderDishesForPrint,
     toRoman: toRoman,

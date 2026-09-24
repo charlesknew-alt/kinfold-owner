@@ -226,16 +226,26 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow35') !== -1, 'menus page cache-bust is flow35');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow35') !== -1, 'hub menus link cache-bust is flow35');
+assert(page.indexOf('flow36') !== -1, 'menus page cache-bust is flow36');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow36') !== -1, 'hub menus link cache-bust is flow36');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
   'generate plan preview no longer uses a raw bullet list');
 assert(page.indexOf('data-layout-note') !== -1,
   'Blocks step has extra-info field per category');
+assert(page.indexOf('data-layout-tip') !== -1 && page.indexOf('data-layout-sell') !== -1,
+  'Blocks step has tip toggle and selling content for Sandwiches');
+assert(api.sectionLayoutFor('Sandwiches').tip === true, 'Sandwiches tip box defaults on');
+assert(/selection of sandwiches/i.test(api.sectionLayoutFor('Sandwiches').sell || ''),
+  'Sandwiches default sell wording mentions selection');
+assert(api.normalizeSectionLayout({ Sandwiches: { width: 'column', frame: true, tip: false, sell: 'Ask at the bar' } }).Sandwiches.tip === false,
+  'normalize keeps tip off when explicitly false');
 assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') !== -1,
   'sandwiches print spiel plus dish list');
+assert(printJs.indexOf('Tip box') !== -1 || printJs.indexOf('sandRule.tip') !== -1 ||
+  printJs.indexOf('wantSandwiches') !== -1,
+  'print honours tip when deciding sandwiches box');
 assert(printJs.indexOf('startersInTop') !== -1 && printJs.indexOf('top-band-logo') !== -1,
   'starters sit beside logo spanning the top band');
 assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
@@ -475,6 +485,7 @@ assert(api.sectionLayoutFor('Mains').width === 'full', 'mains default full width
 assert(api.sectionLayoutFor('Nibbles').frame === true, 'nibbles default frilly box');
 assert(api.sectionLayoutFor('Burgers').width === 'column', 'burgers default column');
 assert(api.sectionLayoutFor('Sandwiches').frame === true, 'sandwiches default frilly box');
+assert(api.sectionLayoutFor('Sandwiches').tip === true, 'sandwiches tip defaults on for empty section');
 assert(api.sectionLayoutFor('Starters').width === 'full' && api.sectionLayoutFor('Starters').frame === false,
   'starters default full-width beside logo, frilly off');
 var customLayout = api.normalizeSectionLayout({ Mains: { width: 'column', frame: true } });
@@ -495,6 +506,24 @@ var sparse = [
 var sparseLayout = print.planFluidLayout(mainMenu, sparse);
 assert(sparseLayout.pages === 1, 'sparse menu stays on one page');
 assert(sparseLayout.p1.rooms || sparseLayout.fillers.some(function (f) { return /Stay|Gatherings|Sandwiches|Logo/i.test(f); }), 'sparse menu gets selling fillers');
+// Tip on (default) → empty Sandwiches still get a selling box; Tip off → omit
+var tipOnLayout = print.planFluidLayout(mainMenu, sparse, {
+  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } })
+});
+assert(tipOnLayout.p1.sandwiches || (tipOnLayout.p2 && tipOnLayout.p2.sandwiches) ||
+  tipOnLayout.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
+  'tip on keeps sandwiches selling box with 0 dishes');
+var tipOffLayout = print.planFluidLayout(mainMenu, sparse, {
+  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: false, sell: '' } })
+});
+assert(!tipOffLayout.p1.sandwiches && !(tipOffLayout.p2 && tipOffLayout.p2.sandwiches) &&
+  !tipOffLayout.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
+  'tip off omits sandwiches box when there are no fillings');
+var tipHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
+  rule: { frame: true, tip: true, note: '(lunch hours)', sell: 'Selection at the bar' }
+});
+assert(/Selection at the bar/.test(tipHtml), 'empty tip box prints sell wording');
+assert(/lunch hours/.test(tipHtml), 'empty tip box still shows note/hours');
 
 // Promo must not force over
 var crowdedDishes = aloneDishes.concat(api.composeDishes(book, 'main', { desserts: true, sandwiches: true, 'little-bells': true }).filter(function (d) {

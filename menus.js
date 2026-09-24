@@ -1120,6 +1120,8 @@
    *   both   — “best fit”: layout / AI picks column or full for this page
    * frame: scalloped “frilly” box around the section
    * note: optional spiel printed under the title (hours, “all served with…”, etc.)
+   * tip: include as a selling box on the long sheet even with 0 dishes
+   * sell: selling words for the tip box (used when tip is on / no fillings)
    */
   var DEFAULT_SECTION_LAYOUT = {
     Nibbles: { width: 'column', frame: true, note: '' },
@@ -1135,7 +1137,10 @@
     Sandwiches: {
       width: 'column',
       frame: true,
-      note: '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.'
+      note: '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.',
+      // Tip = include a selling box on Main/Sunday even with 0 fillings listed
+      tip: true,
+      sell: 'A selection of sandwiches is available — ask the team.'
     },
     Sides: { width: 'column', frame: false, note: '' },
     Sauces: { width: 'column', frame: false, note: '' },
@@ -1152,7 +1157,13 @@
     var out = {};
     SECTIONS.forEach(function (s) {
       var d = DEFAULT_SECTION_LAYOUT[s] || { width: 'full', frame: false, note: '' };
-      out[s] = { width: d.width, frame: !!d.frame, note: String(d.note || '') };
+      out[s] = {
+        width: d.width,
+        frame: !!d.frame,
+        note: String(d.note || ''),
+        tip: !!d.tip,
+        sell: String(d.sell || '')
+      };
     });
     return out;
   }
@@ -1166,10 +1177,17 @@
       var width = String(row.width || base[s].width).toLowerCase();
       if (width !== 'full' && width !== 'column' && width !== 'both') width = base[s].width;
       var note = row.note != null ? String(row.note) : base[s].note;
+      // Old saves had no tip key — Sandwiches stayed on the sheet by default
+      var tip;
+      if (row.tip == null) tip = s === 'Sandwiches' ? true : !!base[s].tip;
+      else tip = row.tip === true || row.tip === 'yes' || row.tip === 1;
+      var sell = row.sell != null ? String(row.sell) : base[s].sell;
       base[s] = {
         width: width,
         frame: row.frame === true || row.frame === 'yes' || row.frame === 1,
-        note: String(note || '').replace(/\r\n/g, '\n').trim()
+        note: String(note || '').replace(/\r\n/g, '\n').trim(),
+        tip: !!tip,
+        sell: String(sell || '').replace(/\r\n/g, '\n').trim()
       };
     });
     return base;
@@ -1179,8 +1197,8 @@
     var canon = normalizeSectionName(name);
     var map = normalizeSectionLayout(layouts);
     if (map[canon]) return map[canon];
-    // Unknown sections: full, no frame, no note
-    return { width: 'full', frame: false, note: '' };
+    // Unknown sections: full, no frame, no note, no tip
+    return { width: 'full', frame: false, note: '', tip: false, sell: '' };
   }
 
   function isColumnWidth(width) {

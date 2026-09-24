@@ -244,9 +244,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260923-flow35"></script>
-  <script src="menus-print.js?v=20260923-flow35"></script>
-  <script src="menus-ingest.js?v=20260923-flow35"></script>
+  <script src="menus.js?v=20260924-flow36"></script>
+  <script src="menus-print.js?v=20260924-flow36"></script>
+  <script src="menus-ingest.js?v=20260924-flow36"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -579,6 +579,9 @@
         html += '<span class="chip">' + dishesIn.length + ' dish' + (dishesIn.length === 1 ? '' : 'es') + '</span>';
         html += '<span class="chip">' + escapeAttr(widthLabel) + '</span>';
         html += '<span class="chip">' + (rule.frame ? 'Frilly' : 'No frame') + '</span>';
+        if (sec === 'Sandwiches') {
+          html += '<span class="chip">' + (rule.tip ? 'Tip box on' : 'Tip box off') + '</span>';
+        }
         html += '</div></div>';
         if (defaults[sec]) {
           html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
@@ -597,6 +600,18 @@
           html += '<label class="field">Extra info under the title</label>';
           html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="Hours, “all served with…”, etc. Shows above the dishes in the box.">' +
             escapeAttr(rule.note || '') + '</textarea>';
+          if (sec === 'Sandwiches') {
+            html += '<div class="layout-row" style="grid-template-columns:1fr 1fr;border:0;padding:10px 0 0;margin-top:8px">';
+            html += '<div><label class="field" style="margin-top:0">Tip box (no fillings)</label>';
+            html += '<select data-layout-tip="' + escapeAttr(sec) + '">';
+            html += '<option value="yes"' + (rule.tip ? ' selected' : '') + '>Yes — show selling words</option>';
+            html += '<option value="no"' + (!rule.tip ? ' selected' : '') + '>No — omit when empty</option>';
+            html += '</select></div>';
+            html += '<div><label class="field" style="margin-top:0">Selling content</label>';
+            html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2" placeholder="A selection of sandwiches is available…">' +
+              escapeAttr(rule.sell || '') + '</textarea></div></div>';
+            html += '<p class="note" style="margin:6px 0 0">When Sandwiches has 0 dishes, Tip puts a selling box on Main / Sunday so guests still see sandwiches are available.</p>';
+          }
           html += '</div>';
         }
         html += '</div>';
@@ -1042,22 +1057,26 @@
           var w = document.querySelector('[data-layout-width="' + sec + '"]');
           var f = document.querySelector('[data-layout-frame="' + sec + '"]');
           var n = document.querySelector('[data-layout-note="' + sec + '"]');
+          var t = document.querySelector('[data-layout-tip="' + sec + '"]');
+          var s = document.querySelector('[data-layout-sell="' + sec + '"]');
           next[sec] = {
             width: (w && w.value) || next[sec].width,
             frame: !!(f && f.value === 'yes'),
-            note: (n && n.value) || ''
+            note: (n && n.value) || '',
+            tip: t ? t.value === 'yes' : !!next[sec].tip,
+            sell: s ? s.value : (next[sec].sell || '')
           };
         });
         sectionLayout = EBMenus.normalizeSectionLayout(next);
         saveSectionLayout();
       }
-      document.querySelectorAll('[data-layout-width],[data-layout-frame]').forEach(function (sel) {
+      document.querySelectorAll('[data-layout-width],[data-layout-frame],[data-layout-tip]').forEach(function (sel) {
         sel.onchange = function () {
           persistLayoutFromDom();
           render();
         };
       });
-      document.querySelectorAll('[data-layout-note]').forEach(function (ta) {
+      document.querySelectorAll('[data-layout-note],[data-layout-sell]').forEach(function (ta) {
         ta.onchange = function () {
           persistLayoutFromDom();
         };
@@ -1068,7 +1087,7 @@
       var resetLayout = document.getElementById('doResetLayout');
       if (resetLayout) {
         resetLayout.onclick = function () {
-          if (!confirm('Reset every section to the default width, frilly-box, and extra-info settings?')) return;
+          if (!confirm('Reset every section to the default width, frilly-box, tip, and extra-info settings?')) return;
           sectionLayout = EBMenus.defaultSectionLayout();
           saveSectionLayout();
           render();
