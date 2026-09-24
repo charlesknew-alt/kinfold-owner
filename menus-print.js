@@ -140,9 +140,11 @@
         'Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can’t guarantee it’s allergen-free.<br>' +
         'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan';
     if (opts.lunchClub) {
+      // Lunch club note lives in the allergy footer (not a mid-page scallop box)
       html +=
         '<br><span class="allergy-lc">' + lunchMark() +
-        ' Bells Lunch Club option — Monday to Thursday &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
+        ' Bells Lunch Club option — smaller options for smaller appetites, Monday to Thursday' +
+        ' &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
     }
     html += '</div>';
     return html;
@@ -485,16 +487,6 @@
     return 'fill-compact';
   }
 
-  function lunchClubBox() {
-    return scallop(
-      '<div class="lunch-box">' +
-        lunchMark() +
-        '<div><strong>Smaller options for smaller appetites</strong><br>Lunch club Mon–Thurs</div>' +
-      '</div>',
-      'box'
-    );
-  }
-
   function isNibbles(name) {
     return /nibble|light bite/i.test(name || '');
   }
@@ -580,18 +572,19 @@
 
   /* —— Fluid layout brain ——
      Sizes the selected dishes, splits pages only when needed, and only
-     drops in Stay a While / Gatherings / sandwiches / lunch-club / foot logo
-     when leftover room lets them sit without opening another page. */
+     drops in Stay a While / Gatherings / sandwiches / foot logo when
+     leftover room lets them sit without opening another page.
+     Lunch club copy sits in the allergy footer whenever dishes are ticked. */
   var PAGE = 100;
   var COST = {
     tracker: 2,
     allergy: 4,
+    allergyLunch: 2.5,
     logoTop: 10,
     nibblesBox: 2.5,
     sectionHead: 2.8,
     rooms: 9,
     sandwiches: 8,
-    lunchClub: 5,
     footLogo: 7,
     bottomCols: 1
   };
@@ -685,7 +678,8 @@
 
     dishes = orderDishesForPrint(dishes || []);
     var bag = pickSections(dishes);
-    var chrome = COST.tracker + COST.allergy + COST.logoTop;
+    var chrome = COST.tracker + COST.allergy + COST.logoTop +
+      (bag.hasLunch ? COST.allergyLunch : 0);
     var front = chrome;
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
@@ -718,12 +712,13 @@
       mode: 'single',
       bag: bag,
       promos: promos || [],
-      p1: { rooms: false, sandwiches: false, lunchClub: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
+      p1: { rooms: false, sandwiches: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
       p2: null,
       leftover: { p1: 0, p2: 0 },
       summary: '',
       fillers: []
     };
+    if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
 
     // —— One page if everything (minus optional fillers) fits ——
     var oneNeed = front;
@@ -760,10 +755,6 @@
         }
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
-      if (bag.hasLunch) {
-        add = tryAdd(left1, COST.lunchClub);
-        if (add.ok) { layout.p1.lunchClub = true; left1 = add.left; layout.fillers.push('Lunch club note'); }
-      }
       add = tryAdd(left1, COST.footLogo);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = left1;
@@ -774,7 +765,7 @@
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
       layout.mode = 'jul-nov';
-      layout.p2 = { rooms: false, sandwiches: false, lunchClub: false, footLogo: false, sidesOnP2: true };
+      layout.p2 = { rooms: false, sandwiches: false, footLogo: false, sidesOnP2: true };
       layout.p1.classicsSplit = 1;
 
       var p1used = front;
@@ -832,14 +823,6 @@
           layout.p2.rooms = true;
           p2left = addRooms2.left;
           layout.fillers.push(promoLabel + ' (page 2)');
-        }
-      }
-      if (bag.hasLunch && !tightBack) {
-        var addL = tryAdd(p2left, COST.lunchClub);
-        if (addL.ok) {
-          layout.p2.lunchClub = true;
-          p2left = addL.left;
-          layout.fillers.push('Lunch club note (page 2)');
         }
       }
       var logoCost = tightBack ? COST.footLogo + 4 : COST.footLogo;
@@ -943,7 +926,6 @@
     if (which === 'sandwiches') {
       return sandwichesBlock(bag, opts);
     }
-    if (which === 'lunch') return lunchClubBox();
     if (which === 'logo') {
       return '<div class="foot-logo"><img src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
     }
@@ -1183,7 +1165,6 @@
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
       if (p1opts.sandwiches && !showColBlock) p1 += renderFiller('sandwiches', bag);
-      if (p1opts.lunchClub) p1 += renderFiller('lunch', bag);
       if (p1opts.footLogo) p1 += renderFiller('logo', bag);
     }
 
@@ -1232,7 +1213,6 @@
       p2 += renderFiller('rooms', bag, promos);
     }
 
-    if (p2opts.lunchClub) p2 += renderFiller('lunch', bag);
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
     p2 += '</div>'; // page-body — grows so allergy stays pinned to the page foot
     p2 += allergy({ lunchClub: !!(bag.hasLunch) });
@@ -1312,8 +1292,8 @@
       '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
-      '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
-      '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
+      '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo{flex:0 0 auto}' +
+      '.scallop,.sec,.cols,.foot-logo,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;height:100%}' +
       '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative;display:flex;flex-direction:column;height:210mm;box-sizing:border-box;overflow:hidden}' +
@@ -1378,9 +1358,8 @@
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
       '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.15em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
-      '.lunch-box .lc{width:28px;height:28px;font-size:28px;margin-left:0;flex:0 0 auto}' +
-      '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle}' +
+      '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic;max-width:92%;margin-left:auto;margin-right:auto}' +
+      '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle;flex:0 0 auto}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       /* Columns start level; stretch so both sides share one height band.
@@ -1421,7 +1400,6 @@
       '.promo p{font-size:10.5pt;font-weight:400;margin:0 0 6px;line-height:1.4}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
-      '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11pt}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
