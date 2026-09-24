@@ -108,6 +108,12 @@ assert(printJs.indexOf('smaller plates for smaller appetites') !== -1,
   'lunch club spiel sits in the allergy footer');
 assert(printJs.indexOf('lunch only') !== -1,
   'lunch club footer says lunch only');
+assert(printJs.indexOf('savePrintHistory') !== -1 && printJs.indexOf('listPrintHistory') !== -1,
+  'print history can save and list generated sheets');
+assert(printJs.indexOf('groupHistoryByDay') !== -1, 'print history groups by day');
+assert(page.indexOf('Print history') !== -1 && page.indexOf('data-view="history"') !== -1,
+  'Menus has a Print history view');
+assert(page.indexOf('savePrintHistory') !== -1, 'Generate saves into print history');
 assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
   'layout plan notes lunch club lives with allergens');
 assert(printJs.indexOf('function lunchClubBox') === -1 && printJs.indexOf('lunch-box') === -1,
@@ -228,8 +234,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow37') !== -1, 'menus page cache-bust is flow37');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow37') !== -1, 'hub menus link cache-bust is flow37');
+assert(page.indexOf('flow38') !== -1, 'menus page cache-bust is flow38');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow38') !== -1, 'hub menus link cache-bust is flow38');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
@@ -384,6 +390,28 @@ var v1 = print.nextPrintVersion('main');
 var v2 = print.nextPrintVersion('main');
 assert(v1.roman === 'I' && v2.roman === 'II', 'print version increments per generate');
 assert(v1.week === v2.week, 'same week label within the week');
+assert(typeof print.savePrintHistory === 'function' && typeof print.listPrintHistory === 'function',
+  'history helpers exported');
+assert(typeof print.groupHistoryByDay === 'function', 'groupHistoryByDay exported');
+var histGroups = print.groupHistoryByDay([
+  {
+    id: 'a',
+    menuId: 'main',
+    menuName: 'Main menu',
+    roman: 'II',
+    generatedAt: new Date(2026, 8, 24, 14, 30).getTime()
+  },
+  {
+    id: 'b',
+    menuId: 'sunday',
+    menuName: 'Sunday',
+    roman: 'I',
+    generatedAt: new Date(2026, 8, 24, 11, 0).getTime()
+  }
+]);
+assert(histGroups.length === 1 && histGroups[0].items.length === 2,
+  'same calendar day groups together');
+assert(/24 September 2026/.test(histGroups[0].label), 'day group label shows generation date');
 assert(page.indexOf('Also put on this sheet') !== -1, 'include-other-menus panel exists');
 assert(page.indexOf('data-include') !== -1, 'include ticks are wired');
 assert(page.indexOf('data-flag="gf"') !== -1 && page.indexOf('data-flag="v"') !== -1 && page.indexOf('data-flag="vg"') !== -1, 'dietary ticks exist');
@@ -562,8 +590,34 @@ assert(fromPdf.length >= 2, 'cleaned PDF-like text parses dishes');
 assert(fromPdf[0].name === 'Bread and Salted Butter' && fromPdf[0].price === '5.95', 'price-only line joins previous name');
 assert(cleaned.indexOf('Please inform') === -1, 'allergy footer stripped from extract');
 
-if (failed) {
-  console.error('\n' + failed + ' check(s) failed');
+var histSample = {
+  id: 'test-hist-1',
+  menuId: 'main',
+  menuName: 'Main menu',
+  roman: 'III',
+  n: 3,
+  week: 'Week of 22nd September 2026',
+  weekKey: '2026-9-22',
+  generatedAt: new Date(2026, 8, 24, 14, 30).getTime(),
+  html: '<html><body>sample main III</body></html>'
+};
+
+print.savePrintHistory(histSample).then(function () {
+  return print.listPrintHistory();
+}).then(function (rows) {
+  assert(rows.some(function (r) { return r.id === 'test-hist-1' && r.roman === 'III'; }),
+    'history lists saved sheet with Roman');
+  return print.getPrintHistory('test-hist-1');
+}).then(function (got) {
+  assert(got && /sample main III/.test(got.html || ''), 'history returns stored HTML');
+  return print.deletePrintHistory('test-hist-1');
+}).then(function () {
+  if (failed) {
+    console.error('\n' + failed + ' check(s) failed');
+    process.exit(1);
+  }
+  console.log('\nAll checks passed');
+}).catch(function (err) {
+  console.error('FAIL  history round-trip: ' + err);
   process.exit(1);
-}
-console.log('\nAll checks passed');
+});

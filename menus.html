@@ -96,6 +96,21 @@
     .section-block-body { padding: 4px 14px 10px; }
     .section-block .dish-row:last-child { border-bottom: 0; }
     .toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+    .history-day { margin: 0 0 18px; }
+    .history-day h3 {
+      font-family: var(--serif); font-weight: 500; font-size: 18px; margin: 0 0 8px;
+      padding-bottom: 6px; border-bottom: 1px solid var(--line);
+    }
+    .history-row {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 12px 0; border-bottom: 1px solid var(--line);
+    }
+    .history-row:last-child { border-bottom: 0; }
+    .history-row .who { font-weight: 700; font-size: 15px; }
+    .history-row .meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+    .history-row .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .view-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+    .view-toggle button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
     input[type=text], input[type=url], input[type=date], select, textarea {
       width: 100%; font: inherit; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--white-warm); color: var(--ink);
@@ -240,13 +255,17 @@
   </header>
   <main>
     <h1>Menus</h1>
-    <p class="lede">A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.</p>
+    <p class="lede" id="pageLede">A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.</p>
+    <div class="view-toggle no-print" id="viewToggle" role="tablist" aria-label="Menus view">
+      <button type="button" class="soft on" data-view="edit" id="viewEdit">Edit &amp; generate</button>
+      <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
+    </div>
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260924-flow37"></script>
-  <script src="menus-print.js?v=20260924-flow37"></script>
-  <script src="menus-ingest.js?v=20260924-flow37"></script>
+  <script src="menus.js?v=20260924-flow38"></script>
+  <script src="menus-print.js?v=20260924-flow38"></script>
+  <script src="menus-ingest.js?v=20260924-flow38"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -267,6 +286,9 @@
     var pendingReview = null;
     var editingPromoId = '';
     var flowStep = 1; // 1 dishes · 2 blocks · 3 wording · 4 generate
+    var viewMode = 'edit'; // edit | history
+    var historyFilter = 'all';
+    var historyCache = [];
 
     var FLOW_STEPS = [
       { id: 1, key: 'dishes', label: 'Dishes' },
@@ -366,8 +388,121 @@
     var MARK = '<svg class="mark" viewBox="0 0 24 24" aria-label="Lunch club"><path fill="currentColor" d="M7.2 4.2h1.4v6.2H7.2zm2.6 0h1.4v6.2h-1.4zm2.6 0h1.4v6.2h-1.4zM8.4 11.2h5.2c.4 1.2-.2 2.4-1.4 2.9V20H9.8v-5.9c-1-.5-1.6-1.6-1.4-2.9z" transform="rotate(-32 12 12)"/><path fill="currentColor" d="M11 3.5l1.1 8.4 1.5-.2L12.6 3.5zM10.4 12h3l.4 1.3c.2.7-.2 1.4-.9 1.6V20h-1.5v-5.1c-.7-.3-1.1-1-.9-1.7z" transform="rotate(34 12 12)"/></svg>';
 
     function render() {
+      var lede = document.getElementById('pageLede');
+      var picker = document.getElementById('menuPicker');
+      document.querySelectorAll('#viewToggle [data-view]').forEach(function (b) {
+        b.classList.toggle('on', b.getAttribute('data-view') === viewMode);
+      });
+      if (viewMode === 'history') {
+        if (lede) {
+          lede.textContent = 'Past generated sheets on this device — by day, with week / Sunday label and Roman print number. Open to print again, or download the HTML.';
+        }
+        if (picker) picker.style.display = 'none';
+        renderHistory();
+        return;
+      }
+      if (lede) {
+        lede.textContent = 'A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.';
+      }
+      if (picker) picker.style.display = '';
       renderPicker();
       renderEditor();
+    }
+
+    function renderHistory() {
+      var el = document.getElementById('editor');
+      el.innerHTML = '<p class="note">Loading print history…</p>';
+      EBMenuPrint.listPrintHistory().then(function (rows) {
+        historyCache = rows || [];
+        var filtered = historyCache;
+        if (historyFilter && historyFilter !== 'all') {
+          filtered = historyCache.filter(function (r) { return r.menuId === historyFilter; });
+        }
+        var html = '';
+        html += '<div class="include-box" style="margin-bottom:14px">';
+        html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
+        html += '<p class="note" style="margin:0 0 10px">Kept on this browser after Generate (up to ' +
+          '60 sheets). Staff on the pub PC see what was generated here. Newest days first.</p>';
+        html += '<label class="field" style="margin-top:0">Show</label>';
+        html += '<select id="historyFilter">';
+        html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
+        EBMenus.MENUS.forEach(function (m) {
+          html += '<option value="' + escapeAttr(m.id) + '"' + (historyFilter === m.id ? ' selected' : '') + '>' +
+            escapeAttr(m.name) + '</option>';
+        });
+        html += '</select></div>';
+        if (!filtered.length) {
+          html += '<p class="note">Nothing saved yet. Generate a menu and it will appear here with its week and Roman numeral.</p>';
+          el.innerHTML = html;
+          bindHistory();
+          return;
+        }
+        var groups = EBMenuPrint.groupHistoryByDay(filtered);
+        groups.forEach(function (g) {
+          html += '<div class="history-day">';
+          html += '<h3>' + escapeAttr(g.label) + '</h3>';
+          g.items.forEach(function (row) {
+            var when = EBMenuPrint.timeLabelFromMs(row.generatedAt);
+            var weekBit = row.hideDate ? ('Print ' + (row.roman || '')) : ((row.week || '') + ' · ' + (row.roman || ''));
+            html += '<div class="history-row" data-history-id="' + escapeAttr(row.id) + '">';
+            html += '<div><div class="who">' + escapeAttr(row.menuName || row.menuId) + '</div>';
+            html += '<div class="meta">' + escapeAttr(weekBit) + ' · generated ' + escapeAttr(when) + '</div></div>';
+            html += '<div class="actions">';
+            html += '<button type="button" class="go" data-history-open="' + escapeAttr(row.id) + '">Open / print</button>';
+            html += '<button type="button" class="soft" data-history-download="' + escapeAttr(row.id) + '">Download</button>';
+            html += '<button type="button" class="link" data-history-delete="' + escapeAttr(row.id) + '">Remove</button>';
+            html += '</div></div>';
+          });
+          html += '</div>';
+        });
+        el.innerHTML = html;
+        bindHistory();
+      }).catch(function () {
+        el.innerHTML = '<p class="note">Could not load print history on this device.</p>';
+      });
+    }
+
+    function bindHistory() {
+      var filt = document.getElementById('historyFilter');
+      if (filt) {
+        filt.onchange = function () {
+          historyFilter = filt.value || 'all';
+          renderHistory();
+        };
+      }
+      document.querySelectorAll('[data-history-open]').forEach(function (btn) {
+        btn.onclick = function () {
+          var id = btn.getAttribute('data-history-open');
+          EBMenuPrint.getPrintHistory(id).then(function (entry) {
+            if (!entry || !entry.html) {
+              alert('That sheet is missing from history.');
+              return;
+            }
+            if (!EBMenuPrint.openPrintHtml(entry.html)) {
+              alert('Allow pop-ups to open the menu sheet, then print it.');
+            }
+          });
+        };
+      });
+      document.querySelectorAll('[data-history-download]').forEach(function (btn) {
+        btn.onclick = function () {
+          var id = btn.getAttribute('data-history-download');
+          EBMenuPrint.getPrintHistory(id).then(function (entry) {
+            if (!entry || !entry.html) {
+              alert('That sheet is missing from history.');
+              return;
+            }
+            EBMenuPrint.downloadPrintHtml(entry);
+          });
+        };
+      });
+      document.querySelectorAll('[data-history-delete]').forEach(function (btn) {
+        btn.onclick = function () {
+          var id = btn.getAttribute('data-history-delete');
+          if (!confirm('Remove this sheet from print history on this device?')) return;
+          EBMenuPrint.deletePrintHistory(id).then(function () { renderHistory(); });
+        };
+      });
     }
 
     function renderPicker() {
@@ -634,7 +769,7 @@
 
     function renderGenerateStep(menu) {
       var html = '';
-      html += '<p class="step-lede">Check the plan, then generate the branded print sheet.</p>';
+      html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Each generate is saved under <strong>Print history</strong> with its week / Sunday date and Roman numeral.</p>';
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
       html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
       html += '<div class="bar-copy" id="generateHint"></div>';
@@ -1741,8 +1876,13 @@
         }
         if (result.plan.meta.paper === 'a5') result.plan.defaultPaper = 'a5';
         w.document.open();
-        w.document.write(EBMenuPrint.build(menu, result.dishes, result.plan));
+        var html = EBMenuPrint.build(menu, result.dishes, result.plan);
+        w.document.write(html);
         w.document.close();
+        // Keep a dated copy (week / Sunday + Roman) so staff can reopen later
+        if (EBMenuPrint.savePrintHistory) {
+          EBMenuPrint.savePrintHistory(EBMenuPrint.getLastBuild && EBMenuPrint.getLastBuild()).catch(function () {});
+        }
       }
 
       var i = 0;
@@ -1781,6 +1921,14 @@
     }
 
     // Generate buttons live inside step 4 — bind in bindEditor after render, not here.
+    document.querySelectorAll('#viewToggle [data-view]').forEach(function (b) {
+      b.onclick = function () {
+        var next = b.getAttribute('data-view');
+        if (!next || next === viewMode) return;
+        viewMode = next;
+        render();
+      };
+    });
     dishId = (dishes()[0] && dishes()[0].id) || '';
     try {
       render();

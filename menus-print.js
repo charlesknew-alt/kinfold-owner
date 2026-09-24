@@ -1784,7 +1784,7 @@
       ? ' Auto: ' + layout.fillers.join(' · ') + '.'
       : (menu.kind === 'party' ? ' Standardised party layout.' : '');
 
-    return (
+    var html = (
       '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(menu.name) + ' — ' + esc(ver.roman) + '</title>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -1886,6 +1886,366 @@
       '})();<\/script>' +
       '</body></html>'
     );
+    lastBuildMeta = {
+      id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      menuId: menu.id,
+      menuName: menu.name,
+      roman: ver.roman,
+      n: ver.n,
+      week: ver.week,
+      weekKey: ver.weekKey,
+      hideDate: !!ver.hideDate,
+      generatedAt: Date.now(),
+      html: html
+    };
+    return html;
+  }
+
+  var lastBuildMeta = null;
+  var HISTORY_DB = 'eb-menu-prints';
+  var HISTORY_STORE = 'prints';
+  var HISTORY_LS_INDEX = 'eb-menu-print-history-v1';
+  var HISTORY_LS_HTML = 'eb-menu-print-html-';
+  var HISTORY_MAX = 60;
+
+  function getLastBuild() {
+    return lastBuildMeta;
+  }
+
+  function dayKeyFromMs(ms) {
+    var d = new Date(ms);
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  function dayLabelFromMs(ms) {
+    var d = new Date(ms);
+    var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    return days[d.getDay()] + ' ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  function timeLabelFromMs(ms) {
+    var d = new Date(ms);
+    var h = d.getHours();
+    var m = d.getMinutes();
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  function sortHistoryNewest(list) {
+    return (list || []).slice().sort(function (a, b) {
+      return (b.generatedAt || 0) - (a.generatedAt || 0);
+    });
+  }
+
+  function groupHistoryByDay(list) {
+    var groups = [];
+    var map = {};
+    sortHistoryNewest(list).forEach(function (row) {
+      var key = dayKeyFromMs(row.generatedAt || 0);
+      if (!map[key]) {
+        map[key] = { dayKey: key, label: dayLabelFromMs(row.generatedAt || 0), items: [] };
+        groups.push(map[key]);
+      }
+      map[key].items.push(row);
+    });
+    return groups;
+  }
+
+  function idbAvailable() {
+    return typeof indexedDB !== 'undefined';
+  }
+
+  function openHistoryDb() {
+    return new Promise(function (resolve, reject) {
+      if (!idbAvailable()) {
+        reject(new Error('no_idb'));
+        return;
+      }
+      var req = indexedDB.open(HISTORY_DB, 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(HISTORY_STORE)) {
+          var store = db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
+          store.createIndex('generatedAt', 'generatedAt', { unique: false });
+          store.createIndex('dayKey', 'dayKey', { unique: false });
+        }
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('idb_open')); };
+    });
+  }
+
+  function pruneHistoryList(list) {
+    var sorted = sortHistoryNewest(list);
+    if (sorted.length <= HISTORY_MAX) return sorted;
+    return sorted.slice(0, HISTORY_MAX);
+  }
+
+  function lsLoadIndex() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(HISTORY_LS_INDEX) || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function lsSaveIndex(list) {
+    localStorage.setItem(HISTORY_LS_INDEX, JSON.stringify(list));
+  }
+
+  function lsSavePrint(entry) {
+    var meta = {
+      id: entry.id,
+      menuId: entry.menuId,
+      menuName: entry.menuName,
+      roman: entry.roman,
+      n: entry.n,
+      week: entry.week,
+      weekKey: entry.weekKey,
+      hideDate: !!entry.hideDate,
+      generatedAt: entry.generatedAt,
+      dayKey: entry.dayKey || dayKeyFromMs(entry.generatedAt)
+    };
+    try {
+      localStorage.setItem(HISTORY_LS_HTML + entry.id, entry.html || '');
+    } catch (e) {
+      // Quota — drop oldest html blobs then retry once
+      var idx = pruneHistoryList(lsLoadIndex());
+      while (idx.length > 10) {
+        var drop = idx.pop();
+        try { localStorage.removeItem(HISTORY_LS_HTML + drop.id); } catch (e2) {}
+      }
+      lsSaveIndex(idx);
+      localStorage.setItem(HISTORY_LS_HTML + entry.id, entry.html || '');
+    }
+    var next = pruneHistoryList([meta].concat(lsLoadIndex().filter(function (r) { return r.id !== meta.id; })));
+    // Remove orphaned html for pruned rows
+    var keep = {};
+    next.forEach(function (r) { keep[r.id] = true; });
+    lsLoadIndex().forEach(function (r) {
+      if (!keep[r.id]) {
+        try { localStorage.removeItem(HISTORY_LS_HTML + r.id); } catch (e3) {}
+      }
+    });
+    lsSaveIndex(next);
+    return meta;
+  }
+
+  function lsListPrints() {
+    return pruneHistoryList(lsLoadIndex());
+  }
+
+  function lsGetPrint(id) {
+    var meta = null;
+    lsLoadIndex().forEach(function (r) { if (r.id === id) meta = r; });
+    if (!meta) return null;
+    var html = '';
+    try { html = localStorage.getItem(HISTORY_LS_HTML + id) || ''; } catch (e) {}
+    return {
+      id: meta.id,
+      menuId: meta.menuId,
+      menuName: meta.menuName,
+      roman: meta.roman,
+      n: meta.n,
+      week: meta.week,
+      weekKey: meta.weekKey,
+      hideDate: meta.hideDate,
+      generatedAt: meta.generatedAt,
+      dayKey: meta.dayKey,
+      html: html
+    };
+  }
+
+  function lsDeletePrint(id) {
+    lsSaveIndex(lsLoadIndex().filter(function (r) { return r.id !== id; }));
+    try { localStorage.removeItem(HISTORY_LS_HTML + id); } catch (e) {}
+  }
+
+  function normalizeHistoryEntry(raw) {
+    if (!raw || !raw.html) return null;
+    var generatedAt = raw.generatedAt || Date.now();
+    return {
+      id: raw.id || ('p' + generatedAt.toString(36)),
+      menuId: String(raw.menuId || 'main'),
+      menuName: String(raw.menuName || raw.menuId || 'Menu'),
+      roman: String(raw.roman || ''),
+      n: raw.n || 0,
+      week: String(raw.week || ''),
+      weekKey: String(raw.weekKey || ''),
+      hideDate: !!raw.hideDate,
+      generatedAt: generatedAt,
+      dayKey: raw.dayKey || dayKeyFromMs(generatedAt),
+      html: String(raw.html)
+    };
+  }
+
+  /** Persist a generated sheet so staff can reopen / print it later on this device. */
+  function savePrintHistory(raw) {
+    var entry = normalizeHistoryEntry(raw || lastBuildMeta);
+    if (!entry) return Promise.resolve(null);
+    if (!idbAvailable()) {
+      lsSavePrint(entry);
+      return Promise.resolve(entry);
+    }
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(HISTORY_STORE, 'readwrite');
+        var store = tx.objectStore(HISTORY_STORE);
+        store.put(entry);
+        tx.oncomplete = function () {
+          // Cap total rows
+          var tx2 = db.transaction(HISTORY_STORE, 'readwrite');
+          var st2 = tx2.objectStore(HISTORY_STORE);
+          var all = [];
+          st2.openCursor(null, 'prev').onsuccess = function (ev) {
+            var cursor = ev.target.result;
+            if (!cursor) {
+              if (all.length > HISTORY_MAX) {
+                all.slice(HISTORY_MAX).forEach(function (row) { st2.delete(row.id); });
+              }
+              return;
+            }
+            all.push(cursor.value);
+            cursor.continue();
+          };
+          tx2.oncomplete = function () { resolve(entry); };
+          tx2.onerror = function () { resolve(entry); };
+        };
+        tx.onerror = function () {
+          try { lsSavePrint(entry); } catch (e) {}
+          reject(tx.error || new Error('idb_put'));
+        };
+      });
+    }).catch(function () {
+      lsSavePrint(entry);
+      return entry;
+    });
+  }
+
+  function listPrintHistory() {
+    if (!idbAvailable()) {
+      return Promise.resolve(lsListPrints());
+    }
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(HISTORY_STORE, 'readonly');
+        var store = tx.objectStore(HISTORY_STORE);
+        var req = store.getAll ? store.getAll() : null;
+        if (req) {
+          req.onsuccess = function () {
+            resolve(sortHistoryNewest((req.result || []).map(function (r) {
+              return {
+                id: r.id,
+                menuId: r.menuId,
+                menuName: r.menuName,
+                roman: r.roman,
+                n: r.n,
+                week: r.week,
+                weekKey: r.weekKey,
+                hideDate: r.hideDate,
+                generatedAt: r.generatedAt,
+                dayKey: r.dayKey
+              };
+            })));
+          };
+          req.onerror = function () { resolve(lsListPrints()); };
+          return;
+        }
+        var rows = [];
+        store.openCursor(null, 'prev').onsuccess = function (ev) {
+          var cursor = ev.target.result;
+          if (!cursor) {
+            resolve(sortHistoryNewest(rows));
+            return;
+          }
+          var r = cursor.value;
+          rows.push({
+            id: r.id,
+            menuId: r.menuId,
+            menuName: r.menuName,
+            roman: r.roman,
+            n: r.n,
+            week: r.week,
+            weekKey: r.weekKey,
+            hideDate: r.hideDate,
+            generatedAt: r.generatedAt,
+            dayKey: r.dayKey
+          });
+          cursor.continue();
+        };
+        tx.onerror = function () { resolve(lsListPrints()); };
+      });
+    }).catch(function () {
+      return lsListPrints();
+    });
+  }
+
+  function getPrintHistory(id) {
+    if (!id) return Promise.resolve(null);
+    if (!idbAvailable()) {
+      return Promise.resolve(lsGetPrint(id));
+    }
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction(HISTORY_STORE, 'readonly');
+        var req = tx.objectStore(HISTORY_STORE).get(id);
+        req.onsuccess = function () {
+          resolve(req.result || lsGetPrint(id));
+        };
+        req.onerror = function () { resolve(lsGetPrint(id)); };
+      });
+    }).catch(function () {
+      return lsGetPrint(id);
+    });
+  }
+
+  function deletePrintHistory(id) {
+    if (!id) return Promise.resolve();
+    lsDeletePrint(id);
+    if (!idbAvailable()) return Promise.resolve();
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction(HISTORY_STORE, 'readwrite');
+        tx.objectStore(HISTORY_STORE).delete(id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { resolve(); };
+      });
+    }).catch(function () {});
+  }
+
+  function openPrintHtml(html) {
+    if (!html) return false;
+    var w = window.open('', '_blank');
+    if (!w) return false;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    return true;
+  }
+
+  function downloadPrintHtml(entry) {
+    if (!entry || !entry.html) return false;
+    var name = 'eight-bells-' +
+      String(entry.menuId || 'menu') + '-' +
+      String(entry.weekKey || dayKeyFromMs(entry.generatedAt || Date.now())).replace(/\s+/g, '') + '-' +
+      String(entry.roman || 'x') + '.html';
+    var blob = new Blob([entry.html], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      if (a.parentNode) a.parentNode.removeChild(a);
+    }, 500);
+    return true;
   }
 
   function partyCss() {
@@ -1931,6 +2291,16 @@
     sundayLabel: sundayLabel,
     weekKey: weekKey,
     nextPrintVersion: nextPrintVersion,
-    wrapGuillotine: wrapGuillotine
+    wrapGuillotine: wrapGuillotine,
+    getLastBuild: getLastBuild,
+    savePrintHistory: savePrintHistory,
+    listPrintHistory: listPrintHistory,
+    getPrintHistory: getPrintHistory,
+    deletePrintHistory: deletePrintHistory,
+    groupHistoryByDay: groupHistoryByDay,
+    dayLabelFromMs: dayLabelFromMs,
+    timeLabelFromMs: timeLabelFromMs,
+    openPrintHtml: openPrintHtml,
+    downloadPrintHtml: downloadPrintHtml
   };
 })(typeof window !== 'undefined' ? window : global);
