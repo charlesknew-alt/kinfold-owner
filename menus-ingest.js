@@ -81,6 +81,75 @@
     });
   }
 
+  /** Shrink big Canva exports so Gemini / Apps Script don’t hang on “Reading…”. */
+  function imageFileForAi(file, onProgress) {
+    var type = (file.type || '').toLowerCase();
+    if (onProgress) onProgress('Preparing image for AI reader…');
+    return fileToDataUrl(file).then(function (dataUrl) {
+      if (typeof Image === 'undefined' || typeof document === 'undefined') {
+        return { dataUrl: dataUrl, mimeType: type || 'image/jpeg' };
+      }
+      return new Promise(function (resolve) {
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var maxEdge = 1600;
+            var w = img.naturalWidth || img.width;
+            var h = img.naturalHeight || img.height;
+            if (!w || !h) {
+              resolve({ dataUrl: dataUrl, mimeType: type || 'image/jpeg' });
+              return;
+            }
+            var scale = Math.min(1, maxEdge / Math.max(w, h));
+            var tw = Math.max(1, Math.round(w * scale));
+            var th = Math.max(1, Math.round(h * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = tw;
+            canvas.height = th;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, tw, th);
+            ctx.drawImage(img, 0, 0, tw, th);
+            var out = canvas.toDataURL('image/jpeg', 0.82);
+            resolve({ dataUrl: out, mimeType: 'image/jpeg' });
+          } catch (e) {
+            resolve({ dataUrl: dataUrl, mimeType: type || 'image/jpeg' });
+          }
+        };
+        img.onerror = function () {
+          resolve({ dataUrl: dataUrl, mimeType: type || 'image/jpeg' });
+        };
+        img.src = dataUrl;
+      });
+    });
+  }
+
+  function fetchWithTimeout(url, opts, ms) {
+    ms = ms || 120000;
+    if (typeof AbortController === 'undefined') {
+      return fetch(url, opts);
+    }
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, ms);
+    var next = {
+      method: opts.method,
+      headers: opts.headers,
+      body: opts.body,
+      signal: ctrl.signal
+    };
+    return fetch(url, next).then(function (res) {
+      clearTimeout(timer);
+      return res;
+    }, function (err) {
+      clearTimeout(timer);
+      if (err && err.name === 'AbortError') {
+        throw new Error('AI reader timed out after ' + Math.round(ms / 1000) +
+          's. Try a smaller image, or wait a minute and retry — Gemini was busy.');
+      }
+      throw err;
+    });
+  }
+
   /** Tidies PDF/OCR text so parsePaste can read headings, prices, descriptions. */
   function cleanExtractedText(raw) {
     var lines = String(raw || '')
@@ -186,17 +255,18 @@
   function readWithAi(file, onProgress) {
     var url = getAiUrl();
     if (!url) return Promise.reject(new Error('No AI reader URL'));
-    if (onProgress) onProgress('Sending to AI reader (uses Gemini credits)…');
-    return fileToDataUrl(file).then(function (dataUrl) {
-      return fetch(url, {
+    if (onProgress) onProgress('Preparing image for AI reader…');
+    return imageFileForAi(file, onProgress).then(function (packed) {
+      if (onProgress) onProgress('Sending to AI reader (uses Gemini credits)…');
+      return fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({
-          imageBase64: dataUrl,
-          mimeType: file.type || 'image/jpeg',
+          imageBase64: packed.dataUrl,
+          mimeType: packed.mimeType || file.type || 'image/jpeg',
           fileName: file.name || ''
         })
-      });
+      }, 120000);
     }).then(function (res) {
       return res.text().then(function (t) {
         var data;

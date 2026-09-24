@@ -30,7 +30,10 @@ function doPost(e) {
   }
 }
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && String(e.parameter.models || '') === '1') {
+    return json_(listGeminiModels_());
+  }
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
@@ -48,6 +51,81 @@ function json_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/** Prefer a working flash model — 3.6 can 503 under load and leave staff stuck on “Reading…”. */
+function geminiModels_() {
+  var preferred = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') || '';
+  // Put known-good flash models first; property override still tried early if set.
+  var list = [
+    preferred,
+    'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash',
+    'gemini-3.6-flash'
+  ];
+  var out = [];
+  var seen = {};
+  for (var i = 0; i < list.length; i++) {
+    var m = String(list[i] || '').trim();
+    if (!m || seen[m]) continue;
+    seen[m] = true;
+    out.push(m);
+  }
+  return out;
+}
+
+function listGeminiModels_() {
+  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) return { ok: false, error: 'GEMINI_API_KEY is not set in Script Properties.' };
+  var resp = UrlFetchApp.fetch(
+    'https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key),
+    { muteHttpExceptions: true }
+  );
+  var code = resp.getResponseCode();
+  var text = resp.getContentText();
+  if (code < 200 || code >= 300) {
+    return { ok: false, error: 'ListModels HTTP ' + code + ': ' + text.slice(0, 400) };
+  }
+  var parsed = JSON.parse(text);
+  var names = [];
+  (parsed.models || []).forEach(function (m) {
+    var name = String(m.name || '').replace(/^models\//, '');
+    var methods = m.supportedGenerationMethods || [];
+    if (methods.indexOf('generateContent') !== -1) names.push(name);
+  });
+  return { ok: true, models: names, preferred: geminiModels_() };
+}
+
+function callGemini_(key, parts, generationConfig) {
+  var models = geminiModels_();
+  var lastErr = '';
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+      model + ':generateContent?key=' + encodeURIComponent(key);
+    var payload = {
+      contents: [{ role: 'user', parts: parts }],
+      generationConfig: generationConfig || { temperature: 0.1, responseMimeType: 'application/json' }
+    };
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    var text = resp.getContentText();
+    if (code >= 200 && code < 300) {
+      return { ok: true, model: model, text: text };
+    }
+    lastErr = 'Gemini HTTP ' + code + ' (' + model + '): ' + String(text || '').slice(0, 280);
+    // Try next model on overload / not found; stop on auth errors
+    if (code === 401 || code === 403) break;
+  }
+  return { ok: false, error: lastErr || 'Gemini request failed' };
+}
+
 function readMenuWithGemini_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   if (!key) {
@@ -61,6 +139,13 @@ function readMenuWithGemini_(body) {
   if (b64.indexOf('data:') === 0 && comma !== -1) {
     mime = b64.slice(5, b64.indexOf(';')) || mime;
     b64 = b64.slice(comma + 1);
+  }
+  // Huge Canva exports blow past practical limits and hang staff on “Reading…”
+  if (b64.length > 6 * 1024 * 1024) {
+    return {
+      ok: false,
+      error: 'Image is too large for the AI reader. Export a smaller PNG/JPG (under ~4MB) or take a clearer photo of the page.'
+    };
   }
 
   var prompt =
@@ -95,37 +180,17 @@ function readMenuWithGemini_(body) {
     '  If nothing was corrected, return "spellingFixes": [] — never omit the field.\n' +
     '  Prefer British English only when fixing real errors; do not rename intentional dish styling.\n';
 
-  var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||
-    'gemini-3.6-flash';
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-    model + ':generateContent?key=' + encodeURIComponent(key);
-
-  var payload = {
-    contents: [{
-      role: 'user',
-      parts: [
-        { text: prompt },
-        { inlineData: { mimeType: mime, data: b64 } }
-      ]
-    }],
-    generationConfig: {
-      temperature: 0.1,
-      responseMimeType: 'application/json'
-    }
-  };
-
-  var resp = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+  var called = callGemini_(key, [
+    { text: prompt },
+    { inlineData: { mimeType: mime, data: b64 } }
+  ], {
+    temperature: 0.1,
+    responseMimeType: 'application/json'
   });
-  var code = resp.getResponseCode();
-  var text = resp.getContentText();
-  if (code < 200 || code >= 300) {
-    return { ok: false, error: 'Gemini HTTP ' + code + ': ' + text.slice(0, 400) };
+  if (!called.ok) {
+    return { ok: false, error: called.error };
   }
-  var parsed = JSON.parse(text);
+  var parsed = JSON.parse(called.text);
   var parts = (((parsed || {}).candidates || [])[0] || {}).content || {};
   var partList = parts.parts || [];
   var outText = '';
@@ -142,6 +207,7 @@ function readMenuWithGemini_(body) {
   return {
     ok: true,
     source: 'gemini',
+    model: called.model,
     fileName: body.fileName || '',
     menu: menu
   };
@@ -195,31 +261,14 @@ function reviewLayoutWithGemini_(body) {
     'not a fixed “prefer column” rule.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
 
-  var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||
-    'gemini-3.6-flash';
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-    model + ':generateContent?key=' + encodeURIComponent(key);
-
-  var payload = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.2,
-      responseMimeType: 'application/json'
-    }
-  };
-
-  var resp = UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+  var called = callGemini_(key, [{ text: prompt }], {
+    temperature: 0.2,
+    responseMimeType: 'application/json'
   });
-  var code = resp.getResponseCode();
-  var text = resp.getContentText();
-  if (code < 200 || code >= 300) {
-    return { ok: false, error: 'Gemini HTTP ' + code + ': ' + text.slice(0, 400) };
+  if (!called.ok) {
+    return { ok: false, error: called.error };
   }
-  var parsed = JSON.parse(text);
+  var parsed = JSON.parse(called.text);
   var parts = (((parsed || {}).candidates || [])[0] || {}).content || {};
   var partList = parts.parts || [];
   var outText = '';
@@ -240,6 +289,7 @@ function reviewLayoutWithGemini_(body) {
   return {
     ok: true,
     source: 'gemini-layout',
+    model: called.model,
     density: density,
     sandwichesOn: sandwichesOn,
     dropFootLogo: !!advice.dropFootLogo,

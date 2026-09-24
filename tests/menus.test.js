@@ -234,8 +234,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow38') !== -1, 'menus page cache-bust is flow38');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow38') !== -1, 'hub menus link cache-bust is flow38');
+assert(page.indexOf('flow39') !== -1, 'menus page cache-bust is flow39');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow39') !== -1, 'hub menus link cache-bust is flow39');
+assert(ingestJs.indexOf('fetchWithTimeout') !== -1 && ingestJs.indexOf('imageFileForAi') !== -1,
+  'AI reader shrinks images and times out instead of hanging');
+assert(aiGs.indexOf('gemini-2.5-flash') !== -1 && aiGs.indexOf('callGemini_') !== -1,
+  'Menu AI falls back across Gemini flash models');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
