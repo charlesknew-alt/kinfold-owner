@@ -1049,10 +1049,12 @@
    * Choose bank wording for Generate.
    * If staff ticked any: use those (manual override, past dates allowed).
    * If none ticked: auto-pick upcoming/evergreen only — never past-dated.
+   * Evergreen lines rotate by calendar day so each day’s sheet feels different.
    */
   function pickPromos(bank, ticks, opts) {
     opts = opts || {};
-    var max = opts.max != null ? opts.max : 5;
+    // Two columns × up to 2 blurbs — enough to fill, not a stack of empty boxes
+    var max = opts.max != null ? opts.max : 4;
     var today = opts.today || new Date();
     bank = Array.isArray(bank) ? bank.slice() : [];
     ticks = ticks || {};
@@ -1063,17 +1065,28 @@
     if (anyTick) {
       chosen = bank.filter(function (p) { return p && ticks[p.id]; });
     } else {
-      chosen = bank.filter(function (p) {
+      var eligible = bank.filter(function (p) {
         return p && p.title && !isPastPromoDate(p.date, today);
       });
-      chosen.sort(function (a, b) {
+      var dated = [];
+      var evergreen = [];
+      eligible.forEach(function (p) {
+        if (p.date) dated.push(p);
+        else evergreen.push(p);
+      });
+      dated.sort(function (a, b) {
         var ad = a.date || '';
         var bd = b.date || '';
-        if (ad && bd) return ad < bd ? -1 : ad > bd ? 1 : 0;
-        if (ad && !bd) return -1;
-        if (!ad && bd) return 1;
-        return 0;
+        return ad < bd ? -1 : ad > bd ? 1 : 0;
       });
+      // Rotate evergreen by day-of-year so Stay a While / Gatherings / quiz cycle
+      if (evergreen.length > 1) {
+        var start = new Date(today.getFullYear(), 0, 0);
+        var dayNum = Math.floor((startOfDay(today) - start) / 86400000);
+        var rot = ((dayNum % evergreen.length) + evergreen.length) % evergreen.length;
+        evergreen = evergreen.slice(rot).concat(evergreen.slice(0, rot));
+      }
+      chosen = dated.concat(evergreen);
     }
     return chosen.slice(0, Math.max(0, max));
   }
@@ -1103,14 +1116,16 @@
    * Per-section print layout rules.
    * width: 'full' | 'column' | 'both'
    *   full   — always full page width
-   *   column — sits in a column (beside promo / another column section)
-   *   both   — prefer column when a partner fits, otherwise full width
+   *   column — always sits in a column
+   *   both   — “best fit”: layout / AI picks column or full for this page
    * frame: scalloped “frilly” box around the section
    * note: optional spiel printed under the title (hours, “all served with…”, etc.)
    */
   var DEFAULT_SECTION_LAYOUT = {
     Nibbles: { width: 'column', frame: true, note: '' },
-    Starters: { width: 'column', frame: true, note: '' },
+    // Starters sit in the top band beside the logo (not a skinny half-column).
+    // Frilly off by default — more prominent, less boxed-in.
+    Starters: { width: 'full', frame: false, note: '' },
     'Sharing Plates': { width: 'both', frame: false, note: '' },
     'Item Boost': { width: 'full', frame: true, note: '' },
     'Pub Classics': { width: 'column', frame: false, note: '' },
@@ -1130,7 +1145,7 @@
   var WIDTH_OPTIONS = [
     { id: 'full', label: 'Full width' },
     { id: 'column', label: 'Column' },
-    { id: 'both', label: 'Both (column if it fits)' }
+    { id: 'both', label: 'Best fit for this page (AI chooses)' }
   ];
 
   function defaultSectionLayout() {

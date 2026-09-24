@@ -187,6 +187,9 @@ function reviewLayoutWithGemini_(body) {
     '8. Item Boost (e.g. Fish of the Day / specials) stays where staff put it on the long sheet. ' +
     'Sandwiches, Desserts and Little Bells as their own menus print as two A5 copies on one landscape A4 (guillotine).\n' +
     '9. Party / occasion menus: staff choose full A4 or 2×A5 — respect that paper choice; do not invent a third format.\n' +
+    '10. SECTION WIDTH “both” / best-fit: when staff set a section to best fit for this page, choose column OR full ' +
+    'width for that section based on what balances THIS sheet (partner columns, leftover room, readability) — ' +
+    'not a fixed “prefer column” rule.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
 
   var model = PropertiesService.getScriptProperties().getProperty('GEMINI_MODEL') ||

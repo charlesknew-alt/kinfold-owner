@@ -140,9 +140,11 @@
         'Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can’t guarantee it’s allergen-free.<br>' +
         'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan';
     if (opts.lunchClub) {
+      // Lunch club note lives in the allergy footer (not a mid-page scallop box)
       html +=
         '<br><span class="allergy-lc">' + lunchMark() +
-        ' Bells Lunch Club option — Monday to Thursday &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
+        ' Bells Lunch Club option — smaller plates for smaller appetites, Monday to Thursday' +
+        ' &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
     }
     html += '</div>';
     return html;
@@ -192,13 +194,41 @@
     var html = '<div class="dish dish-c">';
     html += '<div class="dish-name">';
     html += esc(d.name);
+    // Tags sit with the name so the description line stays a clean centred block
+    if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
     if (!opts.hidePrice && d.price) html += ' <span class="price">' + esc(d.price) + '</span>';
     if (d.lunchClub && !opts.hideLunch) html += ' ' + lunchMark();
     html += '</div>';
-    if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
-    if (d.tags) html += '<div class="tags">' + esc(d.tags) + '</div>';
+    if (d.description) {
+      html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
+    }
     html += '</div>';
     return html;
+  }
+
+  /** Group sandwich fillings by price for A5 card faces. */
+  function cardSandwichesInner(dishes) {
+    var groups = {};
+    var order = [];
+    (dishes || []).forEach(function (d) {
+      var p = cleanPrice(d.price);
+      if (!groups[p]) {
+        groups[p] = [];
+        order.push(p);
+      }
+      groups[p].push(d);
+    });
+    var html = '';
+    order.forEach(function (p) {
+      groups[p].forEach(function (d) {
+        html += dishCentered(d, { hidePrice: true });
+      });
+      if (p) html += '<div class="lb-price">£' + esc(p) + '</div>';
+    });
+    html +=
+      '<div class="desc card-spiel">Served on either Ciabatta vg, Farmhouse White or Granary<br>' +
+      'All served with Fries and Salad</div>';
+    return scallop(html);
   }
 
   function groupBySection(dishes) {
@@ -275,8 +305,9 @@
   /**
    * Split event wording across the two columns so both columns finish
    * at roughly the same height (start aligned, end aligned).
-   * Paired panels always use opposite frames (rect box vs oval wide) so
-   * two matching rectangles never sit side by side.
+   * At most one box per column (up to 2 blurbs each) — never a lonely
+   * third/fourth scallop hanging under a short stack.
+   * Paired panels always use opposite frames (rect box vs oval wide).
    */
   function splitPromosForColumns(promos, opts) {
     opts = opts || {};
@@ -291,6 +322,8 @@
         { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
       ];
     }
+    // Cap at four blurbs → two balanced boxes
+    if (list.length > 4) list = list.slice(0, 4);
     if (list.length === 1) {
       return { left: renderOnePromoBox(list, leftKind), right: '' };
     }
@@ -300,10 +333,15 @@
         right: renderOnePromoBox([list[1]], rightKind)
       };
     }
-    var mid = Math.ceil(list.length / 2);
+    if (list.length === 3) {
+      return {
+        left: renderOnePromoBox(list.slice(0, 2), leftKind),
+        right: renderOnePromoBox([list[2]], rightKind)
+      };
+    }
     return {
-      left: renderPromoBank(list.slice(0, mid), leftKind),
-      right: renderPromoBank(list.slice(mid), rightKind)
+      left: renderOnePromoBox(list.slice(0, 2), leftKind),
+      right: renderOnePromoBox(list.slice(2, 4), rightKind)
     };
   }
 
@@ -351,41 +389,59 @@
   }
 
   /**
-   * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list
-   * inside the frilly box. Falls back to spiel-only when there are no fillings.
+   * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list.
+   * Frilly box only when Blocks → Sandwiches → Frilly is Yes (not hard-coded).
    */
   function sandwichesBlock(bag, opts) {
     opts = opts || {};
     var dishes = sandwichDishesOf(bag);
     var rule = opts.rule || { frame: true, note: '' };
-    var frameKind = opts.frame === 'wide' ? 'wide' : (opts.frame === 'box' || rule.frame ? 'box' : 'wide');
-    if (opts.frame === 'box') frameKind = 'box';
-    if (opts.frame === 'wide') frameKind = 'wide';
+    var wantFrame = !!rule.frame;
+    var frameKind = opts.frame === 'wide' ? 'wide' : 'box';
     var note = (opts.note != null && String(opts.note).trim())
       ? String(opts.note).trim()
       : String(rule.note || '').trim();
     if (!dishes.length) {
-      return sandwichNote(dishes, {
-        frame: frameKind,
-        alignTitle: !!opts.alignTitle,
-        note: note
+      var spiel = note ||
+        '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.';
+      var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
+      var noteInner = '<div class="promo sandwich-promo">';
+      noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
+      lines.forEach(function (line, i) {
+        noteInner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
       });
+      noteInner += '</div>';
+      if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
+      if (opts.alignTitle) {
+        return (
+          '<div class="sandwich-aligned">' +
+            '<div class="promo-head pair-head">' +
+              '<span class="sec-title soft-left">Sandwiches</span>' +
+            '</div>' +
+            scallop(noteInner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, ''), frameKind) +
+          '</div>'
+        );
+      }
+      return scallop(noteInner, frameKind);
     }
     var noteHtml = note
       ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
       : '';
     var body = noteHtml + listDishes(dishes);
+    var titled = sectionTitle('Sandwiches') + body;
     if (opts.alignTitle) {
+      var inner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
       return (
         '<div class="sandwich-aligned">' +
           '<div class="promo-head pair-head">' +
             '<span class="sec-title soft-left">Sandwiches</span>' +
           '</div>' +
-          scallop(body, frameKind) +
+          inner +
         '</div>'
       );
     }
-    return scallop(sectionTitle('Sandwiches') + body, frameKind);
+    if (!wantFrame) return '<div class="sec-plain">' + titled + '</div>';
+    return scallop(titled, frameKind);
   }
 
   /** Prefer shared tidy from menus.js when available (priced desc orphans too). */
@@ -485,16 +541,6 @@
     return 'fill-compact';
   }
 
-  function lunchClubBox() {
-    return scallop(
-      '<div class="lunch-box">' +
-        lunchMark() +
-        '<div><strong>Smaller options for smaller appetites</strong><br>Lunch club Mon–Thurs</div>' +
-      '</div>',
-      'box'
-    );
-  }
-
   function isNibbles(name) {
     return /nibble|light bite/i.test(name || '');
   }
@@ -580,18 +626,19 @@
 
   /* —— Fluid layout brain ——
      Sizes the selected dishes, splits pages only when needed, and only
-     drops in Stay a While / Gatherings / sandwiches / lunch-club / foot logo
-     when leftover room lets them sit without opening another page. */
+     drops in Stay a While / Gatherings / sandwiches / foot logo when
+     leftover room lets them sit without opening another page.
+     Lunch club copy sits in the allergy footer whenever dishes are ticked. */
   var PAGE = 100;
   var COST = {
     tracker: 2,
     allergy: 4,
+    allergyLunch: 2.5,
     logoTop: 10,
     nibblesBox: 2.5,
     sectionHead: 2.8,
     rooms: 9,
     sandwiches: 8,
-    lunchClub: 5,
     footLogo: 7,
     bottomCols: 1
   };
@@ -685,7 +732,8 @@
 
     dishes = orderDishesForPrint(dishes || []);
     var bag = pickSections(dishes);
-    var chrome = COST.tracker + COST.allergy + COST.logoTop;
+    var chrome = COST.tracker + COST.allergy + COST.logoTop +
+      (bag.hasLunch ? COST.allergyLunch : 0);
     var front = chrome;
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
@@ -718,12 +766,13 @@
       mode: 'single',
       bag: bag,
       promos: promos || [],
-      p1: { rooms: false, sandwiches: false, lunchClub: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
+      p1: { rooms: false, sandwiches: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
       p2: null,
       leftover: { p1: 0, p2: 0 },
       summary: '',
       fillers: []
     };
+    if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
 
     // —— One page if everything (minus optional fillers) fits ——
     var oneNeed = front;
@@ -760,10 +809,6 @@
         }
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
-      if (bag.hasLunch) {
-        add = tryAdd(left1, COST.lunchClub);
-        if (add.ok) { layout.p1.lunchClub = true; left1 = add.left; layout.fillers.push('Lunch club note'); }
-      }
       add = tryAdd(left1, COST.footLogo);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = left1;
@@ -774,7 +819,7 @@
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
       layout.mode = 'jul-nov';
-      layout.p2 = { rooms: false, sandwiches: false, lunchClub: false, footLogo: false, sidesOnP2: true };
+      layout.p2 = { rooms: false, sandwiches: false, footLogo: false, sidesOnP2: true };
       layout.p1.classicsSplit = 1;
 
       var p1used = front;
@@ -832,14 +877,6 @@
           layout.p2.rooms = true;
           p2left = addRooms2.left;
           layout.fillers.push(promoLabel + ' (page 2)');
-        }
-      }
-      if (bag.hasLunch && !tightBack) {
-        var addL = tryAdd(p2left, COST.lunchClub);
-        if (addL.ok) {
-          layout.p2.lunchClub = true;
-          p2left = addL.left;
-          layout.fillers.push('Lunch club note (page 2)');
         }
       }
       var logoCost = tightBack ? COST.footLogo + 4 : COST.footLogo;
@@ -943,7 +980,6 @@
     if (which === 'sandwiches') {
       return sandwichesBlock(bag, opts);
     }
-    if (which === 'lunch') return lunchClubBox();
     if (which === 'logo') {
       return '<div class="foot-logo"><img src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
     }
@@ -1030,30 +1066,40 @@
       (!!shareDishes.length && foodUnits > 0 && foodUnits <= 4 && (burgerDishes.length || p1opts.rooms));
 
     var sandList = sandwichDishesOf(bag);
-    var nibblesInCol = !!(bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full');
-    // No nibbles → Starters take the logo-side column (same spot nibbles would occupy)
-    var startersInCol = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full' && !nibblesInCol);
+    // Nibbles / Starters sit in the top band beside the logo (span across),
+    // not a skinny left column under half the page. Frilly follows Blocks settings.
+    var nibblesInTop = !!bag.nibbles;
+    var startersInTop = !!(bag.starters && !bag.nibbles);
+    var startersBelowNibbles = !!(bag.starters && bag.nibbles);
     var sandwichesInCol = !!(p1opts.sandwiches && (wantsColumn(sandRule) || sandList.length));
 
     var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms ||
-      p1opts.sandwiches || (p1opts.sidesOnP1 && sidesPrint) || shareInLeft ||
-      nibblesInCol || startersInCol;
+      p1opts.sandwiches || (p1opts.sidesOnP1 && sidesPrint) || shareInLeft;
     var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length ||
-      !!p1opts.rooms || shareInLeft || classicDishes.length > 0 ||
-      nibblesInCol || startersInCol || sandwichesInCol;
+      !!p1opts.rooms || shareInLeft || classicDishes.length > 0 || sandwichesInCol;
 
-    // Logo-only strip when we are NOT putting food beside it in the column grid
-    if (!showColBlock || !classicsAsColumn) {
+    // Top band: Starters (or Nibbles) flow across to the logo — prominent, not half-width
+    if (nibblesInTop || startersInTop) {
+      p1 += '<div class="top-band top-band-logo">';
+      p1 += '<div class="top-left">';
+      if (nibblesInTop) {
+        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
+      }
+      if (startersInTop) {
+        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
+      }
+      p1 += '</div>';
+      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '</div>';
+    } else if (!showColBlock || !classicsAsColumn) {
       p1 += '<div class="top-band top-band-logo">';
       p1 += '<div class="top-left"></div>';
       p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
       p1 += '</div>';
-      if (bag.nibbles && !nibblesInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
-      }
-      if (bag.starters && !startersInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
-      }
+    }
+    // Starters under nibbles: full width so they stay prominent
+    if (startersBelowNibbles) {
+      p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
 
     if (shareAsFull && !shareInLeft) {
@@ -1077,8 +1123,11 @@
     });
 
     if (showColBlock && classicsAsColumn) {
+      // Logo already in top-band when starters/nibbles sit there — columns start level below
+      var logoInTop = nibblesInTop || startersInTop;
       p1 += '<section class="sec classics-block">';
-      p1 += '<div class="cols cols-classics cols-balanced cols-features cols-with-logo">';
+      p1 += '<div class="cols cols-classics cols-balanced cols-features' +
+        (logoInTop ? '' : ' cols-with-logo') + '">';
       var sandOnRightNote = !!(sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length));
       var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box' }
@@ -1089,15 +1138,9 @@
         : '';
       var rightFeature = (p1opts.rooms && promoCols.right) ? promoCols.right : '';
 
-      // LEFT — Nibbles or Starters (logo partner), Sharing, Sandwiches with spiel + dishes
+      // LEFT — Sharing, Sandwiches; event panel pins to the foot
       p1 += '<div class="col col-events">';
       p1 += '<div class="col-body">';
-      if (nibblesInCol) {
-        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
-      }
-      if (startersInCol) {
-        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
-      }
       if (shareInLeft) {
         p1 += framedBlock(
           sectionTitle(bag.sharing.name) + listDishes(shareDishes),
@@ -1105,9 +1148,9 @@
         );
       }
       if (sandwichesInCol && (sandList.length || !(burgerDishes.length || classicDishes.length))) {
-        p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
+        p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
-      if (!nibblesInCol && !startersInCol && !shareInLeft &&
+      if (!shareInLeft &&
           !(sandwichesInCol && sandList.length) && !leftFeature) {
         p1 += '&nbsp;';
       }
@@ -1115,9 +1158,11 @@
       if (leftFeature) p1 += '<div class="col-feature">' + leftFeature + '</div>';
       p1 += '</div>';
 
-      // RIGHT — Logo at the top of this column so both sides start level, then food
+      // RIGHT — Logo only if not already in top-band; then Burgers + Pub Classics lower
       p1 += '<div class="col col-food">';
-      p1 += '<div class="col-logo"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      if (!logoInTop) {
+        p1 += '<div class="col-logo"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      }
       p1 += '<div class="col-body">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
@@ -1126,7 +1171,7 @@
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
       if (sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length)) {
-        p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
+        p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
@@ -1138,14 +1183,6 @@
       p1 += '</div>';
       if (rightFeature) p1 += '<div class="col-feature">' + rightFeature + '</div>';
       p1 += '</div></div></section>';
-
-      // Starters that did not join the logo column (e.g. nibbles already there, or full width)
-      if (bag.starters && !startersInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
-      }
-      if (bag.nibbles && !nibblesInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
-      }
     } else if (classicDishes.length || burgerDishes.length) {
       if (burgerDishes.length) {
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule) + '</section>';
@@ -1154,7 +1191,7 @@
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
       }
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
-      if (p1opts.sandwiches) p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
+      if (p1opts.sandwiches) p1 += sandwichesBlock(bag, { rule: sandRule });
     } else if (p1opts.rooms || p1opts.sandwiches) {
       p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced cols-features">';
       p1 += '<div class="col col-events"><div class="col-body">&nbsp;</div>';
@@ -1166,7 +1203,7 @@
       p1 += '</div><div class="col col-food"><div class="col-body">&nbsp;</div>';
       if (p1opts.sandwiches) {
         p1 += '<div class="col-feature">' +
-          sandwichesBlock(bag, { frame: 'box', rule: sandRule }) +
+          sandwichesBlock(bag, { rule: sandRule }) +
           '</div>';
       }
       p1 += '</div></div></section>';
@@ -1183,7 +1220,6 @@
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
       if (p1opts.sandwiches && !showColBlock) p1 += renderFiller('sandwiches', bag);
-      if (p1opts.lunchClub) p1 += renderFiller('lunch', bag);
       if (p1opts.footLogo) p1 += renderFiller('logo', bag);
     }
 
@@ -1221,7 +1257,7 @@
         if (!sideList.length && !(p2opts.sidesOnP2 && bag.sauces)) p2 += '&nbsp;';
         p2 += '</div><div class="col col-promo">';
         if (p2opts.sandwiches) {
-          p2 += sandwichesBlock(bag, { frame: 'box', rule: sandRule, alignTitle: true });
+          p2 += sandwichesBlock(bag, { rule: sandRule, alignTitle: true });
         } else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
         else p2 += '&nbsp;';
         p2 += '</div></div>';
@@ -1232,7 +1268,6 @@
       p2 += renderFiller('rooms', bag, promos);
     }
 
-    if (p2opts.lunchClub) p2 += renderFiller('lunch', bag);
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
     p2 += '</div>'; // page-body — grows so allergy stays pinned to the page foot
     p2 += allergy({ lunchClub: !!(bag.hasLunch) });
@@ -1267,11 +1302,7 @@
             '<div class="desc">Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options</div>' +
           '</div>';
       } else if (menu.id === 'sandwiches') {
-        inner = scallop(
-          dishes.map(function (d) { return dishCentered(d, { hidePrice: true }); }).join('') +
-          '<div class="lb-price" style="margin-top:8px">' + esc((dishes[0] && dishes[0].price) || '') + '</div>' +
-          '<div class="desc" style="margin-top:10px">Served on either Ciabatta vg, Farmhouse White or Granary<br>All served with Fries and Salad</div>'
-        );
+        inner = cardSandwichesInner(dishes);
       } else {
         // desserts etc
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
@@ -1312,33 +1343,43 @@
       '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
-      '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo,.page-body > .lunch-box{flex:0 0 auto}' +
-      '.scallop,.sec,.cols,.foot-logo,.lunch-box,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
+      '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo{flex:0 0 auto}' +
+      '.scallop,.sec,.cols,.foot-logo,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;height:100%}' +
-      '.card-face{padding:8mm 8mm 7mm;border-right:1px dashed #cfc7bb;position:relative;display:flex;flex-direction:column;height:210mm;box-sizing:border-box;overflow:hidden}' +
+      '.card-face{padding:7mm 7mm 6mm;border-right:1px dashed #cfc7bb;position:relative;display:flex;flex-direction:column;height:210mm;box-sizing:border-box;overflow:hidden}' +
       '.card-face:last-child{border-right:0}' +
       '.card-top{flex:0 0 auto}' +
-      '.card-mid{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}' +
-      '.card-face .allergy{flex:0 0 auto;margin-top:auto}' +
-      '.card-face.fill-airy{--dish-gap:16px;--sec-gap:18px;--name:11.5pt;--desc:10pt;--title:18pt}' +
-      '.card-face.fill-roomy{--dish-gap:13px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:16pt}' +
-      '.card-face.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:15pt}' +
-      '.card-face.fill-tight,.card-face.fill-compact,.card-face.fill-dense{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9pt;--title:14pt}' +
-      '.card-face.fill-tight .card-mid,.card-face.fill-compact .card-mid,.card-face.fill-dense .card-mid{justify-content:flex-start}' +
-      '.card-face .dish-c{margin:0 0 var(--dish-gap)}' +
-      '.card-face .scallop{margin:0}' +
-      '.card-face .logo{width:64px;margin:0 auto 6px}' +
-      '.card-face h1{margin:2px 0 10px;font-size:18px}' +
+      /* Grow the frilly box to fill the A5 face; spread dishes inside with large type */
+      '.card-mid{flex:1 1 auto;display:flex;flex-direction:column;justify-content:stretch;min-height:0;gap:8px}' +
+      '.card-face .allergy{flex:0 0 auto;margin-top:4px}' +
+      '.card-face.fill-airy{--dish-gap:20px;--sec-gap:20px;--name:14pt;--desc:11.5pt;--title:22pt}' +
+      '.card-face.fill-roomy{--dish-gap:16px;--sec-gap:16px;--name:13pt;--desc:11pt;--title:20pt}' +
+      '.card-face.fill-normal{--dish-gap:12px;--sec-gap:13px;--name:12pt;--desc:10.5pt;--title:18pt}' +
+      '.card-face.fill-tight{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:9.75pt;--title:16pt}' +
+      '.card-face.fill-compact,.card-face.fill-dense{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:14pt}' +
+      '.card-face .dish-c{margin:0;padding:2px 0;text-align:center}' +
+      '.card-face .dish-c .desc,.card-face .card-spiel{text-align:center;max-width:34em;margin-left:auto;margin-right:auto}' +
+      '.card-face .scallop{margin:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:0;width:100%}' +
+      '.card-face .scallop-pad{flex:1 1 auto;display:flex;flex-direction:column;justify-content:space-evenly;min-height:0}' +
+      '.card-face.fill-tight .scallop-pad,.card-face.fill-compact .scallop-pad,.card-face.fill-dense .scallop-pad{justify-content:flex-start}' +
+      '.card-face .lb-foot{flex:0 0 auto;text-align:center}' +
+      '.card-face .lb-price{text-align:center;margin:6px 0 10px}' +
+      '.card-face .card-spiel{margin-top:8px}' +
+      '.card-face .logo{width:86px;margin:0 auto 8px}' +
+      '.card-face h1{margin:2px 0 10px;font-size:min(var(--title),22pt)}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:8px;align-items:start;margin:0 0 6px;overflow:hidden}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
       '.top-band-logo{grid-template-columns:1fr 190px;min-height:0}' +
       '.top-left{min-width:0;overflow:hidden;align-self:start}' +
+      '.top-left .sec-title{text-align:left;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
+      '.top-left .sec-plain{margin:0}' +
+      '.top-left .dish{margin-bottom:calc(var(--dish-gap) + 2px)}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
@@ -1375,12 +1416,12 @@
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
+      '.dish-c .desc,.dish-c .tags{text-align:center}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
       '.lc{width:1em;height:1em;font-size:var(--name);vertical-align:-0.15em;margin-left:0;margin-right:0;display:inline-block;object-fit:contain;flex:0 0 auto}' +
-      '.lunch-box .lc{width:28px;height:28px;font-size:28px;margin-left:0;flex:0 0 auto}' +
-      '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic}' +
-      '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle}' +
+      '.allergy-lc{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-style:italic;max-width:92%;margin-left:auto;margin-right:auto}' +
+      '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle;flex:0 0 auto}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
       /* Columns start level; stretch so both sides share one height band.
@@ -1416,12 +1457,14 @@
       '.bottom-cols .sec-title{text-align:left}' +
       '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:3mm;padding-top:2mm;flex:0 0 auto;flex-shrink:0}' +
       '.promo{text-align:left}' +
-      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:2px 0 2px}' +
+      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px}' +
+      '.promo .promo-title:first-child{margin-top:0}' +
+      '.promo p{font-size:10.5pt;font-weight:400;margin:0 0 10px;line-height:1.45}' +
+      '.promo p:last-child{margin-bottom:0}' +
+      '.col-feature .scallop + .scallop{margin-top:14px}' +
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
-      '.promo p{font-size:10.5pt;font-weight:400;margin:0 0 6px;line-height:1.4}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
-      '.lunch-box{display:flex;gap:10px;align-items:center;font-size:11pt}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
@@ -1445,17 +1488,27 @@
       '.cut-sheet{width:297mm;height:210mm;display:grid;grid-template-columns:1fr 1fr;gap:0;padding:0;position:relative;overflow:hidden}' +
       '.cut-sheet::after{content:"";position:absolute;top:4mm;bottom:4mm;left:50%;width:0;border-left:1px dashed #c5bdb0;pointer-events:none}' +
       '.a5-face{width:148.5mm;height:210mm;padding:6mm 7mm 7mm;overflow:hidden;display:flex;flex-direction:column}' +
-      '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden}' +
+      '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start}' +
       '.a5-face .page-spacer{display:none}' +
       '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
-      '.a5-face{--dish-gap:8px;--sec-gap:11px;--name:10.5pt;--desc:9.5pt;--title:13pt;--promo:10.5pt}' +
+      /* Density ladder drives A5 type — do not lock a tiny size that leaves the face sparse */
+      '.a5-face.fill-airy{--dish-gap:14px;--sec-gap:16px;--name:12.5pt;--desc:11pt;--title:22pt;--promo:12pt}' +
+      '.a5-face.fill-roomy{--dish-gap:11px;--sec-gap:13px;--name:11.5pt;--desc:10.25pt;--title:18pt;--promo:11pt}' +
+      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:11px;--name:10.75pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
+      '.a5-face.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9.25pt;--title:14pt;--promo:10pt}' +
+      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:5px;--sec-gap:7px;--name:9.25pt;--desc:8.5pt;--title:12.5pt;--promo:9pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .party-logo{width:72px}' +
+      '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
       '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 120px;gap:8px;min-height:0}' +
       '.a5-face .tracker{font-size:6pt;margin-bottom:1px}' +
       '.a5-face .tracker .roman{font-size:3.5pt!important}' +
       '.a5-face .allergy{font-size:8.5pt}' +
       '.a5-face .cols{gap:10px}' +
       '.a5-face .scallop{border-width:10px;border-image-width:10px}' +
+      '.a5-face.party-page{text-align:center}' +
+      '.a5-face .party-dish .desc{text-align:center}' +
+      '.a5-face .party-promos{text-align:center;margin-top:auto;padding-top:6px}' +
       '@media print{body{background:#fff}.toolbar{display:none}' +
       '.page,.sheet,.cut-sheet{margin:0;box-shadow:none}' +
       (guillotine
@@ -1468,6 +1521,7 @@
 
   function wrapGuillotine(pagesHtml) {
     // Each A4 page becomes two identical A5 faces on landscape A4 for cutting.
+    // Keep party-page / theme classes so centred type and occasion styles survive.
     var parts = String(pagesHtml || '').split(/(?=<div class="page\b)/).filter(function (s) {
       return /class="page\b/.test(s);
     });
@@ -1476,8 +1530,22 @@
       var openEnd = pageHtml.indexOf('>');
       var close = pageHtml.lastIndexOf('</div>');
       if (openEnd < 0 || close < 0) return pageHtml;
+      var openTag = pageHtml.slice(0, openEnd + 1);
+      var classMatch = openTag.match(/class="([^"]*)"/);
+      var keep = '';
+      if (classMatch) {
+        keep = classMatch[1]
+          .split(/\s+/)
+          .filter(function (c) {
+            return c && c !== 'page' && c !== 'fill-page' && !/^fill-/.test(c);
+          })
+          .join(' ');
+      }
       var content = pageHtml.slice(openEnd + 1, close);
-      var face = '<div class="a5-face fill-page fill-roomy">' + content + '</div>';
+      var face =
+        '<div class="a5-face fill-page fill-airy' + (keep ? ' ' + keep : '') + '">' +
+        content +
+        '</div>';
       return '<div class="cut-sheet">' + face + face + '</div>';
     }).join('');
   }
@@ -1498,13 +1566,14 @@
     var title = meta.title || menu.name || 'Party Menu';
     var prices = meta.coursePrices || '';
     var notes = meta.notes || '';
+    var promos = (plan && plan.promos) || [];
     var sections = groupBySection(dishes);
     var order = ['Starters', 'Mains', 'Desserts'];
     var byName = {};
     sections.forEach(function (s) { byName[s.name.toLowerCase()] = s; });
 
     var occasion = partyOccasion(title, meta);
-    var html = '<div class="page party-page party-theme-' + occasion + ' fill-page fill-roomy">';
+    var html = '<div class="page party-page party-theme-' + occasion + ' fill-page fill-airy">';
     html += trackerBar(ver, { hideDate: true });
     html += '<div class="page-body">';
     html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
@@ -1521,7 +1590,9 @@
         html += '<div class="dish-name">' + esc(d.name);
         if (d.tags) html += ' <em class="tags">' + esc(d.tags) + '</em>';
         html += '</div>';
-        if (d.description) html += '<div class="desc">' + esc(d.description) + '</div>';
+        if (d.description) {
+          html += '<div class="desc">' + esc(d.description).replace(/\n/g, '<br>') + '</div>';
+        }
         html += '</div>';
       });
       html += '</section>';
@@ -1537,6 +1608,23 @@
     });
 
     if (notes) html += '<div class="party-notes">' + esc(notes) + '</div>';
+    if (promos.length) {
+      html += '<div class="party-promos">';
+      promos.forEach(function (p) {
+        if (!p || !p.title) return;
+        html += '<div class="party-promo">';
+        html += '<div class="promo-title">' + esc(p.title) + '</div>';
+        if (p.date) {
+          var when = root.EBMenus && root.EBMenus.formatPromoDate
+            ? root.EBMenus.formatPromoDate(p.date)
+            : p.date;
+          if (when) html += '<div class="promo-date">' + esc(when) + '</div>';
+        }
+        if (p.body) html += '<p class="desc">' + esc(p.body) + '</p>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
     html += '</div>'; // page-body
     html += allergy();
     html += '</div>';
@@ -1670,8 +1758,12 @@
       '.party-sec{margin:0 0 12px}' +
       '.party-sec .sec-title{margin-bottom:10px}' +
       '.party-dish{margin:0 0 10px;padding:0 14mm}' +
-      '.party-dish .desc{padding-right:0;font-style:normal;color:#444}' +
+      '.party-dish .desc{text-align:center;padding-right:0;font-style:normal;color:#444}' +
       '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
+      '.party-promos{margin:10px 10mm 4px;text-align:center}' +
+      '.party-promo{margin:0 0 8px}' +
+      '.party-promo .promo-title{font-size:var(--promo);margin:0 0 2px}' +
+      '.party-promo .desc{font-size:var(--desc);margin:0;color:#3a342c}' +
       /* Light occasion flourishes — classy, not cartoon */
       '.party-theme-christmas{box-shadow:inset 0 0 0 1.5px #2f5d3a}' +
       '.party-theme-christmas .party-title,.party-theme-christmas .sec-title{color:#1e3d28}' +

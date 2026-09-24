@@ -78,7 +78,8 @@ assert(/--title:26pt/.test(printJs) || /--title:28pt/.test(printJs),
 assert(printJs.indexOf('min(var(--title),28pt)') !== -1, 'title size has hard CSS ceiling at 28pt');
 assert(printJs.indexOf('margin:0 0 var(--sec-gap)') !== -1 || printJs.indexOf('margin-bottom:calc(var(--sec-gap)') !== -1,
   'section titles leave a density-aware gap before dishes');
-assert(printJs.indexOf('startersInCol') !== -1, 'starters can sit frilly beside the logo');
+assert(printJs.indexOf('startersInTop') !== -1, 'starters span the top band beside the logo');
+assert(printJs.indexOf('nibblesInTop') !== -1, 'nibbles also use the top band beside the logo');
 assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') !== -1,
   'dish lines use flex leaders that start after the name');
 assert(printJs.indexOf('.dish-line{display:flex') !== -1, 'dish-line flex rule present in source');
@@ -103,12 +104,20 @@ assert(printJs.indexOf('body.scrollHeight>body.clientHeight') !== -1,
 assert(printJs.indexOf('splitPromosForColumns') !== -1, 'event panels can split across columns');
 assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as separate boxes');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
+assert(printJs.indexOf('smaller plates for smaller appetites') !== -1,
+  'lunch club spiel sits in the allergy footer');
+assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
+  'layout plan notes lunch club lives with allergens');
+assert(printJs.indexOf('function lunchClubBox') === -1 && printJs.indexOf('lunch-box') === -1,
+  'mid-page lunch club scallop box is gone');
+assert(printJs.indexOf("which === 'lunch'") === -1,
+  'print no longer packs a mid-page lunch filler');
 assert(printJs.indexOf('flex-shrink:0') !== -1 || printJs.indexOf('allergy stays pinned') !== -1 ||
   /page-body\{flex:1 1 auto/.test(printJs), 'page body yields space so allergy footer is not cropped');
 assert(printJs.indexOf('fill-compact') !== -1 && printJs.indexOf('fitPages') !== -1, 'auto-fit steps type down to fit page');
 assert(printJs.indexOf('fill-dense') !== -1, 'density ladder includes fill-dense floor');
-assert(printJs.indexOf('!nibblesInCol') !== -1,
-  'starters only share the logo column when nibbles are not already there');
+assert(printJs.indexOf('startersInTop') !== -1 || printJs.indexOf('!nibblesInTop') !== -1,
+  'starters only share the logo band when nibbles are not already there');
 assert(printJs.indexOf('Always start airy') !== -1 || /for\(var j=0;j<STEPS\.length/.test(printJs),
   'fit always starts airy so sparse pages fill top to bottom');
 assert(page.indexOf('partyPaper') !== -1 && page.indexOf('2×A5 on A4') !== -1,
@@ -148,7 +157,13 @@ assert(printJs.indexOf('isLittleBells') !== -1 && printJs.indexOf('bag.littleBel
 assert(printJs.indexOf('share-cols') !== -1, 'sharing plates can print in two columns');
 assert(printJs.indexOf('shareInLeft') !== -1 || printJs.indexOf('shareAsColumn') !== -1, 'sharing can sit in a column to balance');
 assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
-assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default prefers column when it fits');
+assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default is best-fit (AI chooses)');
+assert(api.WIDTH_OPTIONS.some(function (w) {
+  return w.id === 'both' && /best fit/i.test(w.label) && /AI chooses/i.test(w.label);
+}), 'width “both” is labelled best fit / AI chooses, not column-if-it-fits');
+assert(api.WIDTH_OPTIONS.every(function (w) {
+  return !/column if it fits/i.test(w.label || '');
+}), 'no width option says column if it fits');
 assert(page.indexOf('Merge ↑') !== -1, 'confirm review has merge-into-above control');
 assert(page.indexOf('data-review-split') !== -1 && page.indexOf('Split') !== -1, 'confirm review has split control');
 assert(page.indexOf('data-review-delete') !== -1 && page.indexOf('Delete') !== -1, 'confirm review has delete control');
@@ -211,8 +226,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow29') !== -1, 'menus page cache-bust is flow29');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow29') !== -1, 'hub menus link cache-bust is flow29');
+assert(page.indexOf('flow34') !== -1, 'menus page cache-bust is flow34');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow34') !== -1, 'hub menus link cache-bust is flow34');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
@@ -221,10 +236,24 @@ assert(page.indexOf('data-layout-note') !== -1,
   'Blocks step has extra-info field per category');
 assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') !== -1,
   'sandwiches print spiel plus dish list');
-assert(printJs.indexOf('startersInCol') !== -1 && printJs.indexOf('cols-with-logo') !== -1,
-  'starters sit beside logo when nibbles absent');
+assert(printJs.indexOf('startersInTop') !== -1 && printJs.indexOf('top-band-logo') !== -1,
+  'starters sit beside logo spanning the top band');
 assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
   'sparse card menus spread to fill the A5 face');
+assert(printJs.indexOf('cardSandwichesInner') !== -1,
+  'sandwich A5 cards group fillings by price');
+assert(/\.card-face\.fill-airy\{[^}]*--name:14pt/.test(printJs),
+  'A5 card faces start with larger dish type to fill the page');
+assert(printJs.indexOf('justify-content:space-evenly') !== -1 && printJs.indexOf('card-face .scallop-pad') !== -1,
+  'card scallop pad spreads dishes to fill the frilly box');
+assert(printJs.indexOf('party-promos') !== -1,
+  'party sheets can print wording from the bank');
+assert(printJs.indexOf('keep party-page') !== -1 || printJs.indexOf('party-page / theme classes') !== -1,
+  'A5 guillotine keeps party-page so descriptions stay centred');
+assert(!/\.a5-face\{--dish-gap:8px/.test(printJs),
+  'A5 faces are not locked to a tiny type size');
+assert(page.indexOf('including 2×A5') !== -1 || page.indexOf('Party sheets') !== -1,
+  'wording step allows bank picks on party / A5 sheets');
 assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
@@ -311,8 +340,25 @@ var bank = [
   api.promoItem('Pub Quiz', 'tonight', '2099-06-15', 'quiz')
 ];
 var auto = api.pickPromos(bank, {}, { today: new Date('2026-09-22'), max: 2 });
-assert(auto.length === 2 && auto[0].id === 'quiz' && auto[1].id === 'stay', 'auto-pick prefers upcoming date then evergreen');
+assert(auto.length === 2 && auto[0].id === 'quiz', 'auto-pick prefers upcoming date first');
+assert(auto.some(function (p) { return p.id === 'stay'; }), 'auto-pick keeps evergreen after dated');
 assert(auto.every(function (p) { return p.id !== 'old'; }), 'auto-pick skips past dates');
+var dayA = api.pickPromos(
+  [api.promoItem('A', 'a', '', 'a'), api.promoItem('B', 'b', '', 'b'), api.promoItem('C', 'c', '', 'c')],
+  {},
+  { today: new Date('2026-09-22'), max: 2 }
+);
+var dayB = api.pickPromos(
+  [api.promoItem('A', 'a', '', 'a'), api.promoItem('B', 'b', '', 'b'), api.promoItem('C', 'c', '', 'c')],
+  {},
+  { today: new Date('2026-09-23'), max: 2 }
+);
+assert(dayA[0].id !== dayB[0].id || dayA[1].id !== dayB[1].id,
+  'evergreen bank wording rotates by calendar day');
+assert(printJs.indexOf('At most one box per column') !== -1 || printJs.indexOf('two balanced boxes') !== -1,
+  'feature panels cap at one box per column');
+assert(printJs.indexOf('Frilly box only when') !== -1 || printJs.indexOf('not hard-coded') !== -1,
+  'sandwich frilly follows Blocks setting');
 var forced = api.pickPromos(bank, { old: true }, { today: new Date('2026-09-22'), max: 2 });
 assert(forced.length === 1 && forced[0].id === 'old', 'manual tick can force a past-dated line');
 assert(api.formatPromoDate('2026-09-30').indexOf('September') !== -1, 'promo date formats for print');
@@ -425,11 +471,11 @@ assert(api.sectionLayoutFor('Mains').width === 'full', 'mains default full width
 assert(api.sectionLayoutFor('Nibbles').frame === true, 'nibbles default frilly box');
 assert(api.sectionLayoutFor('Burgers').width === 'column', 'burgers default column');
 assert(api.sectionLayoutFor('Sandwiches').frame === true, 'sandwiches default frilly box');
-assert(api.sectionLayoutFor('Starters').width === 'column' && api.sectionLayoutFor('Starters').frame === true,
-  'starters default frilly column beside logo');
+assert(api.sectionLayoutFor('Starters').width === 'full' && api.sectionLayoutFor('Starters').frame === false,
+  'starters default full-width beside logo, frilly off');
 var customLayout = api.normalizeSectionLayout({ Mains: { width: 'column', frame: true } });
 assert(customLayout.Mains.width === 'column' && customLayout.Mains.frame === true, 'layout overrides persist shape');
-assert(customLayout.Starters.width === 'column', 'other sections keep defaults');
+assert(customLayout.Starters.width === 'full' && customLayout.Starters.frame === false, 'other sections keep defaults');
 
 assert(page.indexOf('Section layout rules') !== -1, 'layout rules UI present');
 assert(page.indexOf('data-layout-width') !== -1 && page.indexOf('data-layout-frame') !== -1, 'layout width/frame controls');
