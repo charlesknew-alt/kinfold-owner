@@ -305,8 +305,9 @@
   /**
    * Split event wording across the two columns so both columns finish
    * at roughly the same height (start aligned, end aligned).
-   * Paired panels always use opposite frames (rect box vs oval wide) so
-   * two matching rectangles never sit side by side.
+   * At most one box per column (up to 2 blurbs each) — never a lonely
+   * third/fourth scallop hanging under a short stack.
+   * Paired panels always use opposite frames (rect box vs oval wide).
    */
   function splitPromosForColumns(promos, opts) {
     opts = opts || {};
@@ -321,6 +322,8 @@
         { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
       ];
     }
+    // Cap at four blurbs → two balanced boxes
+    if (list.length > 4) list = list.slice(0, 4);
     if (list.length === 1) {
       return { left: renderOnePromoBox(list, leftKind), right: '' };
     }
@@ -330,10 +333,15 @@
         right: renderOnePromoBox([list[1]], rightKind)
       };
     }
-    var mid = Math.ceil(list.length / 2);
+    if (list.length === 3) {
+      return {
+        left: renderOnePromoBox(list.slice(0, 2), leftKind),
+        right: renderOnePromoBox([list[2]], rightKind)
+      };
+    }
     return {
-      left: renderPromoBank(list.slice(0, mid), leftKind),
-      right: renderPromoBank(list.slice(mid), rightKind)
+      left: renderOnePromoBox(list.slice(0, 2), leftKind),
+      right: renderOnePromoBox(list.slice(2, 4), rightKind)
     };
   }
 
@@ -381,41 +389,59 @@
   }
 
   /**
-   * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list
-   * inside the frilly box. Falls back to spiel-only when there are no fillings.
+   * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list.
+   * Frilly box only when Blocks → Sandwiches → Frilly is Yes (not hard-coded).
    */
   function sandwichesBlock(bag, opts) {
     opts = opts || {};
     var dishes = sandwichDishesOf(bag);
     var rule = opts.rule || { frame: true, note: '' };
-    var frameKind = opts.frame === 'wide' ? 'wide' : (opts.frame === 'box' || rule.frame ? 'box' : 'wide');
-    if (opts.frame === 'box') frameKind = 'box';
-    if (opts.frame === 'wide') frameKind = 'wide';
+    var wantFrame = !!rule.frame;
+    var frameKind = opts.frame === 'wide' ? 'wide' : 'box';
     var note = (opts.note != null && String(opts.note).trim())
       ? String(opts.note).trim()
       : String(rule.note || '').trim();
     if (!dishes.length) {
-      return sandwichNote(dishes, {
-        frame: frameKind,
-        alignTitle: !!opts.alignTitle,
-        note: note
+      var spiel = note ||
+        '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.';
+      var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
+      var noteInner = '<div class="promo sandwich-promo">';
+      noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
+      lines.forEach(function (line, i) {
+        noteInner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
       });
+      noteInner += '</div>';
+      if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
+      if (opts.alignTitle) {
+        return (
+          '<div class="sandwich-aligned">' +
+            '<div class="promo-head pair-head">' +
+              '<span class="sec-title soft-left">Sandwiches</span>' +
+            '</div>' +
+            scallop(noteInner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, ''), frameKind) +
+          '</div>'
+        );
+      }
+      return scallop(noteInner, frameKind);
     }
     var noteHtml = note
       ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
       : '';
     var body = noteHtml + listDishes(dishes);
+    var titled = sectionTitle('Sandwiches') + body;
     if (opts.alignTitle) {
+      var inner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
       return (
         '<div class="sandwich-aligned">' +
           '<div class="promo-head pair-head">' +
             '<span class="sec-title soft-left">Sandwiches</span>' +
           '</div>' +
-          scallop(body, frameKind) +
+          inner +
         '</div>'
       );
     }
-    return scallop(sectionTitle('Sandwiches') + body, frameKind);
+    if (!wantFrame) return '<div class="sec-plain">' + titled + '</div>';
+    return scallop(titled, frameKind);
   }
 
   /** Prefer shared tidy from menus.js when available (priced desc orphans too). */
@@ -1040,30 +1066,40 @@
       (!!shareDishes.length && foodUnits > 0 && foodUnits <= 4 && (burgerDishes.length || p1opts.rooms));
 
     var sandList = sandwichDishesOf(bag);
-    var nibblesInCol = !!(bag.nibbles && wantsColumn(nibRule) && nibRule.width !== 'full');
-    // No nibbles → Starters take the logo-side column (same spot nibbles would occupy)
-    var startersInCol = !!(bag.starters && wantsColumn(startRule) && startRule.width !== 'full' && !nibblesInCol);
+    // Nibbles / Starters sit in the top band beside the logo (span across),
+    // not a skinny left column under half the page. Frilly follows Blocks settings.
+    var nibblesInTop = !!bag.nibbles;
+    var startersInTop = !!(bag.starters && !bag.nibbles);
+    var startersBelowNibbles = !!(bag.starters && bag.nibbles);
     var sandwichesInCol = !!(p1opts.sandwiches && (wantsColumn(sandRule) || sandList.length));
 
     var showColBlock = classicDishes.length || burgerDishes.length || p1opts.rooms ||
-      p1opts.sandwiches || (p1opts.sidesOnP1 && sidesPrint) || shareInLeft ||
-      nibblesInCol || startersInCol;
+      p1opts.sandwiches || (p1opts.sidesOnP1 && sidesPrint) || shareInLeft;
     var classicsAsColumn = wantsColumn(classRule) || wantsColumn(burgRule) || !!burgerDishes.length ||
-      !!p1opts.rooms || shareInLeft || classicDishes.length > 0 ||
-      nibblesInCol || startersInCol || sandwichesInCol;
+      !!p1opts.rooms || shareInLeft || classicDishes.length > 0 || sandwichesInCol;
 
-    // Logo-only strip when we are NOT putting food beside it in the column grid
-    if (!showColBlock || !classicsAsColumn) {
+    // Top band: Starters (or Nibbles) flow across to the logo — prominent, not half-width
+    if (nibblesInTop || startersInTop) {
+      p1 += '<div class="top-band top-band-logo">';
+      p1 += '<div class="top-left">';
+      if (nibblesInTop) {
+        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
+      }
+      if (startersInTop) {
+        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
+      }
+      p1 += '</div>';
+      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '</div>';
+    } else if (!showColBlock || !classicsAsColumn) {
       p1 += '<div class="top-band top-band-logo">';
       p1 += '<div class="top-left"></div>';
       p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
       p1 += '</div>';
-      if (bag.nibbles && !nibblesInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
-      }
-      if (bag.starters && !startersInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
-      }
+    }
+    // Starters under nibbles: full width so they stay prominent
+    if (startersBelowNibbles) {
+      p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
 
     if (shareAsFull && !shareInLeft) {
@@ -1087,8 +1123,11 @@
     });
 
     if (showColBlock && classicsAsColumn) {
+      // Logo already in top-band when starters/nibbles sit there — columns start level below
+      var logoInTop = nibblesInTop || startersInTop;
       p1 += '<section class="sec classics-block">';
-      p1 += '<div class="cols cols-classics cols-balanced cols-features cols-with-logo">';
+      p1 += '<div class="cols cols-classics cols-balanced cols-features' +
+        (logoInTop ? '' : ' cols-with-logo') + '">';
       var sandOnRightNote = !!(sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length));
       var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box' }
@@ -1099,15 +1138,9 @@
         : '';
       var rightFeature = (p1opts.rooms && promoCols.right) ? promoCols.right : '';
 
-      // LEFT — Nibbles or Starters (logo partner), Sharing, Sandwiches with spiel + dishes
+      // LEFT — Sharing, Sandwiches; event panel pins to the foot
       p1 += '<div class="col col-events">';
       p1 += '<div class="col-body">';
-      if (nibblesInCol) {
-        p1 += sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide');
-      }
-      if (startersInCol) {
-        p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
-      }
       if (shareInLeft) {
         p1 += framedBlock(
           sectionTitle(bag.sharing.name) + listDishes(shareDishes),
@@ -1115,9 +1148,9 @@
         );
       }
       if (sandwichesInCol && (sandList.length || !(burgerDishes.length || classicDishes.length))) {
-        p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
+        p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
-      if (!nibblesInCol && !startersInCol && !shareInLeft &&
+      if (!shareInLeft &&
           !(sandwichesInCol && sandList.length) && !leftFeature) {
         p1 += '&nbsp;';
       }
@@ -1125,9 +1158,11 @@
       if (leftFeature) p1 += '<div class="col-feature">' + leftFeature + '</div>';
       p1 += '</div>';
 
-      // RIGHT — Logo at the top of this column so both sides start level, then food
+      // RIGHT — Logo only if not already in top-band; then Burgers + Pub Classics lower
       p1 += '<div class="col col-food">';
-      p1 += '<div class="col-logo"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      if (!logoInTop) {
+        p1 += '<div class="col-logo"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      }
       p1 += '<div class="col-body">';
       if (burgerDishes.length) {
         p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
@@ -1136,7 +1171,7 @@
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
       if (sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length)) {
-        p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
+        p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
@@ -1148,14 +1183,6 @@
       p1 += '</div>';
       if (rightFeature) p1 += '<div class="col-feature">' + rightFeature + '</div>';
       p1 += '</div></div></section>';
-
-      // Starters that did not join the logo column (e.g. nibbles already there, or full width)
-      if (bag.starters && !startersInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
-      }
-      if (bag.nibbles && !nibblesInCol) {
-        p1 += '<section class="sec">' + sectionBlock(bag.nibbles.name, bag.nibbles.dishes, nibRule, 'wide') + '</section>';
-      }
     } else if (classicDishes.length || burgerDishes.length) {
       if (burgerDishes.length) {
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule) + '</section>';
@@ -1164,7 +1191,7 @@
         p1 += '<section class="sec">' + framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule) + '</section>';
       }
       if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
-      if (p1opts.sandwiches) p1 += sandwichesBlock(bag, { frame: 'box', rule: sandRule });
+      if (p1opts.sandwiches) p1 += sandwichesBlock(bag, { rule: sandRule });
     } else if (p1opts.rooms || p1opts.sandwiches) {
       p1 += '<section class="sec classics-block"><div class="cols cols-classics cols-balanced cols-features">';
       p1 += '<div class="col col-events"><div class="col-body">&nbsp;</div>';
@@ -1176,7 +1203,7 @@
       p1 += '</div><div class="col col-food"><div class="col-body">&nbsp;</div>';
       if (p1opts.sandwiches) {
         p1 += '<div class="col-feature">' +
-          sandwichesBlock(bag, { frame: 'box', rule: sandRule }) +
+          sandwichesBlock(bag, { rule: sandRule }) +
           '</div>';
       }
       p1 += '</div></div></section>';
@@ -1230,7 +1257,7 @@
         if (!sideList.length && !(p2opts.sidesOnP2 && bag.sauces)) p2 += '&nbsp;';
         p2 += '</div><div class="col col-promo">';
         if (p2opts.sandwiches) {
-          p2 += sandwichesBlock(bag, { frame: 'box', rule: sandRule, alignTitle: true });
+          p2 += sandwichesBlock(bag, { rule: sandRule, alignTitle: true });
         } else if (p2opts.rooms) p2 += renderFiller('rooms', bag, promos);
         else p2 += '&nbsp;';
         p2 += '</div></div>';
@@ -1346,10 +1373,13 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:8px;align-items:start;margin:0 0 6px;overflow:hidden}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
       '.top-band-logo{grid-template-columns:1fr 190px;min-height:0}' +
       '.top-left{min-width:0;overflow:hidden;align-self:start}' +
+      '.top-left .sec-title{text-align:left;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
+      '.top-left .sec-plain{margin:0}' +
+      '.top-left .dish{margin-bottom:calc(var(--dish-gap) + 2px)}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
@@ -1427,9 +1457,12 @@
       '.bottom-cols .sec-title{text-align:left}' +
       '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:3mm;padding-top:2mm;flex:0 0 auto;flex-shrink:0}' +
       '.promo{text-align:left}' +
-      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:2px 0 2px}' +
+      '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px}' +
+      '.promo .promo-title:first-child{margin-top:0}' +
+      '.promo p{font-size:10.5pt;font-weight:400;margin:0 0 10px;line-height:1.45}' +
+      '.promo p:last-child{margin-bottom:0}' +
+      '.col-feature .scallop + .scallop{margin-top:14px}' +
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
-      '.promo p{font-size:10.5pt;font-weight:400;margin:0 0 6px;line-height:1.4}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
