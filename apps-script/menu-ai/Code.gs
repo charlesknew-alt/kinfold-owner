@@ -168,17 +168,20 @@ function reviewLayoutWithGemini_(body) {
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
     'GOLDEN RULES (do not invent sections staff did not list):\n' +
-    '1. COLUMNS: when there are two columns, both MUST start on the same top baseline AND finish at ' +
-    'approximately the same point — never leave one column hanging long with empty space on the other.\n' +
+    '1. COLUMNS (CRITICAL): when two columns sit opposite each other, both MUST start on the same top baseline ' +
+    'AND finish at exactly the same bottom point — never leave one column half as tall as the other. ' +
+    'Feature / event panels exist ONLY to even those heights: put a panel under the SHORTER food stack; ' +
+    'if Sides is short, use ONE small panel beside it — never a stack of three panels taller than Sides. ' +
+    'Do not add panels when there is no gap to fill.\n' +
     '2. PAGE COUNT: only ever ONE full page, or TWO full pages if needed. Never a third page. ' +
     'If content fits on one page, use one page. Always fill each used page top to bottom — ' +
     'if a page looks sparse, open spacing between categories (airy/roomy) rather than leaving a big empty footer.\n' +
     '3. READABILITY: never shrink type below a comfortable customer-readable size. Prefer tight over compact. ' +
     'If it still will not fit on two readable pages, set okToPrint false and say so in notes — ' +
     'staff should remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.\n' +
-    '4. EVENT / FEATURE PANELS: if there are several, prefer TWO (or more) separate boxes split across the columns ' +
-    'rather than one tall box crammed with everything. Side-by-side panels should contrast — one rectangular box ' +
-    'frame beside one oval/wide scallop — never two matching rectangles next to each other.\n' +
+    '4. EVENT / FEATURE PANELS: only where they even opposite columns. Prefer at most ONE box per column ' +
+    '(1–2 blurbs). Never stack multiple scallops beside a short list. Side-by-side panels should contrast — ' +
+    'one rectangular box beside one oval/wide scallop — never two matching rectangles next to each other.\n' +
     '5. PAGE 1 FOOD COLUMNS: LEFT = Stay a While / events / Sharing when used as a column; ' +
     'RIGHT = Burgers then Pub Classics under them.\n' +
     '6. Allergy footer (gf / v / vg) must remain fully visible. If any lunch-club ticks exist, keep the ' +
