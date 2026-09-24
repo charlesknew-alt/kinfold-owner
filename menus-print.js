@@ -143,7 +143,7 @@
       // Lunch club note lives in the allergy footer (not a mid-page scallop box)
       html +=
         '<br><span class="allergy-lc">' + lunchMark() +
-        ' Bells Lunch Club option — smaller plates for smaller appetites, Monday to Thursday' +
+        ' Bells Lunch Club option — smaller plates for smaller appetites, Monday to Thursday, lunch only' +
         ' &nbsp;·&nbsp; two courses £14.95 / three courses £17.95</span>';
     }
     html += '</div>';

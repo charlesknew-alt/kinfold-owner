@@ -106,6 +106,8 @@ assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as se
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
 assert(printJs.indexOf('smaller plates for smaller appetites') !== -1,
   'lunch club spiel sits in the allergy footer');
+assert(printJs.indexOf('lunch only') !== -1,
+  'lunch club footer says lunch only');
 assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
   'layout plan notes lunch club lives with allergens');
 assert(printJs.indexOf('function lunchClubBox') === -1 && printJs.indexOf('lunch-box') === -1,
@@ -226,8 +228,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow36') !== -1, 'menus page cache-bust is flow36');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow36') !== -1, 'hub menus link cache-bust is flow36');
+assert(page.indexOf('flow37') !== -1, 'menus page cache-bust is flow37');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow37') !== -1, 'hub menus link cache-bust is flow37');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
