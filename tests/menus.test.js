@@ -226,8 +226,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow34') !== -1, 'menus page cache-bust is flow34');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow34') !== -1, 'hub menus link cache-bust is flow34');
+assert(page.indexOf('flow35') !== -1, 'menus page cache-bust is flow35');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow35') !== -1, 'hub menus link cache-bust is flow35');
 assert(page.indexOf('plan-sheet') !== -1 && page.indexOf('plan-dish') !== -1,
   'generate plan preview uses tidy sheet checklist markup');
 assert(page.indexOf('ul class="dishes"') === -1,
@@ -254,14 +254,14 @@ assert(!/\.a5-face\{--dish-gap:8px/.test(printJs),
   'A5 faces are not locked to a tiny type size');
 assert(page.indexOf('including 2×A5') !== -1 || page.indexOf('Party sheets') !== -1,
   'wording step allows bank picks on party / A5 sheets');
-assert(aiGs.indexOf('finish at') !== -1 && aiGs.indexOf('approximately the same point') !== -1,
+assert(aiGs.indexOf('finish at') !== -1 && (aiGs.indexOf('exactly the same') !== -1 || aiGs.indexOf('approximately the same point') !== -1),
   'Gemini golden rules require columns to finish level');
 assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
   'Gemini golden rules cap at two pages');
 assert(aiGs.indexOf('two A5 copies') !== -1, 'Gemini knows card menus are 2×A5');
 assert(aiGs.indexOf('full A4 or 2×A5') !== -1, 'Gemini respects party paper choice');
-assert(aiGs.indexOf('separate boxes') !== -1,
-  'Gemini prefers multiple event boxes over one tall panel');
+assert(aiGs.indexOf('even those heights') !== -1 || aiGs.indexOf('SHORTER food stack') !== -1,
+  'Gemini golden rule: feature panels only to even opposite columns');
 assert(aiGs.indexOf('oval') !== -1 || aiGs.indexOf('matching rectangles') !== -1,
   'Gemini golden rules contrast side-by-side feature frames');
 assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
@@ -355,8 +355,12 @@ var dayB = api.pickPromos(
 );
 assert(dayA[0].id !== dayB[0].id || dayA[1].id !== dayB[1].id,
   'evergreen bank wording rotates by calendar day');
-assert(printJs.indexOf('At most one box per column') !== -1 || printJs.indexOf('two balanced boxes') !== -1,
-  'feature panels cap at one box per column');
+assert(printJs.indexOf('planPromoFill') !== -1 && printJs.indexOf('promoBesidePartner') !== -1,
+  'feature panels placed only to even opposite columns');
+assert(printJs.indexOf('balanceOppositeColumns') !== -1,
+  'print prunes surplus panels so opposite columns finish level');
+assert(printJs.indexOf('GOLDEN RULE: opposite columns') !== -1,
+  'print JS documents equal start/finish golden rule');
 assert(printJs.indexOf('Frilly box only when') !== -1 || printJs.indexOf('not hard-coded') !== -1,
   'sandwich frilly follows Blocks setting');
 var forced = api.pickPromos(bank, { old: true }, { today: new Date('2026-09-22'), max: 2 });
