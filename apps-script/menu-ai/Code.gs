@@ -254,6 +254,7 @@ function reviewLayoutWithGemini_(body) {
     '{\n' +
     '  "density": "airy"|"roomy"|"normal"|"tight"|"compact",\n' +
     '  "sandwichesOn": "page1"|"page2"|"omit",\n' +
+    '  "sidesOn": "page1"|"page2",\n' +
     '  "dropFootLogo": true|false,\n' +
     '  "okToPrint": true|false,\n' +
     '  "columnBalance": {\n' +
@@ -262,6 +263,12 @@ function reviewLayoutWithGemini_(body) {
     '  },\n' +
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
+    'SHARED TYPE SCALE (CRITICAL):\n' +
+    '- Titles, dish names and descriptions must be the SAME size on page 1 and page 2.\n' +
+    '- Never leave page 1 enlarged/airy while page 2 is compact/smaller — one density for the whole menu.\n' +
+    '- If page 2 is packed (mains + desserts) and page 1 has spare room, move Sides (or another box) to page 1 ' +
+    'so both pages can share a larger comfortable density. Set sidesOn accordingly.\n' +
+    '- Moving Sandwiches / Sides / feature boxes between pages to equalise fill is encouraged; inventing a third page is not.\n' +
     'COLUMN BALANCE RULES (mandatory before okToPrint):\n' +
     '- Read layout.columns (leftFood / rightFood / shorter). If shorter is left or right, panels MUST be 1 or 2.\n' +
     '- panels:0 is only allowed when shorter is "even".\n' +
@@ -278,7 +285,8 @@ function reviewLayoutWithGemini_(body) {
     '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
     '5. PAGE 1: LEFT often Sandwiches/events/Sharing; RIGHT = Burgers then Pub Classics.\n' +
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
-    '7. Prefer sandwichesOn page2 on long menus unless columns on page1 need the sandwich list to balance.\n' +
+    '7. Prefer sandwichesOn page1 when named fillings sit beside Burgers; otherwise page2. ' +
+    'Move sidesOn to page1 when that lets both pages share a larger density.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
     '9. SECTION WIDTH “both” / best-fit: choose column OR full for balance on THIS sheet.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 7000);
@@ -308,6 +316,8 @@ function reviewLayoutWithGemini_(body) {
   if (['airy', 'roomy', 'normal', 'tight', 'compact'].indexOf(density) === -1) density = 'normal';
   var sandwichesOn = String(advice.sandwichesOn || 'page2').toLowerCase();
   if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page2';
+  var sidesOn = String(advice.sidesOn || '').toLowerCase();
+  if (['page1', 'page2'].indexOf(sidesOn) === -1) sidesOn = '';
 
   function normPage(raw, fallbackShorter) {
     raw = raw && typeof raw === 'object' ? raw : {};
@@ -337,6 +347,7 @@ function reviewLayoutWithGemini_(body) {
     model: called.model,
     density: density,
     sandwichesOn: sandwichesOn,
+    sidesOn: sidesOn || undefined,
     dropFootLogo: !!advice.dropFootLogo,
     okToPrint: advice.okToPrint !== false,
     columnBalance: columnBalance,

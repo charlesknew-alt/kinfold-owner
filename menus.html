@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260925-flow46"></script>
-  <script src="menus-print.js?v=20260925-flow46"></script>
-  <script src="menus-ingest.js?v=20260925-flow46"></script>
+  <script src="menus.js?v=20260925-flow47"></script>
+  <script src="menus-print.js?v=20260925-flow47"></script>
+  <script src="menus-ingest.js?v=20260925-flow47"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -2068,6 +2068,13 @@
           layout.p1.sandwiches = false;
           layout.p2.sandwiches = true;
         }
+        if (advice.sidesOn === 'page1' && layout.p1) {
+          layout.p1.sidesOnP1 = true;
+          if (layout.p2) layout.p2.sidesOnP2 = false;
+        } else if (advice.sidesOn === 'page2' && layout.p2) {
+          layout.p1.sidesOnP1 = false;
+          layout.p2.sidesOnP2 = true;
+        }
         // AI (or local fallback) column fill — any uneven opposite pair before PDF.
         var bal = advice.columnBalance;
         if (!bal && advice.columns) bal = advice.columns;
@@ -2094,7 +2101,7 @@
           var panels = Math.abs(p.gap || 0) > 9 ? 2 : 1;
           return { shorter: p.shorter, panels: panels };
         }
-        return {
+        var out = {
           ok: true,
           source: 'local-column-fallback',
           columnBalance: {
@@ -2103,6 +2110,14 @@
           },
           notes: 'Local column check: fill shorter stacks with feature panels before print.'
         };
+        // Match the shared-type rule: prefer Sides on page 1 when the planner already
+        // parked them there, or when page 2 still holds them and page 1 has spare room.
+        if (layout && layout.p1 && layout.p1.sidesOnP1) out.sidesOn = 'page1';
+        else if (layout && layout.p2 && layout.p2.sidesOnP2 && (layout.leftover && layout.leftover.p1 > 10)) {
+          out.sidesOn = 'page1';
+          out.notes = 'Local check: move Sides to page 1 so both pages share one type size.';
+        }
+        return out;
       }
 
       function openPrintPreview() {

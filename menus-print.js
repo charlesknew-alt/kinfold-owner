@@ -430,6 +430,12 @@
     if (shareDishes.length) leftFood += sectionUnits({ name: 'Sharing', dishes: shareDishes }, false);
     if (burgerDishes.length) rightFood += sectionUnits({ name: 'Burgers', dishes: burgerDishes }, false);
     if (classicDishes.length) rightFood += sectionUnits({ name: 'Pub Classics', dishes: classicDishes }, false);
+    // Sides can sit on page 1 (under the shorter food stack) so page 1+2 share one type size.
+    if (p1.sidesOnP1 && bag.sides) {
+      var sideU1 = sectionUnits(bag.sides, false);
+      if (leftFood <= rightFood) leftFood += sideU1;
+      else rightFood += sideU1;
+    }
     var gap = rightFood - leftFood;
     var page1 = {
       leftFood: Math.round(leftFood * 10) / 10,
@@ -441,7 +447,7 @@
     };
     var page2 = null;
     if (layout.pages >= 2 && layout.p2) {
-      var sideList = (bag.sides && bag.sides.dishes) ? bag.sides.dishes : [];
+      var sideList = (layout.p2.sidesOnP2 && bag.sides && bag.sides.dishes) ? bag.sides.dishes : [];
       var left2 = sideList.length ? sectionUnits(bag.sides, false) : 0;
       if (layout.p2.sidesOnP2 && bag.sauces) left2 += sectionUnits(bag.sauces, false);
       var right2 = layout.p2.sandwiches ? sandwichesPackCost(bag) : 0;
@@ -1056,9 +1062,13 @@
             var addS = tryAdd(p1left, sandCost);
             if (addS.ok) {
               layout.p1.sandwiches = true;
-              layout.p1.sidesOnP1 = !!bag.sides;
-              layout.p2.sidesOnP2 = !bag.sides;
-              layout.leftover.p1 = addS.left;
+              p1left = addS.left;
+              if (bag.sides) {
+                layout.p1.sidesOnP1 = true;
+                layout.p2.sidesOnP2 = false;
+                p2left += sectionUnits(bag.sides, false);
+              }
+              layout.leftover.p1 = p1left;
               layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches + sides (page 1)');
             }
           }
@@ -1072,6 +1082,25 @@
           layout.fillers.push(promoLabel + ' (page 2)');
         }
       }
+
+      // SHARED TYPE SCALE: if page 2 is packed (mains + desserts) and page 1 still
+      // has room, move Sides onto page 1 so both pages can share one comfortable
+      // type size instead of page 1 airy / page 2 compact.
+      var sideCost = bag.sides ? sectionUnits(bag.sides, false) : 0;
+      if (bag.sides && layout.p2.sidesOnP2 && sideCost > 0) {
+        var p2Crowded = p2left < 14 ||
+          (bag.mains && bag.desserts && (bag.mains.dishes || []).length >= 5) ||
+          (bag.mains && (bag.mains.dishes || []).length >= 7);
+        var takeSides = tryAdd(p1left, sideCost + (layout.p1.sandwiches ? 1 : 3));
+        if (p2Crowded && takeSides.ok) {
+          layout.p1.sidesOnP1 = true;
+          layout.p2.sidesOnP2 = false;
+          p1left = takeSides.left;
+          p2left += sideCost;
+          layout.fillers.push('Sides (page 1 — keep type size equal on both pages)');
+        }
+      }
+
       var logoCost = tightBack ? COST.footLogo + 4 : COST.footLogo;
       var addLogo = tryAdd(p2left, logoCost);
       if (addLogo.ok) {
@@ -1079,6 +1108,7 @@
         p2left = addLogo.left;
         layout.fillers.push('Logo (page 2)');
       }
+      layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
 
       if (p1used > PAGE + 10 || p2used > PAGE + 14) layout.fit = 'over';
@@ -1092,7 +1122,7 @@
       : ' Sheet is full — no room for extra selling boxes.';
     layout.summary =
       (layout.fit === 'one' ? 'Fills one A4 top to bottom (spread gaps if sparse).' :
-        layout.fit === 'two' ? 'Fills two A4 pages top to bottom — never a third page.' :
+        layout.fit === 'two' ? 'Fills two A4 pages top to bottom — same type size on both pages; never a third page.' :
           'Too much for two readable pages. Remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.') +
       ' Columns start and finish level. Layout from ' + bag.count + ' dishes.' + bits;
 
@@ -1332,8 +1362,12 @@
       var rightFoodU = 0;
       if (burgerDishes.length) rightFoodU += sectionUnits({ name: 'Burgers', dishes: burgerDishes }, false);
       if (classicDishes.length) rightFoodU += sectionUnits({ name: 'Pub Classics', dishes: classicDishes }, false);
+      // Prefer Sides under the shorter food stack so columns finish level.
+      var sidesOnLeftCol = false;
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
-        rightFoodU += sectionUnits(sidesPrint, false);
+        sidesOnLeftCol = leftFoodU <= rightFoodU;
+        if (sidesOnLeftCol) leftFoodU += sectionUnits(sidesPrint, false);
+        else rightFoodU += sectionUnits(sidesPrint, false);
       }
       var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box', leftFood: leftFoodU, rightFood: rightFoodU }
@@ -1361,8 +1395,11 @@
       if (sandwichesInCol && (sandList.length || !(burgerDishes.length || classicDishes.length))) {
         p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
+      if (sidesOnLeftCol && sidesPrint) {
+        p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+      }
       if (!shareInLeft &&
-          !(sandwichesInCol && sandList.length) && !leftFeature) {
+          !(sandwichesInCol && sandList.length) && !leftFeature && !sidesOnLeftCol) {
         p1 += '&nbsp;';
       }
       p1 += '</div>';
@@ -1384,11 +1421,12 @@
       if (sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length)) {
         p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
-      if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
+      if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule) && !sidesOnLeftCol) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
       if (!burgerDishes.length && !classicDishes.length && !rightFeature &&
-          !(sandwichesInCol && !sandList.length)) {
+          !(sandwichesInCol && !sandList.length) &&
+          !(p1opts.sidesOnP1 && sidesPrint && !sidesOnLeftCol)) {
         p1 += '&nbsp;';
       }
       p1 += '</div>';
@@ -2014,11 +2052,33 @@
             '}' +
           '});}' +
         'function balanceFeatures(){balanceOppositeColumns();}' +
-        // Always start airy so sparse pages fill top→bottom (more gaps), then tighten only if overflow.
-        // Never invent a third page — dense is the floor for readable type.
-        'function fitPages(){document.querySelectorAll(".page.fill-page,.a5-face.fill-page,.card-face.fill-page").forEach(function(page){' +
-          'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
-          'if(!overflows(page))break;}});balanceOppositeColumns();}' +
+        // SHARED TYPE SCALE: page 1 and page 2 must use the SAME title/name/desc size.
+        // Fit every A4 page as one group — pick the densest step that still fits all,
+        // never leave page 1 airy while page 2 goes compact.
+        'function fitGroup(group){' +
+          'if(!group.length)return;' +
+          'if(group.length===1){' +
+            'var page=group[0];' +
+            'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+            'if(!overflows(page))break;}' +
+            'return;' +
+          '}' +
+          'var chosen=STEPS[STEPS.length-1];' +
+          'for(var k=0;k<STEPS.length;k++){' +
+            'group.forEach(function(pg){strip(pg);pg.classList.add("fill-page");pg.classList.add(STEPS[k]);});' +
+            'if(!group.some(overflows)){chosen=STEPS[k];break;}' +
+          '}' +
+          'group.forEach(function(pg){strip(pg);pg.classList.add("fill-page");pg.classList.add(chosen);});' +
+        '}' +
+        'function fitPages(){' +
+          'fitGroup([].slice.call(document.querySelectorAll(".page.fill-page")));' +
+          'fitGroup([].slice.call(document.querySelectorAll(".a5-face.fill-page")));' +
+          '[].slice.call(document.querySelectorAll(".card-face.fill-page")).forEach(function(page){' +
+            'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
+            'if(!overflows(page))break;}' +
+          '});' +
+          'balanceOppositeColumns();' +
+        '}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
         'if(old)old.remove();s.textContent=a5?"@media print{@page{size:A4 landscape;margin:0}}":"@media print{@page{size:A4 portrait;margin:0}}";' +

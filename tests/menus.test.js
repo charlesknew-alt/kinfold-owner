@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow46') !== -1, 'menus page cache-bust is flow46');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow46') !== -1, 'hub menus link cache-bust is flow46');
+assert(page.indexOf('flow47') !== -1, 'menus page cache-bust is flow47');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow47') !== -1, 'hub menus link cache-bust is flow47');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -437,6 +437,14 @@ assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('reviewLayout'
   'layout review uses cloud Menu AI URL on every generate');
 assert(aiGs.indexOf('columnBalance') !== -1 && aiGs.indexOf('panels MUST be 1 or 2') !== -1,
   'Gemini layout review requires panels under uneven columns');
+assert(printJs.indexOf('fitGroup') !== -1 && printJs.indexOf('SHARED TYPE SCALE') !== -1,
+  'print fits page 1 and page 2 to one shared type density');
+assert(printJs.indexOf('sidesOnP1') !== -1 && printJs.indexOf('keep type size equal') !== -1,
+  'planner can move Sides to page 1 so both pages stay the same size');
+assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -1,
+  'Gemini layout review can move Sides between pages for shared type');
+assert(page.indexOf('advice.sidesOn') !== -1,
+  'generate applies AI sidesOn to the print layout');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
   'week date is sentence case, not all-caps');
 assert(/p2 \+= trackerBar\(ver, \{ hideDate: true \}\)/.test(printJs),
@@ -625,6 +633,45 @@ var crowdedDishes = aloneDishes.concat(api.composeDishes(book, 'main', { dessert
 }));
 var crowdedLayout = print.planFluidLayout(mainMenu, crowdedDishes);
 assert(crowdedLayout.fit !== 'over' || crowdedDishes.length > 40, 'fillers never force an extra page on their own');
+
+// Packed mains+desserts on page 2 → move Sides to page 1 so both pages share one type size
+var sharedTypeDishes = [
+  api.dish('Starters', 'Scotch Egg', 'brown sauce', '8.95', ''),
+  api.dish('Starters', 'Whitebait', 'tartare', '7.95', ''),
+  api.dish('Starters', 'Bang Bang Cauliflower', 'sesame', '7.95', 'v'),
+  api.dish('Starters', 'Breaded Prawns', 'sweet chilli', '8.95', ''),
+  api.dish('Sandwiches', 'Falafel & Guacamole', 'fries', '10.95', 'vg'),
+  api.dish('Sandwiches', 'Giant Fish Finger', 'tartare', '11.95', ''),
+  api.dish('Sandwiches', 'BLT', 'mayo', '10.95', ''),
+  api.dish('Sandwiches', 'Chicken Club', 'fries', '12.95', ''),
+  api.dish('Sandwiches', 'Cheese & Onion', 'pickle', '9.95', 'v'),
+  api.dish('Burgers', 'Cheese & Bacon Burger', 'fries', '18.95', ''),
+  api.dish('Burgers', 'Sweet Potato & Halloumi Burger', 'fries', '16.95', 'v'),
+  api.dish('Mains', 'Fish & Chips', 'peas', '17.95', ''),
+  api.dish('Mains', 'Chicken Caesar Salad', 'croutons', '15.95', ''),
+  api.dish('Mains', 'Vegan Katsu Curry', 'rice', '15.95', 'vg'),
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Mains', 'Steak Frites', 'peppercorn', '22.95', ''),
+  api.dish('Mains', 'Sea Bass', 'samphire', '19.95', ''),
+  api.dish('Mains', 'Sausage & Mash', 'onion gravy', '15.95', ''),
+  api.dish('Desserts', 'Blackberry Fool', '', '7.50', 'v'),
+  api.dish('Desserts', 'Lemon Posset', 'shortbread', '7.50', 'v'),
+  api.dish('Desserts', 'Sticky Toffee Pudding', 'custard', '7.95', 'v'),
+  api.dish('Desserts', 'Chocolate Brownie', 'ice cream', '7.95', 'v'),
+  api.dish('Desserts', 'Ice cream or Sorbet', 'three scoops', '6.50', 'v'),
+  api.dish('Sides', 'Cheesy Garlic Bread', '', '5.50', 'v'),
+  api.dish('Sides', 'Dressed Mixed Salad', '', '4.95', 'vg'),
+  api.dish('Sides', 'Loaded Fries', '', '6.50', ''),
+  api.dish('Sides', 'Chips', '', '4.50', 'vg')
+];
+var sharedTypeLayout = print.planFluidLayout(mainMenu, sharedTypeDishes, {
+  sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
+});
+assert(sharedTypeLayout.pages === 2, 'packed long menu uses two pages');
+assert(sharedTypeLayout.p1.sidesOnP1 === true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === false,
+  'Sides move to page 1 so mains/desserts can share a larger type size');
+assert(/same type size/i.test(sharedTypeLayout.summary),
+  'layout summary states shared type size across both pages');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});
