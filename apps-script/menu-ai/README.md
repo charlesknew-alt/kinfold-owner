@@ -29,9 +29,16 @@ Uses your Gemini API quota (often free tier is enough for staff menu updates). E
 
 Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix it made. The Menus review screen shows these **before** you save.
 
-## Shared print history
+## Shared menus + print history
 
-The same web app also stores generated print sheets in a Drive folder **Eight Bells Menu Print History** (index `_index.json` + `{id}.html` files). Actions: `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`. PC and phone then see the same Print history list. Redeploy after pulling so history actions exist.
+The same web app stores staff data in **Script Properties** (no extra Drive login):
+
+- `MENUS_*` — live dishes, party blurbs, promo bank, layout (same on PC and phone)
+- `HISTIDX` + `HIST_{id}_*` — recent generated print sheets (capped to fit Apps Script quota)
+
+Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`.
+
+Redeploy after pulling. Local browser storage remains a backup / offline cache.
 
 ## Layout review (optional)
 

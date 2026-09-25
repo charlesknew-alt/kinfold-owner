@@ -1931,6 +1931,9 @@
 
   function historyCloudUrl() {
     try {
+      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudUrl === 'function') {
+        return root.EBMenuIngest.getCloudUrl();
+      }
       if (root.EBMenuIngest && typeof root.EBMenuIngest.getAiUrl === 'function') {
         var custom = String(root.EBMenuIngest.getAiUrl() || '').trim();
         if (custom) return custom;
@@ -1940,6 +1943,9 @@
   }
 
   function historyCloudPost(body) {
+    if (root.EBMenuIngest && typeof root.EBMenuIngest.cloudPost === 'function') {
+      return root.EBMenuIngest.cloudPost(body);
+    }
     var url = historyCloudUrl();
     if (!url || typeof fetch !== 'function') {
       return Promise.reject(new Error('no_cloud'));

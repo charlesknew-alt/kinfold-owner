@@ -9,6 +9,37 @@
   var TESSERACT_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
   var MAMMOTH_URL = 'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js';
   var AI_URL_KEY = 'eb-menu-ai-url';
+  /** Same Menu AI web app — also stores shared menus + print history in Drive. */
+  var CLOUD_DEFAULT_URL =
+    'https://script.google.com/macros/s/AKfycbyVjmwHDUL9jRtrskiiATFPgNCv2vPfcBiKjcaO0r_pcXulNS49u_qxbxYuPVc0sJGHgQ/exec';
+
+  function getCloudUrl() {
+    var custom = getAiUrl();
+    return custom || CLOUD_DEFAULT_URL;
+  }
+
+  function cloudPost(body) {
+    var url = getCloudUrl();
+    if (!url || typeof fetch !== 'function') {
+      return Promise.reject(new Error('no_cloud'));
+    }
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body || {})
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        var data;
+        try { data = JSON.parse(t); } catch (e) {
+          throw new Error('cloud_bad_json');
+        }
+        if (!data || !data.ok) {
+          throw new Error((data && data.error) || 'cloud_fail');
+        }
+        return data;
+      });
+    });
+  }
 
   function loadScript(src) {
     return new Promise(function (resolve, reject) {
@@ -399,7 +430,10 @@
     cleanExtractedText: cleanExtractedText,
     getAiUrl: getAiUrl,
     setAiUrl: setAiUrl,
+    getCloudUrl: getCloudUrl,
+    cloudPost: cloudPost,
     reviewLayout: reviewLayout,
-    AI_URL_KEY: AI_URL_KEY
+    AI_URL_KEY: AI_URL_KEY,
+    CLOUD_DEFAULT_URL: CLOUD_DEFAULT_URL
   };
 })(typeof window !== 'undefined' ? window : global);

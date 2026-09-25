@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260925-flow42"></script>
-  <script src="menus-print.js?v=20260925-flow42"></script>
-  <script src="menus-ingest.js?v=20260925-flow42"></script>
+  <script src="menus.js?v=20260925-flow43"></script>
+  <script src="menus-print.js?v=20260925-flow43"></script>
+  <script src="menus-ingest.js?v=20260925-flow43"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -274,6 +274,7 @@
     var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
     var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
     var LAYOUT_STORAGE = 'eb-menu-section-layout-v1';
+    var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at';
     var book = load();
     var metaBook = loadMeta();
     var promoBank = loadPromoBank();
@@ -289,6 +290,13 @@
     var viewMode = 'edit'; // edit | history
     var historyFilter = 'all';
     var historyCache = [];
+    var cloudUpdatedAt = (function () {
+      try { return parseInt(localStorage.getItem(CLOUD_AT_KEY) || '0', 10) || 0; }
+      catch (e) { return 0; }
+    })();
+    var cloudPushTimer = null;
+    var cloudSyncNote = '';
+    var cloudPullDone = false;
 
     var FLOW_STEPS = [
       { id: 1, key: 'dishes', label: 'Dishes' },
@@ -314,6 +322,7 @@
     }
     function saveSectionLayout() {
       localStorage.setItem(LAYOUT_STORAGE, JSON.stringify(sectionLayout));
+      queueCloudPush();
     }
 
     function loadPromoBank() {
@@ -333,6 +342,7 @@
     }
     function savePromoBank() {
       localStorage.setItem(PROMO_STORAGE, JSON.stringify(promoBank));
+      queueCloudPush();
     }
     function loadPromoTicks() {
       try { return JSON.parse(localStorage.getItem(PROMO_TICKS) || '{}') || {}; }
@@ -340,6 +350,7 @@
     }
     function savePromoTicks() {
       localStorage.setItem(PROMO_TICKS, JSON.stringify(promoTicks));
+      queueCloudPush();
     }
     function hostPromoTicks() {
       return (promoTicks[menuId] && typeof promoTicks[menuId] === 'object') ? promoTicks[menuId] : {};
@@ -371,10 +382,123 @@
         return out;
       } catch (e) { return {}; }
     }
-    function save() {
+    function saveLocalOnly() {
       localStorage.setItem(STORAGE, JSON.stringify(book));
       localStorage.setItem(META_STORAGE, JSON.stringify(metaBook));
       localStorage.setItem(STORAGE + '-includes', JSON.stringify(includes));
+      localStorage.setItem(PROMO_STORAGE, JSON.stringify(promoBank));
+      localStorage.setItem(PROMO_TICKS, JSON.stringify(promoTicks));
+      localStorage.setItem(LAYOUT_STORAGE, JSON.stringify(sectionLayout));
+      try { localStorage.setItem(CLOUD_AT_KEY, String(cloudUpdatedAt || 0)); } catch (e) {}
+    }
+    function save() {
+      cloudUpdatedAt = Date.now();
+      saveLocalOnly();
+      queueCloudPush();
+    }
+    function buildCloudState() {
+      return {
+        updatedAt: cloudUpdatedAt || Date.now(),
+        book: book,
+        metaBook: metaBook,
+        includes: includes,
+        promoBank: promoBank,
+        promoTicks: promoTicks,
+        sectionLayout: sectionLayout
+      };
+    }
+    function applyCloudState(state) {
+      if (!state || !state.book || typeof state.book !== 'object') return false;
+      book = state.book;
+      if (!book.main) {
+        var seeded = EBMenus.seed();
+        if (!book.party) book.party = seeded.party;
+      }
+      metaBook = {};
+      var rawMeta = state.metaBook && typeof state.metaBook === 'object' ? state.metaBook : {};
+      Object.keys(rawMeta).forEach(function (k) {
+        metaBook[k] = EBMenus.normalizeMeta ? EBMenus.normalizeMeta(rawMeta[k]) : rawMeta[k];
+      });
+      includes = state.includes && typeof state.includes === 'object' ? state.includes : {};
+      promoBank = EBMenus.normalizePromoBank
+        ? EBMenus.normalizePromoBank(state.promoBank)
+        : (Array.isArray(state.promoBank) ? state.promoBank : promoBank);
+      promoTicks = state.promoTicks && typeof state.promoTicks === 'object' ? state.promoTicks : {};
+      sectionLayout = EBMenus.normalizeSectionLayout
+        ? EBMenus.normalizeSectionLayout(state.sectionLayout)
+        : (state.sectionLayout && typeof state.sectionLayout === 'object' ? state.sectionLayout : sectionLayout);
+      cloudUpdatedAt = Number(state.updatedAt) || Date.now();
+      saveLocalOnly();
+      if (!book[menuId] || !book[menuId].length) {
+        menuId = 'main';
+      }
+      dishId = (dishes()[0] && dishes()[0].id) || '';
+      return true;
+    }
+    function queueCloudPush() {
+      if (cloudPushTimer) clearTimeout(cloudPushTimer);
+      cloudPushTimer = setTimeout(function () {
+        cloudPushTimer = null;
+        pushMenusToCloud();
+      }, 600);
+    }
+    function pushMenusToCloud() {
+      if (!window.EBMenuIngest || typeof EBMenuIngest.cloudPost !== 'function') {
+        return Promise.resolve(false);
+      }
+      cloudSyncNote = 'Saving to cloud…';
+      return EBMenuIngest.cloudPost({
+        action: 'saveMenusState',
+        state: buildCloudState()
+      }).then(function (data) {
+        if (data && data.updatedAt) cloudUpdatedAt = Number(data.updatedAt) || cloudUpdatedAt;
+        try { localStorage.setItem(CLOUD_AT_KEY, String(cloudUpdatedAt || 0)); } catch (e) {}
+        cloudSyncNote = 'Menus synced across devices';
+        return true;
+      }).catch(function () {
+        cloudSyncNote = 'Saved on this device only (cloud unreachable)';
+        return false;
+      });
+    }
+    function pullMenusFromCloud() {
+      if (!window.EBMenuIngest || typeof EBMenuIngest.cloudPost !== 'function') {
+        cloudPullDone = true;
+        return Promise.resolve(false);
+      }
+      cloudSyncNote = 'Loading shared menus…';
+      return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
+        var remote = data && data.state;
+        var remoteAt = remote ? (Number(remote.updatedAt) || 0) : 0;
+        if (remote && remoteAt > cloudUpdatedAt) {
+          if (applyCloudState(remote)) {
+            cloudSyncNote = 'Loaded latest menus from cloud';
+            cloudPullDone = true;
+            render();
+            return true;
+          }
+        }
+        if ((!remote || !remoteAt) && cloudUpdatedAt > 0) {
+          // This device has edits; seed the empty cloud store.
+          return pushMenusToCloud().then(function () {
+            cloudPullDone = true;
+            return true;
+          });
+        }
+        if (remote && remoteAt && remoteAt < cloudUpdatedAt) {
+          // Local is newer — upload.
+          return pushMenusToCloud().then(function () {
+            cloudPullDone = true;
+            return true;
+          });
+        }
+        cloudSyncNote = remoteAt ? 'Menus synced across devices' : 'Shared menus ready';
+        cloudPullDone = true;
+        return false;
+      }).catch(function () {
+        cloudSyncNote = 'Using menus on this device (cloud unreachable)';
+        cloudPullDone = true;
+        return false;
+      });
     }
     function loadIncludes() {
       try {
@@ -407,7 +531,8 @@
         return;
       }
       if (lede) {
-        lede.textContent = 'A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.';
+        var base = 'A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. Dishes and wording stay in sync on every phone and PC.';
+        lede.textContent = cloudSyncNote ? (base + ' · ' + cloudSyncNote) : base;
       }
       if (picker) picker.style.display = '';
       renderPicker();
@@ -426,8 +551,8 @@
         var html = '';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
-        html += '<p class="note" style="margin:0 0 10px">Shared across phones and PCs (Google Drive via the Menu AI script). ' +
-          'Also kept on this browser as a backup. Up to 60 sheets. Newest days first.</p>';
+        html += '<p class="note" style="margin:0 0 10px">Shared across phones and PCs (cloud via the Menu AI script). ' +
+          'Also kept on this browser as a backup. Newest days first.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
         html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
@@ -2005,6 +2130,7 @@
     dishId = (dishes()[0] && dishes()[0].id) || '';
     try {
       render();
+      pullMenusFromCloud();
     } catch (bootErr) {
       var ed = document.getElementById('editor');
       if (ed) {

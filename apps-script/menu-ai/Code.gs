@@ -33,6 +33,13 @@ function doPost(e) {
     if (action === 'deletePrintHistory') {
       return json_(deletePrintHistory_(body.id));
     }
+    // Shared live menu book (dishes, blurbs, wording, layout) across devices.
+    if (action === 'getMenusState') {
+      return json_(getMenusState_());
+    }
+    if (action === 'saveMenusState') {
+      return json_(saveMenusState_(body.state || body));
+    }
     // Optional: check a planned print layout before staff export.
     if (action === 'reviewLayout') {
       return json_(reviewLayoutWithGemini_(body));
@@ -51,7 +58,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'POST JSON { imageBase64, mimeType, fileName } or action listPrintHistory / savePrintHistory / getPrintHistory / deletePrintHistory'
+    hint: 'POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, getMenusState, saveMenusState, reviewLayout; or imageBase64 for AI read'
   });
 }
 
@@ -312,56 +319,54 @@ function reviewLayoutWithGemini_(body) {
   };
 }
 
-/* ——— Shared print history (Google Drive) ———
- * Keeps generated menu HTML in a Drive folder so PC and phone see the same list.
- * Folder name: Eight Bells Menu Print History
- * Index file: _index.json  ·  sheets: {id}.html
+/* ——— Shared staff data (Script Properties) ———
+ * Survives across phones/PCs without Drive OAuth.
+ *   MENUS_*   — live dishes / meta / promos / layout
+ *   HISTIDX + HIST_{id}_* — generated print sheets (capped for quota)
  */
 
-var HISTORY_FOLDER_NAME_ = 'Eight Bells Menu Print History';
-var HISTORY_INDEX_NAME_ = '_index.json';
-var HISTORY_MAX_ = 60;
+var HISTORY_MAX_ = 12;
+var PROP_CHUNK_ = 8500;
 
-function historyFolder_() {
+function propDeletePrefix_(props, prefix) {
+  var oldN = parseInt(props.getProperty(prefix + '_n') || '0', 10) || 0;
+  var keys = [prefix + '_n'];
+  for (var i = 0; i < oldN + 5; i++) keys.push(prefix + '_' + i);
+  keys.forEach(function (k) {
+    try { props.deleteProperty(k); } catch (e) {}
+  });
+}
+
+function propWrite_(prefix, text) {
   var props = PropertiesService.getScriptProperties();
-  var id = props.getProperty('PRINT_HISTORY_FOLDER_ID');
-  if (id) {
-    try {
-      return DriveApp.getFolderById(id);
-    } catch (e) {
-      /* folder deleted — recreate below */
-    }
+  text = String(text || '');
+  var n = Math.ceil(text.length / PROP_CHUNK_) || 1;
+  propDeletePrefix_(props, prefix);
+  var batch = {};
+  batch[prefix + '_n'] = String(n);
+  for (var i = 0; i < n; i++) {
+    batch[prefix + '_' + i] = text.substring(i * PROP_CHUNK_, (i + 1) * PROP_CHUNK_);
   }
-  var it = DriveApp.getFoldersByName(HISTORY_FOLDER_NAME_);
-  var folder = it.hasNext() ? it.next() : DriveApp.createFolder(HISTORY_FOLDER_NAME_);
-  props.setProperty('PRINT_HISTORY_FOLDER_ID', folder.getId());
-  return folder;
+  props.setProperties(batch, false);
 }
 
-function historyFindFile_(folder, name) {
-  var it = folder.getFilesByName(name);
-  return it.hasNext() ? it.next() : null;
+function propRead_(prefix) {
+  var props = PropertiesService.getScriptProperties();
+  var n = parseInt(props.getProperty(prefix + '_n') || '0', 10) || 0;
+  if (n <= 0) return '';
+  var parts = [];
+  for (var i = 0; i < n; i++) {
+    parts.push(props.getProperty(prefix + '_' + i) || '');
+  }
+  return parts.join('');
 }
 
-function historyReadIndex_(folder) {
-  var file = historyFindFile_(folder, HISTORY_INDEX_NAME_);
-  if (!file) return [];
-  try {
-    var parsed = JSON.parse(file.getBlob().getDataAsString() || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+function propDelete_(prefix) {
+  propDeletePrefix_(PropertiesService.getScriptProperties(), prefix);
 }
 
-function historyWriteIndex_(folder, list) {
-  var json = JSON.stringify(list || []);
-  var existing = historyFindFile_(folder, HISTORY_INDEX_NAME_);
-  if (existing) {
-    existing.setContent(json);
-  } else {
-    folder.createFile(HISTORY_INDEX_NAME_, json, MimeType.PLAIN_TEXT);
-  }
+function historySafeId_(id) {
+  return String(id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
 }
 
 function historySortNewest_(list) {
@@ -370,17 +375,33 @@ function historySortNewest_(list) {
   });
 }
 
-function historyPrune_(folder, list) {
+function historyReadIndex_() {
+  try {
+    var parsed = JSON.parse(propRead_('HISTIDX') || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function historyWriteIndex_(list) {
+  propWrite_('HISTIDX', JSON.stringify(list || []));
+}
+
+function historyDeleteHtml_(id) {
+  var safe = historySafeId_(id);
+  if (!safe) return;
+  propDelete_('HIST_' + safe);
+}
+
+function historyPrune_(list) {
   var sorted = historySortNewest_(list);
   if (sorted.length <= HISTORY_MAX_) return sorted;
   var keep = sorted.slice(0, HISTORY_MAX_);
   var keepIds = {};
   keep.forEach(function (r) { keepIds[r.id] = true; });
   sorted.slice(HISTORY_MAX_).forEach(function (drop) {
-    var f = historyFindFile_(folder, String(drop.id) + '.html');
-    if (f) {
-      try { f.setTrashed(true); } catch (e) {}
-    }
+    historyDeleteHtml_(drop.id);
   });
   return keep;
 }
@@ -401,40 +422,44 @@ function historyMetaOnly_(entry) {
 }
 
 function listPrintHistory_() {
-  var folder = historyFolder_();
-  var list = historyPrune_(folder, historyReadIndex_(folder));
-  historyWriteIndex_(folder, list);
-  return { ok: true, source: 'drive', items: list };
+  var list = historyPrune_(historyReadIndex_());
+  historyWriteIndex_(list);
+  return { ok: true, source: 'props', items: list };
 }
 
 function savePrintHistory_(raw) {
   if (!raw || !raw.html) {
     return { ok: false, error: 'Missing entry.html' };
   }
-  var folder = historyFolder_();
   var meta = historyMetaOnly_(raw);
   if (!meta.id) {
     meta.id = 'p' + Number(meta.generatedAt || Date.now()).toString(36);
   }
-  var fileName = meta.id + '.html';
-  var existing = historyFindFile_(folder, fileName);
-  if (existing) {
-    existing.setContent(String(raw.html));
-  } else {
-    folder.createFile(fileName, String(raw.html), MimeType.HTML);
+  var safe = historySafeId_(meta.id);
+  if (!safe) return { ok: false, error: 'Bad history id' };
+  meta.id = safe;
+  try {
+    propWrite_('HIST_' + safe, String(raw.html));
+  } catch (e) {
+    // Quota — drop older sheets and retry once.
+    var slim = historyPrune_(historyReadIndex_()).slice(0, Math.max(3, HISTORY_MAX_ - 4));
+    historyReadIndex_().forEach(function (r) {
+      if (!slim.some(function (k) { return k.id === r.id; })) historyDeleteHtml_(r.id);
+    });
+    historyWriteIndex_(slim);
+    propWrite_('HIST_' + safe, String(raw.html));
   }
-  var list = historyReadIndex_(folder).filter(function (r) { return r.id !== meta.id; });
+  var list = historyReadIndex_().filter(function (r) { return r.id !== meta.id; });
   list.unshift(meta);
-  list = historyPrune_(folder, list);
-  historyWriteIndex_(folder, list);
-  return { ok: true, source: 'drive', entry: meta };
+  list = historyPrune_(list);
+  historyWriteIndex_(list);
+  return { ok: true, source: 'props', entry: meta };
 }
 
 function getPrintHistory_(id) {
-  id = String(id || '');
+  id = historySafeId_(id);
   if (!id) return { ok: false, error: 'Missing id' };
-  var folder = historyFolder_();
-  var list = historyReadIndex_(folder);
+  var list = historyReadIndex_();
   var meta = null;
   for (var i = 0; i < list.length; i++) {
     if (list[i].id === id) {
@@ -442,11 +467,10 @@ function getPrintHistory_(id) {
       break;
     }
   }
-  var file = historyFindFile_(folder, id + '.html');
-  if (!file) {
+  var html = propRead_('HIST_' + id);
+  if (!html) {
     return { ok: false, error: 'Sheet not found in cloud history' };
   }
-  var html = file.getBlob().getDataAsString();
   var entry = meta ? historyMetaOnly_(meta) : {
     id: id,
     menuId: 'main',
@@ -460,18 +484,49 @@ function getPrintHistory_(id) {
     dayKey: ''
   };
   entry.html = html;
-  return { ok: true, source: 'drive', entry: entry };
+  return { ok: true, source: 'props', entry: entry };
 }
 
 function deletePrintHistory_(id) {
-  id = String(id || '');
+  id = historySafeId_(id);
   if (!id) return { ok: false, error: 'Missing id' };
-  var folder = historyFolder_();
-  var file = historyFindFile_(folder, id + '.html');
-  if (file) {
-    try { file.setTrashed(true); } catch (e) {}
+  historyDeleteHtml_(id);
+  var list = historyReadIndex_().filter(function (r) { return r.id !== id; });
+  historyWriteIndex_(list);
+  return { ok: true, source: 'props', id: id };
+}
+
+function getMenusState_() {
+  var raw = propRead_('MENUS');
+  if (!raw) return { ok: true, source: 'props', state: null };
+  try {
+    var parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return { ok: true, source: 'props', state: null };
+    }
+    return { ok: true, source: 'props', state: parsed };
+  } catch (e) {
+    return { ok: false, error: 'Could not read shared menus state: ' + String(e && e.message ? e.message : e) };
   }
-  var list = historyReadIndex_(folder).filter(function (r) { return r.id !== id; });
-  historyWriteIndex_(folder, list);
-  return { ok: true, source: 'drive', id: id };
+}
+
+function saveMenusState_(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { ok: false, error: 'Missing state' };
+  }
+  if (!raw.book || typeof raw.book !== 'object') {
+    return { ok: false, error: 'Missing state.book' };
+  }
+  var updatedAt = Number(raw.updatedAt) || Date.now();
+  var state = {
+    updatedAt: updatedAt,
+    book: raw.book,
+    metaBook: raw.metaBook && typeof raw.metaBook === 'object' ? raw.metaBook : {},
+    includes: raw.includes && typeof raw.includes === 'object' ? raw.includes : {},
+    promoBank: Array.isArray(raw.promoBank) ? raw.promoBank : [],
+    promoTicks: raw.promoTicks && typeof raw.promoTicks === 'object' ? raw.promoTicks : {},
+    sectionLayout: raw.sectionLayout && typeof raw.sectionLayout === 'object' ? raw.sectionLayout : {}
+  };
+  propWrite_('MENUS', JSON.stringify(state));
+  return { ok: true, source: 'props', updatedAt: updatedAt };
 }

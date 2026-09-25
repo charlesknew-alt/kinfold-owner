@@ -119,8 +119,18 @@ assert(page.indexOf('Print history') !== -1 && page.indexOf('data-view="history"
 assert(page.indexOf('Shared across phones and PCs') !== -1 || page.indexOf('shared cloud') !== -1,
   'print history UI says it is shared across devices');
 assert(page.indexOf('savePrintHistory') !== -1, 'Generate saves into print history');
-assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('Eight Bells Menu Print History') !== -1,
-  'Menu AI Apps Script stores print history in Drive');
+assert(page.indexOf('pullMenusFromCloud') !== -1 && page.indexOf('saveMenusState') !== -1,
+  'live menu book syncs to cloud for all devices');
+assert(page.indexOf('sync on every phone and PC') !== -1 || page.indexOf('Menus synced across devices') !== -1,
+  'UI mentions menus stay in sync across devices');
+assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('cloudPost') !== -1,
+  'ingest exposes shared cloud POST helper');
+assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('propWrite_') !== -1,
+  'Menu AI Apps Script stores print history in Script Properties');
+assert(aiGs.indexOf('getMenusState_') !== -1 && aiGs.indexOf("propRead_('MENUS')") !== -1,
+  'Menu AI Apps Script stores live menus state in Script Properties');
+assert(aiGs.indexOf('DriveApp') === -1,
+  'shared menus/history do not require Drive OAuth');
 assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
   'layout plan notes lunch club lives with allergens');
 assert(printJs.indexOf('function lunchClubBox') === -1 && printJs.indexOf('lunch-box') === -1,
@@ -241,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow42') !== -1, 'menus page cache-bust is flow42');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow42') !== -1, 'hub menus link cache-bust is flow42');
+assert(page.indexOf('flow43') !== -1, 'menus page cache-bust is flow43');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow43') !== -1, 'hub menus link cache-bust is flow43');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
