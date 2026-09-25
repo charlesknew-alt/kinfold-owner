@@ -267,6 +267,8 @@ function reviewLayoutWithGemini_(body) {
     '- panels:0 is only allowed when shorter is "even".\n' +
     '- Large holes (big |gap|): panels=2 (stack event + rooms filler). Modest holes: panels=1.\n' +
     '- Put panels ONLY under the shorter side — never pile onto the taller food stack.\n' +
+    '- Each event / feature title may appear ONLY ONCE on the whole menu. If page 1 used “Next Pub Quiz”, ' +
+    'page 2 must pick a different unused title (e.g. Stay a While / Gatherings) — never reprint the same box.\n' +
     '- If page2 is null, omit page2 or set shorter:"even", panels:0.\n' +
     '- okToPrint may be true once columnBalance fixes the hole; set false only if type would be unreadable.\n' +
     'OTHER GOLDEN RULES:\n' +

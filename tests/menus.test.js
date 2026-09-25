@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow45') !== -1, 'menus page cache-bust is flow45');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow45') !== -1, 'hub menus link cache-bust is flow45');
+assert(page.indexOf('flow46') !== -1, 'menus page cache-bust is flow46');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow46') !== -1, 'hub menus link cache-bust is flow46');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -421,6 +421,12 @@ assert(printJs.indexOf('Two scallops') !== -1 || printJs.indexOf('stackForShort'
   'large column holes stack two feature panels under the short side');
 assert(printJs.indexOf('measureOppositeColumns') !== -1,
   'print exports column measures for Gemini pre-release check');
+assert(printJs.indexOf('usedTitles') !== -1 && printJs.indexOf('excludeTitles') !== -1,
+  'feature panels track usedTitles so each event prints once per menu');
+assert(printJs.indexOf('filterUnusedPromos') !== -1,
+  'page 2 skips promos already used on page 1');
+assert(aiGs.indexOf('ONLY ONCE') !== -1 || aiGs.indexOf('only once') !== -1,
+  'Gemini layout review forbids reprinting the same feature panel');
 assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFill') !== -1,
   'generate applies AI columnBalance as forceColumnFill');
 assert(page.indexOf('localColumnBalanceFallback') !== -1,

@@ -293,12 +293,31 @@
     return renderOnePromoBox(promos.slice(0, 2), frameKind);
   }
 
+  function promoTitleKey(p) {
+    return String(p && p.title != null ? p.title : p || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function filterUnusedPromos(promos, excludeTitles) {
+    var exclude = {};
+    (excludeTitles || []).forEach(function (t) {
+      var k = promoTitleKey(t);
+      if (k) exclude[k] = true;
+    });
+    return (promos || []).filter(function (p) {
+      return p && p.title && !exclude[promoTitleKey(p)];
+    });
+  }
+
   /**
    * Place feature panels only to even opposite columns.
    * leftFood / rightFood = rough height units of the food stacks.
    * Positive (rightFood - leftFood) means the LEFT column is shorter → fill left.
    * opts.force = { shorter:'left'|'right'|'even', panels:0|1|2 } from Gemini
-   * overrides unit maths when the pre-release AI check says columns do not match.
+   * opts.excludeTitles = titles already printed on an earlier page (never reuse).
+   * Returns usedTitles so the next page can skip them.
    */
   function planPromoFill(leftFood, rightFood, promos, opts) {
     opts = opts || {};
@@ -309,14 +328,17 @@
       { title: 'Stay a While', body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.' },
       { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
     ];
-    var list = (promos || []).filter(function (p) { return p && p.title; });
-    if (!list.length) list = defaults.slice();
+    var excludeTitles = opts.excludeTitles || [];
+    var list = filterUnusedPromos(promos, excludeTitles);
+    if (!list.length) list = filterUnusedPromos(defaults, excludeTitles);
     var pool = list.slice();
     var di = 0;
     while (pool.length < 4 && di < defaults.length * 2) {
       var d = defaults[di % defaults.length];
-      var dup = pool.some(function (p) { return String(p.title).toLowerCase() === String(d.title).toLowerCase(); });
-      if (!dup) pool.push(d);
+      var key = promoTitleKey(d);
+      var blocked = excludeTitles.some(function (t) { return promoTitleKey(t) === key; }) ||
+        pool.some(function (p) { return promoTitleKey(p) === key; });
+      if (!blocked) pool.push(d);
       di += 1;
     }
 
@@ -324,43 +346,67 @@
       var kind = side === 'left' ? leftKind : rightKind;
       var alt = kind === 'box' ? 'wide' : 'box';
       var n = Math.max(0, Math.min(2, parseInt(panels, 10) || 0));
+      var used = [];
       var html = '';
-      if (n >= 2 && pool.length >= 2) {
-        html = renderOnePromoBox(pool.slice(0, 1), kind) +
-          renderOnePromoBox(pool.slice(1, 2), alt);
-      } else if (n >= 1) {
-        html = renderOnePromoBox(pool.slice(0, n === 1 && pool.length > 1 ? 1 : Math.min(2, pool.length)), kind);
+      if (!pool.length || n < 1) {
+        if (side === 'left') return { left: '', right: '', note: 'No unused panels left', usedTitles: used };
+        return { left: '', right: '', note: 'No unused panels left', usedTitles: used };
       }
-      if (side === 'left') return { left: html, right: '', note: 'Feature under shorter left column' };
-      return { left: '', right: html, note: 'Feature under shorter right column' };
+      if (n >= 2 && pool.length >= 2) {
+        used = [pool[0].title, pool[1].title];
+        html = renderOnePromoBox([pool[0]], kind) + renderOnePromoBox([pool[1]], alt);
+      } else {
+        var take = Math.min(n === 1 ? 1 : Math.min(2, pool.length), pool.length);
+        used = pool.slice(0, take).map(function (p) { return p.title; });
+        html = renderOnePromoBox(pool.slice(0, take), kind);
+      }
+      if (side === 'left') {
+        return { left: html, right: '', note: 'Feature under shorter left column', usedTitles: used };
+      }
+      return { left: '', right: html, note: 'Feature under shorter right column', usedTitles: used };
     }
 
-    // Pre-release AI verdict wins over local unit guesses.
     var force = opts.force || null;
     if (force && force.shorter && force.shorter !== 'even') {
       var forcedPanels = Math.max(1, Math.min(2, parseInt(force.panels, 10) || 1));
+      // Only ask for as many panels as we still have unused titles.
+      forcedPanels = Math.min(forcedPanels, Math.max(1, pool.length));
+      if (!pool.length) {
+        return { left: '', right: '', note: 'No unused feature panels left', usedTitles: [] };
+      }
       if (force.shorter === 'left' || force.shorter === 'right') {
         return stackForShort(force.shorter, forcedPanels);
       }
     }
 
     var gap = (rightFood || 0) - (leftFood || 0);
-    if (gap > 2.5) return stackForShort('left', gap > 14 ? 2 : (gap > 9 ? 2 : 1));
-    if (gap < -2.5) return stackForShort('right', -gap > 14 ? 2 : (-gap > 9 ? 2 : 1));
+    if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1);
+    if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1);
     if (pool.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
       return {
         left: renderOnePromoBox([pool[0]], leftKind),
         right: renderOnePromoBox([pool[1]], rightKind),
-        note: 'Paired feature panels (even columns)'
+        note: 'Paired feature panels (even columns)',
+        usedTitles: [pool[0].title, pool[1].title]
       };
     }
     if (pool.length && Math.abs(gap) <= 2.5) {
       if (gap >= 0) {
-        return { left: renderOnePromoBox([pool[0]], leftKind), right: '', note: 'One panel on left' };
+        return {
+          left: renderOnePromoBox([pool[0]], leftKind),
+          right: '',
+          note: 'One panel on left',
+          usedTitles: [pool[0].title]
+        };
       }
-      return { left: '', right: renderOnePromoBox([pool[0]], rightKind), note: 'One panel on right' };
+      return {
+        left: '',
+        right: renderOnePromoBox([pool[0]], rightKind),
+        note: 'One panel on right',
+        usedTitles: [pool[0].title]
+      };
     }
-    return { left: '', right: '', note: 'No feature panels — columns already even' };
+    return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
   }
 
   /**
@@ -1160,6 +1206,8 @@
     var sandRule = ruleFor('Sandwiches', plan);
     var sideRule = ruleFor('Sides', plan);
     var dessRule = ruleFor('Desserts', plan);
+    // Feature panel titles already printed — each event box only once per menu.
+    var usedPromoTitles = [];
 
     var p1 = '<div class="page fill-page ' + fill1 + '">';
     p1 += trackerBar(ver, { hideDate: hideDate });
@@ -1295,10 +1343,9 @@
         promoFrameOpts.force = plan.forceColumnFill.page1;
       }
       // Always fill a real opposite-column hole before the PDF opens.
-      var canBalance = true;
-      var promoCols = canBalance
-        ? planPromoFill(leftFoodU, rightFoodU, promos, promoFrameOpts)
-        : { left: '', right: '' };
+      // Track usedTitles so page 2 never reprints the same event panel.
+      var promoCols = planPromoFill(leftFoodU, rightFoodU, promos, promoFrameOpts);
+      usedPromoTitles = usedPromoTitles.concat(promoCols.usedTitles || []);
       var leftFeature = promoCols.left || '';
       var rightFeature = promoCols.right || '';
 
@@ -1414,11 +1461,14 @@
         if (p2opts.sidesOnP2 && bag.sauces) sideU += sectionUnits(bag.sauces, false);
         var rightU = p2opts.sandwiches ? sandwichesPackCost(bag) : 0;
         var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
-        var p2Fill = planPromoFill(sideU, rightU, promos, {
+        var remainingPromos = filterUnusedPromos(promos, usedPromoTitles);
+        var p2Fill = planPromoFill(sideU, rightU, remainingPromos, {
           leftFrame: 'box',
           rightFrame: 'wide',
-          force: p2Force
+          force: p2Force,
+          excludeTitles: usedPromoTitles
         });
+        usedPromoTitles = usedPromoTitles.concat(p2Fill.usedTitles || []);
         p2 += '<div class="cols bottom-cols cols-balanced cols-features">';
         p2 += '<div class="col col-sides">';
         p2 += '<div class="col-body">';
@@ -1439,7 +1489,7 @@
         if (p2opts.sandwiches) {
           p2 += sandwichesBlock(bag, { rule: sandRule, alignTitle: true });
         } else if (p2opts.rooms && !p2Fill.right) {
-          p2 += promoBesidePartner(promos, sideU, 'box');
+          p2 += promoBesidePartner(remainingPromos, sideU, 'box');
         } else if (!p2Fill.right) {
           p2 += '&nbsp;';
         }
@@ -1450,7 +1500,7 @@
         p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
       }
     } else if (p2opts.rooms) {
-      p2 += renderFiller('rooms', bag, promos);
+      p2 += renderFiller('rooms', bag, filterUnusedPromos(promos, usedPromoTitles));
     }
 
     if (p2opts.footLogo) p2 += renderFiller('logo', bag);
