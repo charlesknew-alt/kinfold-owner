@@ -19,8 +19,22 @@ function doPost(e) {
   try {
     var raw = e && e.postData && e.postData.contents ? e.postData.contents : '{}';
     var body = JSON.parse(raw);
-    // Optional second use: check a planned print layout before staff export.
-    if (body && body.action === 'reviewLayout') {
+    var action = body && body.action ? String(body.action) : '';
+    // Shared print history (Drive) — same web app URL, works on PC and phone.
+    if (action === 'listPrintHistory') {
+      return json_(listPrintHistory_());
+    }
+    if (action === 'savePrintHistory') {
+      return json_(savePrintHistory_(body.entry || body));
+    }
+    if (action === 'getPrintHistory') {
+      return json_(getPrintHistory_(body.id || (body.entry && body.entry.id)));
+    }
+    if (action === 'deletePrintHistory') {
+      return json_(deletePrintHistory_(body.id));
+    }
+    // Optional: check a planned print layout before staff export.
+    if (action === 'reviewLayout') {
       return json_(reviewLayoutWithGemini_(body));
     }
     var result = readMenuWithGemini_(body);
@@ -37,7 +51,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'POST JSON { imageBase64, mimeType, fileName }'
+    hint: 'POST JSON { imageBase64, mimeType, fileName } or action listPrintHistory / savePrintHistory / getPrintHistory / deletePrintHistory'
   });
 }
 
@@ -296,4 +310,168 @@ function reviewLayoutWithGemini_(body) {
     okToPrint: advice.okToPrint !== false,
     notes: String(advice.notes || '').slice(0, 280)
   };
+}
+
+/* ——— Shared print history (Google Drive) ———
+ * Keeps generated menu HTML in a Drive folder so PC and phone see the same list.
+ * Folder name: Eight Bells Menu Print History
+ * Index file: _index.json  ·  sheets: {id}.html
+ */
+
+var HISTORY_FOLDER_NAME_ = 'Eight Bells Menu Print History';
+var HISTORY_INDEX_NAME_ = '_index.json';
+var HISTORY_MAX_ = 60;
+
+function historyFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('PRINT_HISTORY_FOLDER_ID');
+  if (id) {
+    try {
+      return DriveApp.getFolderById(id);
+    } catch (e) {
+      /* folder deleted — recreate below */
+    }
+  }
+  var it = DriveApp.getFoldersByName(HISTORY_FOLDER_NAME_);
+  var folder = it.hasNext() ? it.next() : DriveApp.createFolder(HISTORY_FOLDER_NAME_);
+  props.setProperty('PRINT_HISTORY_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function historyFindFile_(folder, name) {
+  var it = folder.getFilesByName(name);
+  return it.hasNext() ? it.next() : null;
+}
+
+function historyReadIndex_(folder) {
+  var file = historyFindFile_(folder, HISTORY_INDEX_NAME_);
+  if (!file) return [];
+  try {
+    var parsed = JSON.parse(file.getBlob().getDataAsString() || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function historyWriteIndex_(folder, list) {
+  var json = JSON.stringify(list || []);
+  var existing = historyFindFile_(folder, HISTORY_INDEX_NAME_);
+  if (existing) {
+    existing.setContent(json);
+  } else {
+    folder.createFile(HISTORY_INDEX_NAME_, json, MimeType.PLAIN_TEXT);
+  }
+}
+
+function historySortNewest_(list) {
+  return (list || []).slice().sort(function (a, b) {
+    return (b.generatedAt || 0) - (a.generatedAt || 0);
+  });
+}
+
+function historyPrune_(folder, list) {
+  var sorted = historySortNewest_(list);
+  if (sorted.length <= HISTORY_MAX_) return sorted;
+  var keep = sorted.slice(0, HISTORY_MAX_);
+  var keepIds = {};
+  keep.forEach(function (r) { keepIds[r.id] = true; });
+  sorted.slice(HISTORY_MAX_).forEach(function (drop) {
+    var f = historyFindFile_(folder, String(drop.id) + '.html');
+    if (f) {
+      try { f.setTrashed(true); } catch (e) {}
+    }
+  });
+  return keep;
+}
+
+function historyMetaOnly_(entry) {
+  return {
+    id: String(entry.id || ''),
+    menuId: String(entry.menuId || 'main'),
+    menuName: String(entry.menuName || entry.menuId || 'Menu'),
+    roman: String(entry.roman || ''),
+    n: entry.n || 0,
+    week: String(entry.week || ''),
+    weekKey: String(entry.weekKey || ''),
+    hideDate: !!entry.hideDate,
+    generatedAt: entry.generatedAt || Date.now(),
+    dayKey: String(entry.dayKey || '')
+  };
+}
+
+function listPrintHistory_() {
+  var folder = historyFolder_();
+  var list = historyPrune_(folder, historyReadIndex_(folder));
+  historyWriteIndex_(folder, list);
+  return { ok: true, source: 'drive', items: list };
+}
+
+function savePrintHistory_(raw) {
+  if (!raw || !raw.html) {
+    return { ok: false, error: 'Missing entry.html' };
+  }
+  var folder = historyFolder_();
+  var meta = historyMetaOnly_(raw);
+  if (!meta.id) {
+    meta.id = 'p' + Number(meta.generatedAt || Date.now()).toString(36);
+  }
+  var fileName = meta.id + '.html';
+  var existing = historyFindFile_(folder, fileName);
+  if (existing) {
+    existing.setContent(String(raw.html));
+  } else {
+    folder.createFile(fileName, String(raw.html), MimeType.HTML);
+  }
+  var list = historyReadIndex_(folder).filter(function (r) { return r.id !== meta.id; });
+  list.unshift(meta);
+  list = historyPrune_(folder, list);
+  historyWriteIndex_(folder, list);
+  return { ok: true, source: 'drive', entry: meta };
+}
+
+function getPrintHistory_(id) {
+  id = String(id || '');
+  if (!id) return { ok: false, error: 'Missing id' };
+  var folder = historyFolder_();
+  var list = historyReadIndex_(folder);
+  var meta = null;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === id) {
+      meta = list[i];
+      break;
+    }
+  }
+  var file = historyFindFile_(folder, id + '.html');
+  if (!file) {
+    return { ok: false, error: 'Sheet not found in cloud history' };
+  }
+  var html = file.getBlob().getDataAsString();
+  var entry = meta ? historyMetaOnly_(meta) : {
+    id: id,
+    menuId: 'main',
+    menuName: 'Menu',
+    roman: '',
+    n: 0,
+    week: '',
+    weekKey: '',
+    hideDate: false,
+    generatedAt: Date.now(),
+    dayKey: ''
+  };
+  entry.html = html;
+  return { ok: true, source: 'drive', entry: entry };
+}
+
+function deletePrintHistory_(id) {
+  id = String(id || '');
+  if (!id) return { ok: false, error: 'Missing id' };
+  var folder = historyFolder_();
+  var file = historyFindFile_(folder, id + '.html');
+  if (file) {
+    try { file.setTrashed(true); } catch (e) {}
+  }
+  var list = historyReadIndex_(folder).filter(function (r) { return r.id !== id; });
+  historyWriteIndex_(folder, list);
+  return { ok: true, source: 'drive', id: id };
 }

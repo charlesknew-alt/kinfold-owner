@@ -111,9 +111,16 @@ assert(printJs.indexOf('lunch only') !== -1,
 assert(printJs.indexOf('savePrintHistory') !== -1 && printJs.indexOf('listPrintHistory') !== -1,
   'print history can save and list generated sheets');
 assert(printJs.indexOf('groupHistoryByDay') !== -1, 'print history groups by day');
+assert(printJs.indexOf('HISTORY_CLOUD_DEFAULT') !== -1 && printJs.indexOf('listPrintHistory') !== -1,
+  'print history syncs via cloud Apps Script URL');
+assert(printJs.indexOf('migrateLocalToCloud') !== -1, 'device-only sheets can upload to shared history');
 assert(page.indexOf('Print history') !== -1 && page.indexOf('data-view="history"') !== -1,
   'Menus has a Print history view');
+assert(page.indexOf('Shared across phones and PCs') !== -1 || page.indexOf('shared cloud') !== -1,
+  'print history UI says it is shared across devices');
 assert(page.indexOf('savePrintHistory') !== -1, 'Generate saves into print history');
+assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('Eight Bells Menu Print History') !== -1,
+  'Menu AI Apps Script stores print history in Drive');
 assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
   'layout plan notes lunch club lives with allergens');
 assert(printJs.indexOf('function lunchClubBox') === -1 && printJs.indexOf('lunch-box') === -1,
@@ -234,8 +241,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow41') !== -1, 'menus page cache-bust is flow41');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow41') !== -1, 'hub menus link cache-bust is flow41');
+assert(page.indexOf('flow42') !== -1, 'menus page cache-bust is flow42');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow42') !== -1, 'hub menus link cache-bust is flow42');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');

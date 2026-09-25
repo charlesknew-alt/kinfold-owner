@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260924-flow41"></script>
-  <script src="menus-print.js?v=20260924-flow41"></script>
-  <script src="menus-ingest.js?v=20260924-flow41"></script>
+  <script src="menus.js?v=20260925-flow42"></script>
+  <script src="menus-print.js?v=20260925-flow42"></script>
+  <script src="menus-ingest.js?v=20260925-flow42"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -400,7 +400,7 @@
       });
       if (viewMode === 'history') {
         if (lede) {
-          lede.textContent = 'Past generated sheets on this device — by day, with week / Sunday label and Roman print number. Open to print again, or download the HTML.';
+          lede.textContent = 'Past generated sheets shared in the cloud — same list on PC and phone. Grouped by day, with week / Sunday label and Roman print number. Open to print again, or download the HTML.';
         }
         if (picker) picker.style.display = 'none';
         renderHistory();
@@ -426,8 +426,8 @@
         var html = '';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
-        html += '<p class="note" style="margin:0 0 10px">Kept on this browser after Generate (up to ' +
-          '60 sheets). Staff on the pub PC see what was generated here. Newest days first.</p>';
+        html += '<p class="note" style="margin:0 0 10px">Shared across phones and PCs (Google Drive via the Menu AI script). ' +
+          'Also kept on this browser as a backup. Up to 60 sheets. Newest days first.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
         html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
@@ -504,7 +504,7 @@
       document.querySelectorAll('[data-history-delete]').forEach(function (btn) {
         btn.onclick = function () {
           var id = btn.getAttribute('data-history-delete');
-          if (!confirm('Remove this sheet from print history on this device?')) return;
+          if (!confirm('Remove this sheet from shared print history (all devices)?')) return;
           EBMenuPrint.deletePrintHistory(id).then(function () { renderHistory(); });
         };
       });
@@ -813,7 +813,7 @@
 
     function renderGenerateStep(menu) {
       var html = '';
-      html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Each generate is saved under <strong>Print history</strong> with its week / Sunday date and Roman numeral.</p>';
+      html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Each generate is saved under <strong>Print history</strong> (shared cloud + this device) with its week / Sunday date and Roman numeral.</p>';
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
       html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
       html += '<div class="bar-copy" id="generateHint"></div>';

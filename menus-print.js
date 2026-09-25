@@ -1925,6 +1925,196 @@
   var HISTORY_LS_INDEX = 'eb-menu-print-history-v1';
   var HISTORY_LS_HTML = 'eb-menu-print-html-';
   var HISTORY_MAX = 60;
+  /** Live Menu AI web app — also stores shared print history in Drive. */
+  var HISTORY_CLOUD_DEFAULT =
+    'https://script.google.com/macros/s/AKfycbyVjmwHDUL9jRtrskiiATFPgNCv2vPfcBiKjcaO0r_pcXulNS49u_qxbxYuPVc0sJGHgQ/exec';
+
+  function historyCloudUrl() {
+    try {
+      if (root.EBMenuIngest && typeof root.EBMenuIngest.getAiUrl === 'function') {
+        var custom = String(root.EBMenuIngest.getAiUrl() || '').trim();
+        if (custom) return custom;
+      }
+    } catch (e) {}
+    return HISTORY_CLOUD_DEFAULT;
+  }
+
+  function historyCloudPost(body) {
+    var url = historyCloudUrl();
+    if (!url || typeof fetch !== 'function') {
+      return Promise.reject(new Error('no_cloud'));
+    }
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body || {})
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        var data;
+        try { data = JSON.parse(t); } catch (e) {
+          throw new Error('cloud_bad_json');
+        }
+        if (!data || !data.ok) {
+          throw new Error((data && data.error) || 'cloud_fail');
+        }
+        return data;
+      });
+    });
+  }
+
+  function localSaveOnly(entry) {
+    if (!idbAvailable()) {
+      lsSavePrint(entry);
+      return Promise.resolve(entry);
+    }
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(HISTORY_STORE, 'readwrite');
+        var store = tx.objectStore(HISTORY_STORE);
+        store.put(entry);
+        tx.oncomplete = function () {
+          var tx2 = db.transaction(HISTORY_STORE, 'readwrite');
+          var st2 = tx2.objectStore(HISTORY_STORE);
+          var all = [];
+          st2.openCursor(null, 'prev').onsuccess = function (ev) {
+            var cursor = ev.target.result;
+            if (!cursor) {
+              if (all.length > HISTORY_MAX) {
+                all.slice(HISTORY_MAX).forEach(function (row) { st2.delete(row.id); });
+              }
+              return;
+            }
+            all.push(cursor.value);
+            cursor.continue();
+          };
+          tx2.oncomplete = function () { resolve(entry); };
+          tx2.onerror = function () { resolve(entry); };
+        };
+        tx.onerror = function () {
+          try { lsSavePrint(entry); } catch (e) {}
+          reject(tx.error || new Error('idb_put'));
+        };
+      });
+    }).catch(function () {
+      lsSavePrint(entry);
+      return entry;
+    });
+  }
+
+  function localListOnly() {
+    if (!idbAvailable()) {
+      return Promise.resolve(lsListPrints());
+    }
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction(HISTORY_STORE, 'readonly');
+        var store = tx.objectStore(HISTORY_STORE);
+        var req = store.getAll ? store.getAll() : null;
+        if (req) {
+          req.onsuccess = function () {
+            resolve(sortHistoryNewest((req.result || []).map(function (r) {
+              return {
+                id: r.id,
+                menuId: r.menuId,
+                menuName: r.menuName,
+                roman: r.roman,
+                n: r.n,
+                week: r.week,
+                weekKey: r.weekKey,
+                hideDate: r.hideDate,
+                generatedAt: r.generatedAt,
+                dayKey: r.dayKey
+              };
+            })));
+          };
+          req.onerror = function () { resolve(lsListPrints()); };
+          return;
+        }
+        var rows = [];
+        store.openCursor(null, 'prev').onsuccess = function (ev) {
+          var cursor = ev.target.result;
+          if (!cursor) {
+            resolve(sortHistoryNewest(rows));
+            return;
+          }
+          var r = cursor.value;
+          rows.push({
+            id: r.id,
+            menuId: r.menuId,
+            menuName: r.menuName,
+            roman: r.roman,
+            n: r.n,
+            week: r.week,
+            weekKey: r.weekKey,
+            hideDate: r.hideDate,
+            generatedAt: r.generatedAt,
+            dayKey: r.dayKey
+          });
+          cursor.continue();
+        };
+        tx.onerror = function () { resolve(lsListPrints()); };
+      });
+    }).catch(function () {
+      return lsListPrints();
+    });
+  }
+
+  function localGetOnly(id) {
+    if (!idbAvailable()) {
+      return Promise.resolve(lsGetPrint(id));
+    }
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction(HISTORY_STORE, 'readonly');
+        var req = tx.objectStore(HISTORY_STORE).get(id);
+        req.onsuccess = function () {
+          resolve(req.result || lsGetPrint(id));
+        };
+        req.onerror = function () { resolve(lsGetPrint(id)); };
+      });
+    }).catch(function () {
+      return lsGetPrint(id);
+    });
+  }
+
+  function localDeleteOnly(id) {
+    lsDeletePrint(id);
+    if (!idbAvailable()) return Promise.resolve();
+    return openHistoryDb().then(function (db) {
+      return new Promise(function (resolve) {
+        var tx = db.transaction(HISTORY_STORE, 'readwrite');
+        tx.objectStore(HISTORY_STORE).delete(id);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { resolve(); };
+      });
+    }).catch(function () {});
+  }
+
+  /** Push device-only sheets up so the other phone/PC can see them once. */
+  function migrateLocalToCloud(cloudIds) {
+    var known = cloudIds || {};
+    return localListOnly().then(function (rows) {
+      var missing = (rows || []).filter(function (r) { return r && r.id && !known[r.id]; });
+      if (!missing.length) return;
+      // Upload oldest first so prune keeps newest; cap burst.
+      missing.sort(function (a, b) {
+        return (a.generatedAt || 0) - (b.generatedAt || 0);
+      });
+      var chain = Promise.resolve();
+      missing.slice(-20).forEach(function (meta) {
+        chain = chain.then(function () {
+          return localGetOnly(meta.id).then(function (full) {
+            if (!full || !full.html) return;
+            return historyCloudPost({
+              action: 'savePrintHistory',
+              entry: full
+            }).catch(function () {});
+          });
+        });
+      });
+      return chain;
+    }).catch(function () {});
+  }
 
   function getLastBuild() {
     return lastBuildMeta;
@@ -2101,138 +2291,78 @@
     };
   }
 
-  /** Persist a generated sheet so staff can reopen / print it later on this device. */
+  /**
+   * Persist a generated sheet in shared cloud history (Drive via Menu AI Apps Script)
+   * and cache a copy on this device for offline reopen.
+   */
   function savePrintHistory(raw) {
     var entry = normalizeHistoryEntry(raw || lastBuildMeta);
     if (!entry) return Promise.resolve(null);
-    if (!idbAvailable()) {
-      lsSavePrint(entry);
-      return Promise.resolve(entry);
-    }
-    return openHistoryDb().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        var tx = db.transaction(HISTORY_STORE, 'readwrite');
-        var store = tx.objectStore(HISTORY_STORE);
-        store.put(entry);
-        tx.oncomplete = function () {
-          // Cap total rows
-          var tx2 = db.transaction(HISTORY_STORE, 'readwrite');
-          var st2 = tx2.objectStore(HISTORY_STORE);
-          var all = [];
-          st2.openCursor(null, 'prev').onsuccess = function (ev) {
-            var cursor = ev.target.result;
-            if (!cursor) {
-              if (all.length > HISTORY_MAX) {
-                all.slice(HISTORY_MAX).forEach(function (row) { st2.delete(row.id); });
-              }
-              return;
-            }
-            all.push(cursor.value);
-            cursor.continue();
-          };
-          tx2.oncomplete = function () { resolve(entry); };
-          tx2.onerror = function () { resolve(entry); };
-        };
-        tx.onerror = function () {
-          try { lsSavePrint(entry); } catch (e) {}
-          reject(tx.error || new Error('idb_put'));
-        };
+    return localSaveOnly(entry).then(function (saved) {
+      return historyCloudPost({
+        action: 'savePrintHistory',
+        entry: saved
+      }).then(function () {
+        return saved;
+      }).catch(function () {
+        // Offline / script not redeployed — local cache still has it.
+        return saved;
       });
-    }).catch(function () {
-      lsSavePrint(entry);
-      return entry;
     });
   }
 
   function listPrintHistory() {
-    if (!idbAvailable()) {
-      return Promise.resolve(lsListPrints());
-    }
-    return openHistoryDb().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        var tx = db.transaction(HISTORY_STORE, 'readonly');
-        var store = tx.objectStore(HISTORY_STORE);
-        var req = store.getAll ? store.getAll() : null;
-        if (req) {
-          req.onsuccess = function () {
-            resolve(sortHistoryNewest((req.result || []).map(function (r) {
-              return {
-                id: r.id,
-                menuId: r.menuId,
-                menuName: r.menuName,
-                roman: r.roman,
-                n: r.n,
-                week: r.week,
-                weekKey: r.weekKey,
-                hideDate: r.hideDate,
-                generatedAt: r.generatedAt,
-                dayKey: r.dayKey
-              };
-            })));
-          };
-          req.onerror = function () { resolve(lsListPrints()); };
-          return;
-        }
-        var rows = [];
-        store.openCursor(null, 'prev').onsuccess = function (ev) {
-          var cursor = ev.target.result;
-          if (!cursor) {
-            resolve(sortHistoryNewest(rows));
-            return;
-          }
-          var r = cursor.value;
-          rows.push({
-            id: r.id,
-            menuId: r.menuId,
-            menuName: r.menuName,
-            roman: r.roman,
-            n: r.n,
-            week: r.week,
-            weekKey: r.weekKey,
-            hideDate: r.hideDate,
-            generatedAt: r.generatedAt,
-            dayKey: r.dayKey
-          });
-          cursor.continue();
+    return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      var known = {};
+      items.forEach(function (r) { if (r && r.id) known[r.id] = true; });
+      // Fire-and-forget: upload any sheets that only exist on this device.
+      migrateLocalToCloud(known);
+      return sortHistoryNewest(items.map(function (r) {
+        return {
+          id: r.id,
+          menuId: r.menuId,
+          menuName: r.menuName,
+          roman: r.roman,
+          n: r.n,
+          week: r.week,
+          weekKey: r.weekKey,
+          hideDate: r.hideDate,
+          generatedAt: r.generatedAt,
+          dayKey: r.dayKey,
+          source: 'cloud'
         };
-        tx.onerror = function () { resolve(lsListPrints()); };
-      });
+      }));
     }).catch(function () {
-      return lsListPrints();
+      return localListOnly();
     });
   }
 
   function getPrintHistory(id) {
     if (!id) return Promise.resolve(null);
-    if (!idbAvailable()) {
-      return Promise.resolve(lsGetPrint(id));
-    }
-    return openHistoryDb().then(function (db) {
-      return new Promise(function (resolve) {
-        var tx = db.transaction(HISTORY_STORE, 'readonly');
-        var req = tx.objectStore(HISTORY_STORE).get(id);
-        req.onsuccess = function () {
-          resolve(req.result || lsGetPrint(id));
-        };
-        req.onerror = function () { resolve(lsGetPrint(id)); };
-      });
+    return historyCloudPost({
+      action: 'getPrintHistory',
+      id: id
+    }).then(function (data) {
+      var entry = data.entry || null;
+      if (entry && entry.html) {
+        // Refresh local cache so reopen still works offline later.
+        localSaveOnly(normalizeHistoryEntry(entry)).catch(function () {});
+      }
+      return entry;
     }).catch(function () {
-      return lsGetPrint(id);
+      return localGetOnly(id);
     });
   }
 
   function deletePrintHistory(id) {
     if (!id) return Promise.resolve();
-    lsDeletePrint(id);
-    if (!idbAvailable()) return Promise.resolve();
-    return openHistoryDb().then(function (db) {
-      return new Promise(function (resolve) {
-        var tx = db.transaction(HISTORY_STORE, 'readwrite');
-        tx.objectStore(HISTORY_STORE).delete(id);
-        tx.oncomplete = function () { resolve(); };
-        tx.onerror = function () { resolve(); };
-      });
-    }).catch(function () {});
+    return localDeleteOnly(id).then(function () {
+      return historyCloudPost({
+        action: 'deletePrintHistory',
+        id: id
+      }).catch(function () {});
+    });
   }
 
   function openPrintHtml(html) {
@@ -2324,6 +2454,7 @@
     dayLabelFromMs: dayLabelFromMs,
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
-    downloadPrintHtml: downloadPrintHtml
+    downloadPrintHtml: downloadPrintHtml,
+    historyCloudUrl: historyCloudUrl
   };
 })(typeof window !== 'undefined' ? window : global);

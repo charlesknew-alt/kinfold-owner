@@ -29,6 +29,10 @@ Uses your Gemini API quota (often free tier is enough for staff menu updates). E
 
 Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix it made. The Menus review screen shows these **before** you save.
 
+## Shared print history
+
+The same web app also stores generated print sheets in a Drive folder **Eight Bells Menu Print History** (index `_index.json` + `{id}.html` files). Actions: `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`. PC and phone then see the same Print history list. Redeploy after pulling so history actions exist.
+
 ## Layout review (optional)
 
 Redeploy the same web app after pulling updates. Generate can POST `{ "action": "reviewLayout", "layout": { … } }` so Gemini checks page balance before the print preview opens. Without a redeploy, Generate still works and skips that step.
