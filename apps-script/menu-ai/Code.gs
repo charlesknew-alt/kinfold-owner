@@ -275,6 +275,8 @@ function reviewLayoutWithGemini_(body) {
     'do not park the sandwich sell box on page 2 next to desserts if page 1 has room.\n' +
     '- Prefer fewer feature panels on the packed page over shrinking type. One panel is enough when two ' +
     'would force smaller shared type.\n' +
+    '- Feature panels are LITTLE promotions — never a tall empty frame. Balance columns with food ' +
+    '(Sides / sandwich sell box under the shorter stack) first; only then add a compact promo foot.\n' +
     '- dropFootLogo: true when keeping the page-2 logo would force tight/compact type — readable mains/desserts ' +
     'beat a second logo. Always prefer larger shared type over decorative chrome.\n' +
     '- After type is set, both pages should fill top→bottom (no blank bottom third with content jammed up).\n' +

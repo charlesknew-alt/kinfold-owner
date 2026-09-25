@@ -369,6 +369,8 @@
     var force = opts.force || null;
     if (force && force.shorter && force.shorter !== 'even') {
       var forcedPanels = Math.max(1, Math.min(2, parseInt(force.panels, 10) || 1));
+      // Prefer one little promo — two stacked panels only for huge holes.
+      if (forcedPanels > 1 && Math.abs((rightFood || 0) - (leftFood || 0)) < 12) forcedPanels = 1;
       // Only ask for as many panels as we still have unused titles.
       forcedPanels = Math.min(forcedPanels, Math.max(1, pool.length));
       if (!pool.length) {
@@ -425,12 +427,15 @@
     var shareDishes = (bag.sharing && bag.sharing.dishes) ? bag.sharing.dishes : [];
     var leftFood = 0;
     var rightFood = 0;
-    if (p1.sandwiches && sandList.length) leftFood += sandwichesPackCost(bag);
-    else if (p1.sandwiches) leftFood += COST.sandwiches;
     if (shareDishes.length) leftFood += sectionUnits({ name: 'Sharing', dishes: shareDishes }, false);
     if (burgerDishes.length) rightFood += sectionUnits({ name: 'Burgers', dishes: burgerDishes }, false);
     if (classicDishes.length) rightFood += sectionUnits({ name: 'Pub Classics', dishes: classicDishes }, false);
-    // Sides can sit on page 1 (under the shorter food stack) so page 1+2 share one type size.
+    // Tip/sell box and Sides sit under the shorter stack (named fillings stay left).
+    if (p1.sandwiches && sandList.length) leftFood += sandwichesPackCost(bag);
+    else if (p1.sandwiches) {
+      if (leftFood <= rightFood) leftFood += COST.sandwiches;
+      else rightFood += COST.sandwiches;
+    }
     if (p1.sidesOnP1 && bag.sides) {
       var sideU1 = sectionUnits(bag.sides, false);
       if (leftFood <= rightFood) leftFood += sideU1;
@@ -1374,15 +1379,34 @@
       p1 += '<section class="sec classics-block">';
       p1 += '<div class="cols cols-classics cols-balanced cols-features' +
         (logoInTop ? '' : ' cols-with-logo') + '">';
-      var sandOnRightNote = !!(sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length));
-      // Estimate food-stack height so feature panels only fill the SHORTER column
+      var sandOnRightNote = false;
+      // Estimate food-stack height so Sides / sandwich sell balance columns;
+      // feature panels stay little promotions under whatever is still short.
       var leftFoodU = 0;
-      if (shareInLeft) leftFoodU += sectionUnits({ name: 'Sharing', dishes: shareDishes }, false);
-      if (sandwichesInCol && sandList.length) leftFoodU += sandwichesPackCost(bag);
-      else if (sandwichesInCol) leftFoodU += COST.sandwiches;
       var rightFoodU = 0;
+      if (shareInLeft) leftFoodU += sectionUnits({ name: 'Sharing', dishes: shareDishes }, false);
       if (burgerDishes.length) rightFoodU += sectionUnits({ name: 'Burgers', dishes: burgerDishes }, false);
       if (classicDishes.length) rightFoodU += sectionUnits({ name: 'Pub Classics', dishes: classicDishes }, false);
+
+      // Named fillings stay left beside Burgers. Tip/sell box goes to the SHORTER
+      // column so we do not pile Burgers + Sandwiches + Sides on the right while
+      // Sharing sits alone under a huge empty promo frame.
+      var sandOnLeftCol = false;
+      var sandOnRightCol = false;
+      if (sandwichesInCol && sandList.length) {
+        sandOnLeftCol = true;
+        leftFoodU += sandwichesPackCost(bag);
+      } else if (sandwichesInCol) {
+        if (leftFoodU <= rightFoodU) {
+          sandOnLeftCol = true;
+          leftFoodU += COST.sandwiches;
+        } else {
+          sandOnRightCol = true;
+          sandOnRightNote = true;
+          rightFoodU += COST.sandwiches;
+        }
+      }
+
       // Prefer Sides under the shorter food stack so columns finish level.
       var sidesOnLeftCol = false;
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
@@ -1404,7 +1428,7 @@
       var leftFeature = promoCols.left || '';
       var rightFeature = promoCols.right || '';
 
-      // LEFT — Sharing, Sandwiches; feature panel only if this side is shorter
+      // LEFT — Sharing, optional sandwiches/sides; little promo if still short
       p1 += '<div class="col col-events">';
       p1 += '<div class="col-body">';
       if (shareInLeft) {
@@ -1413,14 +1437,13 @@
           shareRule
         );
       }
-      if (sandwichesInCol && (sandList.length || !(burgerDishes.length || classicDishes.length))) {
+      if (sandOnLeftCol) {
         p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
       if (sidesOnLeftCol && sidesPrint) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
-      if (!shareInLeft &&
-          !(sandwichesInCol && sandList.length) && !leftFeature && !sidesOnLeftCol) {
+      if (!shareInLeft && !sandOnLeftCol && !sidesOnLeftCol && !leftFeature) {
         p1 += '&nbsp;';
       }
       p1 += '</div>';
@@ -1439,14 +1462,14 @@
       if (classicDishes.length) {
         p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
       }
-      if (sandwichesInCol && !sandList.length && (burgerDishes.length || classicDishes.length)) {
+      if (sandOnRightCol) {
         p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
       }
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule) && !sidesOnLeftCol) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
       }
       if (!burgerDishes.length && !classicDishes.length && !rightFeature &&
-          !(sandwichesInCol && !sandList.length) &&
+          !sandOnRightCol &&
           !(p1opts.sidesOnP1 && sidesPrint && !sidesOnLeftCol)) {
         p1 += '&nbsp;';
       }
@@ -1727,21 +1750,18 @@
       '.allergy-lc .lc{width:1.15em;height:1.15em;font-size:11pt;margin:0;vertical-align:middle;flex:0 0 auto}' +
       '.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:8px 0 10px;align-items:start}' +
       '.cols-classics{grid-template-columns:1fr 1fr}' +
-      /* Columns start level; stretch so both sides share one height band.
-         Feature panels sit in .col-feature with margin-top:auto so they finish
-         on the same baseline; a short JS pass equalises their heights so tops
-         line up sideways too (gap lives above the panels). */
+      /* Columns start level and stretch to the same foot. Feature panels stay
+         CONTENT-SIZED (little promotions) — never grow into a tall empty frame.
+         Food (Sides / sandwich sell) balances the short column instead. */
       '.cols-balanced{align-items:stretch}' +
       '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}' +
       '.cols-balanced .col-body{flex:0 0 auto;min-width:0}' +
       '.cols-balanced .col-logo{flex:0 0 auto;display:flex;justify-content:flex-end;margin:0 0 8px}' +
       '.cols-balanced .col-logo .logo-tr{width:160px!important;margin:0}' +
       '.cols-with-logo{align-items:stretch;margin-top:0}' +
-      /* Feature foot grows so a short burgers stack + quiz does not leave a tall empty mid-band */
-      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:1 1 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px}' +
+      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px}' +
       '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:0 0 auto}' +
-      '.cols-balanced .col-feature > .scallop:only-child{flex:1 1 auto;display:flex;flex-direction:column}' +
-      '.cols-balanced .col-feature > .scallop:only-child .scallop-pad{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}' +
+      '.cols-balanced .col-feature > .scallop .scallop-pad,.cols-balanced .col-fill > .scallop .scallop-pad{flex:0 0 auto}' +
       '.sec-note{font-family:var(--sans);font-size:var(--desc);color:#3a342c;line-height:1.35;margin:0 0 8px;font-weight:400}' +
       '.scallop .sec-note{margin-top:0}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
@@ -2072,13 +2092,10 @@
               '}' +
               'last.parentNode.removeChild(last);' +
             '}' +
-            // Equalise paired .col-feature feet when both still have one
+            // Feature panels stay content-sized — do not stretch them to match
+            // the taller foot (that made a big empty quiz frame).
             'var feats=[].slice.call(cols.querySelectorAll(":scope > .col > .col-feature"));' +
-            'if(feats.length>=2){' +
-              'feats.forEach(function(f){f.style.minHeight="";});' +
-              'var max=0;feats.forEach(function(f){max=Math.max(max,f.offsetHeight);});' +
-              'if(max>0)feats.forEach(function(f){f.style.minHeight=max+"px";});' +
-            '}' +
+            'feats.forEach(function(f){f.style.minHeight="";});' +
           '});}' +
         'function balanceFeatures(){balanceOppositeColumns();}' +
         // SHARED TYPE SCALE: page 1 and page 2 must use the SAME title/name/desc size.
