@@ -504,6 +504,13 @@ function getMenusState_() {
     if (!parsed || typeof parsed !== 'object') {
       return { ok: true, source: 'props', state: null };
     }
+    // Ignore empty stub so a fresh phone does not wipe local dishes.
+    var book = parsed.book || {};
+    var hasDish = false;
+    Object.keys(book).forEach(function (k) {
+      if (Array.isArray(book[k]) && book[k].length) hasDish = true;
+    });
+    if (!hasDish) return { ok: true, source: 'props', state: null };
     return { ok: true, source: 'props', state: parsed };
   } catch (e) {
     return { ok: false, error: 'Could not read shared menus state: ' + String(e && e.message ? e.message : e) };

@@ -409,6 +409,11 @@
     }
     function applyCloudState(state) {
       if (!state || !state.book || typeof state.book !== 'object') return false;
+      var hasDish = false;
+      Object.keys(state.book).forEach(function (k) {
+        if (Array.isArray(state.book[k]) && state.book[k].length) hasDish = true;
+      });
+      if (!hasDish) return false;
       book = state.book;
       if (!book.main) {
         var seeded = EBMenus.seed();
