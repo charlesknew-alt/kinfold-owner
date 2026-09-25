@@ -310,11 +310,11 @@
     });
   }
 
-  /** Ask Gemini to sense-check page balance before print (needs AI reader URL + redeployed script). */
+  /** Ask Gemini to sense-check opposite columns before print (always uses cloud Menu AI URL). */
   function reviewLayout(layoutSummary, onProgress) {
-    var url = getAiUrl();
+    var url = getCloudUrl();
     if (!url) return Promise.resolve(null);
-    if (onProgress) onProgress('Gemini checking page balance…');
+    if (onProgress) onProgress('Gemini checking columns match before release…');
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },

@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260925-flow44"></script>
-  <script src="menus-print.js?v=20260925-flow44"></script>
-  <script src="menus-ingest.js?v=20260925-flow44"></script>
+  <script src="menus.js?v=20260925-flow45"></script>
+  <script src="menus-print.js?v=20260925-flow45"></script>
+  <script src="menus-ingest.js?v=20260925-flow45"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -2010,7 +2010,7 @@
         'Ordering sections (Nibbles → Starters → Sharing → Item Boost → Classics → Mains…)',
         'Choosing one or two pages and columns',
         'Placing wording / sandwiches / logo only if they fit',
-        'Gemini checking page balance (if AI reader is set)',
+        'Gemini checking opposite columns match (adds feature panels if not)',
         'Opening classy print preview'
       ];
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px">Layout</div>';
@@ -2027,7 +2027,7 @@
 
       function layoutPayload() {
         if (!layout) return { kind: menu.kind, pages: 1 };
-        return {
+        var payload = {
           kind: menu.kind,
           pages: layout.pages,
           fit: layout.fit,
@@ -2040,6 +2040,15 @@
             return acc;
           }, {})
         };
+        // Units Gemini uses to decide where feature panels must go before release.
+        if (EBMenuPrint.measureOppositeColumns) {
+          payload.columns = EBMenuPrint.measureOppositeColumns(menu, result.dishes, {
+            layout: layout,
+            sectionLayout: sectionLayout,
+            promos: promos
+          });
+        }
+        return payload;
       }
 
       function applyLayoutAdvice(advice) {
@@ -2059,8 +2068,41 @@
           layout.p1.sandwiches = false;
           layout.p2.sandwiches = true;
         }
+        // AI (or local fallback) column fill — any uneven opposite pair before PDF.
+        var bal = advice.columnBalance;
+        if (!bal && advice.columns) bal = advice.columns;
+        if (bal && typeof bal === 'object') {
+          result.plan.forceColumnFill = {
+            page1: bal.page1 || null,
+            page2: bal.page2 || null
+          };
+        }
         if (advice.notes) result.plan.layoutReview = advice.notes;
         result.plan.layout = layout;
+      }
+
+      /** If Gemini is offline, still force panels under any short column before release. */
+      function localColumnBalanceFallback() {
+        if (!EBMenuPrint.measureOppositeColumns) return null;
+        var cols = EBMenuPrint.measureOppositeColumns(menu, result.dishes, {
+          layout: layout,
+          sectionLayout: sectionLayout,
+          promos: promos
+        });
+        function pageFill(p) {
+          if (!p || p.shorter === 'even') return { shorter: 'even', panels: 0 };
+          var panels = Math.abs(p.gap || 0) > 9 ? 2 : 1;
+          return { shorter: p.shorter, panels: panels };
+        }
+        return {
+          ok: true,
+          source: 'local-column-fallback',
+          columnBalance: {
+            page1: pageFill(cols.page1),
+            page2: pageFill(cols.page2)
+          },
+          notes: 'Local column check: fill shorter stacks with feature panels before print.'
+        };
       }
 
       function openPrintPreview() {
@@ -2097,16 +2139,25 @@
           setTimeout(tick, 240);
           return;
         }
-        // Step 3: optional Gemini balance check
+        // Step 3: Gemini column-balance gate (every long-menu generate before PDF).
         var reviewPromise = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewLayout && menu.kind === 'long')
           ? EBMenuIngest.reviewLayout(layoutPayload())
           : Promise.resolve(null);
         reviewPromise.then(function (advice) {
+          if (!advice) advice = localColumnBalanceFallback();
+          else if (!advice.columnBalance) {
+            // Gemini replied without columnBalance — merge local fill so we never release uneven.
+            var local = localColumnBalanceFallback();
+            if (local) advice.columnBalance = local.columnBalance;
+          }
           var li3 = overlay.querySelector('[data-step="3"]');
           if (li3) {
             li3.style.opacity = '1';
-            if (!advice) li3.textContent = 'Balance check skipped (no AI reader URL / script not redeployed)';
-            else if (advice.notes) li3.textContent = 'Gemini: ' + advice.notes;
+            if (!advice) li3.textContent = 'Balance check skipped';
+            else if (advice.source === 'local-column-fallback') {
+              li3.textContent = 'Columns checked locally — adding feature panels under shorter stacks';
+            } else if (advice.notes) li3.textContent = 'Gemini: ' + advice.notes;
+            else li3.textContent = 'Gemini checked opposite columns before release';
           }
           applyLayoutAdvice(advice);
           var sum = document.getElementById('arrangeSummary');

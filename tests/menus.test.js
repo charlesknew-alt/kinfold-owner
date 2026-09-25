@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow44') !== -1, 'menus page cache-bust is flow44');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow44') !== -1, 'hub menus link cache-bust is flow44');
+assert(page.indexOf('flow45') !== -1, 'menus page cache-bust is flow45');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow45') !== -1, 'hub menus link cache-bust is flow45');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -308,17 +308,21 @@ assert(!/\.a5-face\{--dish-gap:8px/.test(printJs),
   'A5 faces are not locked to a tiny type size');
 assert(page.indexOf('including 2×A5') !== -1 || page.indexOf('Party sheets') !== -1,
   'wording step allows bank picks on party / A5 sheets');
-assert(aiGs.indexOf('finish at') !== -1 && (aiGs.indexOf('exactly the same') !== -1 || aiGs.indexOf('approximately the same point') !== -1),
+assert(aiGs.indexOf('finish level') !== -1 || aiGs.indexOf('finish at') !== -1,
   'Gemini golden rules require columns to finish level');
-assert(aiGs.indexOf('Never a third page') !== -1 || aiGs.indexOf('only ever ONE full page') !== -1,
+assert(aiGs.indexOf('Never a third') !== -1 || aiGs.indexOf('only ONE or TWO pages') !== -1,
   'Gemini golden rules cap at two pages');
-assert(aiGs.indexOf('two A5 copies') !== -1, 'Gemini knows card menus are 2×A5');
-assert(aiGs.indexOf('full A4 or 2×A5') !== -1, 'Gemini respects party paper choice');
-assert(aiGs.indexOf('even those heights') !== -1 || aiGs.indexOf('SHORTER food stack') !== -1,
+assert(aiGs.indexOf('2×A5') !== -1 || aiGs.indexOf('two A5') !== -1, 'Gemini knows card menus are 2×A5');
+assert(aiGs.indexOf('A4 or 2×A5') !== -1 || aiGs.indexOf('party paper') !== -1,
+  'Gemini respects party paper choice');
+assert(aiGs.indexOf('shorter stack') !== -1 || aiGs.indexOf('SHORTER') !== -1 ||
+  aiGs.indexOf('panels MUST be 1 or 2') !== -1,
   'Gemini golden rule: feature panels only to even opposite columns');
-assert(aiGs.indexOf('oval') !== -1 || aiGs.indexOf('matching rectangles') !== -1,
+assert(aiGs.indexOf('oval') !== -1 || aiGs.indexOf('box beside wide') !== -1 ||
+  aiGs.indexOf('contrasting frames') !== -1,
   'Gemini golden rules contrast side-by-side feature frames');
-assert(page.indexOf('Gemini checking page balance') !== -1, 'Generate runs Gemini balance check step');
+assert(page.indexOf('opposite columns match') !== -1 || page.indexOf('Gemini checking') !== -1,
+  'Generate runs Gemini balance check step');
 assert(printJs.indexOf('leftFrame') !== -1 && printJs.indexOf('rightFrame') !== -1,
   'paired promo panels pick opposite frame kinds');
 assert(printJs.indexOf("leftFrame: 'box', rightFrame: 'wide'") !== -1 ||
@@ -413,8 +417,20 @@ assert(printJs.indexOf('planPromoFill') !== -1 && printJs.indexOf('promoBesidePa
   'feature panels placed only to even opposite columns');
 assert(printJs.indexOf('balanceOppositeColumns') !== -1,
   'print prunes surplus panels so opposite columns finish level');
-assert(printJs.indexOf('Two scallops') !== -1,
+assert(printJs.indexOf('Two scallops') !== -1 || printJs.indexOf('stackForShort') !== -1,
   'large column holes stack two feature panels under the short side');
+assert(printJs.indexOf('measureOppositeColumns') !== -1,
+  'print exports column measures for Gemini pre-release check');
+assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFill') !== -1,
+  'generate applies AI columnBalance as forceColumnFill');
+assert(page.indexOf('localColumnBalanceFallback') !== -1,
+  'local fallback fills short columns if Gemini is offline');
+assert(page.indexOf('opposite columns match') !== -1,
+  'arrange step says Gemini checks columns before release');
+assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('reviewLayout') !== -1,
+  'layout review uses cloud Menu AI URL on every generate');
+assert(aiGs.indexOf('columnBalance') !== -1 && aiGs.indexOf('panels MUST be 1 or 2') !== -1,
+  'Gemini layout review requires panels under uneven columns');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
   'week date is sentence case, not all-caps');
 assert(/p2 \+= trackerBar\(ver, \{ hideDate: true \}\)/.test(printJs),

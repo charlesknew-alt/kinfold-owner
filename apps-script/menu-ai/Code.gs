@@ -235,8 +235,9 @@ function readMenuWithGemini_(body) {
 }
 
 /**
- * Review a planned 1–2 page print layout (no image). Staff Generate can call this
- * so Gemini checks balance / blank areas before the PDF opens.
+ * Review a planned 1–2 page print layout (no image). Staff Generate calls this
+ * BEFORE the PDF opens so Gemini checks opposite columns and adds feature panels
+ * wherever a short stack would leave a blank band — any sheet, not one special case.
  */
 function reviewLayoutWithGemini_(body) {
   var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
@@ -245,42 +246,40 @@ function reviewLayoutWithGemini_(body) {
   }
   var layout = body.layout || body;
   var prompt =
-    'You are checking an Eight Bells (Bolney) pub menu print layout before staff export to PDF.\n' +
+    'You are the final gate before an Eight Bells (Bolney) pub menu PDF opens.\n' +
+    'Your job: if ANY pair of opposite columns will not finish level, you MUST add feature panels ' +
+    'under the shorter stack. Do not release uneven columns. This applies to every generation — ' +
+    'Sandwiches vs Burgers, Sides vs Sandwiches, Events vs Classics, or any other opposite pair.\n' +
     'Return ONLY valid JSON (no markdown):\n' +
     '{\n' +
     '  "density": "airy"|"roomy"|"normal"|"tight"|"compact",\n' +
     '  "sandwichesOn": "page1"|"page2"|"omit",\n' +
     '  "dropFootLogo": true|false,\n' +
     '  "okToPrint": true|false,\n' +
+    '  "columnBalance": {\n' +
+    '    "page1": { "shorter": "left"|"right"|"even", "panels": 0|1|2 },\n' +
+    '    "page2": { "shorter": "left"|"right"|"even", "panels": 0|1|2 }\n' +
+    '  },\n' +
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
-    'GOLDEN RULES (do not invent sections staff did not list):\n' +
-    '1. COLUMNS (CRITICAL): when two columns sit opposite each other, both MUST start on the same top baseline ' +
-    'AND finish at exactly the same bottom point — never leave one column half as tall as the other. ' +
-    'Feature / event panels exist ONLY to even those heights: put a panel under the SHORTER food stack; ' +
-    'if Sides is short, use ONE small panel beside it — never a stack of three panels taller than Sides. ' +
-    'Do not add panels when there is no gap to fill.\n' +
-    '2. PAGE COUNT: only ever ONE full page, or TWO full pages if needed. Never a third page. ' +
-    'If content fits on one page, use one page. Always fill each used page top to bottom — ' +
-    'if a page looks sparse, open spacing between categories (airy/roomy) rather than leaving a big empty footer.\n' +
-    '3. READABILITY: never shrink type below a comfortable customer-readable size. Prefer tight over compact. ' +
-    'If it still will not fit on two readable pages, set okToPrint false and say so in notes — ' +
-    'staff should remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.\n' +
-    '4. EVENT / FEATURE PANELS: only where they even opposite columns. Prefer at most ONE box per column ' +
-    '(1–2 blurbs). Never stack multiple scallops beside a short list. Side-by-side panels should contrast — ' +
-    'one rectangular box beside one oval/wide scallop — never two matching rectangles next to each other.\n' +
-    '5. PAGE 1 FOOD COLUMNS: LEFT = Stay a While / events / Sharing when used as a column; ' +
-    'RIGHT = Burgers then Pub Classics under them.\n' +
-    '6. Allergy footer (gf / v / vg) must remain fully visible. If any lunch-club ticks exist, keep the ' +
-    'Bells Lunch Club knife-and-fork key in the footer.\n' +
-    '7. Prefer sandwichesOn page2 beside sides/sauces on long menus. Drop the foot logo only if it forces overflow.\n' +
-    '8. Item Boost (e.g. Fish of the Day / specials) stays where staff put it on the long sheet. ' +
-    'Sandwiches, Desserts and Little Bells as their own menus print as two A5 copies on one landscape A4 (guillotine).\n' +
-    '9. Party / occasion menus: staff choose full A4 or 2×A5 — respect that paper choice; do not invent a third format.\n' +
-    '10. SECTION WIDTH “both” / best-fit: when staff set a section to best fit for this page, choose column OR full ' +
-    'width for that section based on what balances THIS sheet (partner columns, leftover room, readability) — ' +
-    'not a fixed “prefer column” rule.\n' +
-    'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 6000);
+    'COLUMN BALANCE RULES (mandatory before okToPrint):\n' +
+    '- Read layout.columns (leftFood / rightFood / shorter). If shorter is left or right, panels MUST be 1 or 2.\n' +
+    '- panels:0 is only allowed when shorter is "even".\n' +
+    '- Large holes (big |gap|): panels=2 (stack event + rooms filler). Modest holes: panels=1.\n' +
+    '- Put panels ONLY under the shorter side — never pile onto the taller food stack.\n' +
+    '- If page2 is null, omit page2 or set shorter:"even", panels:0.\n' +
+    '- okToPrint may be true once columnBalance fixes the hole; set false only if type would be unreadable.\n' +
+    'OTHER GOLDEN RULES:\n' +
+    '1. COLUMNS start on the same top baseline and finish at the same bottom point.\n' +
+    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom.\n' +
+    '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
+    '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
+    '5. PAGE 1: LEFT often Sandwiches/events/Sharing; RIGHT = Burgers then Pub Classics.\n' +
+    '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
+    '7. Prefer sandwichesOn page2 on long menus unless columns on page1 need the sandwich list to balance.\n' +
+    '8. Respect party paper choice (A4 or 2×A5).\n' +
+    '9. SECTION WIDTH “both” / best-fit: choose column OR full for balance on THIS sheet.\n' +
+    'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 7000);
 
   var called = callGemini_(key, [{ text: prompt }], {
     temperature: 0.2,
@@ -307,6 +306,29 @@ function reviewLayoutWithGemini_(body) {
   if (['airy', 'roomy', 'normal', 'tight', 'compact'].indexOf(density) === -1) density = 'normal';
   var sandwichesOn = String(advice.sandwichesOn || 'page2').toLowerCase();
   if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page2';
+
+  function normPage(raw, fallbackShorter) {
+    raw = raw && typeof raw === 'object' ? raw : {};
+    var shorter = String(raw.shorter || fallbackShorter || 'even').toLowerCase();
+    if (['left', 'right', 'even'].indexOf(shorter) === -1) shorter = 'even';
+    var panels = parseInt(raw.panels, 10);
+    if (isNaN(panels) || panels < 0) panels = 0;
+    if (panels > 2) panels = 2;
+    // Never release an uneven pair with zero panels.
+    if (shorter !== 'even' && panels < 1) panels = 1;
+    if (shorter === 'even') panels = 0;
+    return { shorter: shorter, panels: panels };
+  }
+
+  var cols = layout.columns || {};
+  var fb1 = (cols.page1 && cols.page1.shorter) || 'even';
+  var fb2 = (cols.page2 && cols.page2.shorter) || 'even';
+  var columnBalance = {
+    page1: normPage(advice.columnBalance && advice.columnBalance.page1, fb1),
+    page2: cols.page2 ? normPage(advice.columnBalance && advice.columnBalance.page2, fb2) :
+      { shorter: 'even', panels: 0 }
+  };
+
   return {
     ok: true,
     source: 'gemini-layout',
@@ -315,6 +337,7 @@ function reviewLayoutWithGemini_(body) {
     sandwichesOn: sandwichesOn,
     dropFootLogo: !!advice.dropFootLogo,
     okToPrint: advice.okToPrint !== false,
+    columnBalance: columnBalance,
     notes: String(advice.notes || '').slice(0, 280)
   };
 }

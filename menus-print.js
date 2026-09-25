@@ -297,8 +297,8 @@
    * Place feature panels only to even opposite columns.
    * leftFood / rightFood = rough height units of the food stacks.
    * Positive (rightFood - leftFood) means the LEFT column is shorter → fill left.
-   * Large holes get two stacked scallops (quiz + rooms) so the short side
-   * does not finish with a tall empty band under two burgers.
+   * opts.force = { shorter:'left'|'right'|'even', panels:0|1|2 } from Gemini
+   * overrides unit maths when the pre-release AI check says columns do not match.
    */
   function planPromoFill(leftFood, rightFood, promos, opts) {
     opts = opts || {};
@@ -311,7 +311,6 @@
     ];
     var list = (promos || []).filter(function (p) { return p && p.title; });
     if (!list.length) list = defaults.slice();
-    // Pad so a huge sandwiches-vs-burgers hole can still be filled.
     var pool = list.slice();
     var di = 0;
     while (pool.length < 4 && di < defaults.length * 2) {
@@ -320,28 +319,34 @@
       if (!dup) pool.push(d);
       di += 1;
     }
-    var gap = (rightFood || 0) - (leftFood || 0);
 
-    function stackForShort(side, need) {
+    function stackForShort(side, panels) {
       var kind = side === 'left' ? leftKind : rightKind;
       var alt = kind === 'box' ? 'wide' : 'box';
+      var n = Math.max(0, Math.min(2, parseInt(panels, 10) || 0));
       var html = '';
-      if (need > 14 && pool.length >= 2) {
-        // Two scallops: event + rooms filler — fills a tall empty band
+      if (n >= 2 && pool.length >= 2) {
         html = renderOnePromoBox(pool.slice(0, 1), kind) +
           renderOnePromoBox(pool.slice(1, 2), alt);
-      } else if (need > 9) {
-        html = renderOnePromoBox(pool.slice(0, 2), kind);
-      } else {
-        html = renderOnePromoBox(pool.slice(0, 1), kind);
+      } else if (n >= 1) {
+        html = renderOnePromoBox(pool.slice(0, n === 1 && pool.length > 1 ? 1 : Math.min(2, pool.length)), kind);
       }
       if (side === 'left') return { left: html, right: '', note: 'Feature under shorter left column' };
       return { left: '', right: html, note: 'Feature under shorter right column' };
     }
 
-    if (gap > 2.5) return stackForShort('left', gap);
-    if (gap < -2.5) return stackForShort('right', -gap);
-    // Food stacks already similar — optional matching pair (one blurb each), or none if tight
+    // Pre-release AI verdict wins over local unit guesses.
+    var force = opts.force || null;
+    if (force && force.shorter && force.shorter !== 'even') {
+      var forcedPanels = Math.max(1, Math.min(2, parseInt(force.panels, 10) || 1));
+      if (force.shorter === 'left' || force.shorter === 'right') {
+        return stackForShort(force.shorter, forcedPanels);
+      }
+    }
+
+    var gap = (rightFood || 0) - (leftFood || 0);
+    if (gap > 2.5) return stackForShort('left', gap > 14 ? 2 : (gap > 9 ? 2 : 1));
+    if (gap < -2.5) return stackForShort('right', -gap > 14 ? 2 : (-gap > 9 ? 2 : 1));
     if (pool.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
       return {
         left: renderOnePromoBox([pool[0]], leftKind),
@@ -356,6 +361,55 @@
       return { left: '', right: renderOnePromoBox([pool[0]], rightKind), note: 'One panel on right' };
     }
     return { left: '', right: '', note: 'No feature panels — columns already even' };
+  }
+
+  /**
+   * Rough opposite-column food units for the Gemini pre-release check.
+   * Any sheet with uneven stacks must get feature panels before PDF opens.
+   */
+  function measureOppositeColumns(menu, dishes, plan) {
+    var layout = (plan && plan.layout) || {};
+    var bag = (layout && layout.bag) || pickSections(orderDishesForPrint(dishes || []));
+    var p1 = layout.p1 || {};
+    var split = splitClassicsBag(bag.classics);
+    var burgerDishes = (bag.burgers && bag.burgers.dishes) ? bag.burgers.dishes.slice() : [];
+    if (split.burgers && split.burgers.length) burgerDishes = burgerDishes.concat(split.burgers);
+    var classicDishes = split.classics || [];
+    var sandList = sandwichDishesOf(bag);
+    var shareDishes = (bag.sharing && bag.sharing.dishes) ? bag.sharing.dishes : [];
+    var leftFood = 0;
+    var rightFood = 0;
+    if (p1.sandwiches && sandList.length) leftFood += sandwichesPackCost(bag);
+    else if (p1.sandwiches) leftFood += COST.sandwiches;
+    if (shareDishes.length) leftFood += sectionUnits({ name: 'Sharing', dishes: shareDishes }, false);
+    if (burgerDishes.length) rightFood += sectionUnits({ name: 'Burgers', dishes: burgerDishes }, false);
+    if (classicDishes.length) rightFood += sectionUnits({ name: 'Pub Classics', dishes: classicDishes }, false);
+    var gap = rightFood - leftFood;
+    var page1 = {
+      leftFood: Math.round(leftFood * 10) / 10,
+      rightFood: Math.round(rightFood * 10) / 10,
+      gap: Math.round(gap * 10) / 10,
+      shorter: Math.abs(gap) <= 2.5 ? 'even' : (gap > 0 ? 'left' : 'right'),
+      leftLabel: p1.sandwiches ? 'Sandwiches / events' : 'Events / sharing',
+      rightLabel: 'Burgers / Pub Classics'
+    };
+    var page2 = null;
+    if (layout.pages >= 2 && layout.p2) {
+      var sideList = (bag.sides && bag.sides.dishes) ? bag.sides.dishes : [];
+      var left2 = sideList.length ? sectionUnits(bag.sides, false) : 0;
+      if (layout.p2.sidesOnP2 && bag.sauces) left2 += sectionUnits(bag.sauces, false);
+      var right2 = layout.p2.sandwiches ? sandwichesPackCost(bag) : 0;
+      var gap2 = right2 - left2;
+      page2 = {
+        leftFood: Math.round(left2 * 10) / 10,
+        rightFood: Math.round(right2 * 10) / 10,
+        gap: Math.round(gap2 * 10) / 10,
+        shorter: Math.abs(gap2) <= 2.5 ? 'even' : (gap2 > 0 ? 'left' : 'right'),
+        leftLabel: 'Sides / sauces',
+        rightLabel: layout.p2.sandwiches ? 'Sandwiches' : 'Events'
+      };
+    }
+    return { page1: page1, page2: page2 };
   }
 
   /**
@@ -1236,12 +1290,12 @@
       var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box', leftFood: leftFoodU, rightFood: rightFoodU }
         : { leftFrame: 'box', rightFrame: 'wide', leftFood: leftFoodU, rightFood: rightFoodU };
-      // CRITICAL: opposite columns must finish level. Always try to fill a real
-      // sandwiches-vs-burgers hole (defaults pad if the event bank is thin).
-      var canBalance = Math.abs(leftFoodU - rightFoodU) > 2 ||
-        !!(promos && promos.length) ||
-        !!p1opts.rooms ||
-        !!(layout.leftover && layout.leftover.p1 >= 3);
+      // Pre-release Gemini columnBalance (any uneven pair) overrides unit guesses.
+      if (plan && plan.forceColumnFill && plan.forceColumnFill.page1) {
+        promoFrameOpts.force = plan.forceColumnFill.page1;
+      }
+      // Always fill a real opposite-column hole before the PDF opens.
+      var canBalance = true;
       var promoCols = canBalance
         ? planPromoFill(leftFoodU, rightFoodU, promos, promoFrameOpts)
         : { left: '', right: '' };
@@ -1355,7 +1409,17 @@
       var sideList = (p2opts.sidesOnP2 && sidesPrint) ? sidesPrint.dishes.slice() : [];
       // Sides (and sauces) in the left column; Sandwiches fully in the frilly box on the right.
       if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms || bag.sauces)) {
-        p2 += '<div class="cols bottom-cols cols-balanced">';
+        var sideU = 0;
+        if (sideList.length) sideU += sectionUnits({ name: 'Sides', dishes: sideList }, false);
+        if (p2opts.sidesOnP2 && bag.sauces) sideU += sectionUnits(bag.sauces, false);
+        var rightU = p2opts.sandwiches ? sandwichesPackCost(bag) : 0;
+        var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
+        var p2Fill = planPromoFill(sideU, rightU, promos, {
+          leftFrame: 'box',
+          rightFrame: 'wide',
+          force: p2Force
+        });
+        p2 += '<div class="cols bottom-cols cols-balanced cols-features">';
         p2 += '<div class="col col-sides">';
         p2 += '<div class="col-body">';
         if (sideList.length) {
@@ -1367,21 +1431,21 @@
           p2 += listDishes(bag.sauces.dishes);
         }
         if (!sideList.length && !(p2opts.sidesOnP2 && bag.sauces)) p2 += '&nbsp;';
-        p2 += '</div></div>';
+        p2 += '</div>';
+        if (p2Fill.left) p2 += '<div class="col-feature">' + p2Fill.left + '</div>';
+        p2 += '</div>';
         p2 += '<div class="col col-promo">';
         p2 += '<div class="col-body">';
         if (p2opts.sandwiches) {
           p2 += sandwichesBlock(bag, { rule: sandRule, alignTitle: true });
-        } else if (p2opts.rooms) {
-          // ONE panel only, sized to the sides list — never a stack taller than Sides
-          var sideU = 0;
-          if (sideList.length) sideU += sectionUnits({ name: 'Sides', dishes: sideList }, false);
-          if (p2opts.sidesOnP2 && bag.sauces) sideU += sectionUnits(bag.sauces, false);
+        } else if (p2opts.rooms && !p2Fill.right) {
           p2 += promoBesidePartner(promos, sideU, 'box');
-        } else {
+        } else if (!p2Fill.right) {
           p2 += '&nbsp;';
         }
-        p2 += '</div></div></div>';
+        p2 += '</div>';
+        if (p2Fill.right) p2 += '<div class="col-feature">' + p2Fill.right + '</div>';
+        p2 += '</div></div>';
       } else if (p2opts.sidesOnP2 && sidesPrint) {
         p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
       }
@@ -2481,6 +2545,8 @@
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
     downloadPrintHtml: downloadPrintHtml,
-    historyCloudUrl: historyCloudUrl
+    historyCloudUrl: historyCloudUrl,
+    measureOppositeColumns: measureOppositeColumns,
+    planPromoFill: planPromoFill
   };
 })(typeof window !== 'undefined' ? window : global);
