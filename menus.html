@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260925-flow49"></script>
-  <script src="menus-print.js?v=20260925-flow49"></script>
-  <script src="menus-ingest.js?v=20260925-flow49"></script>
+  <script src="menus.js?v=20260925-flow50"></script>
+  <script src="menus-print.js?v=20260925-flow50"></script>
+  <script src="menus-ingest.js?v=20260925-flow50"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -2159,36 +2159,51 @@
           setTimeout(tick, 240);
           return;
         }
-        // Step 3: Gemini column-balance gate (every long-menu generate before PDF).
+        // Step 3: Gemini column-balance gate — hard deadline so Arranging never sticks.
         var reviewPromise = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewLayout && menu.kind === 'long')
           ? EBMenuIngest.reviewLayout(layoutPayload())
           : Promise.resolve(null);
-        reviewPromise.then(function (advice) {
-          if (!advice) advice = localColumnBalanceFallback();
-          else if (!advice.columnBalance) {
-            // Gemini replied without columnBalance — merge local fill so we never release uneven.
-            var local = localColumnBalanceFallback();
-            if (local) advice.columnBalance = local.columnBalance;
-          }
-          var li3 = overlay.querySelector('[data-step="3"]');
-          if (li3) {
-            li3.style.opacity = '1';
-            if (!advice) li3.textContent = 'Balance check skipped';
-            else if (advice.source === 'local-column-fallback') {
-              li3.textContent = 'Columns checked locally — adding feature panels under shorter stacks';
-            } else if (advice.notes) li3.textContent = 'Gemini: ' + advice.notes;
-            else li3.textContent = 'Gemini checked opposite columns before release';
-          }
-          applyLayoutAdvice(advice);
-          var sum = document.getElementById('arrangeSummary');
-          if (sum) {
-            sum.style.display = 'block';
-            sum.textContent = (layout && layout.summary ? layout.summary + ' ' : '') +
-              (advice && advice.notes ? advice.notes : '');
+        var settled = false;
+        function finishArrange(advice) {
+          if (settled) return;
+          settled = true;
+          try {
+            if (!advice) advice = localColumnBalanceFallback();
+            else if (!advice.columnBalance) {
+              var local = localColumnBalanceFallback();
+              if (local) advice.columnBalance = local.columnBalance;
+            }
+            var li3 = overlay.querySelector('[data-step="3"]');
+            if (li3) {
+              li3.style.opacity = '1';
+              if (!advice) li3.textContent = 'Balance check skipped';
+              else if (advice.source === 'local-column-fallback') {
+                li3.textContent = 'Columns checked locally — adding feature panels under shorter stacks';
+              } else if (advice.notes) li3.textContent = 'Gemini: ' + advice.notes;
+              else li3.textContent = 'Gemini checked opposite columns before release';
+            }
+            applyLayoutAdvice(advice);
+            var sum = document.getElementById('arrangeSummary');
+            if (sum) {
+              sum.style.display = 'block';
+              sum.textContent = (layout && layout.summary ? layout.summary + ' ' : '') +
+                (advice && advice.notes ? advice.notes : '');
+            }
+          } catch (err) {
+            if (window.console && console.warn) console.warn('layout advice failed', err);
           }
           var li4 = overlay.querySelector('[data-step="4"]');
           if (li4) li4.style.opacity = '1';
           setTimeout(openPrintPreview, 420);
+        }
+        // Absolute ceiling — if Gemini/Apps Script hangs, open preview with local fill.
+        var hangWatch = setTimeout(function () { finishArrange(null); }, 14000);
+        reviewPromise.then(function (advice) {
+          clearTimeout(hangWatch);
+          finishArrange(advice);
+        }, function () {
+          clearTimeout(hangWatch);
+          finishArrange(null);
         });
       }
       setTimeout(tick, 180);

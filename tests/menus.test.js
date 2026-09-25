@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow49') !== -1, 'menus page cache-bust is flow49');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow49') !== -1, 'hub menus link cache-bust is flow49');
+assert(page.indexOf('flow50') !== -1, 'menus page cache-bust is flow50');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow50') !== -1, 'hub menus link cache-bust is flow50');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -431,6 +431,12 @@ assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFil
   'generate applies AI columnBalance as forceColumnFill');
 assert(page.indexOf('localColumnBalanceFallback') !== -1,
   'local fallback fills short columns if Gemini is offline');
+assert(page.indexOf('finishArrange') !== -1 && page.indexOf('hangWatch') !== -1,
+  'arrange modal hard-times out so Gemini hang cannot stick Arranging');
+assert(ingestJs.indexOf('reviewLayout') !== -1 && /fetchWithTimeout\([\s\S]*12000/.test(ingestJs),
+  'layout review uses a 12s fetch timeout');
+assert(aiGs.indexOf('maxModels') !== -1,
+  'layout review Gemini call limits model retries so Apps Script cannot run for minutes');
 assert(page.indexOf('opposite columns match') !== -1,
   'arrange step says Gemini checks columns before release');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('reviewLayout') !== -1,

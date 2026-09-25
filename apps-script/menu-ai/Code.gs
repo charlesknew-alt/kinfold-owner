@@ -118,10 +118,13 @@ function listGeminiModels_() {
   return { ok: true, models: names, preferred: geminiModels_() };
 }
 
-function callGemini_(key, parts, generationConfig) {
+function callGemini_(key, parts, generationConfig, opts) {
+  opts = opts || {};
   var models = geminiModels_();
+  var maxModels = parseInt(opts.maxModels, 10);
+  if (isNaN(maxModels) || maxModels < 1) maxModels = models.length;
   var lastErr = '';
-  for (var i = 0; i < models.length; i++) {
+  for (var i = 0; i < models.length && i < maxModels; i++) {
     var model = models[i];
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
       model + ':generateContent?key=' + encodeURIComponent(key);
@@ -300,7 +303,7 @@ function reviewLayoutWithGemini_(body) {
   var called = callGemini_(key, [{ text: prompt }], {
     temperature: 0.2,
     responseMimeType: 'application/json'
-  });
+  }, { maxModels: 2 });
   if (!called.ok) {
     return { ok: false, error: called.error };
   }

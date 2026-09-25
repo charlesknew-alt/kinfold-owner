@@ -310,19 +310,20 @@
     });
   }
 
-  /** Ask Gemini to sense-check opposite columns before print (always uses cloud Menu AI URL). */
+  /** Ask Gemini to sense-check opposite columns before print (always uses cloud Menu AI URL).
+   *  Hard-capped — never leave staff stuck on “Arranging…” if Gemini/Apps Script hangs. */
   function reviewLayout(layoutSummary, onProgress) {
     var url = getCloudUrl();
     if (!url) return Promise.resolve(null);
     if (onProgress) onProgress('Gemini checking columns match before release…');
-    return fetch(url, {
+    return fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({
         action: 'reviewLayout',
         layout: layoutSummary || {}
       })
-    }).then(function (res) {
+    }, 12000).then(function (res) {
       return res.text().then(function (t) {
         var data;
         try { data = JSON.parse(t); } catch (e) { return null; }
