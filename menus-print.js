@@ -1630,11 +1630,17 @@
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
       '.page{width:210mm;height:297mm;padding:11mm 10mm 9mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
-      '.page-body.spread-even{justify-content:space-between}' +
+      '.page-body.spread-even{justify-content:space-evenly}' +
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo{flex:0 0 auto}' +
-      '.page-body.spread-even > .sec,.page-body.spread-even > .top-band,.page-body.spread-even > .cols,.page-body.spread-even > .classics-block,.page-body.spread-even > .foot-logo,.page-body.spread-even > .bottom-cols{flex:0 0 auto}' +
+      /* When spreading, let the main column / bottom band grow so type stays large
+         but the block reaches the foot — no blank bottom third. */
+      '.page-body.spread-even > .sec,.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols{flex:1 1 auto;min-height:0}' +
+      '.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols,.page-body.spread-even > .foot-logo{display:flex;flex-direction:column}' +
+      '.page-body.spread-even > .classics-block > .cols,.page-body.spread-even > .cols.bottom-cols{flex:1 1 auto;min-height:0;align-items:stretch}' +
+      '.page-body.spread-even .cols-balanced .col{min-height:100%}' +
+      '.page-body.spread-even > .foot-logo{flex:0 0 auto;margin-top:auto}' +
       '.scallop,.sec,.cols,.foot-logo,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
       '.sheet-inner{display:grid;grid-template-columns:1fr 1fr;height:100%}' +
@@ -2122,9 +2128,16 @@
           'var body=page.querySelector(".page-body");' +
           'if(!body)return;' +
           'var spare=body.clientHeight-body.scrollHeight;' +
-          'if(spare<40)return;' +
+          'if(spare<28)return;' +
           'body.classList.add("spread-even");' +
-          'if(overflows(page))body.classList.remove("spread-even");' +
+          'if(overflows(page)){body.classList.remove("spread-even");return;}' +
+          // If still a large hole, bump section gaps once more after stretch.
+          'spare=body.clientHeight-body.scrollHeight;' +
+          'if(spare>60)growGaps(page);' +
+          'if(overflows(page)){' +
+            'clearSpread(page);' +
+            'growGaps(page);' +
+          '}' +
         '}' +
         'function fitPages(){' +
           'var a4=[].slice.call(document.querySelectorAll(".page.fill-page"));' +

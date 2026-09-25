@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow48') !== -1, 'menus page cache-bust is flow48');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow48') !== -1, 'hub menus link cache-bust is flow48');
+assert(page.indexOf('flow49') !== -1, 'menus page cache-bust is flow49');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow49') !== -1, 'hub menus link cache-bust is flow49');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
