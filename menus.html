@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260925-flow47"></script>
-  <script src="menus-print.js?v=20260925-flow47"></script>
-  <script src="menus-ingest.js?v=20260925-flow47"></script>
+  <script src="menus.js?v=20260925-flow48"></script>
+  <script src="menus-print.js?v=20260925-flow48"></script>
+  <script src="menus-ingest.js?v=20260925-flow48"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -2110,12 +2110,17 @@
           },
           notes: 'Local column check: fill shorter stacks with feature panels before print.'
         };
-        // Match the shared-type rule: prefer Sides on page 1 when the planner already
-        // parked them there, or when page 2 still holds them and page 1 has spare room.
+        // Match the shared-type rule: prefer Sides / Sandwiches on page 1 when the
+        // planner parked them there, or when page 2 is the type ceiling.
         if (layout && layout.p1 && layout.p1.sidesOnP1) out.sidesOn = 'page1';
         else if (layout && layout.p2 && layout.p2.sidesOnP2 && (layout.leftover && layout.leftover.p1 > 10)) {
           out.sidesOn = 'page1';
           out.notes = 'Local check: move Sides to page 1 so both pages share one type size.';
+        }
+        if (layout && layout.p1 && layout.p1.sandwiches) out.sandwichesOn = 'page1';
+        else if (layout && layout.p2 && layout.p2.sandwiches && (layout.leftover && layout.leftover.p1 > 8)) {
+          out.sandwichesOn = 'page1';
+          out.notes = 'Local check: move Sandwiches box to page 1 so page 2 type can enlarge.';
         }
         return out;
       }

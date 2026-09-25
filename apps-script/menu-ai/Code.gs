@@ -263,12 +263,18 @@ function reviewLayoutWithGemini_(body) {
     '  },\n' +
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
-    'SHARED TYPE SCALE (CRITICAL):\n' +
+    'SHARED TYPE SCALE (CRITICAL — blanket policy for every menu):\n' +
     '- Titles, dish names and descriptions must be the SAME size on page 1 and page 2.\n' +
     '- Never leave page 1 enlarged/airy while page 2 is compact/smaller — one density for the whole menu.\n' +
-    '- If page 2 is packed (mains + desserts) and page 1 has spare room, move Sides (or another box) to page 1 ' +
-    'so both pages can share a larger comfortable density. Set sidesOn accordingly.\n' +
-    '- Moving Sandwiches / Sides / feature boxes between pages to equalise fill is encouraged; inventing a third page is not.\n' +
+    '- Maximise that shared size: the packed page is the ceiling. Move Sandwiches (incl. tip/sell box), ' +
+    'Sides, or feature panels OFF the packed page onto the roomier page so both can enlarge together.\n' +
+    '- Prefer sandwichesOn page1 (named fillings OR tip/sell box) whenever page 2 holds mains + desserts — ' +
+    'do not park the sandwich sell box on page 2 next to desserts if page 1 has room.\n' +
+    '- Prefer fewer feature panels on the packed page over shrinking type. One panel is enough when two ' +
+    'would force smaller shared type.\n' +
+    '- After type is set, both pages should fill top→bottom (no blank bottom third with content jammed up).\n' +
+    '- Moving Sandwiches / Sides / feature boxes between pages to equalise fill is required when it raises ' +
+    'shared type; inventing a third page is not.\n' +
     'COLUMN BALANCE RULES (mandatory before okToPrint):\n' +
     '- Read layout.columns (leftFood / rightFood / shorter). If shorter is left or right, panels MUST be 1 or 2.\n' +
     '- panels:0 is only allowed when shorter is "even".\n' +
@@ -280,13 +286,13 @@ function reviewLayoutWithGemini_(body) {
     '- okToPrint may be true once columnBalance fixes the hole; set false only if type would be unreadable.\n' +
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point.\n' +
-    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom.\n' +
+    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
     '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
     '5. PAGE 1: LEFT often Sandwiches/events/Sharing; RIGHT = Burgers then Pub Classics.\n' +
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
-    '7. Prefer sandwichesOn page1 when named fillings sit beside Burgers; otherwise page2. ' +
-    'Move sidesOn to page1 when that lets both pages share a larger density.\n' +
+    '7. Prefer sandwichesOn page1 (fillings or sell box) so page 2 mains/desserts can stay large. ' +
+    'Move sidesOn to page1 when that raises the shared density.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
     '9. SECTION WIDTH “both” / best-fit: choose column OR full for balance on THIS sheet.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 7000);
@@ -314,8 +320,8 @@ function reviewLayoutWithGemini_(body) {
   }
   var density = String(advice.density || 'normal').toLowerCase();
   if (['airy', 'roomy', 'normal', 'tight', 'compact'].indexOf(density) === -1) density = 'normal';
-  var sandwichesOn = String(advice.sandwichesOn || 'page2').toLowerCase();
-  if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page2';
+  var sandwichesOn = String(advice.sandwichesOn || 'page1').toLowerCase();
+  if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page1';
   var sidesOn = String(advice.sidesOn || '').toLowerCase();
   if (['page1', 'page2'].indexOf(sidesOn) === -1) sidesOn = '';
 

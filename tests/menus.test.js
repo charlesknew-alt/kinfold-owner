@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow47') !== -1, 'menus page cache-bust is flow47');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow47') !== -1, 'hub menus link cache-bust is flow47');
+assert(page.indexOf('flow48') !== -1, 'menus page cache-bust is flow48');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow48') !== -1, 'hub menus link cache-bust is flow48');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -441,8 +441,14 @@ assert(printJs.indexOf('fitGroup') !== -1 && printJs.indexOf('SHARED TYPE SCALE'
   'print fits page 1 and page 2 to one shared type density');
 assert(printJs.indexOf('sidesOnP1') !== -1 && printJs.indexOf('keep type size equal') !== -1,
   'planner can move Sides to page 1 so both pages stay the same size');
+assert(printJs.indexOf('spreadPage') !== -1 && printJs.indexOf('spread-even') !== -1,
+  'after shared type, leftover vertical space is spread evenly down the page');
+assert(printJs.indexOf('free page 2 for larger type') !== -1,
+  'planner can move Sandwiches box to page 1 to raise shared type');
 assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -1,
   'Gemini layout review can move Sides between pages for shared type');
+assert(aiGs.indexOf('tip/sell box') !== -1 || aiGs.indexOf('sell box') !== -1,
+  'Gemini prefers sandwich sell box on page 1 when page 2 is packed');
 assert(page.indexOf('advice.sidesOn') !== -1,
   'generate applies AI sidesOn to the print layout');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
@@ -672,6 +678,46 @@ assert(sharedTypeLayout.p1.sidesOnP1 === true && sharedTypeLayout.p2 && sharedTy
   'Sides move to page 1 so mains/desserts can share a larger type size');
 assert(/same type size/i.test(sharedTypeLayout.summary),
   'layout summary states shared type size across both pages');
+
+// Tip/sell sandwich box (0 fillings) must prefer page 1 when page 2 holds mains+desserts
+var tipOnlyPacked = [
+  api.dish('Nibbles', 'Olives', '', '4.95', 'vg'),
+  api.dish('Nibbles', 'Bread', 'butter', '5.95', 'v'),
+  api.dish('Nibbles', 'Nuts', '', '4.50', 'vg'),
+  api.dish('Starters', 'Soup', 'bread', '6.95', 'v'),
+  api.dish('Starters', 'Scotch Egg', 'sauce', '8.95', ''),
+  api.dish('Starters', 'Whitebait', 'tartare', '7.95', ''),
+  api.dish('Starters', 'Prawns', 'chilli', '8.95', ''),
+  api.dish('Starters', 'Cauliflower', 'sesame', '7.95', 'v'),
+  api.dish('Sharing Plates', 'Camembert', 'ciabatta', '14.95', 'v'),
+  api.dish('Burgers', 'Wagyu Burger', 'long description of fries and salad garnish here', '18.95', ''),
+  api.dish('Burgers', 'Asian Burger', 'another long burger spiel with pickles and sauce', '16.95', 'vg'),
+  api.dish('Mains', 'Fish & Chips', 'peas', '17.95', ''),
+  api.dish('Mains', 'Caesar Salad', 'croutons', '15.95', ''),
+  api.dish('Mains', 'Katsu Curry', 'rice', '15.95', 'vg'),
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Mains', 'Steak Frites', 'peppercorn', '22.95', ''),
+  api.dish('Mains', 'Sea Bass', 'samphire', '19.95', ''),
+  api.dish('Mains', 'Liver & Bacon', 'mash', '17.95', ''),
+  api.dish('Mains', 'Hake Fillet', 'greens', '18.95', ''),
+  api.dish('Desserts', 'Blackberry Fool', '', '7.50', 'v'),
+  api.dish('Desserts', 'Cookie Dough', '', '7.95', 'v'),
+  api.dish('Desserts', 'Lemon Posset', 'shortbread', '7.50', 'v'),
+  api.dish('Desserts', 'Cheeses', 'biscuits', '9.95', 'v'),
+  api.dish('Desserts', 'Ice cream', 'three scoops', '6.50', 'v'),
+  api.dish('Sides', 'Seasonal Veg', '', '4.95', 'vg'),
+  api.dish('Sides', 'Salad', '', '4.95', 'vg'),
+  api.dish('Sides', 'Truffle Fries', '', '6.95', ''),
+  api.dish('Sides', 'Chips', '', '4.50', 'vg')
+];
+var tipPackedLayout = print.planFluidLayout(mainMenu, tipOnlyPacked, {
+  sectionLayout: api.normalizeSectionLayout({
+    Sandwiches: { tip: true, frame: true, width: 'column', sell: 'A selection of sandwiches is available — ask the team.' }
+  })
+});
+assert(tipPackedLayout.pages === 2, 'nibbles+mains packed menu uses two pages');
+assert(tipPackedLayout.p1.sandwiches === true && !(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches),
+  'sandwich sell box sits on page 1 so page 2 type can enlarge');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});
