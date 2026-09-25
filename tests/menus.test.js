@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow50') !== -1, 'menus page cache-bust is flow50');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow50') !== -1, 'hub menus link cache-bust is flow50');
+assert(page.indexOf('flow51') !== -1, 'menus page cache-bust is flow51');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow51') !== -1, 'hub menus link cache-bust is flow51');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -443,6 +443,10 @@ assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('reviewLayout'
   'layout review uses cloud Menu AI URL on every generate');
 assert(aiGs.indexOf('columnBalance') !== -1 && aiGs.indexOf('panels MUST be 1 or 2') !== -1,
   'Gemini layout review requires panels under uneven columns');
+assert(printJs.indexOf('preferReadableType') !== -1 && printJs.indexOf('clearFitArtifacts') !== -1,
+  'print drops foot logos and clears stretch before refitting for larger shared type');
+assert(printJs.indexOf('No page-2 logo (keep type readable)') !== -1,
+  'planner skips page-2 logo when it would cost readable type');
 assert(printJs.indexOf('fitGroup') !== -1 && printJs.indexOf('SHARED TYPE SCALE') !== -1,
   'print fits page 1 and page 2 to one shared type density');
 assert(printJs.indexOf('sidesOnP1') !== -1 && printJs.indexOf('keep type size equal') !== -1,

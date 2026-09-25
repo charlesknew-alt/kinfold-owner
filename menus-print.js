@@ -1117,12 +1117,17 @@
         }
       }
 
-      var logoCost = tightBack ? COST.footLogo + 4 : COST.footLogo;
+      // Foot logo is optional chrome — only keep it when page 2 still has generous
+      // leftover after mains/desserts. Readable shared type beats a second logo.
+      var logoCost = COST.footLogo + (tightBack ? 12 : 8);
       var addLogo = tryAdd(p2left, logoCost);
-      if (addLogo.ok) {
+      if (addLogo.ok && p2left > (tightBack ? 24 : 18)) {
         layout.p2.footLogo = true;
         p2left = addLogo.left;
         layout.fillers.push('Logo (page 2)');
+      } else if (bag.mains && bag.desserts) {
+        layout.p2.footLogo = false;
+        layout.fillers.push('No page-2 logo (keep type readable)');
       }
       layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
@@ -1775,11 +1780,11 @@
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density ladder — ALWAYS start airy and only tighten if the page overflows */
-      '.fill-airy{--dish-gap:14px;--sec-gap:18px;--name:12pt;--desc:10.5pt;--title:28pt;--promo:12.5pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:26pt;--promo:12pt}' +
-      '.fill-normal{--dish-gap:10px;--sec-gap:13px;--name:11pt;--desc:9.75pt;--title:22pt;--promo:11pt}' +
-      '.fill-tight{--dish-gap:7px;--sec-gap:10px;--name:10.25pt;--desc:9.25pt;--title:18pt;--promo:10pt}' +
+      /* Density ladder — readable type first; only tighten if a page truly overflows */
+      '.fill-airy{--dish-gap:16px;--sec-gap:20px;--name:13pt;--desc:11pt;--title:30pt;--promo:13pt}' +
+      '.fill-roomy{--dish-gap:13px;--sec-gap:17px;--name:12.25pt;--desc:10.5pt;--title:27pt;--promo:12.25pt}' +
+      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:24pt;--promo:11.5pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.75pt;--desc:9.5pt;--title:20pt;--promo:10.5pt}' +
       '.fill-compact{--dish-gap:5px;--sec-gap:8px;--name:9.75pt;--desc:8.75pt;--title:16pt;--promo:9.5pt}' +
       '.fill-dense{--dish-gap:3px;--sec-gap:5px;--name:9pt;--desc:8pt;--title:13.5pt;--promo:8.75pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
@@ -2077,10 +2082,16 @@
           '});}' +
         'function balanceFeatures(){balanceOppositeColumns();}' +
         // SHARED TYPE SCALE: page 1 and page 2 must use the SAME title/name/desc size.
-        // Fit every A4 page as one group — pick the densest step that still fits all,
-        // never leave page 1 airy while page 2 goes compact.
+        // Fit every A4 page as one group — pick the largest step that still fits all.
+        // Clear prior stretch/minHeights first — leftover equalisation from a previous
+        // fitPages pass must not force an artificially tiny shared density.
+        'function clearFitArtifacts(page){' +
+          'clearSpread(page);' +
+          '[].forEach.call(page.querySelectorAll(".col-feature"),function(f){f.style.minHeight="";});' +
+        '}' +
         'function fitGroup(group){' +
           'if(!group.length)return;' +
+          'group.forEach(clearFitArtifacts);' +
           'if(group.length===1){' +
             'var page=group[0];' +
             'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
@@ -2093,6 +2104,24 @@
             'if(!group.some(overflows)){chosen=STEPS[k];break;}' +
           '}' +
           'group.forEach(function(pg){strip(pg);pg.classList.add("fill-page");pg.classList.add(chosen);});' +
+        '}' +
+        // Readable type beats footer logo: if shared density is tight/compact/dense,
+        // hide page foot logos and refit so mains/desserts can enlarge.
+        'function preferReadableType(group){' +
+          'if(!group.length)return;' +
+          'fitGroup(group);' +
+          'function tooSmall(pg){' +
+            'return pg.classList.contains("fill-tight")||pg.classList.contains("fill-compact")||pg.classList.contains("fill-dense");' +
+          '}' +
+          'if(!group.some(tooSmall))return;' +
+          'var hidden=0;' +
+          'group.forEach(function(pg){' +
+            '[].forEach.call(pg.querySelectorAll(".foot-logo"),function(el){' +
+              'el.style.display="none";hidden+=1;' +
+            '});' +
+          '});' +
+          'if(!hidden)return;' +
+          'fitGroup(group);' +
         '}' +
         // After shared type is locked, grow gaps / spread sections so leftover space
         // is not a blank bottom third — fill top→bottom evenly without changing type size.
@@ -2131,7 +2160,6 @@
           'if(spare<28)return;' +
           'body.classList.add("spread-even");' +
           'if(overflows(page)){body.classList.remove("spread-even");return;}' +
-          // If still a large hole, bump section gaps once more after stretch.
           'spare=body.clientHeight-body.scrollHeight;' +
           'if(spare>60)growGaps(page);' +
           'if(overflows(page)){' +
@@ -2142,9 +2170,10 @@
         'function fitPages(){' +
           'var a4=[].slice.call(document.querySelectorAll(".page.fill-page"));' +
           'var a5=[].slice.call(document.querySelectorAll(".a5-face.fill-page"));' +
-          'fitGroup(a4);' +
-          'fitGroup(a5);' +
+          'preferReadableType(a4);' +
+          'preferReadableType(a5);' +
           '[].slice.call(document.querySelectorAll(".card-face.fill-page")).forEach(function(page){' +
+            'clearFitArtifacts(page);' +
             'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
             'if(!overflows(page))break;}' +
           '});' +
