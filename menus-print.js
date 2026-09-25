@@ -115,7 +115,7 @@
     }
     return (
       '<div class="tracker">' +
-        '<span>' + esc(ver.week) + '</span>' +
+        '<span class="week">' + esc(ver.week) + '</span>' +
         '<span class="roman">' + esc(ver.roman) + '</span>' +
       '</div>'
     );
@@ -297,52 +297,63 @@
    * Place feature panels only to even opposite columns.
    * leftFood / rightFood = rough height units of the food stacks.
    * Positive (rightFood - leftFood) means the LEFT column is shorter → fill left.
+   * Large holes get two stacked scallops (quiz + rooms) so the short side
+   * does not finish with a tall empty band under two burgers.
    */
   function planPromoFill(leftFood, rightFood, promos, opts) {
     opts = opts || {};
     var leftKind = opts.leftFrame === 'wide' ? 'wide' : 'box';
     var rightKind = opts.rightFrame === 'wide' ? 'wide' : 'box';
     if (opts.rightFrame == null) rightKind = leftKind === 'box' ? 'wide' : 'box';
+    var defaults = [
+      { title: 'Stay a While', body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.' },
+      { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
+    ];
     var list = (promos || []).filter(function (p) { return p && p.title; });
-    if (!list.length) {
-      list = [
-        { title: 'Stay a While', body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.' },
-        { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
-      ];
+    if (!list.length) list = defaults.slice();
+    // Pad so a huge sandwiches-vs-burgers hole can still be filled.
+    var pool = list.slice();
+    var di = 0;
+    while (pool.length < 4 && di < defaults.length * 2) {
+      var d = defaults[di % defaults.length];
+      var dup = pool.some(function (p) { return String(p.title).toLowerCase() === String(d.title).toLowerCase(); });
+      if (!dup) pool.push(d);
+      di += 1;
     }
     var gap = (rightFood || 0) - (leftFood || 0);
-    // Only place panels when there is a real gap to fill — never pile onto the taller side
-    if (gap > 2.5) {
-      // Left shorter: one panel under the short stack (2 blurbs if the hole is big)
-      var nL = gap > 9 ? 2 : 1;
-      return {
-        left: renderOnePromoBox(list.slice(0, nL), leftKind),
-        right: '',
-        note: 'Feature panel under shorter left column'
-      };
+
+    function stackForShort(side, need) {
+      var kind = side === 'left' ? leftKind : rightKind;
+      var alt = kind === 'box' ? 'wide' : 'box';
+      var html = '';
+      if (need > 14 && pool.length >= 2) {
+        // Two scallops: event + rooms filler — fills a tall empty band
+        html = renderOnePromoBox(pool.slice(0, 1), kind) +
+          renderOnePromoBox(pool.slice(1, 2), alt);
+      } else if (need > 9) {
+        html = renderOnePromoBox(pool.slice(0, 2), kind);
+      } else {
+        html = renderOnePromoBox(pool.slice(0, 1), kind);
+      }
+      if (side === 'left') return { left: html, right: '', note: 'Feature under shorter left column' };
+      return { left: '', right: html, note: 'Feature under shorter right column' };
     }
-    if (gap < -2.5) {
-      var nR = -gap > 9 ? 2 : 1;
-      return {
-        left: '',
-        right: renderOnePromoBox(list.slice(0, nR), rightKind),
-        note: 'Feature panel under shorter right column'
-      };
-    }
+
+    if (gap > 2.5) return stackForShort('left', gap);
+    if (gap < -2.5) return stackForShort('right', -gap);
     // Food stacks already similar — optional matching pair (one blurb each), or none if tight
-    if (list.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
+    if (pool.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
       return {
-        left: renderOnePromoBox([list[0]], leftKind),
-        right: renderOnePromoBox([list[1]], rightKind),
+        left: renderOnePromoBox([pool[0]], leftKind),
+        right: renderOnePromoBox([pool[1]], rightKind),
         note: 'Paired feature panels (even columns)'
       };
     }
-    if (list.length && Math.abs(gap) <= 2.5) {
-      // Slight lean: one small panel on the slightly shorter side only
+    if (pool.length && Math.abs(gap) <= 2.5) {
       if (gap >= 0) {
-        return { left: renderOnePromoBox([list[0]], leftKind), right: '', note: 'One panel on left' };
+        return { left: renderOnePromoBox([pool[0]], leftKind), right: '', note: 'One panel on left' };
       }
-      return { left: '', right: renderOnePromoBox([list[0]], rightKind), note: 'One panel on right' };
+      return { left: '', right: renderOnePromoBox([pool[0]], rightKind), note: 'One panel on right' };
     }
     return { left: '', right: '', note: 'No feature panels — columns already even' };
   }
@@ -440,7 +451,10 @@
   function sandwichesPackCost(bag) {
     var dishes = sandwichDishesOf(bag);
     if (dishes.length) {
-      return Math.max(COST.sandwiches, sectionUnits({ name: 'Sandwiches', dishes: dishes }, true));
+      // Frilly + hours line + multi-line descriptions run taller than unit math —
+      // weight them so planPromoFill puts enough panels under a short Burgers stack.
+      var base = Math.max(COST.sandwiches, sectionUnits({ name: 'Sandwiches', dishes: dishes }, true));
+      return base + Math.min(6, dishes.length);
     }
     return COST.sandwiches;
   }
@@ -1222,11 +1236,12 @@
       var promoFrameOpts = sandOnRightNote
         ? { leftFrame: 'wide', rightFrame: 'box', leftFood: leftFoodU, rightFood: rightFoodU }
         : { leftFrame: 'box', rightFrame: 'wide', leftFood: leftFoodU, rightFood: rightFoodU };
-      // CRITICAL: opposite columns must finish level. If leftover allows (or rooms
-      // already packed), ask planPromoFill to put a panel under the shorter stack.
-      var canBalance = !!(promos && promos.length) && (
-        !!p1opts.rooms || !!(layout.leftover && layout.leftover.p1 >= 3)
-      );
+      // CRITICAL: opposite columns must finish level. Always try to fill a real
+      // sandwiches-vs-burgers hole (defaults pad if the event bank is thin).
+      var canBalance = Math.abs(leftFoodU - rightFoodU) > 2 ||
+        !!(promos && promos.length) ||
+        !!p1opts.rooms ||
+        !!(layout.leftover && layout.leftover.p1 >= 3);
       var promoCols = canBalance
         ? planPromoFill(leftFoodU, rightFoodU, promos, promoFrameOpts)
         : { left: '', right: '' };
@@ -1325,7 +1340,8 @@
     if (layout.pages < 2 || !p2opts) return p1;
 
     var p2 = '<div class="page fill-page ' + fill2 + '">';
-    p2 += trackerBar(ver, { hideDate: hideDate });
+    // Week / Sunday date only on page 1 — page 2 keeps the quiet Roman only.
+    p2 += trackerBar(ver, { hideDate: true });
     p2 += '<div class="page-body page-body-start">';
     if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
     if (bag.littleBells) {
@@ -1473,7 +1489,8 @@
       '.card-face .card-spiel{margin-top:8px}' +
       '.card-face .logo{width:86px;margin:0 auto 8px}' +
       '.card-face h1{margin:2px 0 10px;font-size:min(var(--title),22pt)}' +
-      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7pt;letter-spacing:.04em;text-transform:uppercase;color:#a39b91;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
+      '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7.5pt;letter-spacing:.02em;text-transform:none;color:#8a8278;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
+      '.tracker .week{text-transform:none;letter-spacing:.02em}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
@@ -1539,8 +1556,11 @@
       '.cols-balanced .col-logo{flex:0 0 auto;display:flex;justify-content:flex-end;margin:0 0 8px}' +
       '.cols-balanced .col-logo .logo-tr{width:160px!important;margin:0}' +
       '.cols-with-logo{align-items:stretch;margin-top:0}' +
-      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end}' +
-      '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:1 1 auto}' +
+      /* Feature foot grows so a short burgers stack + quiz does not leave a tall empty mid-band */
+      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:1 1 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px}' +
+      '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:0 0 auto}' +
+      '.cols-balanced .col-feature > .scallop:only-child{flex:1 1 auto;display:flex;flex-direction:column}' +
+      '.cols-balanced .col-feature > .scallop:only-child .scallop-pad{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}' +
       '.sec-note{font-family:var(--sans);font-size:var(--desc);color:#3a342c;line-height:1.35;margin:0 0 8px;font-weight:400}' +
       '.scallop .sec-note{margin-top:0}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +

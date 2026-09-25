@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow43') !== -1, 'menus page cache-bust is flow43');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow43') !== -1, 'hub menus link cache-bust is flow43');
+assert(page.indexOf('flow44') !== -1, 'menus page cache-bust is flow44');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow44') !== -1, 'hub menus link cache-bust is flow44');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -413,6 +413,12 @@ assert(printJs.indexOf('planPromoFill') !== -1 && printJs.indexOf('promoBesidePa
   'feature panels placed only to even opposite columns');
 assert(printJs.indexOf('balanceOppositeColumns') !== -1,
   'print prunes surplus panels so opposite columns finish level');
+assert(printJs.indexOf('Two scallops') !== -1,
+  'large column holes stack two feature panels under the short side');
+assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
+  'week date is sentence case, not all-caps');
+assert(/p2 \+= trackerBar\(ver, \{ hideDate: true \}\)/.test(printJs),
+  'page 2 tracker hides the week date');
 assert(printJs.indexOf('GOLDEN RULE: opposite columns') !== -1,
   'print JS documents equal start/finish golden rule');
 assert(printJs.indexOf('Frilly box only when') !== -1 || printJs.indexOf('not hard-coded') !== -1,
