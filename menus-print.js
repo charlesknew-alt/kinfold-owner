@@ -563,6 +563,12 @@
     return false;
   }
 
+  /** Foot feature pair needs comfortable spare room — never jam at min type. */
+  var FOOT_PROMO_MIN_LEFT = 18;
+  function canFitFootPromos(leftover) {
+    return (leftover || 0) >= FOOT_PROMO_MIN_LEFT;
+  }
+
   /**
    * Two feature panels side-by-side under a full-width food block.
    * Prefer unused titles; pad with evergreen defaults so we always try to fill.
@@ -1066,11 +1072,9 @@
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
     if (bag.sharing) front += sectionUnits(bag.sharing, false);
-    // Item Boost / Specials default to a frilly frame
+    // Item Boost / Special Starters on the front; Special Mains/Desserts sit with their course
     if (bag.boost) front += sectionUnits(bag.boost, true);
     if (bag.specialStarters) front += sectionUnits(bag.specialStarters, true);
-    if (bag.specialMains) front += sectionUnits(bag.specialMains, true);
-    if (bag.specialDesserts) front += sectionUnits(bag.specialDesserts, true);
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name) &&
           !isSpecials(s.name)) {
@@ -1082,8 +1086,10 @@
 
     var back = chrome;
     if (bag.mains) back += sectionUnits(bag.mains, false);
+    if (bag.specialMains) back += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) back += sectionUnits(bag.littleBells, true);
     if (bag.desserts) back += sectionUnits(bag.desserts, false);
+    if (bag.specialDesserts) back += sectionUnits(bag.specialDesserts, true);
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
     // Named fillings always print on Main/Sunday; 0 dishes → Tip box only when tip is on
@@ -1103,7 +1109,8 @@
       wantSandwiches = !!bag.sandwiches;
     }
     var sandCost = sandwichesPackCost(bag);
-    var hasBackContent = !!(bag.mains || bag.littleBells || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
+    var hasBackContent = !!(bag.mains || bag.specialMains || bag.littleBells || bag.desserts ||
+      bag.specialDesserts || bag.sides || bag.sauces || bag.sandwiches);
 
     var layout = {
       pages: 1,
@@ -1111,7 +1118,7 @@
       mode: 'single',
       bag: bag,
       promos: promos || [],
-      p1: { rooms: false, sandwiches: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
+      p1: { rooms: false, sandwiches: false, footLogo: false, footPromos: false, classicsSplit: 0, sidesOnP1: false },
       p2: null,
       leftover: { p1: 0, p2: 0 },
       summary: '',
@@ -1122,8 +1129,10 @@
     // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
     if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
+    if (bag.specialMains) oneNeed += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
     if (bag.desserts) oneNeed += sectionUnits(bag.desserts, false);
+    if (bag.specialDesserts) oneNeed += sectionUnits(bag.specialDesserts, true);
     if (bag.sides) oneNeed += sectionUnits(bag.sides, false);
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
     // Named sandwich fillings count as food; empty tip box is optional chrome.
@@ -1171,13 +1180,15 @@
       add = tryAdd(left1, COST.footLogo + 6);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = Math.max(0, left1);
+      // Foot feature pairs only with real spare room — never jam at min type.
+      layout.p1.footPromos = canFitFootPromos(layout.leftover.p1);
       layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
     } else if (hasBackContent || foodNeed > ONE_PAGE_AT_MIN || preferTwo) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
       layout.mode = 'jul-nov';
-      layout.p2 = { rooms: false, sandwiches: false, footLogo: false, sidesOnP2: true };
+      layout.p2 = { rooms: false, sandwiches: false, footLogo: false, footPromos: false, sidesOnP2: true };
       layout.p1.classicsSplit = 1;
 
       var p1used = front;
@@ -1290,6 +1301,10 @@
       }
       layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
+      // Foot feature pairs only when the page still has comfortable spare room.
+      // At min type / packed mains+desserts, omit rather than jam panels in.
+      layout.p1.footPromos = canFitFootPromos(p1left);
+      layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
       if (p1used > PAGE + 10 || p2used > PAGE + 14) layout.fit = 'over';
     } else {
@@ -1348,15 +1363,14 @@
   }
 
   /**
-   * Specials board on Main / Sunday — one frilly Specials box with course
-   * subheads (Starters / Mains / Desserts) so they never mix into regular food.
+   * Specials for one course on Main / Sunday — frilly Specials box that sits
+   * under the matching regular section. No “Starters/Mains” label (context is
+   * the parent course); just Specials + when-gone note + dishes.
    */
-  function specialsBoardBlock(bag, plan) {
-    var starters = (bag.specialStarters && bag.specialStarters.dishes) || [];
-    var mains = (bag.specialMains && bag.specialMains.dishes) || [];
-    var desserts = (bag.specialDesserts && bag.specialDesserts.dishes) || [];
-    if (!starters.length && !mains.length && !desserts.length) return '';
-    var rule = ruleFor('Special Mains', plan);
+  function specialsBesideCourse(dishes, plan, sectionKey) {
+    dishes = dishes || [];
+    if (!dishes.length) return '';
+    var rule = ruleFor(sectionKey || 'Special Mains', plan);
     if (!rule.note) {
       rule = Object.assign({}, rule, {
         note: (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone"
@@ -1366,16 +1380,8 @@
     var inner = sectionTitle('Specials');
     var note = String(rule.note || '').trim();
     if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
-    function course(label, dishes) {
-      if (!dishes.length) return '';
-      var showHead = (starters.length ? 1 : 0) + (mains.length ? 1 : 0) + (desserts.length ? 1 : 0) > 1;
-      return (showHead ? '<div class="specials-course specials-course-left">' + esc(label) + '</div>' : '') +
-        listDishes(dishes);
-    }
-    inner += course('Starters', starters);
-    inner += course('Mains', mains);
-    inner += course('Desserts', desserts);
-    return framedBlock(inner, rule, 'wide');
+    inner += listDishes(dishes);
+    return '<section class="sec specials-beside">' + framedBlock(inner, rule, 'wide') + '</section>';
   }
 
   function layoutMap(plan) {
@@ -1543,6 +1549,10 @@
     if (startersBelowNibbles) {
       p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
+    // Special Starters sit under the regular starters — frilly box, no “Starters” label
+    if (bag.specialStarters && bag.specialStarters.dishes && bag.specialStarters.dishes.length) {
+      p1 += specialsBesideCourse(bag.specialStarters.dishes, plan, 'Special Starters');
+    }
 
     if (shareAsFull && !shareInLeft) {
       p1 += '<section class="sec">' +
@@ -1556,8 +1566,6 @@
         sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
         '</section>';
     }
-    var specialsHtml = specialsBoardBlock(bag, plan);
-    if (specialsHtml) p1 += '<section class="sec">' + specialsHtml + '</section>';
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
           !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
@@ -1633,10 +1641,14 @@
         if (classicDishes.length) {
           p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
         }
-        var foot1 = footPromoPair(promos, { excludeTitles: usedPromoTitles });
-        usedPromoTitles = usedPromoTitles.concat(foot1.usedTitles || []);
-        if (foot1.html) p1 += foot1.html;
-        else if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+        // Only add foot panels when the planner left comfortable spare room —
+        // never jam them under food at minimum type.
+        if (p1opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p1)) {
+          var foot1 = footPromoPair(promos, { excludeTitles: usedPromoTitles });
+          usedPromoTitles = usedPromoTitles.concat(foot1.usedTitles || []);
+          if (foot1.html) p1 += foot1.html;
+          else if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+        }
         p1 += '</section>';
       } else {
       p1 += '<section class="sec classics-block">';
@@ -1733,10 +1745,16 @@
 
     if (layout.pages === 1) {
       if (bag.mains) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+      if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
+        p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
+      }
       if (bag.littleBells) {
         p1 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
       }
       if (bag.desserts) p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
+      if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
+        p1 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
+      }
       if (sidesPrint && !p1opts.sidesOnP1) {
         p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
       }
@@ -1756,10 +1774,16 @@
     p2 += trackerBar(ver, { hideDate: true });
     p2 += '<div class="page-body page-body-start">';
     if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+    if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
+      p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
+    }
     if (bag.littleBells) {
       p2 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
     }
     if (bag.desserts) p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
+    if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
+      p2 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
+    }
 
     var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {
@@ -1782,10 +1806,13 @@
             p2 += listDishes(bag.sauces.dishes);
           }
           p2 += '</section>';
-          var foot2 = footPromoPair(remainingPromos, { excludeTitles: usedPromoTitles });
-          usedPromoTitles = usedPromoTitles.concat(foot2.usedTitles || []);
-          if (foot2.html) p2 += foot2.html;
-          else if (p2opts.rooms) p2 += renderFiller('rooms', bag, remainingPromos);
+          // Packed page 2 (mains + desserts + sides): omit foot panels if jammed.
+          if (p2opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p2)) {
+            var foot2 = footPromoPair(remainingPromos, { excludeTitles: usedPromoTitles });
+            usedPromoTitles = usedPromoTitles.concat(foot2.usedTitles || []);
+            if (foot2.html) p2 += foot2.html;
+            else if (p2opts.rooms) p2 += renderFiller('rooms', bag, remainingPromos);
+          }
         } else {
         var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
         var p2Fill = planPromoFill(sideU, rightU, remainingPromos, {
@@ -2421,6 +2448,21 @@
           'if(!hidden)return;' +
           'fitGroup(group);' +
         '}' +
+        // Feature panels must not jam in at min type — drop foot promo pairs when
+        // the page is already dense/compact or still overflows with them.
+        'function dropJammedFootPromos(page){' +
+          'var foots=page.querySelectorAll(".foot-promos,.foot-promos-one");' +
+          'if(!foots.length)return false;' +
+          'var dense=page.classList.contains("fill-dense")||page.classList.contains("fill-compact")||page.classList.contains("fill-tight");' +
+          'if(!dense&&!overflows(page))return false;' +
+          '[].forEach.call(foots,function(el){if(el.parentNode)el.parentNode.removeChild(el);});' +
+          'return true;' +
+        '}' +
+        'function dropJammedPromos(group){' +
+          'var changed=false;' +
+          'group.forEach(function(pg){if(dropJammedFootPromos(pg))changed=true;});' +
+          'if(changed)fitGroup(group);' +
+        '}' +
         // After shared type is locked, grow gaps / spread sections so leftover space
         // is not a blank bottom third — fill top→bottom evenly without changing type size.
         'function clearSpread(page){' +
@@ -2470,6 +2512,8 @@
           'var a5=[].slice.call(document.querySelectorAll(".a5-face.fill-page"));' +
           'preferReadableType(a4);' +
           'preferReadableType(a5);' +
+          'dropJammedPromos(a4);' +
+          'dropJammedPromos(a5);' +
           '[].slice.call(document.querySelectorAll(".card-face.fill-page")).forEach(function(page){' +
             'clearFitArtifacts(page);' +
             'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
