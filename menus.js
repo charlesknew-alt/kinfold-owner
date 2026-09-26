@@ -571,20 +571,42 @@
     return '';
   }
 
+  /**
+   * Proper dish titles that must never be folded into the previous row —
+   * especially kids plates with no price (All £9.50 lives in the section note).
+   */
+  function looksLikeDishTitle(name) {
+    var n = String(name || '').trim();
+    if (!n || n.length > 80) return false;
+    if (!/^[A-ZÀ-Ý]/.test(n)) return false;
+    if (/^(serves?|served|with|and|filled|ask |see |all served)\b/i.test(n)) return false;
+    // Kids / pub plates: "Tomato & Basil Pasta", "Fish Fingers, Chunky Chips & Peas"
+    if (/\b(pasta|burger|fingers|goujons|nuggets|mac\s*&\s*cheese|macaroni|pizza|sausage|scampi|fish|chicken|roast|risotto|gnocchi|curry|pie|steak|salad|arancini)\b/i.test(n)) {
+      return true;
+    }
+    // Title Case multi-word name with & or commas (sides-as-title style)
+    if (/^[A-ZÀ-Ý][\w'’-]+(?:\s+[&\w'’,-]+){1,8}$/.test(n)) return true;
+    return false;
+  }
+
   /** Description wrap lines wrongly stored as dish titles (PDF extract). */
   function looksLikeDescFragment(name) {
     var n = String(name || '').trim();
     if (!n || n.length > 100) return false;
+    // Keep real dish titles (priced or not) — do not treat as wrap fragments.
+    if (looksLikeDishTitle(n)) return false;
     // Expand “served with…” / ingredient-list fragments (price may sit on that line).
-    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter|choice of|tomato|garden peas|tartare|dressed|ciabatta|red onion|horseradish|honey|braised|crispy|pickled|smoked bacon|micro salad|tomato salsa|pangrattato)\b/i.test(n)) {
+    if (/^(serves?|served|with|and|filled|ask |see |all served|rings?|bacon|onion|fries|salad|streaky|brioche|mayo|cheese|monter|choice of|garden peas|tartare|dressed|ciabatta|red onion|horseradish|honey|braised|crispy|pickled|smoked bacon|micro salad|tomato salsa|pangrattato)\b/i.test(n)) {
       return true;
     }
-    if (/^[a-z]/.test(n) && !/burger|haddock|pie|fish|steak|salad|arancini|cocktail/i.test(n)) {
+    // Bare "tomato …" garnish lines only when lowercase (dish titles are Title Case).
+    if (/^tomato\b/i.test(n) && /^[a-z]/.test(n)) return true;
+    if (/^[a-z]/.test(n) && !/burger|haddock|pie|fish|steak|salad|arancini|cocktail|pasta/i.test(n)) {
       return true;
     }
     // Long comma-lists of garnish (no dish verb) — e.g. "horseradish cream, honey braised leeks…"
     if (/,/.test(n) && n.length > 28 &&
-      !/\b(burger|steak|pie|curry|pasta|gnocchi|schnitzel|casserole|linguini|linguine)\b/i.test(n) &&
+      !/\b(burger|steak|pie|curry|pasta|gnocchi|schnitzel|casserole|linguini|linguine|fingers|goujons)\b/i.test(n) &&
       !/^\d/.test(n)) {
       return true;
     }
@@ -615,6 +637,12 @@
     if (!prev || !d) return false;
     var name = String(d.name || '').trim();
     if (!name || !looksLikeDescFragment(name)) return false;
+    // Never fold a dish from another section (e.g. unpriced Little Bells onto Mains).
+    var prevSec = normalizeSectionName(prev.section || '');
+    var nextSec = normalizeSectionName(d.section || '');
+    if (prev.section && d.section && prevSec !== nextSec) return false;
+    // Kids plates often have no price — the £9.50 line is the section note.
+    if (prevSec === 'Little Bells' || nextSec === 'Little Bells') return false;
     var hasPrice = !!(d.price && String(d.price).trim());
     var prevPrice = !!(prev.price && String(prev.price).trim());
     if (!hasPrice) return true;
@@ -1635,6 +1663,7 @@
     cleanDishName: cleanDishName,
     priceOf: priceOf,
     looksLikeDescFragment: looksLikeDescFragment,
+    looksLikeDishTitle: looksLikeDishTitle,
     shouldMergeOntoPrevious: shouldMergeOntoPrevious,
     mergeDishOnto: mergeDishOnto,
     mergeDishWithPrevious: mergeDishWithPrevious,
