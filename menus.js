@@ -21,7 +21,9 @@
     'Starters',
     'Sharing Plates',
     'Item Boost',
-    'Specials',
+    'Special Starters',
+    'Special Mains',
+    'Special Desserts',
     'Pub Classics',
     'Burgers',
     'Mains',
@@ -31,6 +33,9 @@
     'Sauces',
     'Desserts'
   ];
+
+  var SPECIALS_SECTIONS = ['Special Starters', 'Special Mains', 'Special Desserts'];
+  var SPECIALS_GONE_NOTE = "When it's gone, it's gone";
 
   var SECTION_NAMES = (function () {
     var map = {};
@@ -55,12 +60,26 @@
     map['item boost'] = 'Item Boost';
     map['item boosts'] = 'Item Boost';
     map['boost'] = 'Item Boost';
-    map['specials'] = 'Specials';
-    map['special'] = 'Specials';
-    map["today's special"] = 'Specials';
-    map["today's specials"] = 'Specials';
-    map['chefs special'] = 'Specials';
-    map["chef's special"] = 'Specials';
+    // Specials board courses (own menu) — never merge into regular Starters/Mains/Desserts
+    map['special starters'] = 'Special Starters';
+    map['special starter'] = 'Special Starters';
+    map['specials starters'] = 'Special Starters';
+    map['specials starter'] = 'Special Starters';
+    map['special mains'] = 'Special Mains';
+    map['special main'] = 'Special Mains';
+    map['specials mains'] = 'Special Mains';
+    map['specials main'] = 'Special Mains';
+    map['special desserts'] = 'Special Desserts';
+    map['special dessert'] = 'Special Desserts';
+    map['specials desserts'] = 'Special Desserts';
+    map['specials dessert'] = 'Special Desserts';
+    // Bare “Specials” → Special Mains until staff/AI picks a course
+    map['specials'] = 'Special Mains';
+    map['special'] = 'Special Mains';
+    map["today's special"] = 'Special Mains';
+    map["today's specials"] = 'Special Mains';
+    map['chefs special'] = 'Special Mains';
+    map["chef's special"] = 'Special Mains';
     map['fish of the day'] = 'Item Boost';
     map['pie of the day'] = 'Item Boost';
     map['catch of the day'] = 'Item Boost';
@@ -104,12 +123,21 @@
       ['sauces', 'Sauces'],
       ['item boost', 'Item Boost'],
       ['item boosts', 'Item Boost'],
-      ['specials', 'Specials'],
-      ['special', 'Specials'],
-      ["today's special", 'Specials'],
-      ["today's specials", 'Specials'],
-      ['chefs special', 'Specials'],
-      ["chef's special", 'Specials'],
+      ['special starters', 'Special Starters'],
+      ['special starter', 'Special Starters'],
+      ['specials starters', 'Special Starters'],
+      ['special mains', 'Special Mains'],
+      ['special main', 'Special Mains'],
+      ['specials mains', 'Special Mains'],
+      ['special desserts', 'Special Desserts'],
+      ['special dessert', 'Special Desserts'],
+      ['specials desserts', 'Special Desserts'],
+      ['specials', 'Special Mains'],
+      ['special', 'Special Mains'],
+      ["today's special", 'Special Mains'],
+      ["today's specials", 'Special Mains'],
+      ['chefs special', 'Special Mains'],
+      ["chef's special", 'Special Mains'],
       ['dessert', 'Desserts'],
       ['puddings', 'Desserts'],
       ['sunday roasts', 'Mains'],
@@ -128,8 +156,43 @@
     return map;
   })();
 
-  function sectionOptions() {
+  function sectionOptions(menuId) {
+    if (menuId === 'specials') return SPECIALS_SECTIONS.slice();
     return SECTIONS.slice();
+  }
+
+  function isSpecialsSection(name) {
+    var n = String(name || '').trim();
+    return SPECIALS_SECTIONS.indexOf(n) !== -1 || /^specials?$/i.test(n);
+  }
+
+  /**
+   * Map a course heading / dish into Special Starters|Mains|Desserts so Specials
+   * never fold into the regular Starters / Mains / Desserts bags on Main.
+   */
+  function coerceSpecialsSection(section, name, description) {
+    var s = String(section || '').trim();
+    var n = String(name || '').trim();
+    var d = String(description || '').trim();
+    var blob = (n + ' ' + d).toLowerCase();
+    var lower = s.toLowerCase();
+    if (/special\s*desserts?|specials?\s*desserts?/.test(lower)) return 'Special Desserts';
+    if (/special\s*starters?|specials?\s*starters?/.test(lower)) return 'Special Starters';
+    if (/special\s*mains?|specials?\s*mains?/.test(lower)) return 'Special Mains';
+    // Course headings inside a Specials paste (Starters / Mains / Desserts)
+    if (/dessert|pudding|sweet/.test(lower) && !/special/.test(lower)) return 'Special Desserts';
+    if (/starter|nibble|light\s*bite/.test(lower) && !/main/.test(lower)) return 'Special Starters';
+    if (/^mains?$|main courses|pub classics/.test(lower)) return 'Special Mains';
+    if (SPECIALS_SECTIONS.indexOf(s) !== -1) return s;
+    // Dish heuristics when the paste used a lone “Specials” heading
+    if (/\b(ice\s*cream|sorbet|brownie|cheesecake|fondant|crumble|trifle|pudding|mousse|tart)\b/.test(blob)) {
+      return 'Special Desserts';
+    }
+    if (/\b(soup|p[aâ]t[eé]|terrine|whitebait|calamari|prawn|cocktail|baguette|crostini|bruschetta|wings|scallops?|hock\s*pot|loaded\s*fries|garlic\s*bread)\b/.test(blob) ||
+        /\bin a\b.+\bbaguette\b/.test(blob)) {
+      return 'Special Starters';
+    }
+    return 'Special Mains';
   }
 
   function sectionRank(name) {
@@ -154,7 +217,11 @@
     if (/nibble|light bite/.test(lower)) return 'Nibbles';
     if (/starter/.test(lower)) return 'Starters';
     if (/shar(e|ing)|for the table/.test(lower)) return 'Sharing Plates';
-    if (/^specials?$|today.?s specials?|chef.?s special/.test(lower)) return 'Specials';
+    if (/special\s*starters?|specials?\s*starters?/.test(lower)) return 'Special Starters';
+    if (/special\s*desserts?|specials?\s*desserts?/.test(lower)) return 'Special Desserts';
+    if (/special\s*mains?|specials?\s*mains?|^specials?$|today.?s specials?|chef.?s special/.test(lower)) {
+      return 'Special Mains';
+    }
     if (/item\s*boost|fish of the day|pie of the day|catch of the day/.test(lower)) {
       return 'Item Boost';
     }
@@ -170,10 +237,15 @@
    * Auto-guess a canonical section from paste/AI section + dish name.
    * Burgers / sandwiches win from the dish name even under “Pub classics & Burgers”.
    */
-  function guessSection(section, name, description) {
+  function guessSection(section, name, description, opts) {
+    opts = opts || {};
     var n = String(name || '').trim();
     var s = String(section || '').trim();
     var desc = String(description || '');
+    // Specials menu / board: always file under Special Starters|Mains|Desserts
+    if (opts.menuId === 'specials' || opts.asSpecials) {
+      return coerceSpecialsSection(s, n, desc);
+    }
     if (/^sandwiches?\b/i.test(n)) return 'Sandwiches';
     // Kids section wins over burger/sandwich name heuristics
     if (/little\s*bells|kids?\s*menu|children.?s/i.test(s)) return 'Little Bells';
@@ -186,11 +258,15 @@
       return 'Sauces';
     }
     if (/^sauces?\b/i.test(s)) return 'Sauces';
-    // Specials board (own menu / section) vs Item Boost (Fish / Pie of the Day box)
-    if (/^specials?$|today.?s specials?|chef.?s special/i.test(s)) return 'Specials';
+    // Specials board courses vs Item Boost (Fish / Pie of the Day box)
+    if (/special\s*starters?|specials?\s*starters?/i.test(s)) return 'Special Starters';
+    if (/special\s*desserts?|specials?\s*desserts?/i.test(s)) return 'Special Desserts';
+    if (/special\s*mains?|specials?\s*mains?|^specials?$|today.?s specials?|chef.?s special/i.test(s)) {
+      return coerceSpecialsSection(s, n, desc);
+    }
     if (/item\s*boost/i.test(s)) return 'Item Boost';
     if (/\b(fish|pie|catch)\s+of\s+the\s+day\b/i.test(n)) return 'Item Boost';
-    if (/\bspecial\s+of\s+the\s+day\b/i.test(n)) return 'Specials';
+    if (/\bspecial\s+of\s+the\s+day\b/i.test(n)) return coerceSpecialsSection('Specials', n, desc);
     if (/\bto share\b/i.test(n) || /\bfor the table\b/i.test(n) || /\bsharing\b/i.test(n)) {
       return 'Sharing Plates';
     }
@@ -211,16 +287,20 @@
     return fromSec || 'Mains';
   }
 
-  function assignSections(dishes) {
+  function assignSections(dishes, opts) {
+    opts = opts || {};
     return (dishes || []).map(function (d, i) {
       var rawSec = String(d.section || '').trim();
       if (!rawSec || /^dishes$/i.test(rawSec)) rawSec = '';
-      var section = guessSection(rawSec, d.name, d.description);
+      var section = guessSection(rawSec, d.name, d.description, opts);
       if (!section || /^dishes$/i.test(section) || SECTIONS.indexOf(section) === -1) {
-        section = guessSection('', d.name, d.description);
+        section = guessSection('', d.name, d.description, opts);
       }
       if (!section || /^dishes$/i.test(section) || SECTIONS.indexOf(section) === -1) {
-        section = 'Mains';
+        section = opts.menuId === 'specials' ? 'Special Mains' : 'Mains';
+      }
+      if (opts.menuId === 'specials' || opts.asSpecials) {
+        section = coerceSpecialsSection(section, d.name, d.description);
       }
       return {
         id: d.id || slug(section + '-' + (d.name || 'dish') + '-' + i),
@@ -428,9 +508,12 @@
         dish('Sandwiches', 'Giant Fish Finger & Tartare Sauce', '', '10.50', '')
       ],
       specials: [
-        dish('Specials', 'Pan-Roasted Cod Loin', 'brown shrimp butter, crushed new potatoes, samphire', '19.95', 'gf'),
-        dish('Specials', 'Slow-Cooked Blade of Beef', 'creamy mash, glazed carrots, red wine jus', '18.95', 'gf'),
-        dish('Specials', 'Wild Mushroom & Truffle Risotto', 'parmesan crisp, micro herbs', '16.95', 'v')
+        dish('Special Starters', 'Ham Hock Pot', 'pickles, sourdough', '8.95', 'gf'),
+        dish('Special Starters', 'Pulled Ham in a Charmer Cheese & Ale Sauce', 'sourdough baguette', '8.95', ''),
+        dish('Special Mains', 'Pan-Roasted Cod Loin', 'brown shrimp butter, crushed new potatoes, samphire', '19.95', 'gf'),
+        dish('Special Mains', 'Slow-Cooked Blade of Beef', 'creamy mash, glazed carrots, red wine jus', '18.95', 'gf'),
+        dish('Special Mains', 'Wild Mushroom & Truffle Risotto', 'parmesan crisp, micro herbs', '16.95', 'v'),
+        dish('Special Desserts', 'Sticky Toffee Special', 'brandy snap, clotted cream ice cream', '7.95', 'v')
       ],
       desserts: [
         dish('Desserts', 'Sticky Toffee Pudding', 'brandy snap, clotted cream ice cream, toffee sauce', '7.95', 'v with gf option', true),
@@ -726,7 +809,13 @@
         out[k] = book[k];
         return;
       }
-      out[k] = book[k].map(function (d) { return tidyDishFields(d); });
+      out[k] = book[k].map(function (d) {
+        var row = tidyDishFields(d);
+        if (k === 'specials' || isSpecialsSection(row.section) || row.fromMenu === 'specials') {
+          row.section = coerceSpecialsSection(row.section, row.name, row.description);
+        }
+        return row;
+      });
     });
     return out;
   }
@@ -866,12 +955,17 @@
     includableMenus(hostId).forEach(function (menu) {
       if (!includes[menu.id]) return;
       (book[menu.id] || []).forEach(function (d) {
-        var key = (d.section + '|' + d.name).toLowerCase();
+        var section = d.section;
+        // Specials stay in their own course sections on Main / Sunday
+        if (menu.id === 'specials') {
+          section = coerceSpecialsSection(d.section, d.name, d.description);
+        }
+        var key = (section + '|' + d.name).toLowerCase();
         if (seen[key]) return;
         seen[key] = true;
         list.push({
           id: d.id + '-on-' + hostId,
-          section: d.section,
+          section: section,
           name: d.name,
           description: d.description,
           price: d.price,
@@ -1367,7 +1461,9 @@
     Starters: { width: 'full', frame: false, note: '' },
     'Sharing Plates': { width: 'both', frame: false, note: '' },
     'Item Boost': { width: 'full', frame: true, note: '' },
-    Specials: { width: 'full', frame: true, note: '' },
+    'Special Starters': { width: 'full', frame: true, note: SPECIALS_GONE_NOTE },
+    'Special Mains': { width: 'full', frame: true, note: SPECIALS_GONE_NOTE },
+    'Special Desserts': { width: 'full', frame: true, note: SPECIALS_GONE_NOTE },
     'Pub Classics': { width: 'column', frame: false, note: '' },
     Burgers: { width: 'column', frame: false, note: '' },
     Mains: { width: 'full', frame: false, note: '' },
@@ -1479,6 +1575,10 @@
     toUkDate: toUkDate,
     parsePromoDate: parsePromoDate,
     sectionOptions: sectionOptions,
+    SPECIALS_SECTIONS: SPECIALS_SECTIONS,
+    SPECIALS_GONE_NOTE: SPECIALS_GONE_NOTE,
+    isSpecialsSection: isSpecialsSection,
+    coerceSpecialsSection: coerceSpecialsSection,
     guessSection: guessSection,
     normalizeSectionName: normalizeSectionName,
     assignSections: assignSections,

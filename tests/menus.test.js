@@ -188,14 +188,30 @@ assert(api.guessSection('Sauces', 'Peppercorn', '') === 'Sauces', 'guesses Sauce
 assert(api.SECTIONS.indexOf('Item Boost') !== -1, 'Item Boost is a canonical section');
 assert(api.guessSection('Item Boost', 'Fish of the Day', '') === 'Item Boost', 'keeps Item Boost section');
 assert(api.guessSection('', 'Fish of the Day', 'ask for today’s catch') === 'Item Boost', 'guesses Fish of the Day as Item Boost');
-assert(api.guessSection('Specials', 'Braised Blade', '') === 'Specials', 'Specials heading stays Specials');
+assert(api.guessSection('Specials', 'Braised Blade', '', { menuId: 'specials' }) === 'Special Mains',
+  'Specials board mains default to Special Mains');
+assert(api.guessSection('Starters', 'Ham Hock Pot', '', { menuId: 'specials' }) === 'Special Starters',
+  'Starters heading on Specials menu → Special Starters');
+assert(api.coerceSpecialsSection('Specials', 'Pulled Ham in a Charmer Cheese & Ale Sauce and a Sourdough Baguette', '') === 'Special Starters',
+  'baguette specials guess as Special Starters');
 assert(api.guessSection('', 'Pie of the Day', '') === 'Item Boost', 'Pie of the Day still maps to Item Boost');
-assert(api.SECTIONS.indexOf('Specials') !== -1, 'Specials is a canonical section');
+assert(api.SECTIONS.indexOf('Special Starters') !== -1 && api.SECTIONS.indexOf('Special Mains') !== -1 &&
+  api.SECTIONS.indexOf('Special Desserts') !== -1, 'Specials courses are canonical sections');
 assert(api.MENUS.some(function (m) { return m.id === 'specials'; }), 'Specials is a menu tab');
 assert(api.includableMenus('main').some(function (m) { return m.id === 'specials'; }),
   'Specials can be ticked onto Main menu');
-assert(api.sectionLayoutFor('Specials').frame === true, 'Specials defaults to frilly frame');
+assert(api.sectionOptions('specials').join('|') === 'Special Starters|Special Mains|Special Desserts',
+  'Specials menu dropdown is course-only');
+assert(api.sectionLayoutFor('Special Mains').frame === true &&
+  /gone/i.test(api.sectionLayoutFor('Special Mains').note || ''),
+  'Specials box defaults to frilly frame and when-gone note');
 assert(api.sectionLayoutFor('Item Boost').frame === true, 'Item Boost defaults to frilly frame');
+var composedSpecials = api.composeDishes(api.seed(), 'main', { specials: true });
+assert(composedSpecials.some(function (d) { return d.section === 'Special Starters'; }),
+  'including Specials on Main keeps Special Starters');
+assert(composedSpecials.every(function (d) {
+  return d.fromMenu !== 'specials' || /^Special /.test(d.section);
+}), 'Specials dishes never land in regular Starters/Mains/Desserts');
 assert(api.SECTIONS.indexOf('Little Bells') !== -1, 'Little Bells is a canonical section');
 assert(api.guessSection('Little Bells', 'Beef Burger, Fries & Dressed Salad', '') === 'Little Bells',
   'Little Bells keeps kids burger (not Burgers)');
@@ -275,12 +291,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow61') !== -1, 'menus page cache-bust is flow61');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow61') !== -1, 'hub menus link cache-bust is flow61');
+assert(page.indexOf('flow63') !== -1, 'menus page cache-bust is flow63');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow63') !== -1, 'hub menus link cache-bust is flow63');
 assert(/\.menus\s*\{[^}]*flex-wrap:\s*wrap/.test(page) && !/\.menus\s*\{[^}]*overflow-x:\s*auto/.test(page),
   'menu tabs wrap onto lines instead of horizontal scroll');
-assert(printJs.indexOf('isSpecials') !== -1 && printJs.indexOf('bag.specials') !== -1,
-  'print bags Specials for layout');
+assert(printJs.indexOf('specialsBoardBlock') !== -1 && printJs.indexOf('bag.specialStarters') !== -1,
+  'print bags Specials courses into one Specials board');
+assert(printJs.indexOf("When it's gone, it's gone") !== -1 || printJs.indexOf('SPECIALS_GONE_NOTE') !== -1,
+  'Specials print carries when-gone note');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');
@@ -485,6 +503,8 @@ assert(dayA[0].id !== dayB[0].id || dayA[1].id !== dayB[1].id,
   'evergreen bank wording rotates by calendar day');
 assert(printJs.indexOf('planPromoFill') !== -1 && printJs.indexOf('promoBesidePartner') !== -1,
   'feature panels placed only to even opposite columns');
+assert(printJs.indexOf('orphanColumnHole') !== -1 && printJs.indexOf('footPromoPair') !== -1,
+  'orphan Sandwiches/Sides span full-width with two foot feature panels');
 assert(printJs.indexOf('balanceOppositeColumns') !== -1,
   'print prunes surplus panels so opposite columns finish level');
 assert(printJs.indexOf('Two scallops') !== -1 || printJs.indexOf('stackForShort') !== -1,
