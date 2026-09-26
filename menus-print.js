@@ -874,6 +874,9 @@
   function isMains(name) {
     return /^mains?$/i.test(name || '');
   }
+  function isSundayRoasts(name) {
+    return /sunday\s*roasts?|^roasts?$/i.test(String(name || '').trim());
+  }
   function isLittleBells(name) {
     return /little\s*bells|kids?\s*menu|children.?s/i.test(String(name || '').trim());
   }
@@ -990,7 +993,8 @@
       nibbles: null, starters: null, sharing: null, boost: null,
       specialStarters: null, specialMains: null, specialDesserts: null,
       classics: null, burgers: null,
-      mains: null, littleBells: null, desserts: null, sides: null, sandwiches: null, sauces: null,
+      sundayRoasts: null, mains: null, littleBells: null, desserts: null,
+      sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
     var straySandwiches = [];
@@ -1009,6 +1013,8 @@
       else if (isClassics(s.name) && !bag.classics) {
         // Keep every staff-assigned classic here — including a lone burger filed as classic.
         bag.classics = { name: 'Pub Classics', dishes: (s.dishes || []).slice() };
+      } else if (isSundayRoasts(s.name) && !bag.sundayRoasts) {
+        bag.sundayRoasts = { name: 'Sunday Roasts', dishes: (s.dishes || []).slice() };
       } else if (isMains(s.name) && !bag.mains) bag.mains = s;
       else if (isLittleBells(s.name) && !bag.littleBells) {
         bag.littleBells = { name: 'Little Bells', dishes: (s.dishes || []).slice() };
@@ -1076,8 +1082,8 @@
     if (bag.boost) front += sectionUnits(bag.boost, true);
     if (bag.specialStarters) front += sectionUnits(bag.specialStarters, true);
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name) &&
-          !isSpecials(s.name)) {
+      if (!isMains(s.name) && !isSundayRoasts(s.name) && !isDessert(s.name) && !isBurgers(s.name) &&
+          !isLittleBells(s.name) && !isSpecials(s.name)) {
         front += sectionUnits(s, false);
       }
     });
@@ -1085,6 +1091,7 @@
     if (bag.burgers) front += sectionUnits(bag.burgers, false);
 
     var back = chrome;
+    if (bag.sundayRoasts) back += sectionUnits(bag.sundayRoasts, false);
     if (bag.mains) back += sectionUnits(bag.mains, false);
     if (bag.specialMains) back += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) back += sectionUnits(bag.littleBells, true);
@@ -1109,8 +1116,8 @@
       wantSandwiches = !!bag.sandwiches;
     }
     var sandCost = sandwichesPackCost(bag);
-    var hasBackContent = !!(bag.mains || bag.specialMains || bag.littleBells || bag.desserts ||
-      bag.specialDesserts || bag.sides || bag.sauces || bag.sandwiches);
+    var hasBackContent = !!(bag.sundayRoasts || bag.mains || bag.specialMains || bag.littleBells ||
+      bag.desserts || bag.specialDesserts || bag.sides || bag.sauces || bag.sandwiches);
 
     var layout = {
       pages: 1,
@@ -1128,6 +1135,7 @@
 
     // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
+    if (bag.sundayRoasts) oneNeed += sectionUnits(bag.sundayRoasts, false);
     if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
     if (bag.specialMains) oneNeed += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
@@ -1137,13 +1145,14 @@
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
     // Named sandwich fillings count as food; empty tip box is optional chrome.
     var foodNeed = oneNeed + (sandDishCount > 0 ? sandCost : 0);
+    var roastN = bag.sundayRoasts && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0;
     var mainsN = bag.mains && bag.mains.dishes ? bag.mains.dishes.length : 0;
     var dessertN = bag.desserts && bag.desserts.dishes ? bag.desserts.dishes.length : 0;
     // Two pages when one A4 would clip at minimum type — then grow toward max.
-    var preferTwo = hasBackContent && (bag.mains || bag.littleBells || bag.desserts) && (
+    var preferTwo = hasBackContent && (bag.sundayRoasts || bag.mains || bag.littleBells || bag.desserts) && (
       foodNeed > ONE_PAGE_AT_MIN ||
-      (mainsN >= 5 && dessertN >= 3) ||
-      (sandDishCount >= 4 && mainsN >= 5) ||
+      (mainsN + roastN >= 5 && dessertN >= 3) ||
+      (sandDishCount >= 4 && mainsN + roastN >= 5) ||
       bag.count >= 18
     );
     var preferOne = !preferTwo && foodNeed <= ONE_PAGE_AT_MIN;
@@ -1452,6 +1461,7 @@
     var boostRule = ruleFor('Item Boost', plan);
     var classRule = ruleFor('Pub Classics', plan);
     var burgRule = ruleFor('Burgers', plan);
+    var roastRule = ruleFor('Sunday Roasts', plan);
     var mainRule = ruleFor('Mains', plan);
     var littleRule = ruleFor('Little Bells', plan);
     var sandRule = ruleFor('Sandwiches', plan);
@@ -1565,8 +1575,8 @@
         '</section>';
     }
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
-          !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
+      if (!isMains(s.name) && !isSundayRoasts(s.name) && !isDessert(s.name) && !isSandwich(s.name) &&
+          !isBurgers(s.name) && !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
         var otherRule = ruleFor(s.name, plan);
         p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
       }
@@ -1742,6 +1752,10 @@
     }
 
     if (layout.pages === 1) {
+      if (bag.sundayRoasts) {
+        p1 += '<section class="sec">' +
+          sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
+      }
       if (bag.mains) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
@@ -1771,6 +1785,10 @@
     // Week / Sunday date only on page 1 — page 2 keeps the quiet Roman only.
     p2 += trackerBar(ver, { hideDate: true });
     p2 += '<div class="page-body page-body-start">';
+    if (bag.sundayRoasts) {
+      p2 += '<section class="sec">' +
+        sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
+    }
     if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');

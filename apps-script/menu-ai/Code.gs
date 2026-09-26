@@ -181,7 +181,7 @@ function readMenuWithGemini_(body) {
     '  "subtitle": "",\n' +
     '  "coursePrices": "e.g. 2 courses £32.95 · 3 courses £39.95" or "",\n' +
     '  "dishes": [\n' +
-    '    { "section": "Nibbles"|"Starters"|"Sharing Plates"|"Item Boost"|"Special Starters"|"Special Mains"|"Special Desserts"|"Pub Classics"|"Burgers"|"Mains"|"Little Bells"|"Sandwiches"|"Sides"|"Sauces"|"Desserts",\n' +
+    '    { "section": "Nibbles"|"Starters"|"Sharing Plates"|"Item Boost"|"Special Starters"|"Special Mains"|"Special Desserts"|"Pub Classics"|"Burgers"|"Sunday Roasts"|"Mains"|"Little Bells"|"Sandwiches"|"Sides"|"Sauces"|"Desserts",\n' +
     '      "name": "Dish name only — never a section title",\n' +
     '      "description": "short description",\n' +
     '      "price": "12.95" or "",\n' +

@@ -26,6 +26,7 @@
     'Special Desserts',
     'Pub Classics',
     'Burgers',
+    'Sunday Roasts',
     'Mains',
     'Little Bells',
     'Sandwiches',
@@ -85,8 +86,10 @@
     map['catch of the day'] = 'Item Boost';
     map['dessert'] = 'Desserts';
     map['puddings'] = 'Desserts';
-    map['sunday roasts'] = 'Mains';
-    map['roasts'] = 'Mains';
+    map['sunday roasts'] = 'Sunday Roasts';
+    map['sunday roast'] = 'Sunday Roasts';
+    map['roasts'] = 'Sunday Roasts';
+    map['roast'] = 'Sunday Roasts';
     map['little bells'] = 'Little Bells';
     map['littlebells'] = 'Little Bells';
     map['kids'] = 'Little Bells';
@@ -140,8 +143,10 @@
       ["chef's special", 'Special Mains'],
       ['dessert', 'Desserts'],
       ['puddings', 'Desserts'],
-      ['sunday roasts', 'Mains'],
-      ['roasts', 'Mains'],
+      ['sunday roasts', 'Sunday Roasts'],
+      ['sunday roast', 'Sunday Roasts'],
+      ['roasts', 'Sunday Roasts'],
+      ['roast', 'Sunday Roasts'],
       ['little bells', 'Little Bells'],
       ['littlebells', 'Little Bells'],
       ['kids', 'Little Bells'],
@@ -229,7 +234,8 @@
     if (/^sauces?$/.test(lower) || /\bsauces?\b/.test(lower) && lower.length < 12) return 'Sauces';
     if (/side/.test(lower)) return 'Sides';
     if (/dessert|pudding|sweet/.test(lower)) return 'Desserts';
-    if (/main|roast/.test(lower)) return 'Mains';
+    if (/sunday\s*roasts?|^roasts?$/.test(lower)) return 'Sunday Roasts';
+    if (/main/.test(lower)) return 'Mains';
     return bare.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
   }
 
@@ -265,6 +271,7 @@
       return coerceSpecialsSection(s, n, desc);
     }
     if (/item\s*boost/i.test(s)) return 'Item Boost';
+    if (/sunday\s*roasts?|^roasts?$/i.test(s)) return 'Sunday Roasts';
     if (/\b(fish|pie|catch)\s+of\s+the\s+day\b/i.test(n)) return 'Item Boost';
     if (/\bspecial\s+of\s+the\s+day\b/i.test(n)) return coerceSpecialsSection('Specials', n, desc);
     if (/\bto share\b/i.test(n) || /\bfor the table\b/i.test(n) || /\bsharing\b/i.test(n)) {
@@ -482,8 +489,8 @@
       ],
       sunday: [
         dish('Nibbles', 'Bread and Salted Butter', '', '5.95', ''),
-        dish('Sunday roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
-        dish('Sunday roasts', 'Pork Loin', 'crackling and apple sauce', '19.95', ''),
+        dish('Sunday Roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
+        dish('Sunday Roasts', 'Pork Loin', 'crackling and apple sauce', '19.95', ''),
         dish('Mains', 'Wild Mushroom Gnocchi', 'truffle, parmesan, beer', '17.95', ''),
         dish('Desserts', 'Sticky Toffee Pudding', 'brandy snap, clotted cream ice cream, toffee sauce', '7.95', 'v', true)
       ],
@@ -789,9 +796,11 @@
     var merged = formatMarks(parseMarks(
       [raw.tags || '', namePull.tags || '', descPull.tags || ''].filter(Boolean).join(' ')
     ));
+    var section = String(raw.section || '').trim();
+    if (section) section = normalizeSectionName(section);
     return {
       id: raw.id,
-      section: raw.section,
+      section: section,
       name: cleanDishName(namePull.name),
       description: normalizeDescription(cleanDishDescription(descPull.name)),
       price: raw.price || '',
@@ -1492,6 +1501,11 @@
     'Special Desserts': { width: 'full', frame: true, note: SPECIALS_GONE_NOTE },
     'Pub Classics': { width: 'column', frame: false, note: '' },
     Burgers: { width: 'column', frame: false, note: '' },
+    'Sunday Roasts': {
+      width: 'full',
+      frame: false,
+      note: 'All served with roast potatoes, Yorkshire pudding, seasonal vegetables and gravy'
+    },
     Mains: { width: 'full', frame: false, note: '' },
     'Little Bells': { width: 'full', frame: true, note: '' },
     Sandwiches: {
