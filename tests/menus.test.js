@@ -304,10 +304,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow79') !== -1, 'menus page cache-bust is flow79');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow79') !== -1, 'hub menus link cache-bust is flow79');
+assert(page.indexOf('flow80') !== -1, 'menus page cache-bust is flow80');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow80') !== -1, 'hub menus link cache-bust is flow80');
 assert(printJs.indexOf('function renderLittleBellsRow') !== -1 && printJs.indexOf('cols-little-desserts') !== -1,
   'Little Bells Column width pairs beside Desserts');
+assert(printJs.indexOf('dessertsAllowColumn') !== -1 && printJs.indexOf('sidesAllowColumn') !== -1,
+  'Little Bells only pairs partners that Blocks allows as Column');
+assert(printJs.indexOf('lockedFullWidth') !== -1,
+  'Blocks Full width lock keeps sections full-bleed');
 assert(printJs.indexOf('sundayRoasts') !== -1 && printJs.indexOf('roastsOnP1') !== -1,
   'print planner can balance Sunday Roasts onto page 1');
 assert(api.looksLikeDishTitle('Tomato & Basil Pasta') && api.looksLikeDishTitle('Fish Fingers, Chunky Chips & Peas'),
@@ -637,7 +641,9 @@ var kidsColDishes = [
 ];
 var kidsColHtml = print.build(api.menuById('sunday'), kidsColDishes, {
   sectionLayout: api.normalizeSectionLayout({
-    'Little Bells': { width: 'column', frame: true, note: 'All £9.50' }
+    'Little Bells': { width: 'column', frame: true, note: 'All £9.50' },
+    // Desserts default is Full — set Column so the kids|puddings pair is allowed
+    Desserts: { width: 'column', frame: false, note: '' }
   }),
   promos: []
 });
@@ -651,6 +657,41 @@ var kidsFullHtml = print.build(api.menuById('sunday'), kidsColDishes, {
 });
 assert(!/cols-little-desserts/.test(kidsFullHtml),
   'Blocks Full width keeps Little Bells stacked (not a column pair)');
+var kidsColDessertsFull = print.build(api.menuById('sunday'), kidsColDishes.concat([
+  api.dish('Sides', 'Halloumi Fries', '', '6.50', ''),
+  api.dish('Sides', 'Onion Rings', '', '5.95', '')
+]), {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'column', frame: true, note: 'All £9.50' },
+    Desserts: { width: 'full', frame: false, note: '' },
+    Sides: { width: 'column', frame: false, note: '' }
+  }),
+  promos: []
+});
+assert(!/cols-little-desserts/.test(kidsColDessertsFull),
+  'Full-width Desserts stay out of the Little Bells column pair');
+assert(!/cols-little-sides/.test(kidsColDessertsFull),
+  'Full-width Desserts: kids stay above puddings (not paired with Sides ahead of them)');
+assert(/little-solo-row|col-little/.test(kidsColDessertsFull),
+  'Little Bells Column still uses a column when Desserts is Full width');
+var fishIdx = kidsColDessertsFull.indexOf('Fish Fingers');
+var dessIdx = kidsColDessertsFull.indexOf('Sticky Toffee');
+assert(fishIdx > 0 && dessIdx > fishIdx,
+  'order stays kids → full-bleed Desserts');
+// Desserts title must not sit inside the kids column pair
+var pairIdx = kidsColDessertsFull.indexOf('cols-little-desserts');
+assert(pairIdx === -1 || pairIdx > dessIdx,
+  'Sticky Toffee is not printed inside a kids|desserts column');
+// Best fit (both) still allows the kids|desserts column pair
+var kidsColDessertsBoth = print.build(api.menuById('sunday'), kidsColDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'column', frame: true, note: 'All £9.50' },
+    Desserts: { width: 'both', frame: false, note: '' }
+  }),
+  promos: []
+});
+assert(/cols-little-desserts/.test(kidsColDessertsBoth),
+  'Blocks Best fit Desserts may still sit beside Little Bells Column');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
 var jammedSunday = [
