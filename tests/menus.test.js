@@ -259,8 +259,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow58') !== -1, 'menus page cache-bust is flow58');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow58') !== -1, 'hub menus link cache-bust is flow58');
+assert(page.indexOf('flow59') !== -1, 'menus page cache-bust is flow59');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow59') !== -1, 'hub menus link cache-bust is flow59');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');
@@ -795,13 +795,11 @@ var sharedTypeDishes = [
 var sharedTypeLayout = print.planFluidLayout(mainMenu, sharedTypeDishes, {
   sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
 });
-assert(sharedTypeLayout.pages === 1, 'packed menu that fits type range stays on one page');
-assert(/type range/i.test(sharedTypeLayout.summary), 'layout summary states the type range');
-assert(sharedTypeLayout.p1.sandwiches === true || sharedTypeLayout.fillers.some(function (f) {
-  return /Sandwiches/i.test(f);
-}), 'one-page packed menu still includes sandwiches');
-assert(!sharedTypeLayout.p1.rooms || sharedTypeLayout.leftover.p1 > 0,
-  'feature panels only when spare room remains inside the type range');
+assert(sharedTypeLayout.pages === 2, 'packed mains+desserts+sandwiches use two pages (would clip at min type)');
+assert(/type range/i.test(sharedTypeLayout.summary) || /minimum type/i.test(sharedTypeLayout.summary),
+  'layout summary states type range / min-type decision');
+assert(sharedTypeLayout.p1.sidesOnP1 === true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === false,
+  'Sides move to page 1 so both pages can open type toward the maximum');
 
 // Tip/sell sandwich box (0 fillings) must prefer page 1 when page 2 holds mains+desserts
 var tipOnlyPacked = [
@@ -839,16 +837,44 @@ var tipPackedLayout = print.planFluidLayout(mainMenu, tipOnlyPacked, {
     Sandwiches: { tip: true, frame: true, width: 'column', sell: 'A selection of sandwiches is available — ask the team.' }
   })
 });
-assert(tipPackedLayout.pages === 1 || tipPackedLayout.pages === 2,
-  'nibbles+mains packed menu uses one or two pages within type range');
-assert(tipPackedLayout.pages === 1 ||
-  (tipPackedLayout.p1.sandwiches === true && !(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches)),
-  'sandwich sell box prefers page 1 when two pages are needed');
-// Seed main menu (~30 dishes) should prefer one page inside the type range
+assert(tipPackedLayout.pages === 2, 'nibbles+mains+desserts packed menu uses two pages');
+assert(tipPackedLayout.p1.sandwiches === true && !(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches),
+  'sandwich sell box sits on page 1 so both pages can open type toward the maximum');
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
-assert(seedMainLayout.pages === 1, 'sample main menu fits one page within type range');
+assert(seedMainLayout.pages === 2, 'sample main menu uses two pages (too much for min type on one)');
 assert(seedMainLayout.typeRange && seedMainLayout.typeRange.name.max === 11.5,
   'layout exposes typeRange on the plan');
+// Screenshot-shaped sheet: starters + 5 sandwiches + sides + 7 mains + desserts → two pages
+var clipRisk = [
+  api.dish('Starters', 'Buffalo Cauliflower Wings', 'vegan mayo', '8.25', 'vg'),
+  api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+  api.dish('Starters', 'Breaded Prawns', 'sweet chilli', '8.95', ''),
+  api.dish('Starters', 'Hoi Sin Jackfruit Bau Buns', 'asian slaw', '8.50', 'vg'),
+  api.dish('Sandwiches', 'Crayfish Marie Rose', 'fries', '10.95', ''),
+  api.dish('Sandwiches', 'Falafel & Guacamole', 'fries', '10.95', 'vg'),
+  api.dish('Sandwiches', 'Italian Meat & Mozzarella', 'fries', '11.50', ''),
+  api.dish('Sandwiches', 'Gochujang Chicken', 'fries', '11.50', ''),
+  api.dish('Sandwiches', 'Giant Fish Finger', 'tartare', '11.95', ''),
+  api.dish('Sides', 'Loaded Fries', '', '6.50', ''),
+  api.dish('Sides', 'Chips', '', '4.50', 'vg'),
+  api.dish('Sides', 'Cheesy Garlic Bread', '', '5.50', 'v'),
+  api.dish('Sides', 'Dressed Mixed Salad', '', '4.95', 'vg'),
+  api.dish('Mains', 'Spicy Asian Burger', 'fries', '16.95', 'vg'),
+  api.dish('Mains', 'Homemade Beef Lasagne', 'salad', '15.95', 'v'),
+  api.dish('Mains', 'Fish & Chips', 'peas', '17.95', 'df'),
+  api.dish('Mains', 'Ham, Egg & Chips', '', '18.95', 'gf'),
+  api.dish('Mains', 'Chicken Katsu Curry', 'rice', '16.95', ''),
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Mains', 'Trenchmore Wagyu Beef Burger', 'fries', '20.95', ''),
+  api.dish('Desserts', 'Cheeses', 'biscuits', '8.95', 'v'),
+  api.dish('Desserts', 'Ice Cream or Sorbet', 'three scoops', '6.50', 'v'),
+  api.dish('Desserts', 'Sticky Toffee Pudding', 'custard', '7.95', 'v'),
+  api.dish('Desserts', 'Lime Posset', 'shortbread', '7.50', 'v'),
+  api.dish('Desserts', 'Chocolate Brownie', 'ice cream', '7.95', 'v')
+];
+var clipLayout = print.planFluidLayout(mainMenu, clipRisk);
+assert(clipLayout.pages === 2, 'full starters/sandwiches/mains/desserts sheet uses two pages — no clipped desserts');
+assert(/minimum type|two A4/i.test(clipLayout.summary), 'summary explains two pages because one would clip at min type');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});
