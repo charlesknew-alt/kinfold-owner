@@ -456,18 +456,11 @@
   function tidyOrphanDescriptions(dishes) {
     var out = [];
     (dishes || []).forEach(function (raw) {
-      var d = {
-        id: raw.id,
-        section: raw.section,
-        name: raw.name,
-        description: raw.description || '',
-        price: raw.price || '',
-        tags: raw.tags || '',
-        lunchClub: !!raw.lunchClub,
-        fromMenu: raw.fromMenu
-      };
+      var d = tidyDishFields(raw);
       if (out.length && shouldMergeOntoPrevious(out[out.length - 1], d)) {
         mergeDishOnto(out[out.length - 1], d);
+        // Re-tidy after merge so description casing / tags stay consistent.
+        out[out.length - 1] = tidyDishFields(out[out.length - 1]);
         return;
       }
       out.push(d);
@@ -525,7 +518,11 @@
     var clean = String(name || '');
     // OCR often leaves “gf available” / “with available gf” in the dish title
     clean = clean.replace(/\bwith\s+available\b/ig, ' ');
+    clean = clean.replace(/\bgf\s+available\b/ig, ' gf option ');
+    clean = clean.replace(/\bvg\s+available\b/ig, ' vg option ');
+    clean = clean.replace(/\bv\s+available\b/ig, ' v option ');
     clean = clean.replace(/\bavailable\b/ig, ' option ');
+    clean = clean.replace(/\bve\b/ig, ' vg ');
     clean = clean.replace(/\blunch\s*club\b/ig, ' ').replace(/\[lunch\]/ig, ' ');
     var re = /\b(?:gf|vg|v)(?:\s*(?:\/|&)\s*(?:gf|vg|v))*(?:\s+(?:with\s+)?(?:gf|vg|v(?:\s*(?:\/|&)\s*(?:gf|vg|v))*)?\s*option)?\b/ig;
     clean = clean.replace(re, function (hit) {
@@ -535,6 +532,39 @@
     clean = clean.replace(/\boption\b/ig, ' ');
     clean = clean.replace(/\s{2,}/g, ' ').replace(/^[\s,–-]+|[\s,–-]+$/g, '');
     return { name: clean, tags: tags.join(' ').replace(/\s+/g, ' ').trim() };
+  }
+
+  /**
+   * Dish descriptions print in lowercase so the sheet is consistent
+   * (names keep capitals; the second line does not).
+   */
+  function normalizeDescription(desc) {
+    var s = String(desc || '').replace(/\s+/g, ' ').trim();
+    if (!s) return '';
+    return s.toLowerCase();
+  }
+
+  /**
+   * Pull hardwired dietary words out of name/description into tags,
+   * and force description casing lowercase for print/save consistency.
+   */
+  function tidyDishFields(raw) {
+    raw = raw || {};
+    var namePull = pullTags(raw.name || '');
+    var descPull = pullTags(raw.description || '');
+    var merged = formatMarks(parseMarks(
+      [raw.tags || '', namePull.tags || '', descPull.tags || ''].filter(Boolean).join(' ')
+    ));
+    return {
+      id: raw.id,
+      section: raw.section,
+      name: cleanDishName(namePull.name),
+      description: normalizeDescription(descPull.name),
+      price: raw.price || '',
+      tags: merged,
+      lunchClub: !!raw.lunchClub,
+      fromMenu: raw.fromMenu
+    };
   }
 
   function parsePaste(text) {
@@ -1297,6 +1327,9 @@
     splitDishAt: splitDishAt,
     isJunkDescription: isJunkDescription,
     tidyOrphanDescriptions: tidyOrphanDescriptions,
+    normalizeDescription: normalizeDescription,
+    tidyDishFields: tidyDishFields,
+    pullTags: pullTags,
     isHeading: isHeading
   };
 })(typeof window !== 'undefined' ? window : global);

@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow53') !== -1, 'menus page cache-bust is flow53');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow53') !== -1, 'hub menus link cache-bust is flow53');
+assert(page.indexOf('flow54') !== -1, 'menus page cache-bust is flow54');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow54') !== -1, 'hub menus link cache-bust is flow54');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -527,6 +527,20 @@ assert(api.formatMarks(api.parseMarks('gf option')) === 'gf option', 'gf option 
 assert(api.formatMarks(api.parseMarks('v with gf option')) === 'v with gf option', 'v with gf option round-trips');
 assert(api.formatMarks(api.parseMarks('vg')) === 'vg', 'vg round-trips');
 assert(api.formatMarks({ gf: true, vgOpt: true, v: false, vg: false, gfOpt: false, vOpt: false }) === 'gf with vg option', 'gf with vg option formats');
+assert(api.normalizeDescription('Served with Ice Cream') === 'served with ice cream',
+  'descriptions print lowercase');
+assert(api.tidyDishFields({
+  name: 'Sticky Toffee Pudding',
+  description: 'Served with Ice Cream gf available',
+  price: '7.95',
+  tags: ''
+}).description === 'served with ice cream', 'hardwired gf available leaves the description');
+assert(api.tidyDishFields({
+  name: 'Sticky Toffee Pudding',
+  description: 'Served with Ice Cream gf available',
+  price: '7.95',
+  tags: ''
+}).tags === 'gf option', 'hardwired gf available becomes a tag');
 
 assert(printJs.indexOf('border-image') !== -1, 'scallops use border-image (no stretch through text)');
 assert(printJs.indexOf('background-size:100% 100%') === -1, 'no stretched full-bleed frame fill');

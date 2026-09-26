@@ -191,6 +191,7 @@
 
   function dishRow(d, opts) {
     opts = opts || {};
+    if (root.EBMenus && root.EBMenus.tidyDishFields) d = root.EBMenus.tidyDishFields(d);
     var name = d.name;
     if (root.EBMenus && root.EBMenus.cleanDishName) name = root.EBMenus.cleanDishName(name);
     var price = d.price;
@@ -226,6 +227,7 @@
 
   function dishCentered(d, opts) {
     opts = opts || {};
+    if (root.EBMenus && root.EBMenus.tidyDishFields) d = root.EBMenus.tidyDishFields(d);
     var html = '<div class="dish dish-c">';
     html += '<div class="dish-name">';
     html += esc(d.name);
