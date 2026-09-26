@@ -278,9 +278,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow85"></script>
-  <script src="menus-print.js?v=20260926-flow85"></script>
-  <script src="menus-ingest.js?v=20260926-flow85"></script>
+  <script src="menus.js?v=20260926-flow86"></script>
+  <script src="menus-print.js?v=20260926-flow86"></script>
+  <script src="menus-ingest.js?v=20260926-flow86"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -708,8 +708,27 @@
       document.querySelectorAll('[data-history-delete]').forEach(function (btn) {
         btn.onclick = function () {
           var id = btn.getAttribute('data-history-delete');
-          if (!confirm('Remove this sheet from shared print history (all devices)?')) return;
-          EBMenuPrint.deletePrintHistory(id).then(function () { renderHistory(); });
+          if (!id) return;
+          // Instant UI remove so staff can clear many sheets in one session;
+          // cloud / local delete continues in the background (no full reload).
+          historyCache = (historyCache || []).filter(function (r) { return r.id !== id; });
+          var row = btn.closest ? btn.closest('.history-row') : null;
+          var day = row && row.parentNode;
+          if (row && row.parentNode) row.parentNode.removeChild(row);
+          if (day && day.classList && day.classList.contains('history-day') &&
+              !day.querySelector('.history-row')) {
+            if (day.parentNode) day.parentNode.removeChild(day);
+          }
+          if (!document.querySelector('.history-row')) {
+            var el = document.getElementById('editor');
+            if (el && !el.querySelector('.history-empty-note')) {
+              var note = document.createElement('p');
+              note.className = 'note history-empty-note';
+              note.innerHTML = 'Nothing saved yet. Generate a menu, then click <strong>Save to menus</strong> on the print sheet to stamp its week and Roman numeral here.';
+              el.appendChild(note);
+            }
+          }
+          EBMenuPrint.deletePrintHistory(id).catch(function () {});
         };
       });
     }

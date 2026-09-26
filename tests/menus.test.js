@@ -307,8 +307,10 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow85') !== -1, 'menus page cache-bust is flow85');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow85') !== -1, 'hub menus link cache-bust is flow85');
+assert(page.indexOf('flow86') !== -1, 'menus page cache-bust is flow86');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow86') !== -1, 'hub menus link cache-bust is flow86');
+assert(page.indexOf('cloud / local delete continues in the background') !== -1,
+  'history Remove deletes in the background without reloading the list');
 assert(printJs.indexOf('cols-little-solo') !== -1 && printJs.indexOf('levelOppositeColumns') !== -1,
   'opposite columns are leveled with food then feature panels');
 assert(printJs.indexOf('function noteUnits') !== -1,
