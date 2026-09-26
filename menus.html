@@ -266,7 +266,7 @@
       (function () {
         if (/(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''))) {
           var el = document.getElementById('pageLede');
-          if (el) el.textContent = 'Update today’s dishes, then generate the print sheet. Same menus as the owner page — kept simple for the floor.';
+          if (el) el.textContent = 'Upload or edit dishes, clear when needed, then generate. Same menus as the owner page — kept simple for the floor.';
         }
       })();
     </script>
@@ -277,9 +277,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow71"></script>
-  <script src="menus-print.js?v=20260926-flow71"></script>
-  <script src="menus-ingest.js?v=20260926-flow71"></script>
+  <script src="menus.js?v=20260926-flow72"></script>
+  <script src="menus-print.js?v=20260926-flow72"></script>
+  <script src="menus-ingest.js?v=20260926-flow72"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -570,13 +570,12 @@
       }
       if (lede) {
         var base = isStaffMode
-          ? 'Update today’s dishes, then generate the print sheet. Same menus as the owner page — kept simple for the floor.'
+          ? 'Upload or edit dishes, clear when needed, then generate. Same menus as the owner page — kept simple for the floor.'
           : 'A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. Dishes and wording stay in sync on every phone and PC.';
         lede.textContent = cloudSyncNote ? (base + ' · ' + cloudSyncNote) : base;
       }
       if (picker) picker.style.display = '';
       if (isStaffMode && flowStep > FLOW_STEPS.length) flowStep = FLOW_STEPS.length;
-      if (isStaffMode && mode === 'paste') mode = 'complete';
       renderPicker();
       renderEditor();
     }
@@ -848,7 +847,7 @@
     function renderDishesStep(menu, list) {
       var html = '';
       if (isStaffMode) {
-        html += '<p class="step-lede">Edit today’s dishes, tick allergens, then generate. Layout and event wording stay as the owner set them.</p>';
+        html += '<p class="step-lede">Upload or paste a menu, edit dishes, clear when you need a fresh start, then generate. Layout and event wording stay as the owner set them.</p>';
       } else {
         html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
       }
@@ -872,24 +871,22 @@
 
       if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
         html += renderDishForm(menu);
-      } else if (mode === 'paste' && !isStaffMode) {
+      } else if (mode === 'paste') {
         html += renderPasteBlock(menu);
       }
 
       html += renderComplete();
       html += '<div class="toolbar-row no-print">';
       html += '<button type="button" class="soft" data-mode="add">Add a dish</button>';
-      if (!isStaffMode) {
-        html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
-      }
+      html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
       html += '</div>';
+      html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+      html += '<button class="link" id="doClear" type="button">Clear this menu</button>';
       if (!isStaffMode) {
-        html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
-        html += '<button class="link" id="doClear" type="button">Clear this menu</button>';
         html += '<span>·</span>';
         html += '<button class="link" id="doReset" type="button">Put sample menus back</button>';
-        html += '</div>';
       }
+      html += '</div>';
       if (isStaffMode) html += flowNav(null, 2, 'Next · Generate');
       else html += flowNav(null, 2, 'Next · Blocks');
       return html;
