@@ -875,10 +875,9 @@
   };
 
   /**
-   * Adult pub type range (pt). Auto-fit steps between max → min; never above max
-   * (oversized type looks like a kids’ menu on a sparse two-pager).
-   * Prefer one A4 when food fits inside this range rather than opening page 2
-   * just to stretch type.
+   * Adult pub type range (pt). Auto-fit steps between max → min; never above max.
+   * Decision rule: if food will not fit one A4 even at MINIMUM type, use two
+   * pages and open type toward the maximum. Never clip desserts off the foot.
    */
   var TYPE_RANGE = {
     name: { min: 9, max: 11.5 },
@@ -886,14 +885,16 @@
     title: { min: 14, max: 22 },
     promo: { min: 9, max: 11.5 }
   };
-  // Unit-model headroom: compact/dense can pack ~this much over PAGE at max type.
-  var ONE_PAGE_DENSE = PAGE + 20;
+  // One page only with clear headroom at min type — unit model under-counts
+  // scalloped boxes / full-width mains vs real browser height.
+  var ONE_PAGE_AT_MIN = PAGE - 12;
 
   function dishUnits(d) {
-    var u = 1.35;
+    // Slightly pessimistic vs real Roboto lines + leaders (clipping is worse
+    // than an honest two-pager that can grow type toward the max).
+    var u = 1.55;
     if (d.description) {
-      // Long burger/classic spiels are taller than a short sandwich note — weight them
-      u += 0.85 + Math.floor(String(d.description).length / 55) * 0.55;
+      u += 1.0 + Math.floor(String(d.description).length / 50) * 0.6;
     }
     return u;
   }
@@ -1043,9 +1044,16 @@
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
     // Named sandwich fillings count as food; empty tip box is optional chrome.
     var foodNeed = oneNeed + (sandDishCount > 0 ? sandCost : 0);
-    // Prefer one page whenever food fits inside the type range (dense step),
-    // instead of opening a sparse two-pager with cartoony oversized type.
-    var preferOne = foodNeed <= ONE_PAGE_DENSE;
+    var mainsN = bag.mains && bag.mains.dishes ? bag.mains.dishes.length : 0;
+    var dessertN = bag.desserts && bag.desserts.dishes ? bag.desserts.dishes.length : 0;
+    // Two pages when one A4 would clip at minimum type — then grow toward max.
+    var preferTwo = hasBackContent && (bag.mains || bag.littleBells || bag.desserts) && (
+      foodNeed > ONE_PAGE_AT_MIN ||
+      (mainsN >= 5 && dessertN >= 3) ||
+      (sandDishCount >= 4 && mainsN >= 5) ||
+      bag.count >= 18
+    );
+    var preferOne = !preferTwo && foodNeed <= ONE_PAGE_AT_MIN;
 
     if (preferOne) {
       layout.pages = 1;
@@ -1060,8 +1068,6 @@
           layout.p1.rooms = true;
           left1 = add.left;
           layout.fillers.push(promoLabel);
-        } else if (foodNeed > PAGE - 10) {
-          layout.fillers.push('No feature panels (one page within type range)');
         }
       }
       if (wantSandwiches) {
@@ -1077,15 +1083,12 @@
           }
         }
       }
-      if (bag.sides) layout.p1.sidesOnP1 = true;
+      if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
       add = tryAdd(left1, COST.footLogo + 6);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
-      if (foodNeed > PAGE) {
-        layout.fillers.push('Type stepped down within range so everything fits one page');
-      }
       layout.leftover.p1 = Math.max(0, left1);
       layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
-    } else if (hasBackContent || foodNeed > ONE_PAGE_DENSE) {
+    } else if (hasBackContent || foodNeed > ONE_PAGE_AT_MIN || preferTwo) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
@@ -1217,8 +1220,8 @@
       'pt, descriptions ' + TYPE_RANGE.desc.min + '–' + TYPE_RANGE.desc.max +
       'pt, section titles ' + TYPE_RANGE.title.min + '–' + TYPE_RANGE.title.max + 'pt.';
     layout.summary =
-      (layout.fit === 'one' ? 'Fills one A4 within the type range (shrink type before opening page 2).' :
-        layout.fit === 'two' ? 'Two A4 pages — food exceeds one-page capacity at minimum type; same type size on both pages; never a third page.' :
+      (layout.fit === 'one' ? 'One A4 — food fits at minimum type, so type can open toward the maximum.' :
+        layout.fit === 'two' ? 'Two A4 pages — would clip at minimum type on one page; same type on both pages, opening toward the maximum; never a third page.' :
           'Too much for two readable pages. Remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.') +
       typeNote +
       ' Columns start and finish level. Layout from ' + bag.count + ' dishes.' + bits;
