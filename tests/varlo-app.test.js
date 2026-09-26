@@ -17,16 +17,17 @@ function assert(cond, msg) {
 }
 
 function extract(name) {
-  var m = html.match(new RegExp("['\"]?" + name + "['\"]?\\s*:\\s*'([^']+)'"));
+  var m = html.match(new RegExp("['\"]" + name + "['\"]\\s*:\\s*'([^']+)'"));
   return m ? m[1] : '';
 }
 
-var ebHub = extract('eightbells');
-var wmHub = extract('windmill');
+var ebHub = extract('hub-eightbells');
+var wmHub = extract('hub-windmill');
 var ebPaper = extract('paperwork-eightbells');
 var wmPaper = extract('paperwork-windmill');
 var card = extract('cardtakings-eightbells');
 var cardWm = extract('cardtakings-windmill');
+var roomsWm = extract('rooms-windmill');
 
 assert(ebHub.indexOf('/exec') !== -1 && ebHub.indexOf('page=') === -1, 'EB manager hub has no page=');
 assert(wmHub.indexOf('/exec') !== -1 && wmHub.indexOf('page=') === -1, 'WM manager hub has no page=');
@@ -57,10 +58,20 @@ assert(html.indexOf('function withOwnerShell') !== -1, 'owner iframe helper kept
 assert(html.indexOf('function stripOwnerShell') !== -1, 'manager iframe strips shell=owner');
 assert(html.indexOf('function withStaffMenus') !== -1 && html.indexOf('mode=staff') !== -1,
   'Eight Bells manager Menus get mode=staff');
-assert(html.indexOf("menusFab") !== -1 && html.indexOf("openApp('menus-eightbells'") !== -1,
-  'Eight Bells manager has Menus FAB');
+assert(html.indexOf('id="managerHomeEb"') !== -1 && html.indexOf('id="managerHomeWm"') !== -1,
+  'manager roles land on a home tile menu');
+assert(html.indexOf("openApp('hub-eightbells'") !== -1 && html.indexOf("openApp('menus-eightbells'") !== -1,
+  'EB manager home has paperwork and Menus');
+assert(html.indexOf("openApp('pricequery-eightbells'") !== -1, 'EB manager home has drink pricing');
+assert(html.indexOf("openApp('hub-windmill'") !== -1 && html.indexOf("openApp('rooms-windmill'") !== -1,
+  'WM manager home has paperwork and Rooms');
+assert(roomsWm.indexOf('rooms-windmill.html') !== -1, 'WM rooms opens rooms-windmill.html');
+assert(html.indexOf('MANAGER_APPS') !== -1, 'manager apps are allowlisted');
+assert(html.indexOf('menusFab') === -1 && html.indexOf('roomsFab') === -1, 'manager FABs removed in favour of home tiles');
 assert(html.indexOf('openOwnerReview') === -1, 'does not touch openOwnerReview');
-assert(!/Owner tools|owner paperwork|page=owner/.test(html.match(/id="managerView"[\s\S]*id="roomsFab"/)[0]), 'manager chrome has no owner-paperwork link');
+var managerChunk = html.match(/id="managerView"[\s\S]*?<\/div>\s*<script>/);
+assert(managerChunk && !/Owner tools|owner paperwork|page=owner/.test(managerChunk[0]),
+  'manager chrome has no owner-paperwork link');
 
 assert(html.indexOf('#1c1610') !== -1 && html.indexOf('#f6f0e6') !== -1, 'Varlo ink + cream tokens');
 assert(html.indexOf('#b68a3a') !== -1 && html.indexOf('#24362c') !== -1, 'Varlo brass + forest tokens');

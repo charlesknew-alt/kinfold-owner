@@ -15,10 +15,10 @@ Everyone signs in on this GitHub Pages site (one CNAME). After login:
 | Role | Lands on |
 |---|---|
 | Owner | Existing owner tiles (Staff Hub, invoicing, paperwork, rooms, payroll, card takings) |
-| Eight Bells manager | Venue manager hub iframe — EB `/exec` with **no** `page=` and **no** `shell=owner` |
-| Windmill manager | Venue manager hub iframe — WM `/exec` with **no** `page=` and **no** `shell=owner` |
+| Eight Bells manager | Home menu: daily/weekly paperwork, Menus, drink pricing, card takings |
+| Windmill manager | Home menu: daily/weekly paperwork, Rooms, card takings (Teya) |
 
-Sheets and the live takings `/exec` IDs are unchanged. Owner paperwork still iframes those scripts with `shell=owner`. Eight Bells Card Takings still uses the Barclaycard / Apps Script `page=cardday` reader. **Windmill Card Takings** is a standalone Teya CSV reader (`card-takings.html`) — browser-only, does not feed paperwork. Manager views never send `shell=owner`. There is no owner-paperwork link on the manager hub. `openOwnerReview` is untouched.
+Managers no longer drop straight into paperwork. Paperwork is one tile on the home menu (`hub-eightbells` / `hub-windmill` — venue `/exec` with **no** `page=` and **no** `shell=owner`). Sheets and the live takings `/exec` IDs are unchanged. Owner paperwork still iframes those scripts with `shell=owner`. Eight Bells Card Takings still uses the Barclaycard / Apps Script `page=cardday` reader. **Windmill Card Takings** is a standalone Teya CSV reader (`card-takings.html`) — browser-only, does not feed paperwork. Manager views never send `shell=owner`. There is no owner-paperwork link on the manager hub. `openOwnerReview` is untouched.
 
 ## Owner: set manager passwords
 
