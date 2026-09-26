@@ -304,14 +304,18 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow80') !== -1, 'menus page cache-bust is flow80');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow80') !== -1, 'hub menus link cache-bust is flow80');
+assert(page.indexOf('flow81') !== -1, 'menus page cache-bust is flow81');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow81') !== -1, 'hub menus link cache-bust is flow81');
 assert(printJs.indexOf('function renderLittleBellsRow') !== -1 && printJs.indexOf('cols-little-desserts') !== -1,
   'Little Bells Column width pairs beside Desserts');
 assert(printJs.indexOf('dessertsAllowColumn') !== -1 && printJs.indexOf('sidesAllowColumn') !== -1,
   'Little Bells only pairs partners that Blocks allows as Column');
-assert(printJs.indexOf('lockedFullWidth') !== -1,
-  'Blocks Full width lock keeps sections full-bleed');
+assert(printJs.indexOf('lockedFullWidth') !== -1 && printJs.indexOf('lockedColumnWidth') !== -1,
+  'Blocks Full / Column locks are distinct from Best fit');
+assert(printJs.indexOf('columnSoloSection') !== -1,
+  'Column-locked sections alone stay half-width');
+assert(api.isLockedColumnWidth('column') && !api.isLockedColumnWidth('both') && !api.isLockedColumnWidth('full'),
+  'locked Column is only the Column Blocks choice');
 assert(printJs.indexOf('sundayRoasts') !== -1 && printJs.indexOf('roastsOnP1') !== -1,
   'print planner can balance Sunday Roasts onto page 1');
 assert(api.looksLikeDishTitle('Tomato & Basil Pasta') && api.looksLikeDishTitle('Fish Fingers, Chunky Chips & Peas'),
@@ -692,6 +696,55 @@ var kidsColDessertsBoth = print.build(api.menuById('sunday'), kidsColDishes, {
 });
 assert(/cols-little-desserts/.test(kidsColDessertsBoth),
   'Blocks Best fit Desserts may still sit beside Little Bells Column');
+// Packed Sunday with Sides on page 2 alone: Blocks Column must not orphan to full-bleed
+var sidesColAloneDishes = [];
+for (var sci = 0; sci < 8; sci++) {
+  sidesColAloneDishes.push(api.dish('Nibbles', 'Nibble ' + sci, 'loaded', '6.95', ''));
+  sidesColAloneDishes.push(api.dish('Starters', 'Starter ' + sci, 'long starter description text', '8.95', ''));
+}
+for (var sci = 0; sci < 5; sci++) {
+  sidesColAloneDishes.push(api.dish('Sunday Roasts', 'Roast ' + sci, 'roast potatoes yorkshire', '21.95', ''));
+  sidesColAloneDishes.push(api.dish('Little Bells', 'Kid Dish ' + sci, '', '', ''));
+  sidesColAloneDishes.push(api.dish('Desserts', 'Dessert ' + sci, 'nice long pudding description text here', '8.25', 'v'));
+}
+for (var sci = 0; sci < 8; sci++) {
+  sidesColAloneDishes.push(api.dish('Mains', 'Main ' + sci, 'mash and gravy long', '17.95', ''));
+}
+for (var sci = 0; sci < 4; sci++) {
+  sidesColAloneDishes.push(api.dish('Sides', 'SideItem' + sci, '', '5.95', ''));
+}
+var sidesColAlonePromos = [
+  { title: 'Next Pub Quiz', body: 'quiz night tonight' },
+  { title: 'How are we doing?', body: 'tell us' },
+  { title: 'All tips go to staff working today!', body: 'tips' },
+  { title: 'Stay a While', body: 'rooms' },
+  { title: 'Gatherings', body: 'events' }
+];
+var sidesColAlonePlan = print.planFluidLayout(api.menuById('sunday'), sidesColAloneDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'full', frame: false, note: 'note' },
+    Desserts: { width: 'full', frame: false, note: '' },
+    Sides: { width: 'column', frame: false, note: '' },
+    Sandwiches: { width: 'column', frame: true, tip: true, sell: 'Ask.' }
+  }),
+  promos: sidesColAlonePromos
+});
+assert(sidesColAlonePlan.pages === 2 && sidesColAlonePlan.p2 && sidesColAlonePlan.p2.sidesOnP2,
+  'fixture keeps Sides on page 2 alone (the orphan case)');
+var sidesColAloneHtml = print.build(api.menuById('sunday'), sidesColAloneDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'full', frame: false, note: 'note' },
+    Desserts: { width: 'full', frame: false, note: '' },
+    Sides: { width: 'column', frame: false, note: '' },
+    Sandwiches: { width: 'column', frame: true, tip: true, sell: 'Ask.' }
+  }),
+  promos: sidesColAlonePromos
+});
+var a4Only = sidesColAloneHtml.split('mode-panel mode-a5')[0] || sidesColAloneHtml;
+assert(!/<section class="sec"><div class="sec-title soft-left">Sides/.test(a4Only),
+  'Blocks Column Sides are not orphaned to a full-bleed section');
+assert(/bottom-cols[\s\S]{0,500}SideItem0|col-sides[\s\S]{0,300}SideItem0|column-solo-row[\s\S]{0,300}SideItem0/.test(a4Only),
+  'Blocks Column Sides stay in a column under Desserts');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
 var jammedSunday = [

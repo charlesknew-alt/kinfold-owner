@@ -1611,6 +1611,16 @@
     return width === 'full' || width === 'both';
   }
 
+  /** Blocks “Column” lock (not Best fit). Must stay a half-column — never full-bleed. */
+  function isLockedColumnWidth(width) {
+    return width === 'column';
+  }
+
+  /** Blocks “Full width” lock (not Best fit). Must stay full-bleed — never a half-column. */
+  function isLockedFullWidth(width) {
+    return width === 'full';
+  }
+
   root.EBMenus = {
     MENUS: MENUS,
     SECTIONS: SECTIONS,
@@ -1660,6 +1670,8 @@
     sectionLayoutFor: sectionLayoutFor,
     isColumnWidth: isColumnWidth,
     isFullWidth: isFullWidth,
+    isLockedColumnWidth: isLockedColumnWidth,
+    isLockedFullWidth: isLockedFullWidth,
     cleanDishName: cleanDishName,
     priceOf: priceOf,
     looksLikeDescFragment: looksLikeDescFragment,

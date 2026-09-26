@@ -1453,7 +1453,29 @@
 
   /** Blocks “Full width” lock (not Best fit). Must print full-bleed — never a half-column. */
   function lockedFullWidth(rule) {
+    if (root.EBMenus && root.EBMenus.isLockedFullWidth) {
+      return !!(rule && root.EBMenus.isLockedFullWidth(rule.width));
+    }
     return !!(rule && wantsFull(rule) && !wantsColumn(rule));
+  }
+
+  /** Blocks “Column” lock (not Best fit). Must stay half-column — never orphaned to full-bleed. */
+  function lockedColumnWidth(rule) {
+    if (root.EBMenus && root.EBMenus.isLockedColumnWidth) {
+      return !!(rule && root.EBMenus.isLockedColumnWidth(rule.width));
+    }
+    return !!(rule && String(rule.width || '').toLowerCase() === 'column');
+  }
+
+  /** Half-column section with empty opposite — honours Blocks Column when no partner. */
+  function columnSoloSection(title, dishes, rule) {
+    if (!dishes || !dishes.length) return '';
+    var inner = sectionBlock(title, dishes, rule, 'box');
+    return '<section class="sec column-solo-row">' +
+      '<div class="cols cols-balanced">' +
+      '<div class="col"><div class="col-body">' + inner + '</div></div>' +
+      '<div class="col"><div class="col-body">&nbsp;</div></div>' +
+      '</div></section>';
   }
 
   /**
@@ -1728,7 +1750,9 @@
 
       // Orphan column (e.g. Sandwiches alone): span food full-width, two feature
       // panels as a footer row — never leave a tall empty hole beside a column.
-      if (orphanColumnHole(leftFoodU, rightFoodU) && !(leftHasFood && rightHasFood)) {
+      // Exception: Blocks “Column” lock on Sides must stay half-width (never full-bleed).
+      var sidesLockedCol = !!(p1opts.sidesOnP1 && sidesPrint && lockedColumnWidth(sideRule));
+      if (orphanColumnHole(leftFoodU, rightFoodU) && !(leftHasFood && rightHasFood) && !sidesLockedCol) {
         p1 += '<section class="sec classics-block">';
         if (!logoInTop) {
           p1 += '<div class="top-band top-band-logo"><div class="top-left"></div>' +
@@ -1871,7 +1895,11 @@
         p1 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
       }
       if (sidesPrint && !p1opts.sidesOnP1 && !littleP1.usedSides) {
-        p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
+        if (lockedColumnWidth(sideRule)) {
+          p1 += columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule);
+        } else {
+          p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
+        }
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
       if (p1opts.sandwiches && !showColBlock) p1 += renderFiller('sandwiches', bag);
@@ -1916,14 +1944,16 @@
       var sidesCol = sidesPrint && wantsColumn(sideRule);
       var sideList = (p2opts.sidesOnP2 && sidesPrint && !littleP2.usedSides) ? sidesPrint.dishes.slice() : [];
       // Sides (and sauces) in the left column; Sandwiches fully in the frilly box on the right.
-      // If Sides sit alone (no sandwiches opposite), span full-width + two foot panels.
+      // If Sides sit alone (no sandwiches opposite), Best fit may span full-width + foot panels.
+      // Blocks “Column” lock must stay half-width — never orphan to full-bleed.
       if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms || bag.sauces)) {
         var sideU = 0;
         if (sideList.length) sideU += sectionUnits({ name: 'Sides', dishes: sideList }, false);
         if (p2opts.sidesOnP2 && bag.sauces) sideU += sectionUnits(bag.sauces, false);
         var rightU = p2opts.sandwiches ? sandwichesPackCost(bag) : 0;
         var remainingPromos = filterUnusedPromos(promos, usedPromoTitles);
-        if (orphanColumnHole(sideU, rightU) && sideList.length && !p2opts.sandwiches) {
+        var sidesLockedColP2 = !!(sideList.length && lockedColumnWidth(sideRule));
+        if (orphanColumnHole(sideU, rightU) && sideList.length && !p2opts.sandwiches && !sidesLockedColP2) {
           p2 += '<section class="sec">';
           p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
           p2 += listDishes(sideList);
@@ -1977,7 +2007,11 @@
         p2 += '</div></div>';
         }
       } else if (p2opts.sidesOnP2 && sidesPrint) {
-        p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
+        if (lockedColumnWidth(sideRule)) {
+          p2 += columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule);
+        } else {
+          p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
+        }
       }
     } else if (p2opts.rooms) {
       p2 += renderFiller('rooms', bag, filterUnusedPromos(promos, usedPromoTitles));
