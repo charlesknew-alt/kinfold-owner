@@ -136,7 +136,10 @@ assert(page.indexOf('Print history') !== -1 && page.indexOf('data-view="history"
   'Menus has a Print history view');
 assert(page.indexOf('Shared across phones and PCs') !== -1 || page.indexOf('shared cloud') !== -1,
   'print history UI says it is shared across devices');
-assert(page.indexOf('savePrintHistory') !== -1, 'Generate saves into print history');
+assert(page.indexOf('Save to menus') !== -1 && printJs.indexOf('saveToMenus') !== -1,
+  'print sheet Save to menus stamps history (not every generate)');
+assert(printJs.indexOf('peekPrintVersion') !== -1 && printJs.indexOf('commitPrintVersion') !== -1,
+  'version numbers are peeked on preview and committed on Save to menus');
 assert(page.indexOf('pullMenusFromCloud') !== -1 && page.indexOf('saveMenusState') !== -1,
   'live menu book syncs to cloud for all devices');
 assert(page.indexOf('sync on every phone and PC') !== -1 || page.indexOf('Menus synced across devices') !== -1,
@@ -304,8 +307,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow84') !== -1, 'menus page cache-bust is flow84');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow84') !== -1, 'hub menus link cache-bust is flow84');
+assert(page.indexOf('flow85') !== -1, 'menus page cache-bust is flow85');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow85') !== -1, 'hub menus link cache-bust is flow85');
 assert(printJs.indexOf('cols-little-solo') !== -1 && printJs.indexOf('levelOppositeColumns') !== -1,
   'opposite columns are leveled with food then feature panels');
 assert(printJs.indexOf('function noteUnits') !== -1,
@@ -938,9 +941,13 @@ assert(forced.length === 1 && forced[0].id === 'old', 'manual tick can force a p
 assert(api.formatPromoDate('2026-09-30').indexOf('September') !== -1, 'promo date formats for print');
 assert(page.indexOf('Events &amp; selling lines') !== -1 || page.indexOf('In the bank') !== -1, 'wording bank mode in UI');
 assert(page.indexOf('data-promo-tick') !== -1, 'promo ticks on long menus');
-var v1 = print.nextPrintVersion('main');
-var v2 = print.nextPrintVersion('main');
-assert(v1.roman === 'I' && v2.roman === 'II', 'print version increments per generate');
+var peekA = print.peekPrintVersion('main');
+var peekB = print.peekPrintVersion('main');
+assert(peekA.roman === peekB.roman, 'preview peek does not burn version numbers');
+var v1 = print.commitPrintVersion('main');
+var v2 = print.commitPrintVersion('main');
+assert(v1.roman === peekA.roman, 'Save to menus stamps the peeked Roman');
+assert(v1.roman === 'I' && v2.roman === 'II', 'print version increments only when stamped');
 assert(v1.week === v2.week, 'same week label within the week');
 assert(typeof print.savePrintHistory === 'function' && typeof print.listPrintHistory === 'function',
   'history helpers exported');

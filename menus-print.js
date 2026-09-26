@@ -120,14 +120,13 @@
     return sun.getFullYear() + '-' + (sun.getMonth() + 1) + '-' + sun.getDate();
   }
 
-  /** Next Roman print number for this menu in the current week (or Sunday date). */
-  function nextPrintVersion(menuId) {
+  function printVersionStorageKey(menuId) {
     var isSunday = menuId === 'sunday';
-    var key = 'eb-print-ver-' + menuId + '-' + (isSunday ? sundayKey() : weekKey());
-    var n = 0;
-    try { n = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) {}
-    n += 1;
-    try { localStorage.setItem(key, String(n)); } catch (e) {}
+    return 'eb-print-ver-' + menuId + '-' + (isSunday ? sundayKey() : weekKey());
+  }
+
+  function printVersionMeta(menuId, n) {
+    var isSunday = menuId === 'sunday';
     return {
       n: n,
       roman: toRoman(n),
@@ -135,6 +134,28 @@
       weekKey: isSunday ? sundayKey() : weekKey(),
       hideDate: false
     };
+  }
+
+  /** Next Roman for preview — does not burn a number until Save to menus. */
+  function peekPrintVersion(menuId) {
+    var n = 0;
+    try { n = parseInt(localStorage.getItem(printVersionStorageKey(menuId)) || '0', 10) || 0; } catch (e) {}
+    return printVersionMeta(menuId, n + 1);
+  }
+
+  /** Stamp the next Roman when staff click Save to menus on the print sheet. */
+  function commitPrintVersion(menuId) {
+    var key = printVersionStorageKey(menuId);
+    var n = 0;
+    try { n = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) {}
+    n += 1;
+    try { localStorage.setItem(key, String(n)); } catch (e) {}
+    return printVersionMeta(menuId, n);
+  }
+
+  /** @deprecated use commitPrintVersion — kept for older callers/tests */
+  function nextPrintVersion(menuId) {
+    return commitPrintVersion(menuId);
   }
 
   /** Date / version strip — party/Christmas: Roman only, no week line. */
@@ -2602,7 +2623,8 @@
 
   function build(menu, dishes, plan) {
     plan = plan || {};
-    var ver = nextPrintVersion(menu.id);
+    // Preview shows the next Roman without burning it — Save to menus stamps it.
+    var ver = peekPrintVersion(menu.id);
     if (menu.id === 'party' || menu.kind === 'party') ver.hideDate = true;
     var landscape = menu.kind === 'card';
     var guillotine = !!plan.guillotine && !landscape;
@@ -2656,7 +2678,8 @@
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
       '</style></head><body class="' + bodyClass + '">' +
       '<div class="toolbar">' +
-        '<button type="button" onclick="window.print()">Print / save as PDF</button>' +
+        '<button type="button" id="printSheet">Print / save as PDF</button>' +
+        '<button type="button" id="saveToMenus">Save to menus</button>' +
         (landscape ? '<span class="hint">Card menu — two identical copies on landscape A4 for the guillotine.</span>' :
           '<label class="paper-opt"><input type="radio" name="paper" value="a4"' +
             (defaultPaper === 'a4' ? ' checked' : '') +
@@ -2664,9 +2687,10 @@
           '<label class="paper-opt"><input type="radio" name="paper" value="a5"' +
             (defaultPaper === 'a5' ? ' checked' : '') +
             ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
-        '<span class="hint">' + esc(dateHint) +
+        '<span class="hint" id="printHint">' + esc(dateHint) +
         ' — fill top to bottom; readable type only; allergy line kept clear.' +
-        esc(fillerHint) + '</span>' +
+        esc(fillerHint) +
+        ' Click Save to menus to stamp this print version into history.</span>' +
       '</div>' +
       a4Stack + a5Stack +
       '<script>(function(){' +
@@ -2849,10 +2873,41 @@
         'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();' +
         'setTimeout(fitPages,80);setTimeout(fitPages,400);setTimeout(fitPages,1200);' +
         'window.addEventListener("beforeprint",fitPages);' +
-        'var pb=document.querySelector(".toolbar button");' +
+        'var SAVE_META=' + JSON.stringify({
+          menuId: menu.id,
+          menuName: menu.name,
+          week: ver.week,
+          weekKey: ver.weekKey,
+          hideDate: !!ver.hideDate
+        }) + ';' +
+        'var pb=document.getElementById("printSheet");' +
         'if(pb){pb.onclick=function(ev){ev.preventDefault();' +
           'function go(){fitPages();setTimeout(function(){window.print();},80);}' +
           'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);}else go();' +
+        '};}' +
+        // Stamp Roman + keep one history copy only when staff choose Save to menus.
+        'var sb=document.getElementById("saveToMenus");' +
+        'if(sb){sb.onclick=function(){' +
+          'if(!window.opener||!window.opener.EBMenuPrint||!window.opener.EBMenuPrint.commitPrintVersion){' +
+            'alert("Keep the Menus tab open, then click Save to menus again.");return;}' +
+          'var api=window.opener.EBMenuPrint;' +
+          'sb.disabled=true;sb.textContent="Saving…";' +
+          'var ver=api.commitPrintVersion(SAVE_META.menuId);' +
+          'if(SAVE_META.hideDate)ver.hideDate=true;' +
+          '[].forEach.call(document.querySelectorAll(".tracker .roman"),function(el){el.textContent=ver.roman;});' +
+          'var hint=document.getElementById("printHint");' +
+          'if(hint){hint.textContent=(SAVE_META.hideDate?("print "+ver.roman):(ver.week+" · print "+ver.roman))+' +
+            '" — saved to Print history.";}' +
+          'try{document.title=api.printSheetLabel?api.printSheetLabel(SAVE_META.menuName,ver):document.title;}catch(e1){}' +
+          'fitPages();' +
+          'var html="<!DOCTYPE html>"+document.documentElement.outerHTML;' +
+          'api.savePrintHistory({' +
+            'menuId:SAVE_META.menuId,menuName:SAVE_META.menuName,' +
+            'roman:ver.roman,n:ver.n,week:ver.week||SAVE_META.week,weekKey:ver.weekKey||SAVE_META.weekKey,' +
+            'hideDate:!!ver.hideDate,html:html' +
+          '}).then(function(){sb.textContent="Saved · "+ver.roman;})' +
+          '.catch(function(){sb.disabled=false;sb.textContent="Save to menus";' +
+            'alert("Could not save this sheet. Try again.");});' +
         '};}' +
       '})();<\/script>' +
       '</body></html>'
@@ -3271,27 +3326,38 @@
   }
 
   function listPrintHistory() {
+    function asRow(r, source) {
+      return {
+        id: r.id,
+        menuId: r.menuId,
+        menuName: r.menuName,
+        roman: r.roman,
+        n: r.n,
+        week: r.week,
+        weekKey: r.weekKey,
+        hideDate: r.hideDate,
+        generatedAt: r.generatedAt,
+        dayKey: r.dayKey,
+        source: source
+      };
+    }
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
-      var items = Array.isArray(data.items) ? data.items : [];
+      var cloudItems = Array.isArray(data.items) ? data.items : [];
       var known = {};
-      items.forEach(function (r) { if (r && r.id) known[r.id] = true; });
+      cloudItems.forEach(function (r) { if (r && r.id) known[r.id] = true; });
       // Fire-and-forget: upload any sheets that only exist on this device.
       migrateLocalToCloud(known);
-      return sortHistoryNewest(items.map(function (r) {
-        return {
-          id: r.id,
-          menuId: r.menuId,
-          menuName: r.menuName,
-          roman: r.roman,
-          n: r.n,
-          week: r.week,
-          weekKey: r.weekKey,
-          hideDate: r.hideDate,
-          generatedAt: r.generatedAt,
-          dayKey: r.dayKey,
-          source: 'cloud'
-        };
-      }));
+      // Always merge local backup — empty cloud must not hide device saves.
+      return localListOnly().then(function (localItems) {
+        var byId = {};
+        (localItems || []).forEach(function (r) {
+          if (r && r.id) byId[r.id] = asRow(r, 'local');
+        });
+        cloudItems.forEach(function (r) {
+          if (r && r.id) byId[r.id] = asRow(r, 'cloud');
+        });
+        return sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
+      });
     }).catch(function () {
       return localListOnly();
     });
@@ -3407,6 +3473,8 @@
     printFileName: printFileName,
     weekKey: weekKey,
     nextPrintVersion: nextPrintVersion,
+    peekPrintVersion: peekPrintVersion,
+    commitPrintVersion: commitPrintVersion,
     wrapGuillotine: wrapGuillotine,
     getLastBuild: getLastBuild,
     savePrintHistory: savePrintHistory,
