@@ -174,7 +174,7 @@
     @media (min-width: 640px) {
       .complete-head { display: grid; grid-template-columns: minmax(0,1fr) auto auto; gap: 8px; align-items: end; margin: 8px 0; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
     }
-    .ticks-head { display: grid; grid-template-columns: repeat(4, 44px); gap: 4px; text-align: center; }
+    .ticks-head { display: grid; grid-template-columns: repeat(5, 40px); gap: 4px; text-align: center; }
     .dish-row {
       display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; align-items: start;
       padding: 12px 0; border-bottom: 1px solid var(--line);
@@ -209,7 +209,7 @@
     .dish-actions select {
       width: auto; min-width: 7.5rem; padding: 8px 10px; font-size: 13px; font-weight: 600; background: #fff;
     }
-    .ticks { display: grid; grid-template-columns: repeat(4, 44px); gap: 4px; justify-items: center; }
+    .ticks { display: grid; grid-template-columns: repeat(5, 40px); gap: 4px; justify-items: center; }
     .ticks label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--ink-soft); cursor: pointer; min-height: 44px; justify-content: center; }
     .ticks .letter { color: var(--green); font-style: italic; font-size: 12px; }
     .section-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-top: 14px; font-weight: 700; }
@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow55"></script>
-  <script src="menus-print.js?v=20260926-flow55"></script>
-  <script src="menus-ingest.js?v=20260926-flow55"></script>
+  <script src="menus.js?v=20260926-flow56"></script>
+  <script src="menus-print.js?v=20260926-flow56"></script>
+  <script src="menus-ingest.js?v=20260926-flow56"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1105,6 +1105,8 @@
       html += tick('as option', prefix + '-vOpt', m.vOpt);
       html += tick('<span class="letter">vg</span> vegan', prefix + '-vg', m.vg);
       html += tick('as option', prefix + '-vgOpt', m.vgOpt);
+      html += tick('<span class="letter">df</span> dairy free', prefix + '-df', m.df);
+      html += tick('as option', prefix + '-dfOpt', m.dfOpt);
       html += '</div>';
       if (menuId === 'lunch-club') {
         html += '<p class="note">This card is the lunch club itself, Monday to Thursday. Two courses £14.95, three courses £17.95.</p>';
@@ -1253,6 +1255,7 @@
         if (m.gf) html += '<label><input type="checkbox" data-flag="gfOpt" data-id="' + d.id + '"' + (m.gfOpt ? ' checked' : '') + '> gf as option</label>';
         if (m.v) html += '<label><input type="checkbox" data-flag="vOpt" data-id="' + d.id + '"' + (m.vOpt ? ' checked' : '') + '> v as option</label>';
         if (m.vg) html += '<label><input type="checkbox" data-flag="vgOpt" data-id="' + d.id + '"' + (m.vgOpt ? ' checked' : '') + '> vg as option</label>';
+        if (m.df) html += '<label><input type="checkbox" data-flag="dfOpt" data-id="' + d.id + '"' + (m.dfOpt ? ' checked' : '') + '> df as option</label>';
         html += '</div></div>';
         html += '<div class="ticks">';
         if (showLunch) html += '<label><input type="checkbox" data-flag="lunchClub" data-id="' + d.id + '"' + (d.lunchClub ? ' checked' : '') + '><span>' + MARK + '</span></label>';
@@ -1260,6 +1263,7 @@
         html += '<label><input type="checkbox" data-flag="gf" data-id="' + d.id + '"' + (m.gf ? ' checked' : '') + '><span class="letter">gf</span></label>';
         html += '<label><input type="checkbox" data-flag="v" data-id="' + d.id + '"' + (m.v ? ' checked' : '') + '><span class="letter">v</span></label>';
         html += '<label><input type="checkbox" data-flag="vg" data-id="' + d.id + '"' + (m.vg ? ' checked' : '') + '><span class="letter">vg</span></label>';
+        html += '<label><input type="checkbox" data-flag="df" data-id="' + d.id + '"' + (m.df ? ' checked' : '') + '><span class="letter">df</span></label>';
         html += '</div>';
         html += '<div class="dish-actions no-print"><select data-dish-action="' + escapeAttr(d.id) + '" aria-label="Edit ' + escapeAttr(d.name) + '">';
         html += '<option value="">Edit…</option><option value="adjust">Adjust</option><option value="replace">Replace</option>';
@@ -1769,9 +1773,11 @@
         if (flag === 'gf' && !on) m.gfOpt = false;
         if (flag === 'v' && !on) m.vOpt = false;
         if (flag === 'vg' && !on) m.vgOpt = false;
+        if (flag === 'df' && !on) m.dfOpt = false;
         if (flag === 'gfOpt' && on) m.gf = true;
         if (flag === 'vOpt' && on) m.v = true;
         if (flag === 'vgOpt' && on) m.vg = true;
+        if (flag === 'dfOpt' && on) m.df = true;
         item.tags = EBMenus.formatMarks(m);
       }
       save();
@@ -1795,7 +1801,9 @@
         v: !!(document.getElementById(prefix + '-v') && document.getElementById(prefix + '-v').checked),
         vOpt: !!(document.getElementById(prefix + '-vOpt') && document.getElementById(prefix + '-vOpt').checked),
         vg: !!(document.getElementById(prefix + '-vg') && document.getElementById(prefix + '-vg').checked),
-        vgOpt: !!(document.getElementById(prefix + '-vgOpt') && document.getElementById(prefix + '-vgOpt').checked)
+        vgOpt: !!(document.getElementById(prefix + '-vgOpt') && document.getElementById(prefix + '-vgOpt').checked),
+        df: !!(document.getElementById(prefix + '-df') && document.getElementById(prefix + '-df').checked),
+        dfOpt: !!(document.getElementById(prefix + '-dfOpt') && document.getElementById(prefix + '-dfOpt').checked)
       });
     }
     function readForm() {

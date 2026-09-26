@@ -173,7 +173,7 @@
     var html =
       '<div class="allergy">' +
         'Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can’t guarantee it’s allergen-free.<br>' +
-        'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan';
+        'gf – gluten free &nbsp;&nbsp; v – vegetarian &nbsp;&nbsp; vg – vegan &nbsp;&nbsp; df – dairy free';
     if (opts.lunchClub) {
       // Lunch club note lives in the allergy footer (not a mid-page scallop box)
       html +=
