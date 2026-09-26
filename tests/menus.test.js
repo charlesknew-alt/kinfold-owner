@@ -291,8 +291,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow65') !== -1, 'menus page cache-bust is flow65');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow65') !== -1, 'hub menus link cache-bust is flow65');
+assert(page.indexOf('flow66') !== -1, 'menus page cache-bust is flow66');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow66') !== -1, 'hub menus link cache-bust is flow66');
+assert(printJs.indexOf('canFitFootPromos') !== -1 && printJs.indexOf('footPromos') !== -1,
+  'foot feature panels require spare room (not jammed at min type)');
+assert(printJs.indexOf('dropJammedFootPromos') !== -1,
+  'fit script drops jammed foot feature panels at dense/compact type');
 assert(printJs.indexOf('specials-face') !== -1 && printJs.indexOf('specials-course') !== -1,
   'Specials card uses compact specials-course titles');
 assert(/\.card-face\.specials-face h1\{[^}]*font-size:14pt/.test(printJs),

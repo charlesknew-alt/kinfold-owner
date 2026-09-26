@@ -563,6 +563,12 @@
     return false;
   }
 
+  /** Foot feature pair needs comfortable spare room — never jam at min type. */
+  var FOOT_PROMO_MIN_LEFT = 18;
+  function canFitFootPromos(leftover) {
+    return (leftover || 0) >= FOOT_PROMO_MIN_LEFT;
+  }
+
   /**
    * Two feature panels side-by-side under a full-width food block.
    * Prefer unused titles; pad with evergreen defaults so we always try to fill.
@@ -1112,7 +1118,7 @@
       mode: 'single',
       bag: bag,
       promos: promos || [],
-      p1: { rooms: false, sandwiches: false, footLogo: false, classicsSplit: 0, sidesOnP1: false },
+      p1: { rooms: false, sandwiches: false, footLogo: false, footPromos: false, classicsSplit: 0, sidesOnP1: false },
       p2: null,
       leftover: { p1: 0, p2: 0 },
       summary: '',
@@ -1174,13 +1180,15 @@
       add = tryAdd(left1, COST.footLogo + 6);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
       layout.leftover.p1 = Math.max(0, left1);
+      // Foot feature pairs only with real spare room — never jam at min type.
+      layout.p1.footPromos = canFitFootPromos(layout.leftover.p1);
       layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
     } else if (hasBackContent || foodNeed > ONE_PAGE_AT_MIN || preferTwo) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
       layout.mode = 'jul-nov';
-      layout.p2 = { rooms: false, sandwiches: false, footLogo: false, sidesOnP2: true };
+      layout.p2 = { rooms: false, sandwiches: false, footLogo: false, footPromos: false, sidesOnP2: true };
       layout.p1.classicsSplit = 1;
 
       var p1used = front;
@@ -1293,6 +1301,10 @@
       }
       layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
+      // Foot feature pairs only when the page still has comfortable spare room.
+      // At min type / packed mains+desserts, omit rather than jam panels in.
+      layout.p1.footPromos = canFitFootPromos(p1left);
+      layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
       if (p1used > PAGE + 10 || p2used > PAGE + 14) layout.fit = 'over';
     } else {
@@ -1629,10 +1641,14 @@
         if (classicDishes.length) {
           p1 += framedBlock(sectionTitle('Pub Classics') + listDishes(classicDishes), classRule);
         }
-        var foot1 = footPromoPair(promos, { excludeTitles: usedPromoTitles });
-        usedPromoTitles = usedPromoTitles.concat(foot1.usedTitles || []);
-        if (foot1.html) p1 += foot1.html;
-        else if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+        // Only add foot panels when the planner left comfortable spare room —
+        // never jam them under food at minimum type.
+        if (p1opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p1)) {
+          var foot1 = footPromoPair(promos, { excludeTitles: usedPromoTitles });
+          usedPromoTitles = usedPromoTitles.concat(foot1.usedTitles || []);
+          if (foot1.html) p1 += foot1.html;
+          else if (p1opts.rooms) p1 += renderFiller('rooms', bag, promos);
+        }
         p1 += '</section>';
       } else {
       p1 += '<section class="sec classics-block">';
@@ -1790,10 +1806,13 @@
             p2 += listDishes(bag.sauces.dishes);
           }
           p2 += '</section>';
-          var foot2 = footPromoPair(remainingPromos, { excludeTitles: usedPromoTitles });
-          usedPromoTitles = usedPromoTitles.concat(foot2.usedTitles || []);
-          if (foot2.html) p2 += foot2.html;
-          else if (p2opts.rooms) p2 += renderFiller('rooms', bag, remainingPromos);
+          // Packed page 2 (mains + desserts + sides): omit foot panels if jammed.
+          if (p2opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p2)) {
+            var foot2 = footPromoPair(remainingPromos, { excludeTitles: usedPromoTitles });
+            usedPromoTitles = usedPromoTitles.concat(foot2.usedTitles || []);
+            if (foot2.html) p2 += foot2.html;
+            else if (p2opts.rooms) p2 += renderFiller('rooms', bag, remainingPromos);
+          }
         } else {
         var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
         var p2Fill = planPromoFill(sideU, rightU, remainingPromos, {
@@ -2429,6 +2448,21 @@
           'if(!hidden)return;' +
           'fitGroup(group);' +
         '}' +
+        // Feature panels must not jam in at min type — drop foot promo pairs when
+        // the page is already dense/compact or still overflows with them.
+        'function dropJammedFootPromos(page){' +
+          'var foots=page.querySelectorAll(".foot-promos,.foot-promos-one");' +
+          'if(!foots.length)return false;' +
+          'var dense=page.classList.contains("fill-dense")||page.classList.contains("fill-compact")||page.classList.contains("fill-tight");' +
+          'if(!dense&&!overflows(page))return false;' +
+          '[].forEach.call(foots,function(el){if(el.parentNode)el.parentNode.removeChild(el);});' +
+          'return true;' +
+        '}' +
+        'function dropJammedPromos(group){' +
+          'var changed=false;' +
+          'group.forEach(function(pg){if(dropJammedFootPromos(pg))changed=true;});' +
+          'if(changed)fitGroup(group);' +
+        '}' +
         // After shared type is locked, grow gaps / spread sections so leftover space
         // is not a blank bottom third — fill top→bottom evenly without changing type size.
         'function clearSpread(page){' +
@@ -2478,6 +2512,8 @@
           'var a5=[].slice.call(document.querySelectorAll(".a5-face.fill-page"));' +
           'preferReadableType(a4);' +
           'preferReadableType(a5);' +
+          'dropJammedPromos(a4);' +
+          'dropJammedPromos(a5);' +
           '[].slice.call(document.querySelectorAll(".card-face.fill-page")).forEach(function(page){' +
             'clearFitArtifacts(page);' +
             'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
