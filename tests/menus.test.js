@@ -304,10 +304,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow83') !== -1, 'menus page cache-bust is flow83');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow83') !== -1, 'hub menus link cache-bust is flow83');
-assert(printJs.indexOf('cols-little-solo') !== -1,
-  'Little Bells Column solo fills the opposite hole with a feature panel');
+assert(page.indexOf('flow84') !== -1, 'menus page cache-bust is flow84');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow84') !== -1, 'hub menus link cache-bust is flow84');
+assert(printJs.indexOf('cols-little-solo') !== -1 && printJs.indexOf('levelOppositeColumns') !== -1,
+  'opposite columns are leveled with food then feature panels');
+assert(printJs.indexOf('function noteUnits') !== -1,
+  'Blocks notes count toward column height for level finishes');
 assert(typeof api.normalizeSectionLayoutBook === 'function' && typeof api.sectionLayoutForMenu === 'function',
   'Blocks rules are stored per menu');
 assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout') !== -1,
@@ -711,6 +713,10 @@ assert(/cols-little-sides/.test(kidsColDessertsFull),
   'Column kids + Column Sides pair with food so columns finish level');
 assert(!/cols-little-solo/.test(kidsColDessertsFull),
   'food partner preferred over a solo kids column');
+assert(
+  /cols-little-sides[\s\S]{0,2500}col-feature[\s\S]{0,800}(Stay a While|Gatherings|All tips|Pub Quiz)/.test(kidsColDessertsFull),
+  'shorter column under kids|sides gets feature panels so both finish level'
+);
 var fishIdx = kidsColDessertsFull.indexOf('Fish Fingers');
 var dessIdx = kidsColDessertsFull.indexOf('Sticky Toffee');
 var halloumiIdx = kidsColDessertsFull.indexOf('Halloumi Fries');
@@ -729,7 +735,7 @@ var kidsColNoSides = print.build(api.menuById('sunday'), kidsColDishes, {
 });
 assert(/cols-little-solo[\s\S]{0,800}Stay a While|cols-little-solo[\s\S]{0,800}Gatherings/.test(kidsColNoSides),
   'Column with no food partner gets feature panels so columns finish level');
-assert(printJs.indexOf('columnBalanceFill') !== -1 && printJs.indexOf('even fill across pages') !== -1,
+assert(printJs.indexOf('levelOppositeColumns') !== -1 && printJs.indexOf('even fill across pages') !== -1,
   'layout equalises opposite columns and leftover across two pages');
 // Best fit (both) still allows the kids|desserts column pair
 var kidsColDessertsBoth = print.build(api.menuById('sunday'), kidsColDishes, {

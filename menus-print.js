@@ -1013,6 +1013,14 @@
     return u;
   }
 
+  /** Blocks “extra info” under a title — counts toward column height for level finishes. */
+  function noteUnits(note) {
+    var t = String(note || '').trim();
+    if (!t) return 0;
+    var lines = t.split(/\n/).filter(Boolean).length || 1;
+    return Math.min(8, 2 + lines * 1.6 + Math.floor(t.length / 70));
+  }
+
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
@@ -1513,22 +1521,39 @@
 
   /**
    * GOLDEN RULE: opposite columns start and finish level.
-   * Food first; when one side has food and the other is empty, put feature panels
-   * on the short side (never leave a blank half-page hole).
+   * Food on both sides first; feature panels under the shorter stack only.
    */
-  function columnBalanceFill(leftFoodU, promos, opts) {
+  function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
     opts = opts || {};
-    var remaining = filterUnusedPromos(promos || [], opts.excludeTitles || []);
-    var fill = planPromoFill(leftFoodU || 0, 0, remaining, {
+    var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
+    var fillOpts = {
       leftFrame: opts.leftFrame || 'box',
       rightFrame: opts.rightFrame || 'wide',
-      force: { shorter: 'right', panels: (leftFoodU || 0) >= 10 ? 2 : 1 }
-    });
-    var rightHtml = fill.right || '';
-    if (!rightHtml && remaining.length) {
-      rightHtml = promoBesidePartner(remaining, leftFoodU || 0, opts.rightFrame || 'wide');
+      excludeTitles: opts.excludeTitles || []
+    };
+    var fill = planPromoFill(leftU || 0, rightU || 0, remaining, fillOpts);
+    // If one side is still clearly short and planPromoFill returned nothing usable, force panels.
+    var gap = (rightU || 0) - (leftU || 0);
+    if (!fill.left && !fill.right && remaining.length && Math.abs(gap) > 2.5) {
+      fill = planPromoFill(leftU || 0, rightU || 0, remaining, {
+        leftFrame: fillOpts.leftFrame,
+        rightFrame: fillOpts.rightFrame,
+        excludeTitles: fillOpts.excludeTitles,
+        force: { shorter: gap > 0 ? 'left' : 'right', panels: Math.abs(gap) > 9 ? 2 : 1 }
+      });
     }
-    return { html: rightHtml || '&nbsp;', usedTitles: fill.usedTitles || [] };
+    var leftFeat = fill.left ? '<div class="col-feature">' + fill.left + '</div>' : '';
+    var rightFeat = fill.right ? '<div class="col-feature">' + fill.right + '</div>' : '';
+    var secClass = opts.secClass || 'col-pair-row';
+    var colsClass = opts.colsClass || '';
+    var leftClass = opts.leftClass || '';
+    var rightClass = opts.rightClass || 'col-promo';
+    var html = '<section class="sec ' + secClass + '">' +
+      '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
+      '<div class="col ' + leftClass + '"><div class="col-body">' + leftInner + '</div>' + leftFeat + '</div>' +
+      '<div class="col ' + rightClass + '"><div class="col-body">' + rightInner + '</div>' + rightFeat + '</div>' +
+      '</div></section>';
+    return { html: html, usedTitles: fill.usedTitles || [] };
   }
 
   /** Blocks Column section with no food partner — pair with feature panels so columns finish level. */
@@ -1536,22 +1561,22 @@
     opts = opts || {};
     if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
     var inner = sectionBlock(title, dishes, rule, 'box');
-    var units = sectionUnits({ name: title, dishes: dishes }, false);
-    var fill = columnBalanceFill(units, opts.promos, opts);
-    return {
-      html: '<section class="sec column-solo-row">' +
-        '<div class="cols cols-balanced cols-features">' +
-        '<div class="col"><div class="col-body">' + inner + '</div></div>' +
-        '<div class="col col-promo"><div class="col-body">' + fill.html + '</div></div>' +
-        '</div></section>',
-      usedPromoTitles: fill.usedTitles
-    };
+    var units = sectionUnits({ name: title, dishes: dishes }, !!(rule && rule.frame));
+    var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
+      promos: opts.promos,
+      excludeTitles: opts.excludeTitles,
+      secClass: 'column-solo-row',
+      colsClass: 'column-solo-cols',
+      leftClass: '',
+      rightClass: 'col-promo'
+    });
+    return { html: leveled.html, usedPromoTitles: leveled.usedTitles };
   }
 
   /**
    * Little Bells respects Blocks width.
    * GOLDEN RULE: Column pairs with food first (Desserts if Column/Best fit, else Sides),
-   * then feature panels so opposite columns start and finish level.
+   * then feature panels under the shorter column so both finish level.
    * Locked Full partners are never forced into the pair.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
@@ -1575,41 +1600,64 @@
         usedPromoTitles: []
       };
     }
+    var kidsU = sectionUnits(bag.littleBells, !!(littleRule && littleRule.frame)) +
+      noteUnits(littleRule && littleRule.note);
     // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
       var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide');
-      var pair = '<section class="sec little-desserts-row">' +
-        '<div class="cols cols-balanced cols-little-desserts">' +
-        '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
-        '<div class="col col-desserts"><div class="col-body">' + dessInner + '</div></div>' +
-        '</div></section>';
-      return { html: pair, usedDesserts: true, usedSides: false, usedPromoTitles: [] };
+      var dessU = sectionUnits(bag.desserts, !!(dessRule && dessRule.frame)) +
+        noteUnits(dessRule && dessRule.note);
+      var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
+        promos: opts.promos,
+        excludeTitles: opts.excludeTitles,
+        secClass: 'little-desserts-row',
+        colsClass: 'cols-little-desserts',
+        leftClass: 'col-little',
+        rightClass: 'col-desserts'
+      });
+      return {
+        html: dessPair.html,
+        usedDesserts: true,
+        usedSides: false,
+        usedPromoTitles: dessPair.usedTitles
+      };
     }
-    // Food first: Sides when Blocks allows Column / Best fit (keeps columns level with food).
+    // Food first: Sides when Blocks allows Column / Best fit — then level with panels.
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide');
-      var withSides = '<section class="sec little-sides-row">' +
-        '<div class="cols cols-balanced cols-little-sides">' +
-        '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
-        '<div class="col col-sides"><div class="col-body">' + sideInner + '</div></div>' +
-        '</div></section>';
-      return { html: withSides, usedDesserts: false, usedSides: true, usedPromoTitles: [] };
+      var sideU = sectionUnits(sidesPrint, !!(sideRule && sideRule.frame)) +
+        noteUnits(sideRule && sideRule.note);
+      var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
+        promos: opts.promos,
+        excludeTitles: opts.excludeTitles,
+        secClass: 'little-sides-row',
+        colsClass: 'cols-little-sides',
+        leftClass: 'col-little',
+        rightClass: 'col-sides'
+      });
+      return {
+        html: sidePair.html,
+        usedDesserts: false,
+        usedSides: true,
+        usedPromoTitles: sidePair.usedTitles
+      };
     }
     // No food partner — feature panels on the short side (never a blank half).
-    var kidsU = sectionUnits(bag.littleBells, false);
-    var fill = columnBalanceFill(kidsU, opts.promos, opts);
-    var solo = '<section class="sec little-solo-row">' +
-      '<div class="cols cols-balanced cols-features cols-little-solo">' +
-      '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
-      '<div class="col col-promo"><div class="col-body">' + fill.html + '</div></div>' +
-      '</div></section>';
+    var solo = levelOppositeColumns(kidsInner, kidsU, '&nbsp;', 0, {
+      promos: opts.promos,
+      excludeTitles: opts.excludeTitles,
+      secClass: 'little-solo-row',
+      colsClass: 'cols-little-solo',
+      leftClass: 'col-little',
+      rightClass: 'col-promo'
+    });
     return {
-      html: solo,
+      html: solo.html,
       usedDesserts: false,
       usedSides: false,
-      usedPromoTitles: fill.usedTitles
+      usedPromoTitles: solo.usedTitles
     };
   }
 
