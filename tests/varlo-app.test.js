@@ -55,6 +55,10 @@ assert(sample.indexOf('Device name') !== -1 && sample.indexOf('Device ID') !== -
 
 assert(html.indexOf('function withOwnerShell') !== -1, 'owner iframe helper kept');
 assert(html.indexOf('function stripOwnerShell') !== -1, 'manager iframe strips shell=owner');
+assert(html.indexOf('function withStaffMenus') !== -1 && html.indexOf('mode=staff') !== -1,
+  'Eight Bells manager Menus get mode=staff');
+assert(html.indexOf("menusFab") !== -1 && html.indexOf("openApp('menus-eightbells'") !== -1,
+  'Eight Bells manager has Menus FAB');
 assert(html.indexOf('openOwnerReview') === -1, 'does not touch openOwnerReview');
 assert(!/Owner tools|owner paperwork|page=owner/.test(html.match(/id="managerView"[\s\S]*id="roomsFab"/)[0]), 'manager chrome has no owner-paperwork link');
 
