@@ -1451,6 +1451,56 @@
     return rule.width === 'full' || rule.width === 'both';
   }
 
+  /**
+   * Little Bells respects Blocks width.
+   * column → sit beside Desserts (preferred) or Sides; full → stacked section.
+   */
+  function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint) {
+    if (!bag.littleBells || !bag.littleBells.dishes || !bag.littleBells.dishes.length) {
+      return { html: '', usedDesserts: false, usedSides: false };
+    }
+    var col = wantsColumn(littleRule);
+    var frameKind = col ? 'box' : 'wide';
+    var kidsInner = sectionBlock(
+      bag.littleBells.name,
+      bag.littleBells.dishes,
+      littleRule,
+      frameKind
+    );
+    if (!col) {
+      return {
+        html: '<section class="sec">' + kidsInner + '</section>',
+        usedDesserts: false,
+        usedSides: false
+      };
+    }
+    if (bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
+      var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide');
+      var pair = '<section class="sec little-desserts-row">' +
+        '<div class="cols cols-balanced cols-little-desserts">' +
+        '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
+        '<div class="col col-desserts"><div class="col-body">' + dessInner + '</div></div>' +
+        '</div></section>';
+      return { html: pair, usedDesserts: true, usedSides: false };
+    }
+    if (sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
+      var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide');
+      var withSides = '<section class="sec little-sides-row">' +
+        '<div class="cols cols-balanced cols-little-sides">' +
+        '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
+        '<div class="col col-sides"><div class="col-body">' + sideInner + '</div></div>' +
+        '</div></section>';
+      return { html: withSides, usedDesserts: false, usedSides: true };
+    }
+    // Column with no partner — still half-width, not a full-bleed stack
+    var solo = '<section class="sec little-solo-row">' +
+      '<div class="cols cols-balanced">' +
+      '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
+      '<div class="col"><div class="col-body">&nbsp;</div></div>' +
+      '</div></section>';
+    return { html: solo, usedDesserts: false, usedSides: false };
+  }
+
   /** Wrap section HTML in a scallop frame when the designer said Yes. */
   function framedBlock(inner, rule, kind) {
     if (rule && rule.frame) return scallop(inner, kind || 'wide');
@@ -1797,14 +1847,15 @@
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
       }
-      if (bag.littleBells) {
-        p1 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
+      var littleP1 = renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint);
+      p1 += littleP1.html;
+      if (bag.desserts && !littleP1.usedDesserts) {
+        p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
       }
-      if (bag.desserts) p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
       if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
         p1 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
       }
-      if (sidesPrint && !p1opts.sidesOnP1) {
+      if (sidesPrint && !p1opts.sidesOnP1 && !littleP1.usedSides) {
         p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
@@ -1830,18 +1881,20 @@
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
     }
-    if (bag.littleBells) {
-      p2 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
+    var littleP2 = renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint);
+    p2 += littleP2.html;
+    if (bag.desserts && !littleP2.usedDesserts) {
+      p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
     }
-    if (bag.desserts) p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
     if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
       p2 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
     }
 
-    var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
+    var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces) && !littleP2.usedSides) ||
+      p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {
       var sidesCol = sidesPrint && wantsColumn(sideRule);
-      var sideList = (p2opts.sidesOnP2 && sidesPrint) ? sidesPrint.dishes.slice() : [];
+      var sideList = (p2opts.sidesOnP2 && sidesPrint && !littleP2.usedSides) ? sidesPrint.dishes.slice() : [];
       // Sides (and sauces) in the left column; Sandwiches fully in the frilly box on the right.
       // If Sides sit alone (no sandwiches opposite), span full-width + two foot panels.
       if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms || bag.sauces)) {
