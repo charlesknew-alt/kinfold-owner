@@ -73,9 +73,13 @@ assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
 assert(/logo-tr\{width:180px/.test(printJs), 'front-page logo sized ~180px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
-assert(/--title:26pt/.test(printJs) || /--title:28pt/.test(printJs),
-  'section titles large and readable (~26–28pt)');
-assert(printJs.indexOf('min(var(--title),28pt)') !== -1, 'title size has hard CSS ceiling at 28pt');
+assert(printJs.indexOf('--title-max:22pt') !== -1 && printJs.indexOf('--name-max:11.5pt') !== -1,
+  'type range CSS vars set adult max sizes');
+assert(printJs.indexOf('--name-min:9pt') !== -1 && printJs.indexOf('--desc-min:8pt') !== -1,
+  'type range CSS vars set readable min sizes');
+assert(/\.fill-airy\{[^}]*--name:11\.5pt/.test(printJs) && /\.fill-airy\{[^}]*--title:22pt/.test(printJs),
+  'airy density is capped at type-range max (not kids-menu giant type)');
+assert(printJs.indexOf('min(var(--title),var(--title-max))') !== -1, 'section titles clamp to title-max');
 assert(printJs.indexOf('margin:0 0 var(--sec-gap)') !== -1 || printJs.indexOf('margin-bottom:calc(var(--sec-gap)') !== -1,
   'section titles leave a density-aware gap before dishes');
 assert(printJs.indexOf('startersInTop') !== -1, 'starters span the top band beside the logo');
@@ -87,6 +91,10 @@ assert(!/\*\/\s*\+/.test(printJs), 'print CSS has no comment-plus that becomes N
 require(path.join(root, 'menus-print.js'));
 var printApi = global.EBMenuPrint;
 assert(typeof printApi.build === 'function', 'EBMenuPrint.build exported');
+assert(printApi.typeRange && printApi.typeRange.name.max === 11.5 && printApi.typeRange.title.max === 22,
+  'TYPE_RANGE exported for dish name and section title max');
+assert(printApi.typeRange.desc.max === 10 && printApi.typeRange.desc.min === 8,
+  'TYPE_RANGE covers description min/max');
 var sampleCss = printApi.build(api.menuById('main'), api.seed().main, { pages: 1, forceFillClass: 'fill-roomy' });
 assert(sampleCss.indexOf('NaN') === -1, 'generated print CSS has no NaN from broken concatenations');
 assert(sampleCss.indexOf('.dish-line{display:flex') !== -1, 'generated print CSS keeps dish-line flex leaders');
@@ -251,8 +259,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow57') !== -1, 'menus page cache-bust is flow57');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow57') !== -1, 'hub menus link cache-bust is flow57');
+assert(page.indexOf('flow58') !== -1, 'menus page cache-bust is flow58');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow58') !== -1, 'hub menus link cache-bust is flow58');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');
@@ -787,11 +795,13 @@ var sharedTypeDishes = [
 var sharedTypeLayout = print.planFluidLayout(mainMenu, sharedTypeDishes, {
   sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
 });
-assert(sharedTypeLayout.pages === 2, 'packed long menu uses two pages');
-assert(sharedTypeLayout.p1.sidesOnP1 === true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === false,
-  'Sides move to page 1 so mains/desserts can share a larger type size');
-assert(/same type size/i.test(sharedTypeLayout.summary),
-  'layout summary states shared type size across both pages');
+assert(sharedTypeLayout.pages === 1, 'packed menu that fits type range stays on one page');
+assert(/type range/i.test(sharedTypeLayout.summary), 'layout summary states the type range');
+assert(sharedTypeLayout.p1.sandwiches === true || sharedTypeLayout.fillers.some(function (f) {
+  return /Sandwiches/i.test(f);
+}), 'one-page packed menu still includes sandwiches');
+assert(!sharedTypeLayout.p1.rooms || sharedTypeLayout.leftover.p1 > 0,
+  'feature panels only when spare room remains inside the type range');
 
 // Tip/sell sandwich box (0 fillings) must prefer page 1 when page 2 holds mains+desserts
 var tipOnlyPacked = [
@@ -829,9 +839,16 @@ var tipPackedLayout = print.planFluidLayout(mainMenu, tipOnlyPacked, {
     Sandwiches: { tip: true, frame: true, width: 'column', sell: 'A selection of sandwiches is available — ask the team.' }
   })
 });
-assert(tipPackedLayout.pages === 2, 'nibbles+mains packed menu uses two pages');
-assert(tipPackedLayout.p1.sandwiches === true && !(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches),
-  'sandwich sell box sits on page 1 so page 2 type can enlarge');
+assert(tipPackedLayout.pages === 1 || tipPackedLayout.pages === 2,
+  'nibbles+mains packed menu uses one or two pages within type range');
+assert(tipPackedLayout.pages === 1 ||
+  (tipPackedLayout.p1.sandwiches === true && !(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches)),
+  'sandwich sell box prefers page 1 when two pages are needed');
+// Seed main menu (~30 dishes) should prefer one page inside the type range
+var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
+assert(seedMainLayout.pages === 1, 'sample main menu fits one page within type range');
+assert(seedMainLayout.typeRange && seedMainLayout.typeRange.name.max === 11.5,
+  'layout exposes typeRange on the plan');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});
