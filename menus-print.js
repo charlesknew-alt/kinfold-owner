@@ -839,7 +839,11 @@
 
   function orderDishesForPrint(dishes) {
     var list = tidyDishesForPrint(dishes || []).slice();
-    // Stable sort: section order, then keep paste order within section
+    // Prefer shared sell-order from menus.js: section flow, then interesting
+    // within-section order (expensive first, high/low mix — not import order).
+    if (root.EBMenus && typeof root.EBMenus.orderDishesForSell === 'function') {
+      return root.EBMenus.orderDishesForSell(list);
+    }
     list.forEach(function (d, i) { d._i = i; });
     list.sort(function (a, b) {
       var ra = sectionRank(a.section);

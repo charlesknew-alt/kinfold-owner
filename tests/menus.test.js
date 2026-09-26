@@ -251,8 +251,35 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow56') !== -1, 'menus page cache-bust is flow56');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow56') !== -1, 'hub menus link cache-bust is flow56');
+assert(page.indexOf('flow57') !== -1, 'menus page cache-bust is flow57');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow57') !== -1, 'hub menus link cache-bust is flow57');
+assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
+  'sell-order helpers exported');
+assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');
+assert(api.parseSellPrice('£29.95') === 29.95, 'pound price parses');
+var sellIn = [
+  api.dish('Mains', 'Pie', 'mash', '15.95', ''),
+  api.dish('Mains', 'Sirloin', 'fries', '29.95', ''),
+  api.dish('Mains', 'Katsu', 'rice', '16.95', 'vg'),
+  api.dish('Mains', 'Soup', 'bread', '6.95', 'v'),
+  api.dish('Mains', 'Hake', 'greens', '25.95', '')
+];
+var sellOut = api.sellOrderWithinSection(sellIn);
+assert(sellOut[0].name === 'Sirloin', 'sell order leads with the dearest dish');
+assert(sellOut[1].name === 'Soup', 'sell order contrasts with a cheaper dish next');
+assert(sellOut.map(function (d) { return d.name; }).indexOf('Hake') <
+  sellOut.map(function (d) { return d.name; }).indexOf('Pie'),
+  'next expensive plate stays ahead of mid-price after the contrast');
+var sellPrint = printApi.orderDishesForPrint([
+  api.dish('Starters', 'Soup', '', '6.95', ''),
+  api.dish('Starters', 'Terrine', '', '9.50', ''),
+  api.dish('Mains', 'Pie', '', '15.95', ''),
+  api.dish('Mains', 'Steak', '', '29.95', '')
+]);
+assert(sellPrint[0].section === 'Starters' && sellPrint[0].name === 'Terrine',
+  'print sell-order keeps section flow and dear starter first');
+assert(sellPrint.filter(function (d) { return d.section === 'Mains'; })[0].name === 'Steak',
+  'print sell-order puts expensive main first within Mains');
 assert(page.indexOf('data-flag="df"') !== -1 && page.indexOf('dairy free') !== -1,
   'staff UI has dairy-free (df) checkbox');
 assert(printJs.indexOf('df – dairy free') !== -1, 'print allergy key includes dairy free');
