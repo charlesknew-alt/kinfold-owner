@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eight Bells — Menus quick guide</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paint: #DFC2AF; --paint-deep: #A79283; --ink: #1A1814; --ink-soft: #4a4640;
+      --line: #e5e0d4; --wash: #FBF8F2;
+      --serif: 'Fraunces', Georgia, serif;
+      --sans: 'Source Sans 3', sans-serif;
+    }
+    body {
+      font-family: var(--sans); color: var(--ink); background: #d9d3c8;
+      line-height: 1.4; padding: 16px;
+    }
+    .sheet {
+      max-width: 210mm; margin: 0 auto; background: var(--wash);
+      padding: 14mm 16mm 12mm; box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    }
+    header {
+      border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 14px;
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 12px;
+    }
+    .eyebrow {
+      font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+      color: var(--ink-soft); font-weight: 700;
+    }
+    h1 {
+      font-family: var(--serif); font-weight: 500; font-size: 28px; line-height: 1.15;
+      margin-top: 2px;
+    }
+    .open {
+      font-size: 12px; font-weight: 600; color: var(--ink-soft); text-align: right;
+      max-width: 14em;
+    }
+    .open a { color: var(--ink); }
+    h2 {
+      font-family: var(--serif); font-weight: 500; font-size: 17px;
+      margin: 14px 0 6px; letter-spacing: .01em;
+    }
+    ul { padding-left: 1.15em; margin: 0 0 2px; }
+    li { font-size: 13.5px; margin: 0 0 4px; }
+    li strong { font-weight: 700; }
+    .tip {
+      margin-top: 14px; padding: 10px 12px; background: #fff;
+      border: 1px solid var(--line); border-radius: 10px; font-size: 13px; color: var(--ink-soft);
+    }
+    .tip strong { color: var(--ink); }
+    footer {
+      margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line);
+      font-size: 11px; color: var(--ink-soft); display: flex; justify-content: space-between; gap: 8px;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { box-shadow: none; max-width: none; padding: 10mm 12mm; }
+      .no-print { display: none !important; }
+      a { color: inherit; text-decoration: none; }
+    }
+    .toolbar {
+      max-width: 210mm; margin: 0 auto 10px; display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .toolbar button, .toolbar a.btn {
+      font: 600 13px var(--sans); padding: 8px 14px; border-radius: 999px;
+      border: 0; background: #1c1610; color: #f4eae3; cursor: pointer; text-decoration: none;
+    }
+    .toolbar a.btn.soft { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <button type="button" onclick="window.print()">Print / save PDF</button>
+    <a class="btn soft" href="menus.html?mode=staff">Open Menus</a>
+  </div>
+
+  <article class="sheet">
+    <header>
+      <div>
+        <div class="eyebrow">The Eight Bells · Bolney</div>
+        <h1>Menus — quick guide</h1>
+      </div>
+      <div class="open">For the floor · one sheet</div>
+    </header>
+
+    <h2>The idea</h2>
+    <ul>
+      <li>You keep <strong>separate menus</strong>: Main, Sunday, Specials, Sandwiches, Desserts.</li>
+      <li>Each one can be <strong>printed on its own</strong> (e.g. just Specials, or just Desserts).</li>
+      <li>On <strong>Main</strong> (or Sunday), you can also <strong>tick other menus to include</strong> on that same print sheet.</li>
+    </ul>
+
+    <h2>Day-to-day: Specials</h2>
+    <ul>
+      <li>Open <strong>Menus</strong> → tap the <strong>Specials</strong> tab.</li>
+      <li>Add / adjust dishes, or <strong>Upload / paste whole menu</strong>.</li>
+      <li>Optional: edit the short note under the Specials title (e.g. “When it’s gone, it’s gone”).</li>
+      <li>Tap <strong>Next · Generate</strong> → <strong>Generate menu</strong> → Print / PDF.</li>
+    </ul>
+
+    <h2>Include Specials (or Desserts) on the Main menu</h2>
+    <ul>
+      <li>Open the <strong>Main menu</strong> tab (same for Sunday).</li>
+      <li>On the first step (<strong>Dishes</strong>), find <strong>Also put on this sheet</strong>.</li>
+      <li>Tick <strong>Specials</strong>, <strong>Desserts</strong>, etc. as needed.</li>
+      <li>Generate Main as usual — ticked menus print in their frilly boxes on that sheet.</li>
+      <li>Untick anytime if you only want the main dishes.</li>
+    </ul>
+
+    <h2>Clear the Main menu and upload a new one</h2>
+    <ul>
+      <li>Stay on the <strong>Main menu</strong> tab.</li>
+      <li>Tap <strong>Clear this menu</strong> → confirm (empties Main only; Specials / Desserts stay).</li>
+      <li>Tap <strong>Upload / paste whole menu</strong>.</li>
+      <li>Upload a PDF / Word / photo, or paste the text → <strong>review</strong> the dishes → save.</li>
+      <li>Tick includes again if you want Specials / Desserts on the sheet, then <strong>Generate</strong>.</li>
+    </ul>
+
+    <h2>Print history</h2>
+    <ul>
+      <li>Use <strong>Print history</strong> at the top to reopen a sheet you already generated (shared across phones / PCs).</li>
+    </ul>
+
+    <p class="tip">
+      <strong>Tip:</strong> Clear and upload only affect the tab you’re on. Specials and Desserts are separate lists — clearing Main does not wipe them.
+    </p>
+
+    <footer>
+      <span>Varlo · Eight Bells Menus</span>
+      <span>owner.kinfoldinns.co.uk/menus-guide.html</span>
+    </footer>
+  </article>
+</body>
+</html>
