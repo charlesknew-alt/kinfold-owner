@@ -75,8 +75,14 @@ assert(/logo-tr\{width:180px/.test(printJs), 'front-page logo sized ~180px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
 assert(printJs.indexOf('--title-max:22pt') !== -1 && printJs.indexOf('--name-max:11.5pt') !== -1,
   'type range CSS vars set adult max sizes');
-assert(printJs.indexOf('--name-min:9pt') !== -1 && printJs.indexOf('--desc-min:8pt') !== -1,
-  'type range CSS vars set readable min sizes');
+assert(printJs.indexOf('--name-min:11pt') !== -1 && printJs.indexOf('--desc-min:10pt') !== -1,
+  'type range CSS vars set readable min sizes (+2pt)');
+assert(printJs.indexOf('--title-min:16pt') !== -1, 'section title min is 16pt');
+assert(printJs.indexOf('--dish-gap-min:8px') !== -1, 'minimum gap between dishes is 8px');
+assert(printJs.indexOf('max(var(--dish-gap-min),var(--dish-gap))') !== -1,
+  'dish margin respects dish-gap-min floor');
+assert(/\.fill-dense\{[^}]*--name:11pt/.test(printJs) && /\.fill-dense\{[^}]*--dish-gap:8px/.test(printJs),
+  'dense floor uses raised type mins and 8px dish gap');
 assert(/\.fill-airy\{[^}]*--name:11\.5pt/.test(printJs) && /\.fill-airy\{[^}]*--title:22pt/.test(printJs),
   'airy density is capped at type-range max (not kids-menu giant type)');
 assert(printJs.indexOf('min(var(--title),var(--title-max))') !== -1, 'section titles clamp to title-max');
@@ -93,8 +99,12 @@ var printApi = global.EBMenuPrint;
 assert(typeof printApi.build === 'function', 'EBMenuPrint.build exported');
 assert(printApi.typeRange && printApi.typeRange.name.max === 11.5 && printApi.typeRange.title.max === 22,
   'TYPE_RANGE exported for dish name and section title max');
-assert(printApi.typeRange.desc.max === 10 && printApi.typeRange.desc.min === 8,
-  'TYPE_RANGE covers description min/max');
+assert(printApi.typeRange.desc.max === 10 && printApi.typeRange.desc.min === 10,
+  'TYPE_RANGE description min/max (+2pt min)');
+assert(printApi.typeRange.name.min === 11 && printApi.typeRange.title.min === 16,
+  'TYPE_RANGE name/title mins raised by 2pt');
+assert(printApi.typeRange.dishGapPx && printApi.typeRange.dishGapPx.min === 8,
+  'TYPE_RANGE includes minimum dish gap');
 var sampleCss = printApi.build(api.menuById('main'), api.seed().main, { pages: 1, forceFillClass: 'fill-roomy' });
 assert(sampleCss.indexOf('NaN') === -1, 'generated print CSS has no NaN from broken concatenations');
 assert(sampleCss.indexOf('.dish-line{display:flex') !== -1, 'generated print CSS keeps dish-line flex leaders');
@@ -259,8 +269,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow59') !== -1, 'menus page cache-bust is flow59');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow59') !== -1, 'hub menus link cache-bust is flow59');
+assert(page.indexOf('flow60') !== -1, 'menus page cache-bust is flow60');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow60') !== -1, 'hub menus link cache-bust is flow60');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');
