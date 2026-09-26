@@ -493,14 +493,40 @@
       var left2 = sideList.length ? sectionUnits(bag.sides, false) : 0;
       if (layout.p2.sidesOnP2 && bag.sauces) left2 += sectionUnits(bag.sauces, false);
       var right2 = layout.p2.sandwiches ? sandwichesPackCost(bag) : 0;
+      // Little Bells Column is its own opposite-column pair (food first, else panels).
+      var littleRuleM = null;
+      var dessRuleM = null;
+      var sideRuleM = null;
+      if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+        littleRuleM = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout);
+        dessRuleM = root.EBMenus.sectionLayoutFor('Desserts', plan && plan.sectionLayout);
+        sideRuleM = root.EBMenus.sectionLayoutFor('Sides', plan && plan.sectionLayout);
+      }
+      var kidsCol = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
+        littleRuleM && wantsColumn(littleRuleM));
+      if (kidsCol) {
+        var kidsU2 = sectionUnits(bag.littleBells, false);
+        var dessCol = !!(dessRuleM && wantsColumn(dessRuleM) && bag.desserts && bag.desserts.dishes &&
+          bag.desserts.dishes.length);
+        var sidesColPartner = !!(sideRuleM && wantsColumn(sideRuleM) && bag.sides && bag.sides.dishes &&
+          bag.sides.dishes.length && !(layout.p1 && layout.p1.sidesOnP1));
+        left2 += kidsU2;
+        if (dessCol) right2 += sectionUnits(bag.desserts, false);
+        else if (sidesColPartner) {
+          right2 += sectionUnits(bag.sides, false);
+          // Sides already counted in the bottom pair — avoid double-count when only kids|sides.
+          if (sideList.length) left2 -= sectionUnits(bag.sides, false);
+        }
+        // else right stays short → feature panels required on the right
+      }
       var gap2 = right2 - left2;
       page2 = {
         leftFood: Math.round(left2 * 10) / 10,
         rightFood: Math.round(right2 * 10) / 10,
         gap: Math.round(gap2 * 10) / 10,
         shorter: Math.abs(gap2) <= 2.5 ? 'even' : (gap2 > 0 ? 'left' : 'right'),
-        leftLabel: 'Sides / sauces',
-        rightLabel: layout.p2.sandwiches ? 'Sandwiches' : 'Events'
+        leftLabel: kidsCol ? 'Little Bells / Sides' : 'Sides / sauces',
+        rightLabel: layout.p2.sandwiches ? 'Sandwiches' : (kidsCol ? 'Desserts / Sides / events' : 'Events')
       };
     }
     return { page1: page1, page2: page2 };
@@ -1298,28 +1324,31 @@
         }
       }
 
-      // SHARED TYPE SCALE: if page 2 is packed (mains + desserts) and page 1 still
-      // has room, move Sides / Sandwiches onto page 1 so both pages can share one
-      // comfortable type size instead of page 1 airy / page 2 compact.
+      // SHARED TYPE + EVEN FILL: same type on both pages, and spread movable
+      // blocks (Sides / Sandwiches) so leftover room is similar — not one airy
+      // page and one packed page.
       var p2Crowded = p2left < 14 ||
         (bag.mains && bag.desserts && (bag.mains.dishes || []).length >= 5) ||
         (bag.mains && (bag.mains.dishes || []).length >= 7) ||
         (!!bag.sundayRoasts && !layout.p1.sundayRoasts && bag.desserts) ||
         tightBack;
       var sideCost = bag.sides ? sectionUnits(bag.sides, false) : 0;
+      var p1MuchEmptier = p1left > p2left + 12;
       if (bag.sides && layout.p2.sidesOnP2 && sideCost > 0) {
         var takeSides = tryAdd(p1left, sideCost + (layout.p1.sandwiches ? 1 : 3));
-        if (p2Crowded && takeSides.ok) {
+        if ((p2Crowded || p1MuchEmptier) && takeSides.ok) {
           layout.p1.sidesOnP1 = true;
           layout.p2.sidesOnP2 = false;
           p1left = takeSides.left;
           p2left += sideCost;
-          layout.fillers.push('Sides (page 1 — keep type size equal on both pages)');
+          layout.fillers.push(p2Crowded
+            ? 'Sides (page 1 — keep type size equal on both pages)'
+            : 'Sides (page 1 — even fill across pages)');
         }
       }
       if (layout.p2.sandwiches && !layout.p1.sandwiches) {
         var takeSand = tryAdd(p1left, sandCost + 1);
-        if (p2Crowded && takeSand.ok) {
+        if ((p2Crowded || p1MuchEmptier) && takeSand.ok) {
           layout.p1.sandwiches = true;
           layout.p2.sandwiches = false;
           p1left = takeSand.left;
@@ -1327,6 +1356,19 @@
           layout.fillers.push(sandDishCount
             ? 'Sandwiches (page 1 — free page 2 for larger type)'
             : 'Sandwiches box (page 1 — free page 2 for larger type)');
+        }
+      }
+      // If Sides landed on page 1 but page 1 is now the packed one and page 2 is
+      // sparse, move them back — never undo a move that was required for shared type.
+      if (layout.p1.sidesOnP1 && !layout.p2.sidesOnP2 && sideCost > 0 &&
+          !p2Crowded && p1left < 10 && p2left > p1left + 14) {
+        var p2CanTake = tryAdd(p2left, sideCost + 2);
+        if (p2CanTake.ok) {
+          layout.p1.sidesOnP1 = false;
+          layout.p2.sidesOnP2 = true;
+          p1left += sideCost;
+          p2left = p2CanTake.left;
+          layout.fillers.push('Sides (page 2 — even fill across pages)');
         }
       }
 
@@ -1367,7 +1409,9 @@
         layout.fit === 'two' ? 'Two A4 pages — would clip at minimum type on one page; same type on both pages, opening toward the maximum; never a third page.' :
           'Too much for two readable pages. Remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.') +
       typeNote +
-      ' Columns start and finish level. Layout from ' + bag.count + ' dishes.' + bits;
+      ' Columns start and finish level (food first, then feature panels).' +
+      (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
+      ' Layout from ' + bag.count + ' dishes.' + bits;
 
     layout.typeRange = TYPE_RANGE;
     layout.orderedDishes = dishes;
@@ -1467,25 +1511,53 @@
     return !!(rule && String(rule.width || '').toLowerCase() === 'column');
   }
 
-  /** Half-column section with empty opposite — honours Blocks Column when no partner. */
-  function columnSoloSection(title, dishes, rule) {
-    if (!dishes || !dishes.length) return '';
+  /**
+   * GOLDEN RULE: opposite columns start and finish level.
+   * Food first; when one side has food and the other is empty, put feature panels
+   * on the short side (never leave a blank half-page hole).
+   */
+  function columnBalanceFill(leftFoodU, promos, opts) {
+    opts = opts || {};
+    var remaining = filterUnusedPromos(promos || [], opts.excludeTitles || []);
+    var fill = planPromoFill(leftFoodU || 0, 0, remaining, {
+      leftFrame: opts.leftFrame || 'box',
+      rightFrame: opts.rightFrame || 'wide',
+      force: { shorter: 'right', panels: (leftFoodU || 0) >= 10 ? 2 : 1 }
+    });
+    var rightHtml = fill.right || '';
+    if (!rightHtml && remaining.length) {
+      rightHtml = promoBesidePartner(remaining, leftFoodU || 0, opts.rightFrame || 'wide');
+    }
+    return { html: rightHtml || '&nbsp;', usedTitles: fill.usedTitles || [] };
+  }
+
+  /** Blocks Column section with no food partner — pair with feature panels so columns finish level. */
+  function columnSoloSection(title, dishes, rule, opts) {
+    opts = opts || {};
+    if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
     var inner = sectionBlock(title, dishes, rule, 'box');
-    return '<section class="sec column-solo-row">' +
-      '<div class="cols cols-balanced">' +
-      '<div class="col"><div class="col-body">' + inner + '</div></div>' +
-      '<div class="col"><div class="col-body">&nbsp;</div></div>' +
-      '</div></section>';
+    var units = sectionUnits({ name: title, dishes: dishes }, false);
+    var fill = columnBalanceFill(units, opts.promos, opts);
+    return {
+      html: '<section class="sec column-solo-row">' +
+        '<div class="cols cols-balanced cols-features">' +
+        '<div class="col"><div class="col-body">' + inner + '</div></div>' +
+        '<div class="col col-promo"><div class="col-body">' + fill.html + '</div></div>' +
+        '</div></section>',
+      usedPromoTitles: fill.usedTitles
+    };
   }
 
   /**
    * Little Bells respects Blocks width.
-   * column → sit beside a partner that also allows Column (Desserts preferred, else Sides);
-   * full → stacked section. Locked Full partners are never forced into the pair.
+   * GOLDEN RULE: Column pairs with food first (Desserts if Column/Best fit, else Sides),
+   * then feature panels so opposite columns start and finish level.
+   * Locked Full partners are never forced into the pair.
    */
-  function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint) {
+  function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
+    opts = opts || {};
     if (!bag.littleBells || !bag.littleBells.dishes || !bag.littleBells.dishes.length) {
-      return { html: '', usedDesserts: false, usedSides: false };
+      return { html: '', usedDesserts: false, usedSides: false, usedPromoTitles: [] };
     }
     var col = wantsColumn(littleRule);
     var frameKind = col ? 'box' : 'wide';
@@ -1499,10 +1571,11 @@
       return {
         html: '<section class="sec">' + kidsInner + '</section>',
         usedDesserts: false,
-        usedSides: false
+        usedSides: false,
+        usedPromoTitles: []
       };
     }
-    // Honour Blocks: only pair with Desserts when that section allows Column / Best fit.
+    // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
       var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide');
@@ -1511,9 +1584,9 @@
         '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
         '<div class="col col-desserts"><div class="col-body">' + dessInner + '</div></div>' +
         '</div></section>';
-      return { html: pair, usedDesserts: true, usedSides: false };
+      return { html: pair, usedDesserts: true, usedSides: false, usedPromoTitles: [] };
     }
-    // Same for Sides — Full width Sides stay full-bleed; only Column / Best fit may sit beside kids.
+    // Food first: Sides when Blocks allows Column / Best fit (keeps columns level with food).
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide');
@@ -1522,15 +1595,22 @@
         '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
         '<div class="col col-sides"><div class="col-body">' + sideInner + '</div></div>' +
         '</div></section>';
-      return { html: withSides, usedDesserts: false, usedSides: true };
+      return { html: withSides, usedDesserts: false, usedSides: true, usedPromoTitles: [] };
     }
-    // Column with no eligible partner — still half-width, not a full-bleed stack
+    // No food partner — feature panels on the short side (never a blank half).
+    var kidsU = sectionUnits(bag.littleBells, false);
+    var fill = columnBalanceFill(kidsU, opts.promos, opts);
     var solo = '<section class="sec little-solo-row">' +
-      '<div class="cols cols-balanced">' +
+      '<div class="cols cols-balanced cols-features cols-little-solo">' +
       '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
-      '<div class="col"><div class="col-body">&nbsp;</div></div>' +
+      '<div class="col col-promo"><div class="col-body">' + fill.html + '</div></div>' +
       '</div></section>';
-    return { html: solo, usedDesserts: false, usedSides: false };
+    return {
+      html: solo,
+      usedDesserts: false,
+      usedSides: false,
+      usedPromoTitles: fill.usedTitles
+    };
   }
 
   /** Wrap section HTML in a scallop frame when the designer said Yes. */
@@ -1881,12 +1961,12 @@
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
       }
-      // Locked Full Desserts: don't pull Sides up beside kids (order: kids → puddings → sides).
-      var dessertsFullP1 = !!(lockedFullWidth(dessRule) &&
-        bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length);
+      // Food-first column pairing (Sides/Desserts when Blocks allow); else feature panels.
       var littleP1 = renderLittleBellsRow(
-        bag, littleRule, dessRule, sideRule, dessertsFullP1 ? null : sidesPrint
+        bag, littleRule, dessRule, sideRule, sidesPrint,
+        { promos: promos, excludeTitles: usedPromoTitles }
       );
+      usedPromoTitles = usedPromoTitles.concat(littleP1.usedPromoTitles || []);
       p1 += littleP1.html;
       if (bag.desserts && !littleP1.usedDesserts) {
         p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
@@ -1896,7 +1976,11 @@
       }
       if (sidesPrint && !p1opts.sidesOnP1 && !littleP1.usedSides) {
         if (lockedColumnWidth(sideRule)) {
-          p1 += columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule);
+          var sideSolo1 = columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule, {
+            promos: promos, excludeTitles: usedPromoTitles
+          });
+          usedPromoTitles = usedPromoTitles.concat(sideSolo1.usedPromoTitles || []);
+          p1 += sideSolo1.html;
         } else {
           p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
         }
@@ -1924,12 +2008,12 @@
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
     }
-    // Locked Full Desserts: kids column alone (not beside Sides), then desserts, then sides.
-    var dessertsFullP2 = !!(lockedFullWidth(dessRule) &&
-      bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length);
+    // Food-first column pairing; feature panels fill any remaining short column.
     var littleP2 = renderLittleBellsRow(
-      bag, littleRule, dessRule, sideRule, dessertsFullP2 ? null : sidesPrint
+      bag, littleRule, dessRule, sideRule, sidesPrint,
+      { promos: promos, excludeTitles: usedPromoTitles }
     );
+    usedPromoTitles = usedPromoTitles.concat(littleP2.usedPromoTitles || []);
     p2 += littleP2.html;
     if (bag.desserts && !littleP2.usedDesserts) {
       p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
@@ -2008,7 +2092,11 @@
         }
       } else if (p2opts.sidesOnP2 && sidesPrint) {
         if (lockedColumnWidth(sideRule)) {
-          p2 += columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule);
+          var sideSolo2 = columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule, {
+            promos: promos, excludeTitles: usedPromoTitles
+          });
+          usedPromoTitles = usedPromoTitles.concat(sideSolo2.usedPromoTitles || []);
+          p2 += sideSolo2.html;
         } else {
           p2 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
         }
