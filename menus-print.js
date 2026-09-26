@@ -1365,19 +1365,15 @@
   /**
    * Specials for one course on Main / Sunday — frilly Specials box that sits
    * under the matching regular section. No “Starters/Mains” label (context is
-   * the parent course); just Specials + when-gone note + dishes.
+   * the parent course); just Specials + optional Blocks note + dishes.
    */
   function specialsBesideCourse(dishes, plan, sectionKey) {
     dishes = dishes || [];
     if (!dishes.length) return '';
     var rule = ruleFor(sectionKey || 'Special Mains', plan);
-    if (!rule.note) {
-      rule = Object.assign({}, rule, {
-        note: (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone"
-      });
-    }
     if (rule.frame == null) rule.frame = true;
-    // Small “Specials” label only — no Starters/Mains course head (parent section is the cue)
+    // Small “Specials” label only — no Starters/Mains course head (parent section is the cue).
+    // Note comes from Blocks → Extra info (not hardwired).
     var inner = '<div class="sec-title specials-beside-title">Specials</div>';
     var note = String(rule.note || '').trim();
     if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
@@ -1895,7 +1891,17 @@
       } else if (menu.id === 'sandwiches') {
         inner = cardSandwichesInner(dishes);
       } else if (menu.id === 'specials') {
-        var gone = (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone";
+        // Board note from Blocks → Specials section “Extra info” (default in layout; editable)
+        var specialsNote = '';
+        if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+          specialsNote = String(root.EBMenus.sectionLayoutFor('Special Mains', plan && plan.sectionLayout).note || '').trim();
+          if (!specialsNote) {
+            specialsNote = String(root.EBMenus.sectionLayoutFor('Special Starters', plan && plan.sectionLayout).note || '').trim();
+          }
+        } else if (plan && plan.sectionLayout) {
+          specialsNote = String((plan.sectionLayout['Special Mains'] || {}).note ||
+            (plan.sectionLayout['Special Starters'] || {}).note || '').trim();
+        }
         var byCourse = { starters: [], mains: [], desserts: [] };
         (dishes || []).forEach(function (d) {
           var sec = String(d.section || '');
@@ -1910,7 +1916,7 @@
         ].filter(function (c) { return c.list.length; });
         var showCourseHeads = courses.length > 1;
         inner = scallop(
-          '<div class="sec-note" style="text-align:center">' + esc(gone) + '</div>' +
+          (specialsNote ? '<div class="sec-note" style="text-align:center">' + esc(specialsNote).replace(/\n/g, '<br>') + '</div>' : '') +
           courses.map(function (c) {
             return (showCourseHeads ? '<div class="specials-course">' + esc(c.label) + '</div>' : '') +
               c.list.map(function (d) { return dishCentered(d); }).join('');
@@ -1999,8 +2005,8 @@
       '.specials-course-left{text-align:left;text-decoration:none;font-size:10pt;letter-spacing:.08em;margin:6px 0 3px}' +
       /* Main/Sunday: Specials frilly box under each course — small title, no course subhead */
       '.specials-beside .specials-beside-title,.specials-beside .sec-title.specials-beside-title{' +
-        'font-size:11pt!important;letter-spacing:.1em;margin:0 0 4px;text-align:center;line-height:1.2}' +
-      '.specials-beside .sec-note{text-align:center;margin:0 0 6px;font-size:9.5pt}' +
+        'font-size:11pt!important;letter-spacing:.1em;margin:0 0 4px;text-align:left!important;line-height:1.2}' +
+      '.specials-beside .sec-note{text-align:left!important;margin:0 0 6px;font-size:9.5pt}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7.5pt;letter-spacing:.02em;text-transform:none;color:#8a8278;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .week{text-transform:none;letter-spacing:.02em}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
