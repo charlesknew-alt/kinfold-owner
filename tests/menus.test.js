@@ -304,10 +304,27 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow77') !== -1, 'menus page cache-bust is flow77');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow77') !== -1, 'hub menus link cache-bust is flow77');
+assert(page.indexOf('flow78') !== -1, 'menus page cache-bust is flow78');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow78') !== -1, 'hub menus link cache-bust is flow78');
 assert(printJs.indexOf('sundayRoasts') !== -1 && printJs.indexOf('roastsOnP1') !== -1,
   'print planner can balance Sunday Roasts onto page 1');
+assert(api.looksLikeDishTitle('Tomato & Basil Pasta') && api.looksLikeDishTitle('Fish Fingers, Chunky Chips & Peas'),
+  'kids plate names count as dish titles');
+assert(!api.looksLikeDescFragment('Tomato & Basil Pasta') && !api.looksLikeDescFragment('Fish Fingers, Chunky Chips & Peas'),
+  'unpriced kids plates are not treated as description fragments');
+var kidsNoPrice = api.tidyOrphanDescriptions([
+  { section: 'Mains', name: 'Short Rib', description: 'rocket', price: '17.95', tags: '' },
+  { section: 'Little Bells', name: 'Fish Fingers, Chunky Chips & Peas', description: '', price: '', tags: '' },
+  { section: 'Little Bells', name: 'Chicken Goujons, Fries & Dressed Salad', description: '', price: '', tags: '' },
+  { section: 'Little Bells', name: 'Beef Burger, Fries & Dressed Salad', description: '', price: '', tags: '' },
+  { section: 'Little Bells', name: 'Tomato & Basil Pasta', description: '', price: '', tags: 'v' },
+  { section: 'Little Bells', name: 'Kids Mac & Cheese', description: '', price: '', tags: '' }
+]);
+assert(kidsNoPrice.length === 6, 'unpriced Little Bells dishes all survive tidy (All £9.50 in note)');
+assert(kidsNoPrice.filter(function (d) { return d.section === 'Little Bells'; }).length === 5,
+  'kids dishes are not folded into Mains when prices are blank');
+assert(!/fish fingers/i.test(kidsNoPrice[0].description || ''),
+  'Fish Fingers does not become a Short Rib description');
 assert(api.SECTIONS.indexOf('Sunday Roasts') !== -1, 'Sunday Roasts is a canonical section');
 assert(api.normalizeSectionName('Sunday roasts') === 'Sunday Roasts', 'legacy Sunday roasts maps to Sunday Roasts');
 assert(api.normalizeSectionName('roasts') === 'Sunday Roasts', 'roasts heading maps to Sunday Roasts');
