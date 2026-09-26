@@ -291,8 +291,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow63') !== -1, 'menus page cache-bust is flow63');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow63') !== -1, 'hub menus link cache-bust is flow63');
+assert(page.indexOf('flow64') !== -1, 'menus page cache-bust is flow64');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow64') !== -1, 'hub menus link cache-bust is flow64');
+assert(printJs.indexOf('specials-face') !== -1 && printJs.indexOf('specials-course') !== -1,
+  'Specials card uses compact specials-course titles');
+assert(/\.card-face\.specials-face h1\{[^}]*font-size:14pt/.test(printJs),
+  'Specials card page title is 14pt');
+assert(/\.specials-course\{[^}]*font-size:10\.5pt/.test(printJs),
+  'Specials course heads (Starters/Mains) are 10.5pt');
 assert(/\.menus\s*\{[^}]*flex-wrap:\s*wrap/.test(page) && !/\.menus\s*\{[^}]*overflow-x:\s*auto/.test(page),
   'menu tabs wrap onto lines instead of horizontal scroll');
 assert(printJs.indexOf('specialsBoardBlock') !== -1 && printJs.indexOf('bag.specialStarters') !== -1,

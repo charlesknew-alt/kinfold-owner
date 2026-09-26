@@ -1369,7 +1369,7 @@
     function course(label, dishes) {
       if (!dishes.length) return '';
       var showHead = (starters.length ? 1 : 0) + (mains.length ? 1 : 0) + (desserts.length ? 1 : 0) > 1;
-      return (showHead ? '<div class="sec-title soft-left" style="margin-top:6px">' + esc(label) + '</div>' : '') +
+      return (showHead ? '<div class="specials-course specials-course-left">' + esc(label) + '</div>' : '') +
         listDishes(dishes);
     }
     inner += course('Starters', starters);
@@ -1883,7 +1883,7 @@
         inner = scallop(
           '<div class="sec-note" style="text-align:center">' + esc(gone) + '</div>' +
           courses.map(function (c) {
-            return (showCourseHeads ? '<div class="sec-title under">' + esc(c.label) + '</div>' : '') +
+            return (showCourseHeads ? '<div class="specials-course">' + esc(c.label) + '</div>' : '') +
               c.list.map(function (d) { return dishCentered(d); }).join('');
           }).join('')
         );
@@ -1891,8 +1891,9 @@
         // desserts etc
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
       }
+      var faceCls = 'card-face fill-page fill-airy' + (menu.id === 'specials' ? ' specials-face' : '');
       return (
-        '<article class="card-face fill-page fill-airy">' +
+        '<article class="' + faceCls + '">' +
           '<div class="card-top">' +
             trackerBar(ver) +
             '<img class="logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="">' +
@@ -1962,6 +1963,11 @@
       '.card-face .card-spiel{margin-top:8px}' +
       '.card-face .logo{width:86px;margin:0 auto 8px}' +
       '.card-face h1{margin:2px 0 10px;font-size:min(var(--title),22pt)}' +
+      /* Specials card: compact titles so dishes dominate the board */
+      '.card-face.specials-face h1{font-size:14pt;letter-spacing:.14em;margin:2px 0 6px}' +
+      '.specials-course{font-family:var(--serif);font-weight:700;font-size:10.5pt;letter-spacing:.1em;text-transform:uppercase;text-align:center;text-decoration:underline;text-underline-offset:2px;margin:8px 0 4px;line-height:1.2}' +
+      '.specials-course:first-of-type{margin-top:4px}' +
+      '.specials-course-left{text-align:left;text-decoration:none;font-size:10pt;letter-spacing:.08em;margin:6px 0 3px}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7.5pt;letter-spacing:.02em;text-transform:none;color:#8a8278;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .week{text-transform:none;letter-spacing:.02em}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
