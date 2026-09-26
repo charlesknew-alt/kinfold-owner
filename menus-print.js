@@ -1066,11 +1066,9 @@
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
     if (bag.sharing) front += sectionUnits(bag.sharing, false);
-    // Item Boost / Specials default to a frilly frame
+    // Item Boost / Special Starters on the front; Special Mains/Desserts sit with their course
     if (bag.boost) front += sectionUnits(bag.boost, true);
     if (bag.specialStarters) front += sectionUnits(bag.specialStarters, true);
-    if (bag.specialMains) front += sectionUnits(bag.specialMains, true);
-    if (bag.specialDesserts) front += sectionUnits(bag.specialDesserts, true);
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name) &&
           !isSpecials(s.name)) {
@@ -1082,8 +1080,10 @@
 
     var back = chrome;
     if (bag.mains) back += sectionUnits(bag.mains, false);
+    if (bag.specialMains) back += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) back += sectionUnits(bag.littleBells, true);
     if (bag.desserts) back += sectionUnits(bag.desserts, false);
+    if (bag.specialDesserts) back += sectionUnits(bag.specialDesserts, true);
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
     // Named fillings always print on Main/Sunday; 0 dishes → Tip box only when tip is on
@@ -1103,7 +1103,8 @@
       wantSandwiches = !!bag.sandwiches;
     }
     var sandCost = sandwichesPackCost(bag);
-    var hasBackContent = !!(bag.mains || bag.littleBells || bag.desserts || bag.sides || bag.sauces || bag.sandwiches);
+    var hasBackContent = !!(bag.mains || bag.specialMains || bag.littleBells || bag.desserts ||
+      bag.specialDesserts || bag.sides || bag.sauces || bag.sandwiches);
 
     var layout = {
       pages: 1,
@@ -1122,8 +1123,10 @@
     // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
     if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
+    if (bag.specialMains) oneNeed += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
     if (bag.desserts) oneNeed += sectionUnits(bag.desserts, false);
+    if (bag.specialDesserts) oneNeed += sectionUnits(bag.specialDesserts, true);
     if (bag.sides) oneNeed += sectionUnits(bag.sides, false);
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
     // Named sandwich fillings count as food; empty tip box is optional chrome.
@@ -1348,15 +1351,14 @@
   }
 
   /**
-   * Specials board on Main / Sunday — one frilly Specials box with course
-   * subheads (Starters / Mains / Desserts) so they never mix into regular food.
+   * Specials for one course on Main / Sunday — frilly Specials box that sits
+   * under the matching regular section. No “Starters/Mains” label (context is
+   * the parent course); just Specials + when-gone note + dishes.
    */
-  function specialsBoardBlock(bag, plan) {
-    var starters = (bag.specialStarters && bag.specialStarters.dishes) || [];
-    var mains = (bag.specialMains && bag.specialMains.dishes) || [];
-    var desserts = (bag.specialDesserts && bag.specialDesserts.dishes) || [];
-    if (!starters.length && !mains.length && !desserts.length) return '';
-    var rule = ruleFor('Special Mains', plan);
+  function specialsBesideCourse(dishes, plan, sectionKey) {
+    dishes = dishes || [];
+    if (!dishes.length) return '';
+    var rule = ruleFor(sectionKey || 'Special Mains', plan);
     if (!rule.note) {
       rule = Object.assign({}, rule, {
         note: (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone"
@@ -1366,16 +1368,8 @@
     var inner = sectionTitle('Specials');
     var note = String(rule.note || '').trim();
     if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
-    function course(label, dishes) {
-      if (!dishes.length) return '';
-      var showHead = (starters.length ? 1 : 0) + (mains.length ? 1 : 0) + (desserts.length ? 1 : 0) > 1;
-      return (showHead ? '<div class="specials-course specials-course-left">' + esc(label) + '</div>' : '') +
-        listDishes(dishes);
-    }
-    inner += course('Starters', starters);
-    inner += course('Mains', mains);
-    inner += course('Desserts', desserts);
-    return framedBlock(inner, rule, 'wide');
+    inner += listDishes(dishes);
+    return '<section class="sec specials-beside">' + framedBlock(inner, rule, 'wide') + '</section>';
   }
 
   function layoutMap(plan) {
@@ -1543,6 +1537,10 @@
     if (startersBelowNibbles) {
       p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
+    // Special Starters sit under the regular starters — frilly box, no “Starters” label
+    if (bag.specialStarters && bag.specialStarters.dishes && bag.specialStarters.dishes.length) {
+      p1 += specialsBesideCourse(bag.specialStarters.dishes, plan, 'Special Starters');
+    }
 
     if (shareAsFull && !shareInLeft) {
       p1 += '<section class="sec">' +
@@ -1556,8 +1554,6 @@
         sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
         '</section>';
     }
-    var specialsHtml = specialsBoardBlock(bag, plan);
-    if (specialsHtml) p1 += '<section class="sec">' + specialsHtml + '</section>';
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
           !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
@@ -1733,10 +1729,16 @@
 
     if (layout.pages === 1) {
       if (bag.mains) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+      if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
+        p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
+      }
       if (bag.littleBells) {
         p1 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
       }
       if (bag.desserts) p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
+      if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
+        p1 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
+      }
       if (sidesPrint && !p1opts.sidesOnP1) {
         p1 += '<section class="sec">' + sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule) + '</section>';
       }
@@ -1756,10 +1758,16 @@
     p2 += trackerBar(ver, { hideDate: true });
     p2 += '<div class="page-body page-body-start">';
     if (bag.mains) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+    if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
+      p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
+    }
     if (bag.littleBells) {
       p2 += '<section class="sec">' + sectionBlock(bag.littleBells.name, bag.littleBells.dishes, littleRule) + '</section>';
     }
     if (bag.desserts) p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
+    if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
+      p2 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
+    }
 
     var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces)) || p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {

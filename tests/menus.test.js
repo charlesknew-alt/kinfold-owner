@@ -291,8 +291,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow64') !== -1, 'menus page cache-bust is flow64');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow64') !== -1, 'hub menus link cache-bust is flow64');
+assert(page.indexOf('flow65') !== -1, 'menus page cache-bust is flow65');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow65') !== -1, 'hub menus link cache-bust is flow65');
 assert(printJs.indexOf('specials-face') !== -1 && printJs.indexOf('specials-course') !== -1,
   'Specials card uses compact specials-course titles');
 assert(/\.card-face\.specials-face h1\{[^}]*font-size:14pt/.test(printJs),
@@ -301,10 +301,15 @@ assert(/\.specials-course\{[^}]*font-size:10\.5pt/.test(printJs),
   'Specials course heads (Starters/Mains) are 10.5pt');
 assert(/\.menus\s*\{[^}]*flex-wrap:\s*wrap/.test(page) && !/\.menus\s*\{[^}]*overflow-x:\s*auto/.test(page),
   'menu tabs wrap onto lines instead of horizontal scroll');
-assert(printJs.indexOf('specialsBoardBlock') !== -1 && printJs.indexOf('bag.specialStarters') !== -1,
-  'print bags Specials courses into one Specials board');
+assert(printJs.indexOf('specialsBesideCourse') !== -1 && printJs.indexOf('bag.specialStarters') !== -1,
+  'Specials sit beside their course (under Starters / under Mains)');
+assert(printJs.indexOf('specials-beside') !== -1,
+  'Specials beside-course blocks are marked specials-beside');
 assert(printJs.indexOf("When it's gone, it's gone") !== -1 || printJs.indexOf('SPECIALS_GONE_NOTE') !== -1,
   'Specials print carries when-gone note');
+assert(/function specialsBesideCourse[\s\S]*?sectionTitle\('Specials'\)/.test(printJs) &&
+  !/function specialsBesideCourse[\s\S]*?specials-course/.test(printJs.split('function specialsBesideCourse')[1].split('function layoutMap')[0]),
+  'beside-course Specials box titles Specials only — no Starters/Mains course head');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');
