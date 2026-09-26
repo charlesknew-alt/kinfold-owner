@@ -793,7 +793,7 @@
       id: raw.id,
       section: raw.section,
       name: cleanDishName(namePull.name),
-      description: normalizeDescription(descPull.name),
+      description: normalizeDescription(cleanDishDescription(descPull.name)),
       price: raw.price || '',
       tags: merged,
       lunchClub: !!raw.lunchClub,
@@ -839,6 +839,8 @@
       if (price) {
         while (i + 1 < lines.length && !priceOf(lines[i + 1]) && !isHeading(lines[i + 1])) {
           var next = lines[i + 1];
+          // Never absorb the allergy footer onto the last dish
+          if (/please\s+(inform|tell)\b|allergies or dietary|we prepare all food/i.test(next)) break;
           if (description && !looksLikeDescFragment(next) && /^[A-ZÀ-Ý]/.test(next)) break;
           description = description ? description + ' ' + next : next;
           i += 1;
@@ -1165,11 +1167,35 @@
     return list;
   }
 
-  /** Allergy / dietary footer wrongly stuck on a dish description. */
+  /**
+   * Cut a trailing allergy / kitchen disclaimer from description text.
+   * Keeps the food words (“served with rice…”) when the footer was glued on.
+   */
+  function stripAllergyFooter(text) {
+    var t = String(text || '');
+    if (!t) return '';
+    t = t.replace(/\s*[.|]*\s*(please\s+(inform|tell)\b[\s\S]*)$/i, '');
+    t = t.replace(/\s*[.|]*\s*(we prepare all food[\s\S]*)$/i, '');
+    t = t.replace(/\s*[.|]*\s*((?:any\s+)?allergies or dietary[\s\S]*)$/i, '');
+    t = t.replace(/\s*[.|]*\s*(can'?t guarantee[\s\S]*allergen[\s\S]*)$/i, '');
+    t = t.replace(/\s*(?:^|[\n.])\s*gf\s*[–—\-]\s*gluten[\s\S]*$/i, '');
+    return t.replace(/\s+/g, ' ').replace(/[.|]+$/g, '').trim();
+  }
+
+  /** True when the field is only an allergy footer / key — not when food text remains. */
   function isJunkDescription(text) {
     var t = String(text || '').trim();
     if (!t) return false;
-    return /please tell our team|allergies or dietary|dietary requirements|please inform|allergen/i.test(t);
+    var cleaned = stripAllergyFooter(t);
+    if (!cleaned) return true;
+    return /^(please\s+(inform|tell)|allergies or dietary|dietary requirements|gf\s*[–—-]\s*gluten)\b/i.test(cleaned);
+  }
+
+  /** Description safe for save/review: footer stripped; empty if nothing food remains. */
+  function cleanDishDescription(text) {
+    var t = stripAllergyFooter(text);
+    if (!t || isJunkDescription(t)) return '';
+    return t;
   }
 
   /**
@@ -1602,7 +1628,9 @@
     findDishSplit: findDishSplit,
     canSplitDish: canSplitDish,
     splitDishAt: splitDishAt,
+    stripAllergyFooter: stripAllergyFooter,
     isJunkDescription: isJunkDescription,
+    cleanDishDescription: cleanDishDescription,
     tidyOrphanDescriptions: tidyOrphanDescriptions,
     normalizeDescription: normalizeDescription,
     tidyDishFields: tidyDishFields,
