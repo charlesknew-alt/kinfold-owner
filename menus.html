@@ -278,9 +278,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow75"></script>
-  <script src="menus-print.js?v=20260926-flow75"></script>
-  <script src="menus-ingest.js?v=20260926-flow75"></script>
+  <script src="menus.js?v=20260926-flow76"></script>
+  <script src="menus-print.js?v=20260926-flow76"></script>
+  <script src="menus-ingest.js?v=20260926-flow76"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -317,8 +317,9 @@
     var cloudSyncNote = '';
     var cloudPullDone = false;
 
-    // Manager: day-to-day printables only (owner keeps Party / Little Bells / Lunch club).
-    var STAFF_MENU_IDS = ['specials', 'main', 'sunday', 'sandwiches', 'desserts'];
+    // Manager: day-to-day printables (owner keeps Party / Lunch club).
+    // Little Bells is included so Sunday/Main can tick the kids menu onto the sheet.
+    var STAFF_MENU_IDS = ['specials', 'main', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
 
     var FLOW_STEPS = isStaffMode
       ? [
@@ -858,10 +859,11 @@
         html += '<div class="include-box"><h3>Also put on this sheet</h3>';
         html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print.</p><div class="include-row">';
         extras.forEach(function (m) {
-          // Staff: only offer Specials (and other visible menus) as includes
+          // Staff: same menus they can open as tabs (incl. Little Bells kids on Main/Sunday)
           if (isStaffMode && STAFF_MENU_IDS.indexOf(m.id) === -1) return;
           var on = !!(includes[menuId] && includes[menuId][m.id]);
-          html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(m.name) + '</label>';
+          var label = m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
+          html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(label) + '</label>';
         });
         html += '</div></div>';
       }
