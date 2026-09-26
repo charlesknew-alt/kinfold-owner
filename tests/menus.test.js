@@ -304,8 +304,10 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow82') !== -1, 'menus page cache-bust is flow82');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow82') !== -1, 'hub menus link cache-bust is flow82');
+assert(page.indexOf('flow83') !== -1, 'menus page cache-bust is flow83');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow83') !== -1, 'hub menus link cache-bust is flow83');
+assert(printJs.indexOf('cols-little-solo') !== -1,
+  'Little Bells Column solo fills the opposite hole with a feature panel');
 assert(typeof api.normalizeSectionLayoutBook === 'function' && typeof api.sectionLayoutForMenu === 'function',
   'Blocks rules are stored per menu');
 assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout') !== -1,
@@ -687,6 +689,8 @@ var kidsFullHtml = print.build(api.menuById('sunday'), kidsColDishes, {
 });
 assert(!/cols-little-desserts/.test(kidsFullHtml),
   'Blocks Full width keeps Little Bells stacked (not a column pair)');
+// GOLDEN RULE: food first — Column kids pair with Column Sides (not a blank hole),
+// even when Desserts is locked Full (puddings stay full-bleed after the pair).
 var kidsColDessertsFull = print.build(api.menuById('sunday'), kidsColDishes.concat([
   api.dish('Sides', 'Halloumi Fries', '', '6.50', ''),
   api.dish('Sides', 'Onion Rings', '', '5.95', '')
@@ -696,22 +700,37 @@ var kidsColDessertsFull = print.build(api.menuById('sunday'), kidsColDishes.conc
     Desserts: { width: 'full', frame: false, note: '' },
     Sides: { width: 'column', frame: false, note: '' }
   }),
-  promos: []
+  promos: [
+    { title: 'Stay a While', body: 'cosy rooms upstairs' },
+    { title: 'Gatherings', body: 'happy to host your event' }
+  ]
 });
 assert(!/cols-little-desserts/.test(kidsColDessertsFull),
   'Full-width Desserts stay out of the Little Bells column pair');
-assert(!/cols-little-sides/.test(kidsColDessertsFull),
-  'Full-width Desserts: kids stay above puddings (not paired with Sides ahead of them)');
-assert(/little-solo-row|col-little/.test(kidsColDessertsFull),
-  'Little Bells Column still uses a column when Desserts is Full width');
+assert(/cols-little-sides/.test(kidsColDessertsFull),
+  'Column kids + Column Sides pair with food so columns finish level');
+assert(!/cols-little-solo/.test(kidsColDessertsFull),
+  'food partner preferred over a solo kids column');
 var fishIdx = kidsColDessertsFull.indexOf('Fish Fingers');
 var dessIdx = kidsColDessertsFull.indexOf('Sticky Toffee');
-assert(fishIdx > 0 && dessIdx > fishIdx,
-  'order stays kids → full-bleed Desserts');
-// Desserts title must not sit inside the kids column pair
-var pairIdx = kidsColDessertsFull.indexOf('cols-little-desserts');
-assert(pairIdx === -1 || pairIdx > dessIdx,
-  'Sticky Toffee is not printed inside a kids|desserts column');
+var halloumiIdx = kidsColDessertsFull.indexOf('Halloumi Fries');
+assert(fishIdx > 0 && halloumiIdx > 0 && dessIdx > fishIdx,
+  'kids|sides pair prints, then full-bleed Desserts');
+// No food partner → feature panels fill the short column (never blank)
+var kidsColNoSides = print.build(api.menuById('sunday'), kidsColDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'column', frame: true, note: 'All £9.50' },
+    Desserts: { width: 'full', frame: false, note: '' }
+  }),
+  promos: [
+    { title: 'Stay a While', body: 'cosy rooms upstairs' },
+    { title: 'Gatherings', body: 'happy to host your event' }
+  ]
+});
+assert(/cols-little-solo[\s\S]{0,800}Stay a While|cols-little-solo[\s\S]{0,800}Gatherings/.test(kidsColNoSides),
+  'Column with no food partner gets feature panels so columns finish level');
+assert(printJs.indexOf('columnBalanceFill') !== -1 && printJs.indexOf('even fill across pages') !== -1,
+  'layout equalises opposite columns and leftover across two pages');
 // Best fit (both) still allows the kids|desserts column pair
 var kidsColDessertsBoth = print.build(api.menuById('sunday'), kidsColDishes, {
   sectionLayout: api.normalizeSectionLayout({
