@@ -291,8 +291,13 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow73') !== -1, 'menus page cache-bust is flow73');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow73') !== -1, 'hub menus link cache-bust is flow73');
+assert(page.indexOf('flow74') !== -1, 'menus page cache-bust is flow74');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow74') !== -1, 'hub menus link cache-bust is flow74');
+assert(/id="menuFile"[^>]*\bmultiple\b/.test(page) || /<input[^>]*id="menuFile"[^>]*multiple/.test(page),
+  'upload input allows multiple files');
+assert(page.indexOf('several files at once') !== -1, 'upload copy explains multi-select');
+assert(ingestJs.indexOf('function readFiles') !== -1 && ingestJs.indexOf('readFiles: readFiles') !== -1,
+  'ingest exports readFiles for multi-upload');
 assert(page.indexOf("menu.id === 'specials'") !== -1,
   'Specials Blocks step edits section note');
 assert(fs.existsSync(path.join(root, 'menus-guide.html')), 'menus staff quick guide page exists');
@@ -1055,7 +1060,40 @@ var histSample = {
   html: '<html><body>sample main III</body></html>'
 };
 
-print.savePrintHistory(histSample).then(function () {
+require(path.join(root, 'menus-ingest.js'));
+var ingest = global.EBMenuIngest;
+assert(ingest && typeof ingest.readFiles === 'function', 'EBMenuIngest.readFiles available');
+var origReadFile = ingest.readFile;
+var stubCalls = 0;
+ingest.readFile = function (file, onProgress) {
+  stubCalls += 1;
+  if (onProgress) onProgress('ok');
+  return Promise.resolve({
+    text: 'text-' + file.name,
+    dishes: [{ id: 'same-id', section: 'Mains', name: 'Dish ' + file.name, description: '', price: '10', tags: '', lunchClub: false }],
+    meta: file.name === 'a.jpg' ? { title: 'From A' } : { title: '', notes: 'From B' },
+    kind: '',
+    spellingFixes: file.name === 'b.jpg' ? [{ from: 'Teh', to: 'The' }] : [],
+    source: 'ocr',
+    fileName: file.name,
+    needsReview: true,
+    warning: 'warn-' + file.name
+  });
+};
+ingest.readFiles([{ name: 'a.jpg' }, { name: 'b.jpg' }], function () {}).then(function (merged) {
+  assert(stubCalls === 2, 'readFiles reads each selected file');
+  assert(merged.dishes.length === 2, 'readFiles merges dishes from both files');
+  assert(merged.dishes[0].id !== merged.dishes[1].id, 'merged dish ids are unique across files');
+  assert(merged.meta.title === 'From A' && merged.meta.notes === 'From B', 'readFiles merges meta fields');
+  assert(merged.spellingFixes.length === 1, 'readFiles keeps spelling fixes from all files');
+  assert(/a\.jpg/.test(merged.fileName) && /b\.jpg/.test(merged.fileName), 'readFiles names all source files');
+  ingest.readFile = origReadFile;
+}).catch(function (err) {
+  ingest.readFile = origReadFile;
+  failed += 1;
+  console.error('FAIL  readFiles merge: ' + err);
+}).then(function () {
+return print.savePrintHistory(histSample).then(function () {
   return print.listPrintHistory();
 }).then(function (rows) {
   assert(rows.some(function (r) { return r.id === 'test-hist-1' && r.roman === 'III'; }),
@@ -1073,4 +1111,5 @@ print.savePrintHistory(histSample).then(function () {
 }).catch(function (err) {
   console.error('FAIL  history round-trip: ' + err);
   process.exit(1);
+});
 });

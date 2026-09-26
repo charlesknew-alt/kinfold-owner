@@ -340,9 +340,106 @@
     });
   }
 
+  function uniquifyDishIds(dishes, fileIndex) {
+    return (dishes || []).map(function (d, i) {
+      var copy = {};
+      Object.keys(d || {}).forEach(function (k) { copy[k] = d[k]; });
+      var base = String(copy.id || ('dish-' + i)).replace(/-f\d+-\d+$/, '');
+      copy.id = base + '-f' + fileIndex + '-' + i;
+      return copy;
+    });
+  }
+
+  function mergeMeta(into, from) {
+    into = into || (root.EBMenus ? root.EBMenus.emptyMeta() : {});
+    from = from || {};
+    ['title', 'subtitle', 'coursePrices', 'notes', 'topKind', 'bottomKind', 'paper'].forEach(function (k) {
+      if (!into[k] && from[k]) into[k] = from[k];
+    });
+    return into;
+  }
+
+  /**
+   * Read several PDFs / Word / images in order and merge into one review result.
+   * @returns {Promise<same shape as readFile>}
+   */
+  function readFiles(fileList, onProgress) {
+    var files = [];
+    if (fileList && typeof fileList.length === 'number') {
+      for (var i = 0; i < fileList.length; i++) {
+        if (fileList[i]) files.push(fileList[i]);
+      }
+    }
+    if (!files.length) return Promise.reject(new Error('No file chosen'));
+    if (files.length === 1) return readFile(files[0], onProgress);
+
+    var combined = {
+      text: '',
+      dishes: [],
+      meta: root.EBMenus ? root.EBMenus.emptyMeta() : {},
+      kind: '',
+      spellingFixes: [],
+      source: '',
+      fileName: files.map(function (f) { return f.name || 'file'; }).join(', '),
+      needsReview: true,
+      warning: '',
+      fileCount: files.length
+    };
+    var sources = {};
+    var warnings = [];
+    var errors = [];
+    var index = 0;
+
+    function next() {
+      if (index >= files.length) {
+        if (!combined.dishes.length && !combined.text) {
+          var failMsg = errors.length
+            ? errors.join(' · ')
+            : 'No readable dishes found in those files.';
+          return Promise.reject(new Error(failMsg));
+        }
+        var sourceKeys = Object.keys(sources);
+        combined.source = sourceKeys.length === 1 ? sourceKeys[0] : 'mixed';
+        var parts = [];
+        parts.push('Read ' + files.length + ' files → ' + combined.dishes.length + ' dishes.');
+        if (errors.length) parts.push('Skipped: ' + errors.join('; '));
+        if (warnings.length) parts.push(warnings.join(' · '));
+        combined.warning = parts.join(' ');
+        return Promise.resolve(combined);
+      }
+      var file = files[index];
+      var fileNo = index + 1;
+      var label = file.name || ('file ' + fileNo);
+      function progress(msg) {
+        if (onProgress) onProgress('File ' + fileNo + ' of ' + files.length + ' (' + label + '): ' + msg);
+      }
+      progress('Starting…');
+      // Call via export so tests (and future wrappers) can stub readFile.
+      var reader = (root.EBMenuIngest && root.EBMenuIngest.readFile) || readFile;
+      return reader(file, progress).then(function (result) {
+        combined.text += (combined.text ? '\n\n—— ' + label + ' ——\n\n' : '') + (result.text || '');
+        combined.dishes = combined.dishes.concat(uniquifyDishIds(result.dishes, fileNo));
+        combined.meta = mergeMeta(combined.meta, result.meta);
+        if (!combined.kind && result.kind) combined.kind = result.kind;
+        combined.spellingFixes = combined.spellingFixes.concat(result.spellingFixes || []);
+        if (result.source) sources[result.source] = true;
+        if (result.warning) warnings.push(label + ': ' + result.warning);
+        index += 1;
+        return next();
+      }, function (err) {
+        var msg = (err && err.message) ? err.message : 'Could not read file';
+        errors.push(label + ' — ' + msg);
+        index += 1;
+        return next();
+      });
+    }
+
+    return next();
+  }
+
   /**
    * @returns {Promise<{
-   *   text, dishes, meta, kind, source: 'ai'|'pdf'|'ocr'|'docx',
+   *   text, dishes, meta, kind, source: 'ai'|'pdf'|'ocr'|'docx'|'mixed',
    *   fileName, needsReview: true, warning?: string
    * }>}
    */
@@ -428,6 +525,7 @@
 
   root.EBMenuIngest = {
     readFile: readFile,
+    readFiles: readFiles,
     cleanExtractedText: cleanExtractedText,
     getAiUrl: getAiUrl,
     setAiUrl: setAiUrl,
