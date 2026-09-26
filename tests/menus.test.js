@@ -304,8 +304,10 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow78') !== -1, 'menus page cache-bust is flow78');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow78') !== -1, 'hub menus link cache-bust is flow78');
+assert(page.indexOf('flow79') !== -1, 'menus page cache-bust is flow79');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow79') !== -1, 'hub menus link cache-bust is flow79');
+assert(printJs.indexOf('function renderLittleBellsRow') !== -1 && printJs.indexOf('cols-little-desserts') !== -1,
+  'Little Bells Column width pairs beside Desserts');
 assert(printJs.indexOf('sundayRoasts') !== -1 && printJs.indexOf('roastsOnP1') !== -1,
   'print planner can balance Sunday Roasts onto page 1');
 assert(api.looksLikeDishTitle('Tomato & Basil Pasta') && api.looksLikeDishTitle('Fish Fingers, Chunky Chips & Peas'),
@@ -626,6 +628,29 @@ var sundayPrint = print.build(
 assert(/Sunday Roasts/i.test(sundayPrint), 'Sunday print shows Sunday Roasts heading');
 assert(/Yorkshire pudding|roast potatoes/i.test(sundayPrint), 'Sunday Roasts note prints under the title');
 assert(/sec-note/i.test(sundayPrint), 'Sunday Roasts description uses section note markup');
+var kidsColDishes = [
+  api.dish('Mains', 'Porchetta', 'mash', '18.95', ''),
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Little Bells', 'Kids Mac & Cheese', '', '', ''),
+  api.dish('Desserts', 'Sticky Toffee', 'toffee', '8.25', ''),
+  api.dish('Desserts', 'Treacle Tart', 'ice cream', '8.25', '')
+];
+var kidsColHtml = print.build(api.menuById('sunday'), kidsColDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'column', frame: true, note: 'All £9.50' }
+  }),
+  promos: []
+});
+assert(/cols-little-desserts/.test(kidsColHtml) && /col-little/.test(kidsColHtml),
+  'Blocks Column puts Little Bells beside Desserts');
+var kidsFullHtml = print.build(api.menuById('sunday'), kidsColDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': { width: 'full', frame: true, note: 'All £9.50' }
+  }),
+  promos: []
+});
+assert(!/cols-little-desserts/.test(kidsFullHtml),
+  'Blocks Full width keeps Little Bells stacked (not a column pair)');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
 var jammedSunday = [
