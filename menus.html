@@ -26,7 +26,7 @@
     main { max-width: 720px; margin: 0 auto; padding: 16px 16px 120px; }
     h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 5vw, 34px); }
     .lede { color: var(--ink-soft); margin: 6px 0 16px; font-size: 14.5px; max-width: 40em; }
-    .menus { display: flex; flex-wrap: nowrap; gap: 8px; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+    .menus { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
     .menus button, button.go, button.ghost, button.soft {
       font-family: var(--sans); cursor: pointer; border-radius: 999px; border: 1px solid var(--line);
       background: #fff; color: var(--ink); padding: 10px 14px; font-weight: 600; font-size: 13px; white-space: nowrap;
@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow60"></script>
-  <script src="menus-print.js?v=20260926-flow60"></script>
-  <script src="menus-ingest.js?v=20260926-flow60"></script>
+  <script src="menus.js?v=20260926-flow61"></script>
+  <script src="menus-print.js?v=20260926-flow61"></script>
+  <script src="menus-ingest.js?v=20260926-flow61"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 

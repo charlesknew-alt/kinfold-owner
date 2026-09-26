@@ -188,7 +188,13 @@ assert(api.guessSection('Sauces', 'Peppercorn', '') === 'Sauces', 'guesses Sauce
 assert(api.SECTIONS.indexOf('Item Boost') !== -1, 'Item Boost is a canonical section');
 assert(api.guessSection('Item Boost', 'Fish of the Day', '') === 'Item Boost', 'keeps Item Boost section');
 assert(api.guessSection('', 'Fish of the Day', 'ask for today’s catch') === 'Item Boost', 'guesses Fish of the Day as Item Boost');
-assert(api.guessSection('Specials', 'Pie of the Day', '') === 'Item Boost', 'maps Specials heading to Item Boost');
+assert(api.guessSection('Specials', 'Braised Blade', '') === 'Specials', 'Specials heading stays Specials');
+assert(api.guessSection('', 'Pie of the Day', '') === 'Item Boost', 'Pie of the Day still maps to Item Boost');
+assert(api.SECTIONS.indexOf('Specials') !== -1, 'Specials is a canonical section');
+assert(api.MENUS.some(function (m) { return m.id === 'specials'; }), 'Specials is a menu tab');
+assert(api.includableMenus('main').some(function (m) { return m.id === 'specials'; }),
+  'Specials can be ticked onto Main menu');
+assert(api.sectionLayoutFor('Specials').frame === true, 'Specials defaults to frilly frame');
 assert(api.sectionLayoutFor('Item Boost').frame === true, 'Item Boost defaults to frilly frame');
 assert(api.SECTIONS.indexOf('Little Bells') !== -1, 'Little Bells is a canonical section');
 assert(api.guessSection('Little Bells', 'Beef Burger, Fries & Dressed Salad', '') === 'Little Bells',
@@ -269,8 +275,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow60') !== -1, 'menus page cache-bust is flow60');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow60') !== -1, 'hub menus link cache-bust is flow60');
+assert(page.indexOf('flow61') !== -1, 'menus page cache-bust is flow61');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow61') !== -1, 'hub menus link cache-bust is flow61');
+assert(/\.menus\s*\{[^}]*flex-wrap:\s*wrap/.test(page) && !/\.menus\s*\{[^}]*overflow-x:\s*auto/.test(page),
+  'menu tabs wrap onto lines instead of horizontal scroll');
+assert(printJs.indexOf('isSpecials') !== -1 && printJs.indexOf('bag.specials') !== -1,
+  'print bags Specials for layout');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');

@@ -782,9 +782,12 @@
     return /shar(e|ing)|for the table/i.test(name || '');
   }
   function isItemBoost(name) {
-    return /item\s*boost|specials?|fish of the day|pie of the day|catch of the day|chef.?s special/i.test(
+    return /item\s*boost|fish of the day|pie of the day|catch of the day/i.test(
       String(name || '').trim()
     );
+  }
+  function isSpecials(name) {
+    return /^specials?$|today.?s specials?|chef.?s special/i.test(String(name || '').trim());
   }
   function isSides(name) {
     return /^sides?$/i.test(name || '');
@@ -814,6 +817,7 @@
     { test: isStarters, rank: 20 },
     { test: isSharing, rank: 25 },
     { test: isItemBoost, rank: 27 },
+    { test: isSpecials, rank: 28 },
     { test: isClassics, rank: 30 },
     { test: isBurgers, rank: 32 },
     { test: isMains, rank: 40 },
@@ -911,7 +915,7 @@
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
-      nibbles: null, starters: null, sharing: null, boost: null, classics: null, burgers: null,
+      nibbles: null, starters: null, sharing: null, boost: null, specials: null, classics: null, burgers: null,
       mains: null, littleBells: null, desserts: null, sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
@@ -921,6 +925,7 @@
       else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
       else if (isItemBoost(s.name) && !bag.boost) bag.boost = { name: 'Item Boost', dishes: s.dishes };
+      else if (isSpecials(s.name) && !bag.specials) bag.specials = { name: 'Specials', dishes: s.dishes };
       else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
       else if (isClassics(s.name) && !bag.classics) {
         // Keep every staff-assigned classic here — including a lone burger filed as classic.
@@ -988,10 +993,12 @@
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
     if (bag.sharing) front += sectionUnits(bag.sharing, false);
-    // Item Boost defaults to a frilly frame (Fish of the Day, etc.)
+    // Item Boost / Specials default to a frilly frame
     if (bag.boost) front += sectionUnits(bag.boost, true);
+    if (bag.specials) front += sectionUnits(bag.specials, true);
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name)) {
+      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name) &&
+          !isSpecials(s.name)) {
         front += sectionUnits(s, false);
       }
     });
@@ -1443,9 +1450,15 @@
         sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
         '</section>';
     }
+    if (bag.specials) {
+      var specialsRule = ruleFor('Specials', plan);
+      p1 += '<section class="sec">' +
+        sectionBlock(bag.specials.name, bag.specials.dishes, specialsRule, 'wide') +
+        '</section>';
+    }
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
-          !isItemBoost(s.name) && !isLittleBells(s.name)) {
+          !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
         var otherRule = ruleFor(s.name, plan);
         p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
       }
