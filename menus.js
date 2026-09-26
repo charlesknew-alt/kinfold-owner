@@ -9,6 +9,7 @@
     { id: 'sunday', name: 'Sunday', kind: 'long' },
     { id: 'party', name: 'Party / Christmas', kind: 'party' },
     { id: 'sandwiches', name: 'Sandwiches', kind: 'card', comfortable: 10 },
+    { id: 'specials', name: 'Specials', kind: 'card', comfortable: 8 },
     { id: 'desserts', name: 'Desserts', kind: 'card', comfortable: 7 },
     { id: 'little-bells', name: 'Little Bells', kind: 'card', comfortable: 6 },
     { id: 'lunch-club', name: 'Lunch club', kind: 'card', comfortable: 12 }
@@ -20,6 +21,7 @@
     'Starters',
     'Sharing Plates',
     'Item Boost',
+    'Specials',
     'Pub Classics',
     'Burgers',
     'Mains',
@@ -53,11 +55,12 @@
     map['item boost'] = 'Item Boost';
     map['item boosts'] = 'Item Boost';
     map['boost'] = 'Item Boost';
-    map['specials'] = 'Item Boost';
-    map["today's special"] = 'Item Boost';
-    map["today's specials"] = 'Item Boost';
-    map['chefs special'] = 'Item Boost';
-    map["chef's special"] = 'Item Boost';
+    map['specials'] = 'Specials';
+    map['special'] = 'Specials';
+    map["today's special"] = 'Specials';
+    map["today's specials"] = 'Specials';
+    map['chefs special'] = 'Specials';
+    map["chef's special"] = 'Specials';
     map['fish of the day'] = 'Item Boost';
     map['pie of the day'] = 'Item Boost';
     map['catch of the day'] = 'Item Boost';
@@ -101,8 +104,12 @@
       ['sauces', 'Sauces'],
       ['item boost', 'Item Boost'],
       ['item boosts', 'Item Boost'],
-      ['specials', 'Item Boost'],
-      ["today's specials", 'Item Boost'],
+      ['specials', 'Specials'],
+      ['special', 'Specials'],
+      ["today's special", 'Specials'],
+      ["today's specials", 'Specials'],
+      ['chefs special', 'Specials'],
+      ["chef's special", 'Specials'],
       ['dessert', 'Desserts'],
       ['puddings', 'Desserts'],
       ['sunday roasts', 'Mains'],
@@ -147,7 +154,8 @@
     if (/nibble|light bite/.test(lower)) return 'Nibbles';
     if (/starter/.test(lower)) return 'Starters';
     if (/shar(e|ing)|for the table/.test(lower)) return 'Sharing Plates';
-    if (/item\s*boost|specials?|fish of the day|pie of the day|catch of the day|chef.?s special/.test(lower)) {
+    if (/^specials?$|today.?s specials?|chef.?s special/.test(lower)) return 'Specials';
+    if (/item\s*boost|fish of the day|pie of the day|catch of the day/.test(lower)) {
       return 'Item Boost';
     }
     if (/little\s*bells|kids?\s*menu|children.?s/.test(lower)) return 'Little Bells';
@@ -178,9 +186,11 @@
       return 'Sauces';
     }
     if (/^sauces?\b/i.test(s)) return 'Sauces';
-    // Featured specials staff file under Item Boost (Fish / Pie of the Day, etc.)
-    if (/item\s*boost|specials?/i.test(s)) return 'Item Boost';
-    if (/\b(fish|pie|catch|special)\s+of\s+the\s+day\b/i.test(n)) return 'Item Boost';
+    // Specials board (own menu / section) vs Item Boost (Fish / Pie of the Day box)
+    if (/^specials?$|today.?s specials?|chef.?s special/i.test(s)) return 'Specials';
+    if (/item\s*boost/i.test(s)) return 'Item Boost';
+    if (/\b(fish|pie|catch)\s+of\s+the\s+day\b/i.test(n)) return 'Item Boost';
+    if (/\bspecial\s+of\s+the\s+day\b/i.test(n)) return 'Specials';
     if (/\bto share\b/i.test(n) || /\bfor the table\b/i.test(n) || /\bsharing\b/i.test(n)) {
       return 'Sharing Plates';
     }
@@ -416,6 +426,11 @@
         dish('Sandwiches', 'Chicken, Bacon & Mayonnaise', '', '9.50', ''),
         dish('Sandwiches', 'Toasted Hot Tuna Melt', '', '10.50', ''),
         dish('Sandwiches', 'Giant Fish Finger & Tartare Sauce', '', '10.50', '')
+      ],
+      specials: [
+        dish('Specials', 'Pan-Roasted Cod Loin', 'brown shrimp butter, crushed new potatoes, samphire', '19.95', 'gf'),
+        dish('Specials', 'Slow-Cooked Blade of Beef', 'creamy mash, glazed carrots, red wine jus', '18.95', 'gf'),
+        dish('Specials', 'Wild Mushroom & Truffle Risotto', 'parmesan crisp, micro herbs', '16.95', 'v')
       ],
       desserts: [
         dish('Desserts', 'Sticky Toffee Pudding', 'brandy snap, clotted cream ice cream, toffee sauce', '7.95', 'v with gf option', true),
@@ -1352,6 +1367,7 @@
     Starters: { width: 'full', frame: false, note: '' },
     'Sharing Plates': { width: 'both', frame: false, note: '' },
     'Item Boost': { width: 'full', frame: true, note: '' },
+    Specials: { width: 'full', frame: true, note: '' },
     'Pub Classics': { width: 'column', frame: false, note: '' },
     Burgers: { width: 'column', frame: false, note: '' },
     Mains: { width: 'full', frame: false, note: '' },

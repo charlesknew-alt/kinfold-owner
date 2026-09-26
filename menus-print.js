@@ -782,9 +782,12 @@
     return /shar(e|ing)|for the table/i.test(name || '');
   }
   function isItemBoost(name) {
-    return /item\s*boost|specials?|fish of the day|pie of the day|catch of the day|chef.?s special/i.test(
+    return /item\s*boost|fish of the day|pie of the day|catch of the day/i.test(
       String(name || '').trim()
     );
+  }
+  function isSpecials(name) {
+    return /^specials?$|today.?s specials?|chef.?s special/i.test(String(name || '').trim());
   }
   function isSides(name) {
     return /^sides?$/i.test(name || '');
@@ -814,6 +817,7 @@
     { test: isStarters, rank: 20 },
     { test: isSharing, rank: 25 },
     { test: isItemBoost, rank: 27 },
+    { test: isSpecials, rank: 28 },
     { test: isClassics, rank: 30 },
     { test: isBurgers, rank: 32 },
     { test: isMains, rank: 40 },
@@ -880,10 +884,12 @@
    * pages and open type toward the maximum. Never clip desserts off the foot.
    */
   var TYPE_RANGE = {
-    name: { min: 9, max: 11.5 },
-    desc: { min: 8, max: 10 },
-    title: { min: 14, max: 22 },
-    promo: { min: 9, max: 11.5 }
+    name: { min: 11, max: 11.5 },
+    desc: { min: 10, max: 10 },
+    title: { min: 16, max: 22 },
+    promo: { min: 11, max: 11.5 },
+    /** Floor for vertical space between dishes — never collapse tighter. */
+    dishGapPx: { min: 8, max: 14 }
   };
   // One page only with clear headroom at min type — unit model under-counts
   // scalloped boxes / full-width mains vs real browser height.
@@ -909,7 +915,7 @@
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
-      nibbles: null, starters: null, sharing: null, boost: null, classics: null, burgers: null,
+      nibbles: null, starters: null, sharing: null, boost: null, specials: null, classics: null, burgers: null,
       mains: null, littleBells: null, desserts: null, sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
@@ -919,6 +925,7 @@
       else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
       else if (isItemBoost(s.name) && !bag.boost) bag.boost = { name: 'Item Boost', dishes: s.dishes };
+      else if (isSpecials(s.name) && !bag.specials) bag.specials = { name: 'Specials', dishes: s.dishes };
       else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
       else if (isClassics(s.name) && !bag.classics) {
         // Keep every staff-assigned classic here — including a lone burger filed as classic.
@@ -986,10 +993,12 @@
     if (bag.nibbles) front += sectionUnits(bag.nibbles, true);
     if (bag.starters) front += sectionUnits(bag.starters, false);
     if (bag.sharing) front += sectionUnits(bag.sharing, false);
-    // Item Boost defaults to a frilly frame (Fish of the Day, etc.)
+    // Item Boost / Specials default to a frilly frame
     if (bag.boost) front += sectionUnits(bag.boost, true);
+    if (bag.specials) front += sectionUnits(bag.specials, true);
     bag.other.forEach(function (s) {
-      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name)) {
+      if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name) &&
+          !isSpecials(s.name)) {
         front += sectionUnits(s, false);
       }
     });
@@ -1218,7 +1227,8 @@
       : ' Sheet is full — no room for extra selling boxes.';
     var typeNote = ' Type range: names ' + TYPE_RANGE.name.min + '–' + TYPE_RANGE.name.max +
       'pt, descriptions ' + TYPE_RANGE.desc.min + '–' + TYPE_RANGE.desc.max +
-      'pt, section titles ' + TYPE_RANGE.title.min + '–' + TYPE_RANGE.title.max + 'pt.';
+      'pt, section titles ' + TYPE_RANGE.title.min + '–' + TYPE_RANGE.title.max +
+      'pt; dish gap ≥' + TYPE_RANGE.dishGapPx.min + 'px.';
     layout.summary =
       (layout.fit === 'one' ? 'One A4 — food fits at minimum type, so type can open toward the maximum.' :
         layout.fit === 'two' ? 'Two A4 pages — would clip at minimum type on one page; same type on both pages, opening toward the maximum; never a third page.' :
@@ -1440,9 +1450,15 @@
         sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
         '</section>';
     }
+    if (bag.specials) {
+      var specialsRule = ruleFor('Specials', plan);
+      p1 += '<section class="sec">' +
+        sectionBlock(bag.specials.name, bag.specials.dishes, specialsRule, 'wide') +
+        '</section>';
+    }
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
-          !isItemBoost(s.name) && !isLittleBells(s.name)) {
+          !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
         var otherRule = ruleFor(s.name, plan);
         p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
       }
@@ -1724,7 +1740,8 @@
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
         '--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
-        '--name-min:9pt;--name-max:11.5pt;--desc-min:8pt;--desc-max:10pt;--title-min:14pt;--title-max:22pt}' +
+        '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
+        '--dish-gap-min:8px;--dish-gap-max:14px}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1758,7 +1775,7 @@
       '.card-face.fill-roomy{--dish-gap:16px;--sec-gap:16px;--name:13pt;--desc:11pt;--title:20pt}' +
       '.card-face.fill-normal{--dish-gap:12px;--sec-gap:13px;--name:12pt;--desc:10.5pt;--title:18pt}' +
       '.card-face.fill-tight{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:9.75pt;--title:16pt}' +
-      '.card-face.fill-compact,.card-face.fill-dense{--dish-gap:6px;--sec-gap:8px;--name:10pt;--desc:9pt;--title:14pt}' +
+      '.card-face.fill-compact,.card-face.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt}' +
       '.card-face .dish-c{margin:0;padding:2px 0;text-align:center}' +
       '.card-face .dish-c .desc,.card-face .card-spiel{text-align:center;max-width:34em;margin-left:auto;margin-right:auto}' +
       '.card-face .scallop{margin:0;flex:1 1 auto;display:flex;flex-direction:column;min-height:0;width:100%}' +
@@ -1781,7 +1798,7 @@
       '.top-left .sec-title{text-align:left;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
       '.top-left .sec-plain{margin:0}' +
-      '.top-left .dish{margin-bottom:calc(var(--dish-gap) + 2px)}' +
+      '.top-left .dish{margin-bottom:calc(max(var(--dish-gap-min),var(--dish-gap)) + 2px)}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
@@ -1805,7 +1822,7 @@
       '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
       '.scallop-pad{padding:4px 10px 3px;overflow:hidden;min-width:0}' +
       '.scallop-box .scallop-pad{padding:4px 10px 4px}' +
-      '.dish{margin:0 0 var(--dish-gap);min-width:0;max-width:100%}' +
+      '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
       '.dish-line{display:flex;flex-wrap:nowrap;align-items:center;min-width:0;max-width:100%;gap:0;line-height:1.28}' +
@@ -1816,7 +1833,7 @@
       '.desc{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max))}' +
-      '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
+      '.dish-c{text-align:center;margin:0 0 max(var(--dish-gap-min),var(--dish-gap))}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:clamp(var(--name-min),var(--name),var(--name-max));letter-spacing:.02em}' +
       '.dish-c .desc,.dish-c .tags{text-align:center}' +
       '.dish-c .dish-line{display:block}' +
@@ -1877,13 +1894,13 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — capped to TYPE_RANGE (adult pub, not kids’-menu giant type).
-         airy = max; dense = min. Fit script steps down only when a page overflows. */
+         airy = max; dense = min. Dish gap never drops below --dish-gap-min (8px). */
       '.fill-airy{--dish-gap:14px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:20pt;--promo:11pt}' +
-      '.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:18pt;--promo:10.5pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:10px;--name:10pt;--desc:9.25pt;--title:16pt;--promo:10pt}' +
-      '.fill-compact{--dish-gap:5px;--sec-gap:8px;--name:9.5pt;--desc:8.75pt;--title:15pt;--promo:9.5pt}' +
-      '.fill-dense{--dish-gap:3px;--sec-gap:6px;--name:9pt;--desc:8pt;--title:14pt;--promo:9pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:14px;--name:11.35pt;--desc:10pt;--title:20pt;--promo:11.35pt}' +
+      '.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:11.2pt;--desc:10pt;--title:18pt;--promo:11.2pt}' +
+      '.fill-tight{--dish-gap:9px;--sec-gap:10px;--name:11.1pt;--desc:10pt;--title:17pt;--promo:11.1pt}' +
+      '.fill-compact{--dish-gap:8px;--sec-gap:9px;--name:11.05pt;--desc:10pt;--title:16.5pt;--promo:11.05pt}' +
+      '.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
       '.fill-dense .scallop-pad{padding:2px 8px 1px}' +
@@ -1896,12 +1913,12 @@
       '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start}' +
       '.a5-face .page-spacer{display:none}' +
       '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
-      /* A5 density — same name/desc caps as A4; titles slightly smaller on the half-sheet */
-      '.a5-face.fill-airy{--dish-gap:12px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11pt}' +
-      '.a5-face.fill-roomy{--dish-gap:10px;--sec-gap:12px;--name:11pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
-      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:10px;--name:10.5pt;--desc:9.5pt;--title:15pt;--promo:10pt}' +
-      '.a5-face.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9.25pt;--title:14pt;--promo:9.5pt}' +
-      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:5px;--sec-gap:7px;--name:9.25pt;--desc:8.5pt;--title:12.5pt;--promo:9pt}' +
+      /* A5 density — same name/desc floors as A4; titles slightly smaller on the half-sheet */
+      '.a5-face.fill-airy{--dish-gap:12px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
+      '.a5-face.fill-roomy{--dish-gap:10px;--sec-gap:12px;--name:11.35pt;--desc:10pt;--title:17pt;--promo:11.35pt}' +
+      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:10px;--name:11.2pt;--desc:10pt;--title:16pt;--promo:11.2pt}' +
+      '.a5-face.fill-tight{--dish-gap:8px;--sec-gap:9px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
+      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
       '.a5-face .party-logo{width:72px}' +
       '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
