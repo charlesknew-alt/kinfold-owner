@@ -304,8 +304,10 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow76') !== -1, 'menus page cache-bust is flow76');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow76') !== -1, 'hub menus link cache-bust is flow76');
+assert(page.indexOf('flow77') !== -1, 'menus page cache-bust is flow77');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow77') !== -1, 'hub menus link cache-bust is flow77');
+assert(printJs.indexOf('sundayRoasts') !== -1 && printJs.indexOf('roastsOnP1') !== -1,
+  'print planner can balance Sunday Roasts onto page 1');
 assert(api.SECTIONS.indexOf('Sunday Roasts') !== -1, 'Sunday Roasts is a canonical section');
 assert(api.normalizeSectionName('Sunday roasts') === 'Sunday Roasts', 'legacy Sunday roasts maps to Sunday Roasts');
 assert(api.normalizeSectionName('roasts') === 'Sunday Roasts', 'roasts heading maps to Sunday Roasts');
@@ -607,6 +609,54 @@ var sundayPrint = print.build(
 assert(/Sunday Roasts/i.test(sundayPrint), 'Sunday print shows Sunday Roasts heading');
 assert(/Yorkshire pudding|roast potatoes/i.test(sundayPrint), 'Sunday Roasts note prints under the title');
 assert(/sec-note/i.test(sundayPrint), 'Sunday Roasts description uses section note markup');
+
+// Sparse openers + full roast/mains/desserts must not dump everything on page 2
+var jammedSunday = [
+  api.dish('Nibbles', 'Loaded Fries', '', '6.95', ''),
+  api.dish('Nibbles', 'Onion Rings', '', '5.95', ''),
+  api.dish('Nibbles', 'Garlic Bread', '', '5.95', 'vg'),
+  api.dish('Nibbles', 'Chips', '', '4.50', ''),
+  api.dish('Starters', 'Scotch Egg', 'cider sauce', '8.95', ''),
+  api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+  api.dish('Starters', 'Prawns', 'katsu', '8.95', ''),
+  api.dish('Starters', 'Cauliflower', 'bang bang', '8.25', 'vg'),
+  api.dish('Sunday Roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
+  api.dish('Sunday Roasts', 'Nut Roast', '', '18.95', 'vg'),
+  api.dish('Sunday Roasts', 'Leg of Lamb', 'cooked pink', '21.95', ''),
+  api.dish('Sunday Roasts', 'Chicken Supreme', 'crispy skin', '18.95', ''),
+  api.dish('Sunday Roasts', 'Loin of Pork', 'crackling', '19.95', ''),
+  api.dish('Mains', 'Beef Burger', 'fries', '18.95', ''),
+  api.dish('Mains', 'Katsu Curry', 'rice', '16.95', 'vg'),
+  api.dish('Mains', 'Porchetta', 'mash', '18.95', ''),
+  api.dish('Mains', 'Short Rib', 'rocket', '17.95', ''),
+  api.dish('Little Bells', 'Fish Fingers', '', '9.50', ''),
+  api.dish('Little Bells', 'Mac & Cheese', '', '9.50', ''),
+  api.dish('Little Bells', 'Goujons', '', '9.50', ''),
+  api.dish('Little Bells', 'Pasta', '', '9.50', 'v'),
+  api.dish('Little Bells', 'Kids Burger', '', '9.50', ''),
+  api.dish('Desserts', 'Fool', 'shortbread', '8.25', ''),
+  api.dish('Desserts', 'Ice Cream', 'three scoops', '5.95', ''),
+  api.dish('Desserts', 'Treacle Tart', 'ice cream', '8.25', ''),
+  api.dish('Desserts', 'Sticky Toffee', 'toffee sauce', '8.25', '')
+];
+var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
+  sectionLayout: api.defaultSectionLayout(),
+  promos: []
+});
+assert(jamLayout.pages === 2 && jamLayout.p1.sundayRoasts === true,
+  'Sunday planner puts Roasts on page 1 when openers are light');
+var jamHtml = print.build(api.menuById('sunday'), jammedSunday, {
+  sectionLayout: api.defaultSectionLayout(),
+  promos: []
+});
+var a4Jam = (jamHtml.match(/mode-a4">([\s\S]*?)(?:<div class="sheet-stack mode-panel mode-a5|$)/) || [])[1] || '';
+var jamPages = a4Jam.split(/<div class="page /);
+assert(jamPages.length >= 3, 'balanced Sunday still uses two A4 pages');
+assert(/Sirloin of Beef/i.test(jamPages[1]) && !/Sirloin of Beef/i.test(jamPages[2]),
+  'Sunday Roasts dishes land on page 1 only');
+assert(/Beef Burger/i.test(jamPages[2]) && /Sticky Toffee/i.test(jamPages[2]),
+  'Mains and desserts stay on page 2');
+assert(!/Beef Burger/i.test(jamPages[1]), 'page 1 is not jammed with mains');
 assert(/^Sunday \d/.test(print.sundayLabel(new Date('2026-09-22T12:00:00Z'))), 'sunday label uses next/current Sunday');
 var sunVer = print.nextPrintVersion('sunday');
 assert(/^Sunday /.test(sunVer.week), 'Sunday print uses Sunday date not Week of');
