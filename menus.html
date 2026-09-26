@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow66"></script>
-  <script src="menus-print.js?v=20260926-flow66"></script>
-  <script src="menus-ingest.js?v=20260926-flow66"></script>
+  <script src="menus.js?v=20260926-flow67"></script>
+  <script src="menus-print.js?v=20260926-flow67"></script>
+  <script src="menus-ingest.js?v=20260926-flow67"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1543,7 +1543,12 @@
         EBMenus.assignSections(result.dishes || [], { menuId: menuId })
       ).filter(function (d) {
         if (EBMenus.isJunkDishName(d.name)) return false;
-        if (EBMenus.isJunkDescription(d.description)) d.description = '';
+        // Strip allergy footer glued onto the last dish — keep “served with…”
+        if (EBMenus.cleanDishDescription) {
+          d.description = EBMenus.cleanDishDescription(d.description);
+        } else if (EBMenus.isJunkDescription(d.description)) {
+          d.description = '';
+        }
         return true;
       });
       var existing = document.getElementById('reviewOverlay');

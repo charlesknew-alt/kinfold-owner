@@ -291,8 +291,35 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow66') !== -1, 'menus page cache-bust is flow66');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow66') !== -1, 'hub menus link cache-bust is flow66');
+assert(page.indexOf('flow67') !== -1, 'menus page cache-bust is flow67');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow67') !== -1, 'hub menus link cache-bust is flow67');
+assert(typeof api.stripAllergyFooter === 'function' && typeof api.cleanDishDescription === 'function',
+  'allergy footer strip helpers exported');
+assert(/rice/.test(api.cleanDishDescription(
+  'Served with rice & Garlic Bread. Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can\'t guarantee it\'s allergen-free.'
+)), 'Stroganoff-style desc keeps served-with when allergy footer was glued on');
+assert(!/please inform/i.test(api.cleanDishDescription(
+  'Served with rice & Garlic Bread Please inform us of any allergies or dietary needs'
+)), 'allergy footer text removed from description');
+var strogPaste = api.parsePaste(
+  'SPECIALS\n' +
+  'Mushroom Stroganoff 15.95\n' +
+  'Served with rice & Garlic Bread\n' +
+  'Please inform us of any allergies or dietary needs, we prepare all food in the same kitchen and can\'t guarantee it\'s allergen-free.'
+);
+assert(strogPaste.length === 1, 'paste keeps one stroganoff dish before allergy footer');
+assert(/rice/i.test(strogPaste[0].description || ''), 'paste keeps Stroganoff served-with description');
+assert(!/please inform/i.test(strogPaste[0].description || ''), 'paste does not put allergy footer on dish');
+var strogAi = api.dishesFromAiMenu({
+  dishes: [{
+    section: 'Special Mains',
+    name: 'Mushroom Stroganoff',
+    description: 'Served with rice & Garlic Bread. Please inform us of any allergies or dietary needs.',
+    price: '15.95',
+    tags: ''
+  }]
+});
+assert(/rice/i.test(strogAi.dishes[0].description || ''), 'AI path keeps served-with after stripping footer');
 assert(printJs.indexOf('canFitFootPromos') !== -1 && printJs.indexOf('footPromos') !== -1,
   'foot feature panels require spare room (not jammed at min type)');
 assert(printJs.indexOf('dropJammedFootPromos') !== -1,
@@ -309,11 +336,32 @@ assert(printJs.indexOf('specialsBesideCourse') !== -1 && printJs.indexOf('bag.sp
   'Specials sit beside their course (under Starters / under Mains)');
 assert(printJs.indexOf('specials-beside') !== -1,
   'Specials beside-course blocks are marked specials-beside');
+assert(printJs.indexOf('specials-beside-title') !== -1,
+  'Main-sheet Specials box uses compact specials-beside-title');
 assert(printJs.indexOf("When it's gone, it's gone") !== -1 || printJs.indexOf('SPECIALS_GONE_NOTE') !== -1,
   'Specials print carries when-gone note');
-assert(/function specialsBesideCourse[\s\S]*?sectionTitle\('Specials'\)/.test(printJs) &&
+assert(/function specialsBesideCourse[\s\S]*?specials-beside-title/.test(printJs) &&
   !/function specialsBesideCourse[\s\S]*?specials-course/.test(printJs.split('function specialsBesideCourse')[1].split('function layoutMap')[0]),
   'beside-course Specials box titles Specials only — no Starters/Mains course head');
+// Split boxes: starter specials under Starters; main specials under Mains — never one combined board
+var splitBook = api.seed();
+var splitDishes = api.composeDishes(splitBook, 'main', { specials: true });
+var splitHtml = printApi.build(api.menuById('main'), splitDishes, {});
+assert((splitHtml.match(/specials-beside/g) || []).length >= 2,
+  'Main + Specials prints separate frilly boxes (not one combined board)');
+assert(splitHtml.indexOf('data-specials-course="Special Starters"') !== -1,
+  'starter specials box marked Special Starters');
+assert(splitHtml.indexOf('data-specials-course="Special Mains"') !== -1,
+  'main specials box marked Special Mains');
+var startBox = splitHtml.indexOf('data-specials-course="Special Starters"');
+var mainBox = splitHtml.indexOf('data-specials-course="Special Mains"');
+var mainsTitle = splitHtml.search(/class="sec-title"[^>]*>\s*Mains/i);
+assert(startBox !== -1 && mainBox !== -1 && startBox < mainBox,
+  'starter specials box appears before main specials box');
+assert(mainsTitle === -1 || mainBox > mainsTitle,
+  'main specials box sits after the Mains section title');
+assert(!/<section class="sec specials-beside"[\s\S]*?class="specials-course"[\s\S]*?<\/section>/.test(splitHtml),
+  'frilly Specials boxes on Main have no Starters/Mains course subhead');
 assert(typeof api.orderDishesForSell === 'function' && typeof api.parseSellPrice === 'function',
   'sell-order helpers exported');
 assert(api.parseSellPrice('8.25/14.95') === 14.95, 'dual price uses the higher figure');

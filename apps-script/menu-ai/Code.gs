@@ -198,6 +198,9 @@ function readMenuWithGemini_(body) {
     '- Put every dish in the section it sits under on the page. Use Little Bells for kids dishes.\n' +
     '- Use kind "party" for set menus (Christmas / party / fixed 2&3 course).\n' +
     '- Do not invent dishes. Prefer fewer clean dishes over OCR junk.\n' +
+    '- DESCRIPTION (critical): Keep every “Served with…” / garnish line on that dish.\n' +
+    '  The last dish before the allergy footer still needs its description — never drop it.\n' +
+    '  Never put the allergy footer (“Please inform us of any allergies…”) into a dish description.\n' +
     '- Normalise AV / GF AVAILABLE into tags like "gf option" or "gf" as appropriate.\n' +
     '- Put DF / dairy free in tags as "df" (or "df option") — never leave DF hardwired in the dish name.\n' +
     '- SPELLING (critical): Correct clear typos and OCR misreads in names and descriptions.\n' +
