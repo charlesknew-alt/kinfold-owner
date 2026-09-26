@@ -787,7 +787,20 @@
     );
   }
   function isSpecials(name) {
-    return /^specials?$|today.?s specials?|chef.?s special/i.test(String(name || '').trim());
+    return /^specials?$|today.?s specials?|chef.?s special|^special\s*(starters?|mains?|desserts?)$/i.test(
+      String(name || '').trim()
+    );
+  }
+  function isSpecialStarters(name) {
+    return /special\s*starters?/i.test(String(name || '').trim());
+  }
+  function isSpecialMains(name) {
+    return /special\s*mains?/i.test(String(name || '').trim()) ||
+      (/^specials?$|today.?s specials?|chef.?s special/i.test(String(name || '').trim()) &&
+        !isSpecialStarters(name) && !isSpecialDesserts(name));
+  }
+  function isSpecialDesserts(name) {
+    return /special\s*desserts?/i.test(String(name || '').trim());
   }
   function isSides(name) {
     return /^sides?$/i.test(name || '');
@@ -817,7 +830,9 @@
     { test: isStarters, rank: 20 },
     { test: isSharing, rank: 25 },
     { test: isItemBoost, rank: 27 },
-    { test: isSpecials, rank: 28 },
+    { test: isSpecialStarters, rank: 28 },
+    { test: isSpecialMains, rank: 29 },
+    { test: isSpecialDesserts, rank: 71 },
     { test: isClassics, rank: 30 },
     { test: isBurgers, rank: 32 },
     { test: isMains, rank: 40 },
@@ -915,7 +930,9 @@
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
-      nibbles: null, starters: null, sharing: null, boost: null, specials: null, classics: null, burgers: null,
+      nibbles: null, starters: null, sharing: null, boost: null,
+      specialStarters: null, specialMains: null, specialDesserts: null,
+      classics: null, burgers: null,
       mains: null, littleBells: null, desserts: null, sides: null, sandwiches: null, sauces: null,
       other: [], hasLunch: false, count: dishes.length
     };
@@ -925,8 +942,13 @@
       else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
       else if (isItemBoost(s.name) && !bag.boost) bag.boost = { name: 'Item Boost', dishes: s.dishes };
-      else if (isSpecials(s.name) && !bag.specials) bag.specials = { name: 'Specials', dishes: s.dishes };
-      else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
+      else if (isSpecialStarters(s.name) && !bag.specialStarters) {
+        bag.specialStarters = { name: 'Special Starters', dishes: s.dishes };
+      } else if (isSpecialDesserts(s.name) && !bag.specialDesserts) {
+        bag.specialDesserts = { name: 'Special Desserts', dishes: s.dishes };
+      } else if (isSpecialMains(s.name) && !bag.specialMains) {
+        bag.specialMains = { name: 'Special Mains', dishes: s.dishes };
+      } else if (isBurgers(s.name) && !bag.burgers) bag.burgers = s;
       else if (isClassics(s.name) && !bag.classics) {
         // Keep every staff-assigned classic here — including a lone burger filed as classic.
         bag.classics = { name: 'Pub Classics', dishes: (s.dishes || []).slice() };
@@ -995,7 +1017,9 @@
     if (bag.sharing) front += sectionUnits(bag.sharing, false);
     // Item Boost / Specials default to a frilly frame
     if (bag.boost) front += sectionUnits(bag.boost, true);
-    if (bag.specials) front += sectionUnits(bag.specials, true);
+    if (bag.specialStarters) front += sectionUnits(bag.specialStarters, true);
+    if (bag.specialMains) front += sectionUnits(bag.specialMains, true);
+    if (bag.specialDesserts) front += sectionUnits(bag.specialDesserts, true);
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isBurgers(s.name) && !isLittleBells(s.name) &&
           !isSpecials(s.name)) {
@@ -1272,6 +1296,37 @@
     return framedBlock(head + noteHtml + body, rule, kind || 'wide');
   }
 
+  /**
+   * Specials board on Main / Sunday — one frilly Specials box with course
+   * subheads (Starters / Mains / Desserts) so they never mix into regular food.
+   */
+  function specialsBoardBlock(bag, plan) {
+    var starters = (bag.specialStarters && bag.specialStarters.dishes) || [];
+    var mains = (bag.specialMains && bag.specialMains.dishes) || [];
+    var desserts = (bag.specialDesserts && bag.specialDesserts.dishes) || [];
+    if (!starters.length && !mains.length && !desserts.length) return '';
+    var rule = ruleFor('Special Mains', plan);
+    if (!rule.note) {
+      rule = Object.assign({}, rule, {
+        note: (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone"
+      });
+    }
+    if (rule.frame == null) rule.frame = true;
+    var inner = sectionTitle('Specials');
+    var note = String(rule.note || '').trim();
+    if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
+    function course(label, dishes) {
+      if (!dishes.length) return '';
+      var showHead = (starters.length ? 1 : 0) + (mains.length ? 1 : 0) + (desserts.length ? 1 : 0) > 1;
+      return (showHead ? '<div class="sec-title soft-left" style="margin-top:6px">' + esc(label) + '</div>' : '') +
+        listDishes(dishes);
+    }
+    inner += course('Starters', starters);
+    inner += course('Mains', mains);
+    inner += course('Desserts', desserts);
+    return framedBlock(inner, rule, 'wide');
+  }
+
   function layoutMap(plan) {
     if (root.EBMenus && root.EBMenus.normalizeSectionLayout) {
       return root.EBMenus.normalizeSectionLayout(plan && plan.sectionLayout);
@@ -1450,12 +1505,8 @@
         sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
         '</section>';
     }
-    if (bag.specials) {
-      var specialsRule = ruleFor('Specials', plan);
-      p1 += '<section class="sec">' +
-        sectionBlock(bag.specials.name, bag.specials.dishes, specialsRule, 'wide') +
-        '</section>';
-    }
+    var specialsHtml = specialsBoardBlock(bag, plan);
+    if (specialsHtml) p1 += '<section class="sec">' + specialsHtml + '</section>';
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isDessert(s.name) && !isSandwich(s.name) && !isBurgers(s.name) &&
           !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
@@ -1711,6 +1762,28 @@
           '</div>';
       } else if (menu.id === 'sandwiches') {
         inner = cardSandwichesInner(dishes);
+      } else if (menu.id === 'specials') {
+        var gone = (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone";
+        var byCourse = { starters: [], mains: [], desserts: [] };
+        (dishes || []).forEach(function (d) {
+          var sec = String(d.section || '');
+          if (isSpecialDesserts(sec) || /dessert/i.test(sec)) byCourse.desserts.push(d);
+          else if (isSpecialStarters(sec) || /starter/i.test(sec)) byCourse.starters.push(d);
+          else byCourse.mains.push(d);
+        });
+        var courses = [
+          { label: 'Starters', list: byCourse.starters },
+          { label: 'Mains', list: byCourse.mains },
+          { label: 'Desserts', list: byCourse.desserts }
+        ].filter(function (c) { return c.list.length; });
+        var showCourseHeads = courses.length > 1;
+        inner = scallop(
+          '<div class="sec-note" style="text-align:center">' + esc(gone) + '</div>' +
+          courses.map(function (c) {
+            return (showCourseHeads ? '<div class="sec-title under">' + esc(c.label) + '</div>' : '') +
+              c.list.map(function (d) { return dishCentered(d); }).join('');
+          }).join('')
+        );
       } else {
         // desserts etc
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
