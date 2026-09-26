@@ -278,9 +278,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow84"></script>
-  <script src="menus-print.js?v=20260926-flow84"></script>
-  <script src="menus-ingest.js?v=20260926-flow84"></script>
+  <script src="menus.js?v=20260926-flow85"></script>
+  <script src="menus-print.js?v=20260926-flow85"></script>
+  <script src="menus-ingest.js?v=20260926-flow85"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -639,7 +639,7 @@
         });
         html += '</select></div>';
         if (!filtered.length) {
-          html += '<p class="note">Nothing saved yet. Generate a menu and it will appear here with its week and Roman numeral.</p>';
+          html += '<p class="note">Nothing saved yet. Generate a menu, then click <strong>Save to menus</strong> on the print sheet to stamp its week and Roman numeral here.</p>';
           el.innerHTML = html;
           bindHistory();
           return;
@@ -1084,9 +1084,9 @@
     function renderGenerateStep(menu) {
       var html = '';
       if (isStaffMode) {
-        html += '<p class="step-lede">Check the plan, then generate. Sheets are saved under <strong>Print history</strong> for reprinting later.</p>';
+        html += '<p class="step-lede">Check the plan, then generate. On the print sheet, click <strong>Save to menus</strong> to stamp a version into Print history.</p>';
       } else {
-        html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Each generate is saved under <strong>Print history</strong> (shared cloud + this device) with its week / Sunday date and Roman numeral.</p>';
+        html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Click <strong>Save to menus</strong> on that sheet to stamp its week / Sunday date and Roman numeral into <strong>Print history</strong> (shared cloud + this device). Preview generates do not fill history.</p>';
       }
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
       html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
@@ -2318,10 +2318,8 @@
         var html = EBMenuPrint.build(menu, result.dishes, result.plan);
         w.document.write(html);
         w.document.close();
-        // Keep a dated copy (week / Sunday + Roman) so staff can reopen later
-        if (EBMenuPrint.savePrintHistory) {
-          EBMenuPrint.savePrintHistory(EBMenuPrint.getLastBuild && EBMenuPrint.getLastBuild()).catch(function () {});
-        }
+        // Print history + Roman stamp happen only when staff click Save to menus
+        // on the print sheet — not on every generate preview.
       }
 
       var i = 0;
