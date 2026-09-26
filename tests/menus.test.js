@@ -304,8 +304,34 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow81') !== -1, 'menus page cache-bust is flow81');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow81') !== -1, 'hub menus link cache-bust is flow81');
+assert(page.indexOf('flow82') !== -1, 'menus page cache-bust is flow82');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow82') !== -1, 'hub menus link cache-bust is flow82');
+assert(typeof api.normalizeSectionLayoutBook === 'function' && typeof api.sectionLayoutForMenu === 'function',
+  'Blocks rules are stored per menu');
+assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout') !== -1,
+  'menus UI keeps a Blocks book per menu');
+assert(page.indexOf('this menu only') !== -1,
+  'Blocks step says rules are per menu');
+var flatLegacy = api.normalizeSectionLayout({
+  Desserts: { width: 'column', frame: true, note: 'legacy' },
+  'Little Bells': { width: 'column', frame: false, note: '' }
+});
+var migratedBook = api.normalizeSectionLayoutBook(flatLegacy);
+assert(migratedBook.main && migratedBook.sunday && migratedBook.main.Desserts.width === 'column',
+  'legacy flat Blocks migrate into every menu');
+assert(migratedBook.main.Desserts.note === 'legacy' && migratedBook.sunday.Desserts.note === 'legacy',
+  'legacy migrate preserves notes on Main and Sunday');
+var splitBook = api.normalizeSectionLayoutBook({
+  main: { Desserts: { width: 'full', frame: false, note: 'main puds' } },
+  sunday: { Desserts: { width: 'column', frame: true, note: 'sunday puds' } }
+});
+assert(api.sectionLayoutForMenu('main', splitBook).Desserts.width === 'full',
+  'Main Blocks Desserts can be Full');
+assert(api.sectionLayoutForMenu('sunday', splitBook).Desserts.width === 'column',
+  'Sunday Blocks Desserts can be Column independently');
+assert(api.sectionLayoutForMenu('main', splitBook).Desserts.note === 'main puds' &&
+  api.sectionLayoutForMenu('sunday', splitBook).Desserts.note === 'sunday puds',
+  'Main and Sunday keep separate Blocks notes');
 assert(printJs.indexOf('function renderLittleBellsRow') !== -1 && printJs.indexOf('cols-little-desserts') !== -1,
   'Little Bells Column width pairs beside Desserts');
 assert(printJs.indexOf('dessertsAllowColumn') !== -1 && printJs.indexOf('sidesAllowColumn') !== -1,

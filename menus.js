@@ -1603,6 +1603,58 @@
     return { width: 'full', frame: false, note: '', tip: false, sell: '' };
   }
 
+  /** True when raw is the old flat map (section name → rule), not a per-menu book. */
+  function isFlatSectionLayout(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+    return SECTIONS.some(function (s) {
+      return raw[s] && typeof raw[s] === 'object' && !Array.isArray(raw[s]);
+    });
+  }
+
+  function defaultSectionLayoutBook() {
+    var out = {};
+    MENUS.forEach(function (m) {
+      out[m.id] = defaultSectionLayout();
+    });
+    return out;
+  }
+
+  /**
+   * Per-menu Blocks rules. Accepts:
+   * - book: { main: { Mains: … }, sunday: { … } }
+   * - flat (legacy): { Mains: … } → cloned into every menu so nothing is lost
+   */
+  function normalizeSectionLayoutBook(raw) {
+    var out = defaultSectionLayoutBook();
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    if (isFlatSectionLayout(raw)) {
+      var shared = normalizeSectionLayout(raw);
+      MENUS.forEach(function (m) {
+        out[m.id] = normalizeSectionLayout(shared);
+      });
+      return out;
+    }
+    MENUS.forEach(function (m) {
+      if (raw[m.id] && typeof raw[m.id] === 'object') {
+        out[m.id] = normalizeSectionLayout(raw[m.id]);
+      }
+    });
+    // Unknown menu ids (future) — keep a normalized copy if present
+    Object.keys(raw).forEach(function (id) {
+      if (out[id] || !raw[id] || typeof raw[id] !== 'object' || Array.isArray(raw[id])) return;
+      if (isFlatSectionLayout(raw[id]) || (raw[id].Mains || raw[id].Desserts || raw[id].Nibbles)) {
+        out[id] = normalizeSectionLayout(raw[id]);
+      }
+    });
+    return out;
+  }
+
+  function sectionLayoutForMenu(menuId, book) {
+    var map = normalizeSectionLayoutBook(book);
+    var id = String(menuId || 'main');
+    return map[id] || defaultSectionLayout();
+  }
+
   function isColumnWidth(width) {
     return width === 'column' || width === 'both';
   }
@@ -1667,6 +1719,10 @@
     sectionRank: sectionRank,
     defaultSectionLayout: defaultSectionLayout,
     normalizeSectionLayout: normalizeSectionLayout,
+    isFlatSectionLayout: isFlatSectionLayout,
+    defaultSectionLayoutBook: defaultSectionLayoutBook,
+    normalizeSectionLayoutBook: normalizeSectionLayoutBook,
+    sectionLayoutForMenu: sectionLayoutForMenu,
     sectionLayoutFor: sectionLayoutFor,
     isColumnWidth: isColumnWidth,
     isFullWidth: isFullWidth,
