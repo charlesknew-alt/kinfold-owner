@@ -2005,8 +2005,8 @@
       '.specials-course-left{text-align:left;text-decoration:none;font-size:10pt;letter-spacing:.08em;margin:6px 0 3px}' +
       /* Main/Sunday: Specials frilly box under each course — small title, no course subhead */
       '.specials-beside .specials-beside-title,.specials-beside .sec-title.specials-beside-title{' +
-        'font-size:11pt!important;letter-spacing:.1em;margin:0 0 4px;text-align:left;line-height:1.2}' +
-      '.specials-beside .sec-note{text-align:left;margin:0 0 6px;font-size:9.5pt}' +
+        'font-size:11pt!important;letter-spacing:.1em;margin:0 0 4px;text-align:left!important;line-height:1.2}' +
+      '.specials-beside .sec-note{text-align:left!important;margin:0 0 6px;font-size:9.5pt}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7.5pt;letter-spacing:.02em;text-transform:none;color:#8a8278;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .week{text-transform:none;letter-spacing:.02em}' +
       '.tracker .roman{font-family:var(--sans)!important;font-size:4pt!important;font-weight:400!important;letter-spacing:.02em;color:#c4bcb2!important;text-transform:none;opacity:.7;line-height:1}' +
