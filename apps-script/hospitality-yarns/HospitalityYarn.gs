@@ -1,0 +1,538 @@
+/**
+ * PubSystemLib — HospitalityYarn.gs
+ *
+ * Daily Entry yarn: classic hospitality/bar jokes + clear industry facts.
+ * Keep lines plain-English with an obvious punchline or a clear fact.
+ * Avoid cryptic "shift yarn" in-jokes.
+ *
+ * Picker: stable per calendar day; year shifts the sequence.
+ * Top-ups: Script Property HOSPITALITY_YARNS_EXTRA = JSON array of
+ *   { "k":"joke"|"true", "t":"…" }
+ *
+ * clasp:
+ *   clasp run appendHospitalityYarns --params '[[{"k":"joke","t":"A man walked into a bar. Ouch."}]]'
+ */
+
+var HOSPITALITY_YARNS_ = [
+  { k: 'joke', t: 'A man walked into a bar. Ouch.' },
+  { k: 'joke', t: 'A horse walks into a bar. The bartender says, “Why the long face?”' },
+  { k: 'joke', t: 'A sandwich walks into a bar. The bartender says, “Sorry — we don’t serve food here.”' },
+  { k: 'joke', t: 'A grasshopper walks into a bar. Bartender: “We’ve got a drink named after you.” Grasshopper: “You’ve got a drink named Steve?”' },
+  { k: 'joke', t: 'A panda walks into a bar, eats, shoots, and leaves.' },
+  { k: 'joke', t: 'A guy walks into a bar with a slab of asphalt under his arm. “Beer please — and one for the road.”' },
+  { k: 'joke', t: 'A priest, a minister and a rabbi walk into a bar. The bartender says, “Is this some kind of joke?”' },
+  { k: 'joke', t: 'A dyslexic walks into a bra.' },
+  { k: 'joke', t: 'A guy walks into a bar and says, “Ow.”' },
+  { k: 'joke', t: 'Two purees walk into a bar. They get smashed.' },
+  { k: 'joke', t: 'A mushroom walks into a bar. Bartender: “We don’t serve your kind.” Mushroom: “Why not? I’m a fungi.”' },
+  { k: 'joke', t: 'A termite walks into a bar and asks, “Is the bar tender here?”' },
+  { k: 'joke', t: 'A neutron walks into a bar and asks how much for a drink. Bartender: “For you — no charge.”' },
+  { k: 'joke', t: 'A skeleton walks into a bar and says, “I’ll have a beer and a mop.”' },
+  { k: 'joke', t: 'A man walks into a pub and asks for a double entendre. So the barmaid gives him one.' },
+  { k: 'joke', t: 'Why did the tomato turn red? It saw the salad dressing.' },
+  { k: 'joke', t: 'What do you call a fake noodle? An impasta.' },
+  { k: 'joke', t: 'Why don’t eggs tell jokes? They’d crack each other up.' },
+  { k: 'joke', t: 'What did the grape say when it got stepped on? Nothing — it just let out a little wine.' },
+  { k: 'joke', t: 'Why did the coffee file a police report? It got mugged.' },
+  { k: 'joke', t: 'What do you call cheese that isn’t yours? Nacho cheese.' },
+  { k: 'joke', t: 'Why did the baker go to the bank? He needed dough.' },
+  { k: 'joke', t: 'What’s a bartender’s favourite exercise? Mixing.' },
+  { k: 'joke', t: 'Why was the maths book sad at the pub quiz? It had too many problems.' },
+  { k: 'joke', t: 'A customer says, “Do you serve crabs?” Waiter: “We serve anyone — have a seat.”' },
+  { k: 'joke', t: 'Guest: “What’s the soup of the day?” Waiter: “It’s bean soup.” Guest: “I don’t care what it’s been — what is it now?”' },
+  { k: 'joke', t: 'A diner says, “Waiter, this coffee tastes like mud.” Waiter: “Yes sir — it was ground this morning.”' },
+  { k: 'joke', t: '“Waiter, there’s a fly in my soup!” “Don’t worry sir — it won’t drink much.”' },
+  { k: 'joke', t: '“Waiter, will my pizza be long?” “No sir — it will be round.”' },
+  { k: 'joke', t: 'A man orders a pizza. Clerk: “Do you want it cut into six or twelve?” Man: “Six — I could never eat twelve.”' },
+  { k: 'joke', t: 'Why did the man drown in his bowl of muesli? He was pulled under by a strong currant.' },
+  { k: 'joke', t: 'What do you call a pig that does karate? A pork chop.' },
+  { k: 'joke', t: 'Why don’t oysters share their pearls? They’re shellfish.' },
+  { k: 'joke', t: 'How do you make a tissue dance? Put a little boogie in it. (Bar napkins, same energy.)' },
+  { k: 'joke', t: 'A beer walks into a bar. The bartender says, “Hey, why the frothy head?”' },
+  { k: 'joke', t: 'Two atoms walk into a bar. One says, “I think I lost an electron.” “Are you sure?” “Yes — I’m positive.”' },
+  { k: 'joke', t: 'A man asks for a whisky without ice. Bartender: “Without ice?” Man: “Yes — I’m on the rocks already.”' },
+  { k: 'joke', t: 'Why did the scarecrow win an award? He was outstanding in his field — and he still couldn’t get served before last orders.' },
+  { k: 'joke', t: 'What’s the difference between a poorly dressed man on a trampoline and a well-dressed man on a trampoline? Attire. (Works better after a pint.)' },
+  { k: 'joke', t: 'A man walks into a library and asks for books about paranoia. Librarian whispers, “They’re right behind you…” Wrong venue — try the snug.' },
+  { k: 'joke', t: 'Why did the cookie go to the hospital? He felt crumby after service.' },
+  { k: 'joke', t: 'What did one plate say to the other? Dinner’s on me.' },
+  { k: 'joke', t: 'Why was the broom late for its shift? It overswept.' },
+  { k: 'joke', t: 'A chef’s favourite music? Heavy metal — especially stainless.' },
+  { k: 'joke', t: 'Why did the banana go to the doctor? It wasn’t peeling well.' },
+  { k: 'joke', t: 'What do you call a sad cup of coffee? Depresso.' },
+  { k: 'joke', t: 'Why did the lettuce win the race? It was a-head.' },
+  { k: 'joke', t: 'A man walked into a bar… and ordered a drink. Sometimes jokes are just thirsty.' },
+  { k: 'joke', t: 'Why do bakers work so hard? They knead the dough.' },
+  { k: 'joke', t: 'What’s a pirate’s favourite letter at the bar? You’d think R — but it’s the C they love.' },
+  { k: 'joke', t: 'Customer: “I’d like something cold and full of ice.” Bartender: “How about an apology from the ice machine?”' },
+  { k: 'joke', t: 'Why did the yoghurt go to the art exhibition? Because it was cultured.' },
+  { k: 'joke', t: 'What do cows order at the bar? Moo-tinis.' },
+  { k: 'joke', t: 'A man says to the waiter, “I’ll have the soup and a kind word.” Waiter brings soup. Man: “Where’s the kind word?” Waiter whispers, “Don’t eat the soup.”' },
+  { k: 'joke', t: 'Why don’t seagulls fly over the bay? Because then they’d be bagels. (Pub-quiz energy.)' },
+  { k: 'joke', t: 'What did the janitor say when he jumped out of the closet? “Supplies!”' },
+  { k: 'joke', t: 'Why was the mushroom invited to all the parties? He was a fungi to be with.' },
+  { k: 'joke', t: 'A string walks into a bar. Bartender: “We don’t serve strings.” String ties a knot, messes up his hair, walks back in. Bartender: “Aren’t you a string?” “No — I’m a frayed knot.”' },
+  { k: 'joke', t: 'Why did the chicken join a band? It had the drumsticks.' },
+  { k: 'joke', t: 'What do you call a bear with no teeth? A gummy bear — usually found near the sweet jar at the bar.' },
+  { k: 'joke', t: 'Why did the man put his money in the freezer? He wanted cold hard cash for the till float.' },
+  { k: 'joke', t: 'A customer complains the bread is stale. Waiter: “That’s impossible — we baked it fresh this morning… yesterday.”' },
+  { k: 'joke', t: 'What’s the best thing to put in a pie? Your teeth.' },
+  { k: 'joke', t: 'Why did the grape stop in the middle of the road? It ran out of juice.' },
+  { k: 'joke', t: 'A man orders soup. “Waiter — this soup is spoiled!” Waiter: “Who told you?” Man: “A little swallow.”' },
+  { k: 'joke', t: 'Why do fish always know their weight? Because they have their own scales — handy for kitchen delivery.' },
+  { k: 'joke', t: 'What did the grape do when it got stepped on? It let out a little wine. Still the best wine joke.' },
+  { k: 'joke', t: 'Bartender to a ghost: “Sorry — we don’t serve spirits after midnight.”' },
+  { k: 'joke', t: 'Why was the restaurant so hot? Because of all the chilli peppers — and the Friday rush.' },
+  { k: 'joke', t: 'A man asks, “Do you have frog’s legs?” Waiter: “Yes.” Man: “Well hop over and get me a sandwich.”' },
+  { k: 'joke', t: 'Why did the coffee taste like dirt? Because it was ground a few minutes ago near the flowerbeds. (Don’t.)' },
+  { k: 'joke', t: 'What’s orange and sounds like a parrot? A carrot. Classic. Still works at quiz night.' },
+  { k: 'joke', t: 'A duck walks into a pub and asks, “Got any grapes?” Barman: “No.” Duck leaves, returns later: “Got any grapes?” … You know the rest.' },
+  { k: 'joke', t: 'Why did the man get fired from the orange juice factory? He couldn’t concentrate.' },
+  { k: 'joke', t: 'What do you call a sleeping bull? A bulldozer. Useful when the keg delivery arrives.' },
+  { k: 'joke', t: 'Customer: “I’ll have a rum and coke.” Bartender: “Diet?” Customer: “No thanks — I’m fine.”' },
+  { k: 'joke', t: 'Why don’t vampires like garlic bread? Too many stakes in Italian restaurants.' },
+  { k: 'joke', t: 'A man walks into a bar with a giraffe. They both get drunk. Giraffe passes out. Man gets up to leave. Bartender: “You can’t leave that lyin’ there.” Man: “That’s not a lion — it’s a giraffe.”' },
+  { k: 'joke', t: 'Why was the chef so calm? He had a lot of thyme on his hands. (He didn’t.)' },
+  { k: 'joke', t: 'What do you call a train carrying bubblegum? A chew-chew train. (Kids’ menu energy.)' },
+  { k: 'joke', t: 'Waiter: “How did you find your steak?” Diner: “I just lifted a chip and there it was.”' },
+  { k: 'joke', t: 'Why did the man eat his lunch under a bull? He wanted a burger on the go. Terrible. Perfect.' },
+  { k: 'joke', t: 'A cheese factory exploded in France. Da brie was everywhere.' },
+  { k: 'joke', t: 'Why did the invisible man turn down the chef job? He couldn’t see himself doing it.' },
+  { k: 'joke', t: 'What do you get if you cross a snowman and a vampire? Frostbite — and a very confused cocktail list.' },
+  { k: 'joke', t: 'A man walked into a bar and asked for water. Bartender: “Still?” Man: “Yes — I’ve been standing here ages.”' },
+  { k: 'joke', t: 'Why did the biscuit go to the dentist? Because it was feeling crumby — and it had a filling.' },
+  { k: 'joke', t: 'What’s a bartender’s favourite tree? A bar-k.' },
+  { k: 'joke', t: 'Why did the cucumber need a drink? It was in a pickle.' },
+  { k: 'joke', t: 'A man orders a coffee. “No cream.” Waiter returns: “We’re out of cream — is no milk OK?”' },
+  { k: 'joke', t: 'Why don’t oysters give to charity? Because they’re shellfish. Still true.' },
+  { k: 'joke', t: 'What did the grape say to the wine? “I missed you when you left.”' },
+  { k: 'joke', t: 'A man walks into a bar. The bartender ducks.' },
+  { k: 'joke', t: 'Why was the kitchen floor so sticky? Because of the jam session.' },
+  { k: 'joke', t: 'What’s the most musical part of a chicken? The drumstick.' },
+  { k: 'joke', t: 'A diner says the portions are too small. Waiter: “Then you’ll be glad you’re not paying much.”' },
+  { k: 'joke', t: 'Why did the banana quit its job? It slipped up on health & safety.' },
+  { k: 'joke', t: 'What do you call a cow that plays the trumpet? A moo-sician — house band optional.' },
+  { k: 'joke', t: 'Bartender: “What’ll it be?” Customer: “Surprise me.” Bartender turns out the lights.' },
+  { k: 'joke', t: 'A man asks for a steak and says “make it lean.” Waiter: “Which way?”' },
+  { k: 'joke', t: 'Why do bakers make good musicians? They know their scales… and their rolls.' },
+  { k: 'joke', t: 'What’s brown and sticky? A stick. (Then order pudding.)' },
+  { k: 'joke', t: 'A fish walks into a bar. Bartender: “What can I get you?” Fish: “Water — but make it wet.”' },
+  { k: 'joke', t: 'Why did the man throw butter out the window? He wanted to see a butterfly. Kitchen: unimpressed.' },
+  { k: 'joke', t: 'Customer: “Is the chilli hot?” Waiter: “No — it’s sitting right there.”' },
+  { k: 'joke', t: 'Why was the restaurant called “Karma”? There’s no menu — you get what you deserve.' },
+  { k: 'joke', t: 'A man walked into a bar… then another… then realised he was walking into doors. Optician joke wearing a pub hat.' },
+  { k: 'joke', t: 'Why did the chef break up with the bread? Too many loafers in its life.' },
+  { k: 'joke', t: 'What do you call an alligator in a vest? An investigator — usually checking the walk-in fridge.' },
+  { k: 'joke', t: 'Waiter: “We have fresh fish.” Customer: “What about the chicken?” Waiter: “It’s not as fresh.”' },
+  { k: 'joke', t: 'Why did the coffee go to school? To become a smart espresso.' },
+  { k: 'joke', t: 'A man orders soup. Fly in it. Waiter: “Don’t worry — there’s no extra charge.”' },
+  { k: 'joke', t: 'Why don’t eggs work in restaurants? They quit before they crack under pressure. They crack anyway.' },
+  { k: 'joke', t: 'What’s a pirate’s favourite pub snack? Arrrr-tisanal crisps.' },
+  { k: 'joke', t: 'A man walks into a bar and says, “Give me something tall and cold.” Bartender points at the fridge.' },
+  { k: 'joke', t: 'Why did the lettuce blush? It saw the salad dressing. Classic for a reason.' },
+  { k: 'joke', t: 'What do you get when you play a country song backwards? You get your job back, your dog back, and your beer back.' },
+  { k: 'joke', t: 'A kangaroo walks into a bar and orders a beer. Pays with a twenty. Bartender gives £1 change. Kangaroo doesn’t complain. Bartender: “We don’t get many kangaroos in here.” Kangaroo: “At these prices, I’m not surprised.”' },
+  { k: 'joke', t: 'Why did the man sit on his watch in the café? He wanted to be on time.' },
+  { k: 'joke', t: 'What’s the difference between a chef and a cook? About £15,000 and a hat.' },
+  { k: 'joke', t: 'A customer says, “This pizza is cold.” Waiter: “Then it’s not pizza — it’s a frisbee.”' },
+  { k: 'joke', t: 'Why do hamburger jokes land well? Because they’re rare… medium… well done.' },
+  { k: 'joke', t: 'A man walks into a bar and asks for a double. Bartender: “Double what?” Man: “Double check that I’ve got my wallet.”' },
+  { k: 'joke', t: 'Why was the pasta so tired? It was al dente — and then it wasn’t.' },
+  { k: 'joke', t: 'What did the mayonnaise say to the fridge? “Close the door — I’m dressing.”' },
+  { k: 'joke', t: 'A bartender asks a piece of bread, “Want a drink?” Bread: “No thanks — I’m already toasted.”' },
+  { k: 'joke', t: 'Customer: “I’ll have the lamb.” Waiter: “Excellent — and for your main?”' },
+  { k: 'joke', t: 'Why did the soda go to school? To become soft-drink educated.' },
+  { k: 'joke', t: 'A man asks, “What’s your house wine?” Sommelier: “The one that lives here.”' },
+  { k: 'joke', t: 'Why don’t melons get married? They cantaloupe.' },
+  { k: 'joke', t: 'What’s a vampire’s favourite fruit? A blood orange — brunch special.' },
+  { k: 'joke', t: 'A man walked into a bar and ordered a round for the house. The house declined — it was teetotal.' },
+  { k: 'joke', t: 'Why did the chef put the cake in the freezer? He wanted icing on the cake later.' },
+  { k: 'joke', t: 'What do you call a group of musical whales? An orca-stra. Pub quiz gold.' },
+  { k: 'joke', t: 'Waiter: “Coffee or tea?” Customer: “Surprise me.” Waiter: “Boo! It’s coffee.”' },
+  { k: 'joke', t: 'Why did the man bring a ladder to the bar? He heard the drinks were on the house.' },
+  { k: 'joke', t: 'A steak walks into a bar and asks for a drink. Bartender: “We don’t serve food.” Steak leaves well done.' },
+  { k: 'joke', t: 'Why was the beer always invited? It was always draftable.' },
+  { k: 'joke', t: 'What did one crouton say to the other? “You’ve got to be kidding — we’re in this soup together.”' },
+  { k: 'joke', t: 'A man orders chips. “Are they French fries?” Waiter: “No — they’re chips. This is Britain.”' },
+  { k: 'joke', t: 'Why did the cookie cry? Because its mum was a wafer so long. Terrible. Iconic.' },
+  { k: 'joke', t: 'Bartender to a slow drinker: “Shall I throw a party in your glass? Looks like you’ve got room.”' },
+  { k: 'joke', t: 'Why did the restaurant hire a gardener? They wanted better tips. (Leaves.)' },
+  { k: 'joke', t: 'A man says, “I’m on a seafood diet.” Friend: “Oh?” Man: “I see food and I eat it.”' },
+  { k: 'joke', t: 'Why do waiters make good comedians? Timing — when the kitchen allows it.' },
+  { k: 'joke', t: 'What’s the difference between a butcher and a barber? One cuts meat, the other meets cuts. Avoid both after midnight.' },
+  { k: 'joke', t: 'A customer wants gluten-free water. Waiter pours it carefully into a different glass.' },
+  { k: 'joke', t: 'Why did the pie go to the dentist? It needed a filling.' },
+  { k: 'joke', t: 'What do you call a fake stone at the bar? A shamrock. (St Patrick’s only.)' },
+  { k: 'joke', t: 'A man walked into a bar. Then a table. Then a chair. Then he put his glasses on.' },
+  { k: 'joke', t: 'Why was the ice cream so good at his job? He kept his cool under pressure.' },
+  { k: 'joke', t: 'Customer: “What’s good here?” Waiter: “The exits — but the food’s fine too.”' },
+  { k: 'joke', t: 'A bartender says “We don’t serve time travellers.” A time traveller walks into a bar.' },
+  { k: 'joke', t: 'A man orders a coffee with two sugars. Waiter: “We’re out of sugar.” Man: “Then make it tea.”' },
+  { k: 'joke', t: 'Why don’t bar stools ever get lonely? Someone always sits with them.' },
+  { k: 'joke', t: 'What’s a bartender’s favourite day? Happy hour — every hour if you’re the ice.' },
+  { k: 'joke', t: 'A diner complains: “There’s a hair in my soup!” Waiter: “Don’t shout — everyone will want one.”' },
+  { k: 'joke', t: 'Why did the chicken go to the pub? To get to the other bar stool.' },
+  { k: 'joke', t: 'A man asks for “whatever’s local.” Bartender points at the rain.' },
+  { k: 'joke', t: 'Why was the kitchen so good at secrets? Too many leaks already.' },
+  { k: 'joke', t: 'What did the plate say to the bowl? “Dinner’s on me tonight.”' },
+  { k: 'joke', t: 'A man walked into a bar. The bartender said, “Why the glue?” Man: “I’m stuck for a punchline.”' },
+  { k: 'joke', t: 'Why did the soda bottle go to therapy? It had too much fizz-ical tension.' },
+  { k: 'joke', t: 'Customer: “Make it a strong one.” Bartender: “How about a coffee?”' },
+  { k: 'joke', t: 'Why do pizza makers make good comedians? They know how to deliver.' },
+  { k: 'joke', t: 'A fish and chips walk into a bar. Bartender: “Sorry — we don’t serve food.” They leave battered.' },
+  { k: 'joke', t: 'What’s the difference between roast beef and pea soup? Anyone can roast beef.' },
+  { k: 'joke', t: 'Why did the man stare at the can of orange juice? It said concentrate.' },
+  { k: 'joke', t: 'A waiter drops a tray. Customer: “Is that today’s special?” Waiter: “No — it’s yesterday’s.”' },
+  { k: 'joke', t: 'Why don’t oysters go to parties? They clam up.' },
+  { k: 'joke', t: 'What do you get if you divide the circumference of a pumpkin by its diameter? Pumpkin pi. Dessert menu.' },
+  { k: 'joke', t: 'A man walks into a bar and asks for a beer. Horse behind the bar serves him. Man stares. Horse: “What — you shocked a horse can bartend?” Man: “No — I can’t believe the ferret sold the place.”' },
+  { k: 'joke', t: 'Why was the chef always calm in a crisis? Practice. And a walk-in to hide in.' },
+  { k: 'joke', t: 'Customer: “I’ll have a glass of house red.” Waiter: “Would you like the wine list?” Customer: “No — I like surprises and disappointment equally.”' },
+  { k: 'joke', t: 'Why did the biscuit refuse to fight? It was a soft cookie.' },
+  { k: 'joke', t: 'A man says the soup is cold. Waiter: “Then it’s gazpacho.” Man: “It’s tomato soup.” Waiter: “Then it’s cold tomato soup.”' },
+  { k: 'joke', t: 'What’s a sheep’s favourite pub snack? A baaa-gel.' },
+  { k: 'joke', t: 'Why did the man take his pencil to bed? To draw the curtains — then he dreamt of stocktake.' },
+  { k: 'joke', t: 'A bartender polishes a glass for twenty minutes. Customer: “Is that clean enough?” Bartender: “No — I’m just nervous.”' },
+  { k: 'joke', t: 'Why do mushrooms hate parties? They’re always getting left in the dark. Then someone says “fungi.”' },
+  { k: 'joke', t: 'What did the grape use to call its friends? A wine-line.' },
+  { k: 'joke', t: 'A man walked into a bar. Ouch. (Worth repeating — it’s the brief.)' },
+  { k: 'joke', t: 'Why did the tomato turn up late for service? It got stuck in a jam.' },
+  { k: 'joke', t: 'Customer asks for a table for two. Waiter: “Smoking or non?” Customer: “Surprise me.” Waiter seats them by the fire exit.' },
+  { k: 'joke', t: 'Why was the pasta so confident? It was well seasoned for success.' },
+  { k: 'joke', t: 'A man orders a martini. “Shaken or stirred?” “Surprise me.” Bartender spills it.' },
+  { k: 'joke', t: 'What’s the best way to talk to a waiter? Tip first, joke second.' },
+  { k: 'joke', t: 'Why did the chef get arrested? He was caught beating an egg.' },
+  { k: 'joke', t: 'A cow walks into a bar and says, “Do you know my beef?”' },
+  { k: 'joke', t: 'Why don’t waiters ever win races? They’re always taking orders.' },
+  { k: 'joke', t: 'What do you call a pig that knows karate and works FOH? Pork chop with a smile.' },
+  { k: 'joke', t: 'A man asks, “Is this seat free?” Waiter: “No — you have to pay for it like everyone else.”' },
+  { k: 'joke', t: 'Why did the ice melt at the bar? It couldn’t handle the heat of Friday night.' },
+  { k: 'joke', t: 'What’s a bartender’s favourite subject? Mixology — and gossip.' },
+  { k: 'joke', t: 'A diner: “I’ll have what he’s having.” Waiter: “He’s having a heart attack.” Old. Dark. Classic.' },
+  { k: 'joke', t: 'Why did the banana go out with the prune? It couldn’t find a date. Fruit bowl romance.' },
+  { k: 'joke', t: 'A man walks into a bar. Bartender: “Get out — we’re closed.” Man: “Then why is the door open?” Bartender: “We’re airing the jokes.”' },
+  { k: 'joke', t: 'Why do bakers always know the news? Fresh from the oven — and the grapevine.' },
+  { k: 'joke', t: 'What did one knife say to the other? “Look sharp — service is starting.”' },
+  { k: 'joke', t: 'A customer wants the bill. Waiter: “Would you like to pay the price?” Customer: “I’d rather pay the bill.”' },
+  { k: 'joke', t: 'Why was the coffee bean depressed? It had been grounded.' },
+  { k: 'joke', t: 'A man ordered a pizza with everything. Delivery: “Even anchovies?” Man: “Especially regret.”' },
+  { k: 'joke', t: 'Why did the lettuce win the award? It was a-head of the competition.' },
+  { k: 'joke', t: 'What’s the difference between a chef’s kiss and a real kiss? One is plating.' },
+  { k: 'joke', t: 'A barman says to a customer, “Your drink is on the house.” Customer looks up nervously.' },
+  { k: 'joke', t: 'Why did the man bring string to the restaurant? He wanted a tie-in meal. (Frayed knot sequel.)' },
+  { k: 'joke', t: 'What do you call a chicken looking at lettuce? Chicken sees a salad. Pub-quiz groaner.' },
+  { k: 'joke', t: 'A waiter asks, “Soup or salad?” Customer: “I don’t know — I’m not good at decisions.” Waiter: “Then soup. It’s one syllable.”' },
+  { k: 'joke', t: 'Why don’t eggs tell jokes in the kitchen? They’d crack up — and so would hygiene.' },
+  { k: 'joke', t: 'A man walks into a bar with a dog. Bartender: “No dogs.” Man: “He’s my seeing-eye dog.” Bartender: “That’s a chihuahua.” Man: “They gave me a chihuahua?!”' },
+  { k: 'joke', t: 'Why was the restaurant so quiet on Monday? Because everyone was still digesting Sunday.' },
+  { k: 'joke', t: 'What did the fork say to the spoon? “You stirrer.”' },
+  { k: 'joke', t: 'A customer complains the water is cloudy. Waiter: “Then it’s soft water. Hard water is clearer.” Customer: “…What?” Waiter: “Exactly.”' },
+  { k: 'joke', t: 'Why did the pie get promoted? It was filling a vacancy.' },
+  { k: 'joke', t: 'A man asks for a light lunch. Waiter brings a candle and a sandwich.' },
+  { k: 'joke', t: 'Why do chefs hate telling secrets? Too many people on the pass already know.' },
+  { k: 'joke', t: 'A diner says, “I’ll have the steak, rare.” Waiter: “How rare?” Diner: “Still mooing is fine.”' },
+  { k: 'joke', t: 'Why did the grape stop rolling? It ran out of juice at the cellar door.' },
+  { k: 'joke', t: 'A bartender’s favourite Christmas song? “All I Want for Christmas Is Brews.”' },
+  { k: 'joke', t: 'What do you call a snowman in the kitchen walk-in? Lost.' },
+  { k: 'joke', t: 'A man walked into a bar… and out again. It was a revolving door restaurant concept. Failed.' },
+  { k: 'joke', t: 'Why was the chef so good at baseball? He knew his batter.' },
+  { k: 'joke', t: 'Customer: “Do you have a children’s menu?” Waiter: “Yes — but we prefer adults to order.”' },
+  { k: 'joke', t: 'Why did the coffee refuse to work? It was exhausted already.' },
+  { k: 'joke', t: 'A man orders two beers. “One for me, one for my imaginary friend.” Bartender: “Sorry — we don’t serve spirits without a licence joke.”' },
+  { k: 'joke', t: 'Why did the man eat his fork? He was told dinner was on him.' },
+  { k: 'joke', t: 'A waiter drops cutlery. “That’ll be the knife — always falling for someone.”' },
+  { k: 'joke', t: 'Why do soda bottles make bad secret-keepers? They always crack under pressure.' },
+  { k: 'joke', t: 'A man asks, “What’s your signature dish?” Chef: “Anything still in stock.” Honest comedy.' },
+  { k: 'joke', t: 'Why was the bread so polite? It had good manners and better rolls.' },
+  { k: 'joke', t: 'What did the spaghetti say to the fettuccine? “Pasta la vista.”' },
+  { k: 'joke', t: 'A customer wants a table with a view. Waiter: “Of what — the kitchen stress?”' },
+  { k: 'joke', t: 'Why did the ice go to school? To become a little cooler.' },
+  { k: 'true', t: 'True: CAMRA (Campaign for Real Ale) was founded in 1971 to fight for better traditional beer.' },
+  { k: 'true', t: 'True: a “tied house” must buy beer from a set brewery or pub company; a “free house” can choose its beers.' },
+  { k: 'true', t: 'True: “last orders” and the closing bell grew from World War I licensing rules that stuck for decades.' },
+  { k: 'true', t: 'True: the Licensing Act 2003 ended fixed national closing times in England and Wales — pubs set their own hours.' },
+  { k: 'true', t: 'True: don’t ring the bar bell yourself — in British pubs it’s traditionally for staff calling last orders.' },
+  { k: 'true', t: 'True: British pubs often have an “invisible queue” at the bar — eye contact beats waving cash.' },
+  { k: 'true', t: 'True: buying rounds is a social rule in many UK pubs — skip your turn and people remember.' },
+  { k: 'true', t: 'True: Roman Britain had roadside wine shops called tabernae — an early ancestor of the tavern.' },
+  { k: 'true', t: 'True: hops arrived in English brewing in the late Middle Ages; earlier “ale” was usually unhopped.' },
+  { k: 'true', t: 'True: by 1577, England and Wales had around 17,000 alehouses — pubs were already everywhere.' },
+  { k: 'true', t: 'True: English alehouse licensing dates back to an Act of 1552.' },
+  { k: 'true', t: 'True: Victorian pubs often used etched glass, tiles and mirrors to look grand under gaslight.' },
+  { k: 'true', t: 'True: a “snug” was a small private bar area — more privacy, often a higher price for the same drink.' },
+  { k: 'true', t: 'True: the name “ploughman’s lunch” was heavily pushed by cheese marketing in the 1950s–60s.' },
+  { k: 'true', t: 'True: bread, cheese and beer is an old meal; the branded ploughman’s plate is much newer.' },
+  { k: 'true', t: 'True: “Time, gentlemen, please!” meant service had stopped — even when the room wasn’t only gentlemen.' },
+  { k: 'true', t: 'True: after last orders, drinkers traditionally got “drinking-up time” to finish, not reorder.' },
+  { k: 'true', t: 'True: Georgian London coffee houses were nicknamed “penny universities” — news and gossip for a penny.' },
+  { k: 'true', t: 'True: ice in drinks was once a luxury; everyday cold drinks needed the ice trade first.' },
+  { k: 'true', t: 'True: medieval monasteries kept a lot of European brewing knowledge alive.' },
+  { k: 'true', t: 'True: a “yard of ale” is a tall, awkward glass made for drinking contests more than comfort.' },
+  { k: 'true', t: 'True: kitchen slang “86” means you’re out of a dish — origins disputed, meaning clear.' },
+  { k: 'true', t: 'True: “restaurant” comes from French restaurer — “to restore” — first linked to restorative broths.' },
+  { k: 'true', t: 'True: oysters were once cheap street food; later scarcity and fashion made them luxury.' },
+  { k: 'true', t: 'True: “tip” as a word comes from old slang meaning “to give” — not from “To Insure Promptness.”' },
+  { k: 'true', t: 'True: the T.I.P. (“To Insure Promptness”) tip-jar story is a myth — a later backronym.' },
+  { k: 'true', t: 'True: public bar and lounge/saloon often meant different prices and atmospheres under one roof.' },
+  { k: 'true', t: 'True: in many UK pubs you order at the bar unless you’re in a restaurant-style dining room.' },
+  { k: 'true', t: 'True: “public house” shortened to “pub.”' },
+  { k: 'true', t: 'True: porter and stout grew with industrial London — big-city beers for big-city work.' },
+  { k: 'true', t: 'True: a managed pub has a salaried manager; a tenancy means someone rents and runs the business.' },
+  { k: 'true', t: 'True: 1988 let English pubs open through the afternoon again after decades of split sessions.' },
+  { k: 'true', t: 'True: inns once offered beds and stabling; taverns focused on drink; alehouses were everyday beer shops.' },
+  { k: 'true', t: 'True: painted pub signs helped travellers who couldn’t read the written name.' },
+  { k: 'true', t: 'True: “Inn” in a name once promised lodging — many modern inns no longer offer rooms.' },
+  { k: 'true', t: 'True: cask ale is still “alive” in the cellar — temperature and clean lines matter as much as the brand.' },
+  { k: 'true', t: 'True: firkin and kilderkin are traditional cask sizes still used in cellar talk.' },
+  { k: 'true', t: 'True: froth on a pint isn’t only looks — it also helps release aroma.' },
+  { k: 'true', t: 'True: many villages still treat the pub as an unofficial noticeboard and meeting place.' },
+  { k: 'true', t: 'True: wet-led pubs make most money from drink; food-led pubs depend on the kitchen.' },
+  { k: 'true', t: 'True: Sunday lunch culture outlived the old strict Sunday licensing sessions that shaped it.' },
+  { k: 'true', t: 'True: some wartime pubs kept trading under blackout — darker rooms, same gossip.' },
+  { k: 'true', t: 'True: Domesday-era drinking dens aren’t neat “oldest pubs,” but Britain’s drinking-house habit is ancient.' },
+  { k: 'true', t: 'True: the Defence of the Realm Act in WWI tightened pub hours for munitions workers — and the habit stuck.' },
+  { k: 'true', t: 'True: guest ales and changing pump clips are part of how free houses keep regulars interested.' },
+  { k: 'true', t: 'True: CAMRA’s Good Beer Guide helped turn real-ale hunting into a national hobby.' },
+  { k: 'true', t: 'True: pewter tankards and marked measures were part of long fights against short-measure pours.' },
+  { k: 'true', t: 'True: “one for the road” once meant a last drink before travelling — now it usually means call a taxi.' },
+  { k: 'true', t: 'True: beer gardens became much more important after indoor smoking bans.' },
+  { k: 'true', t: 'True: a clean glass and the right temperature fix more “this pint’s off” complaints than speeches do.' },
+  { k: 'true', t: 'True: “Real ale” for CAMRA means cask-conditioned beer — not just any craft branding.' },
+  { k: 'true', t: 'True: pub quizzes took off as cheap midweek entertainment — trivia as a reason to come out.' },
+  { k: 'true', t: 'True: takeaway beer in jugs was normal long before craft cans.' },
+  { k: 'true', t: 'True: some historic pub interiors are protected or CAMRA-listed so refurbishments don’t wipe them out.' },
+  { k: 'true', t: 'True: tablecloths once signalled status — white linen meant you weren’t eating off a wooden board.' },
+  { k: 'true', t: 'True: Benedictine and other monastic traditions helped spread brewing skill across Europe.' },
+  { k: 'true', t: 'True: coaching inns timed horse changes carefully — hospitality was logistics before spreadsheets.' },
+  { k: 'true', t: 'True: “mine host” is old English for the landlord — the face of the house.' },
+  { k: 'true', t: 'True: free-of-tie can still mean high rent — “free” is about beer choice, not free money.' },
+  { k: 'true', t: 'True: many pubs still shout last orders out of habit even when their licence allows later hours.' },
+  { k: 'true', t: 'True: eye contact and a small step forward is the polite “I’m next” signal at many British bars.' },
+  { k: 'true', t: 'True: the world’s largest pizza (Guinness-recognised records have been broken more than once) has measured over 1,000 square metres — hospitality loves a record.' },
+  { k: 'true', t: 'True: Naples is widely treated as pizza’s spiritual home; modern pizza grew from flatbreads with tomato after tomatoes arrived from the Americas.' },
+  { k: 'true', t: 'True: Margherita pizza is linked to an 1889 Naples story honouring Queen Margherita — tomato, mozzarella, basil as the Italian flag.' },
+  { k: 'true', t: 'True: the word “hotel” comes from French hôtel — originally a large town house, later lodging for travellers.' },
+  { k: 'true', t: 'True: “chef” is French for chief — short for chef de cuisine, the head of the kitchen.' },
+  { k: 'true', t: 'True: “sommelier” originally related to a pack-animal driver; it later meant the person in charge of wine.' },
+  { k: 'true', t: 'True: Michelin stars began as a tyre-company guide to get motorists driving further — and eating well on the way.' },
+  { k: 'true', t: 'True: the first Michelin Guide was published in 1900; stars for restaurants came later (1926 onwards).' },
+  { k: 'true', t: 'True: “à la carte” means ordering dishes individually from the menu, not as a fixed set meal.' },
+  { k: 'true', t: 'True: “table d’hôte” is a set multi-course menu at a fixed price — the opposite of full à la carte freedom.' },
+  { k: 'true', t: 'True: silver service means food is served from platters with fork and spoon — theatre at the table.' },
+  { k: 'true', t: 'True: Gueridon service is cooking or finishing dishes on a trolley beside the guest — crêpes Suzette energy.' },
+  { k: 'true', t: 'True: the word “menu” comes from Latin via French for a detailed list — once rare, now expected.' },
+  { k: 'true', t: 'True: early restaurants in Paris sold restorative broths; the full modern restaurant idea grew from that.' },
+  { k: 'true', t: 'True: “bistro” may come from Russian quickly (“bystro”) — a popular story, debated by historians.' },
+  { k: 'true', t: 'True: room service became a hotel selling point in the 20th century — privacy as a product.' },
+  { k: 'true', t: 'True: the first known pizza delivery is often linked to 19th-century Naples; global delivery culture exploded with phones and scooters.' },
+  { k: 'true', t: 'True: Domino’s and similar chains turned pizza delivery into a logistics race — speed as marketing.' },
+  { k: 'true', t: 'True: fine dining “covers” means number of guests served — a core restaurant KPI.' },
+  { k: 'true', t: 'True: “revPASH” and similar stats measure revenue per available seat-hour — yield management for restaurants.' },
+  { k: 'true', t: 'True: the 60°C / 140°F “danger zone” idea is about bacteria multiplying in warm food — core kitchen safety.' },
+  { k: 'true', t: 'True: HACCP (hazard analysis) is the modern framework behind professional kitchen food-safety systems.' },
+  { k: 'true', t: 'True: “mise en place” means everything in its place — prep done before service starts.' },
+  { k: 'true', t: 'True: a pass is the kitchen counter where finished dishes are checked before they reach guests.' },
+  { k: 'true', t: 'True: “behind” is kitchen/bar slang warning someone you’re moving behind them with hot or sharp things.' },
+  { k: 'true', t: 'True: “on the fly” means urgently — usually a remake for a ticket already in the weeds.' },
+  { k: 'true', t: 'True: “in the weeds” means slammed — more tickets than hands.' },
+  { k: 'true', t: 'True: “corner” is a warning shout when carrying trays around a blind corner.' },
+  { k: 'true', t: 'True: espresso means pressed out — forced hot water through finely ground coffee.' },
+  { k: 'true', t: 'True: a cappuccino is traditionally roughly equal parts espresso, steamed milk and foam.' },
+  { k: 'true', t: 'True: tea is the world’s most drunk prepared beverage after water — hospitality in a cup.' },
+  { k: 'true', t: 'True: afternoon tea as a fashionable meal is linked to 19th-century British high society.' },
+  { k: 'true', t: 'True: the sandwich is named after the Earl of Sandwich — gambling-friendly handheld food, by popular legend.' },
+  { k: 'true', t: 'True: fish and chips became a British staple in the 19th century as fried fish met cheap fried potatoes.' },
+  { k: 'true', t: 'True: the first fish-and-chip shops appeared in Britain in the 1860s era — exact “first” claims vary by town.' },
+  { k: 'true', t: 'True: champagne can legally use that name only from the Champagne region of France (with protected rules).' },
+  { k: 'true', t: 'True: prosecco is Italian sparkling wine — similar party job, different rules and grapes.' },
+  { k: 'true', t: 'True: whisky is usually Scotland/Ireland spelling; whiskey is common in Ireland and the US — both are aged spirit.' },
+  { k: 'true', t: 'True: gin’s juniper character helped make it a base for countless classic cocktails.' },
+  { k: 'true', t: 'True: the Martini’s exact “correct” recipe is one of hospitality’s longest arguments.' },
+  { k: 'true', t: 'True: Prohibition in the US (1920–1933) shut legal bars and pushed drinking underground — cocktail culture changed with it.' },
+  { k: 'true', t: 'True: speakeasies were illegal bars during Prohibition — password culture included.' },
+  { k: 'true', t: 'True: the cocktail umbrella is mostly mid-20th-century tiki theatre — garnish as showbusiness.' },
+  { k: 'true', t: 'True: “86” may come from Chumley’s at 86 Bedford Street in New York, or from soda-fountain codes — still disputed.' },
+  { k: 'true', t: 'True: the world’s biggest hotel chains measure success in rooms available and rooms sold — occupancy is king.' },
+  { k: 'true', t: 'True: RevPAR (revenue per available room) is a core hotel performance number.' },
+  { k: 'true', t: 'True: a hotel “folio” is the guest’s bill — the running tab for the stay.' },
+  { k: 'true', t: 'True: turndown service is the evening ritual of preparing the room for sleep — sometimes with a chocolate.' },
+  { k: 'true', t: 'True: the minibar was invented to sell convenience at a premium — tiny fridge, large margin.' },
+  { k: 'true', t: 'True: concierge comes from French — originally a keeper of keys / doorkeeper role.' },
+  { k: 'true', t: 'True: the golden rule of service textbooks is still simple: treat guests as you’d want to be treated — then add timing.' },
+  { k: 'true', t: 'True: mystery shoppers exist because hospitality brands want to know what the guest actually experiences.' },
+  { k: 'true', t: 'True: TripAdvisor and review culture made every diner a public critic — reputation became searchable.' },
+  { k: 'true', t: 'True: “front of house” is guest-facing staff; “back of house” is kitchen and support — two theatres, one building.' },
+  { k: 'true', t: 'True: a sommelier’s tastevin is a shallow silver cup historically used for checking wine appearance and clarity.' },
+  { k: 'true', t: 'True: corked wine is spoiled by TCA taint — musty cardboard, not just “I don’t like it.”' },
+  { k: 'true', t: 'True: decanting can help older wines leave sediment behind and younger wines open up with air.' },
+  { k: 'true', t: 'True: beer styles like IPA started as British pale ales; the name is tied to export stories to India.' },
+  { k: 'true', t: 'True: lager is fermented cooler with different yeast than classic British ales — cleaner, crisper profile.' },
+  { k: 'true', t: 'True: Guinness is a dry Irish stout — nitrogen widgets made the canned “surge” famous.' },
+  { k: 'true', t: 'True: the widget in canned stout releases gas when opened to create a creamy head.' },
+  { k: 'true', t: 'True: floor staff “side work” is the unglamorous prep and reset that makes service possible.' },
+  { k: 'true', t: 'True: a “turn” in restaurants means reseating a table again in one service — more turns, more covers.' },
+  { k: 'true', t: 'True: open-kitchen design puts the kitchen on show — entertainment and pressure in equal measure.' },
+  { k: 'true', t: 'True: tasting menus grew as chefs’ statement formats — many courses, less guest choice.' },
+  { k: 'true', t: 'True: farm-to-table became a marketing language for shorter supply chains and seasonal cooking.' },
+  { k: 'true', t: 'True: allergen law in the UK requires clear info on major allergens — hospitality is partly paperwork.' },
+  { k: 'true', t: 'True: the “big 14” allergens include things like gluten, milk, nuts, eggs, fish and sulphites.' },
+  { k: 'true', t: 'True: FIFO means first in, first out — oldest stock used first to cut waste.' },
+  { k: 'true', t: 'True: food cost percentage is a core restaurant control — too high and the menu is a charity.' },
+  { k: 'true', t: 'True: labour cost percentage is the other big control — rota vs covers is the eternal fight.' },
+  { k: 'true', t: 'True: the average UK Sunday roast ritual is as much culture as cooking — gravy is diplomacy.' },
+  { k: 'true', t: 'True: afternoon drinking sessions once had a legal mid-afternoon gap — the old “afternoon closed” era.' },
+  { k: 'true', t: 'True: some pubs still keep a genuine brass last-orders bell — theatre with legal roots.' },
+  { k: 'true', t: 'True: Domino’s once advertised pizza delivery in 30 minutes — a logistics promise that shaped the industry.' },
+  { k: 'true', t: 'True: the first known written pizza recipes appear centuries after flatbreads; tomato pizza needs the Columbian Exchange.' },
+  { k: 'true', t: 'True: hospitality literally means welcoming strangers — from Latin hospitalitas.' },
+  { k: 'true', t: 'True: hotels, hospitals and hospitality share the same linguistic root — caring for guests/patients.' },
+  { k: 'true', t: 'True: the Savoy Hotel in London (opened 1889) helped set modern luxury hotel standards in Britain.' },
+  { k: 'true', t: 'True: César Ritz and chef Auguste Escoffier partnered on grand hotel dining that shaped fine service.' },
+  { k: 'true', t: 'True: Escoffier helped modernise kitchen brigade systems — specialised stations instead of chaos.' },
+  { k: 'true', t: 'True: brigade titles like saucier, pâtissier and garde manger come from that classical kitchen structure.' },
+  { k: 'true', t: 'True: room types (single, twin, double, suite) are hotel product design as much as bed sizes.' },
+  { k: 'true', t: 'True: overbooking hotels is a calculated yield tactic — then the apology dance begins.' },
+  { k: 'true', t: 'True: “comp” means complimentary — free on the house, usually with a reason and a manager code.' },
+  { k: 'true', t: 'True: a “walk” in hotels means relocating a guest to another hotel when you’re over capacity.' },
+  { k: 'true', t: 'True: pillow menus and late checkout became luxury extras — sleep as upsell.' },
+  { k: 'true', t: 'True: airline meals are hospitality under physics constraints — pressure and dryness change taste.' },
+  { k: 'true', t: 'True: cruise ships are floating hotels with theatre, buffets and serious logistics.' },
+  { k: 'true', t: 'True: the tip jar is modern theatre; the older British habit was more about service charge and rounding up.' },
+  { k: 'true', t: 'True: service charge is not always distributed the same way — staff contracts matter.' },
+  { k: 'true', t: 'True: “hospitality industry” usually means food, drink, lodging and related guest services as a group.' },
+  { k: 'true', t: 'True: tourism and hospitality overlap, but hospitality is the service system underneath the trip.' },
+  { k: 'true', t: 'True: the biggest pizzas on record have needed forklifts, giant ovens or open-air baking — spectacle as marketing.' },
+  { k: 'true', t: 'True: Napoli pizza makers have protected styles (like Pizza Napoletana rules) for dough, oven and toppings.' },
+  { k: 'true', t: 'True: wood-fired ovens often run around 400–500°C — pizza in about 60–90 seconds when it’s true Neapolitan style.' },
+  { k: 'true', t: 'True: deep-dish pizza is a Chicago classic — more casserole energy than thin Neapolitan.' },
+  { k: 'true', t: 'True: New York pizza is known for wide foldable slices — street food architecture.' },
+  { k: 'true', t: 'True: the pineapple-on-pizza argument is basically a global hospitality culture war.' },
+  { k: 'true', t: 'True: buffet psychology uses long displays and multiple pans — abundance is the product.' },
+  { k: 'true', t: 'True: all-you-can-eat works when most guests eat less than they think they will — margins hide in averages.' },
+  { k: 'true', t: 'True: free hotel breakfast became a competitive weapon for midscale brands.' },
+  { k: 'true', t: 'True: loyalty points turned regular guests into a currency — stay more, redeem later.' },
+  { k: 'true', t: 'True: a “comping culture” without rules can destroy food cost — generosity needs a system.' },
+  { k: 'true', t: 'True: mystery oils and “chef’s surprise” specials are also inventory rescue in disguise.' },
+  { k: 'true', t: 'True: the pass bell (or shout) is kitchen communication — plating is a relay race.' },
+  { k: 'true', t: 'True: dark kitchens / ghost kitchens cook delivery-only food — hospitality without dining rooms.' },
+  { k: 'true', t: 'True: QR-code menus surged during Covid and stayed because printing less is easier.' },
+  { k: 'true', t: 'True: contactless payments changed tipping behaviour — screens ask when wallets used to hesitate.' },
+  { k: 'true', t: 'True: the UK smoking ban (2007 England) pushed drinkers into beer gardens and changed pub design.' },
+  { k: 'true', t: 'True: many modern pubs make more from food than their grandparents’ wet-led model ever did.' },
+  { k: 'true', t: 'True: a firkin is 9 gallons of cask beer — cellar maths you can drink.' },
+  { k: 'true', t: 'True: nitro cold brew and nitro stout both use nitrogen for a creamy texture.' },
+  { k: 'true', t: 'True: “on the house” means free — the house is paying, not the guest.' },
+  { k: 'true', t: 'True: “the customer is always right” was a marketing slogan, not a kitchen safety policy.' },
+  { k: 'true', t: 'True: Marriott, Hilton and similar groups scaled hospitality by standardising the guest experience.' },
+  { k: 'true', t: 'True: boutique hotels sell personality instead of identical rooms — brand as interior design.' },
+  { k: 'true', t: 'True: glamping is hospitality meeting camping — comfort sold as outdoors.' },
+  { k: 'true', t: 'True: Airbnb turned spare rooms into lodging supply — hotels suddenly had millions of micro-competitors.' },
+  { k: 'true', t: 'True: restaurant reservations systems are yield tools — no-shows are the enemy.' },
+  { k: 'true', t: 'True: deposits for large tables exist because ghost bookings cost real food and labour.' },
+  { k: 'true', t: 'True: the largest restaurant brands measure success in thousands of sites — logistics wearing aprons.' },
+  { k: 'true', t: 'True: McDonald’s didn’t invent the burger; it invented fast-food systems at world scale.' },
+  { k: 'true', t: 'True: franchise models let hospitality brands grow using other people’s capital and local managers.' },
+  { k: 'true', t: 'True: a kitchen “ticket” is the order printout — the script for the next few minutes of chaos.' },
+  { k: 'true', t: 'True: expo / expeditor is the person controlling the pass — traffic controller for plates.' },
+  { k: 'true', t: 'True: “fire” as a kitchen verb means start cooking that dish now.' },
+  { k: 'true', t: 'True: “all day” means the total number needed of an item across tickets — “four steaks all day.”' },
+  { k: 'true', t: 'True: “dying on the pass” means food sitting too long under heat lamps — quality dropping in real time.' },
+  { k: 'true', t: 'True: hospitality training still drills smile, eye contact and using the guest’s name — old tools that work.' },
+  { k: 'true', t: 'True: the best pubs feel like a living room you share with strangers — that’s the product.' },
+];
+
+function hospitalityYarnKindLabel_(k) {
+  if (k === 'true') return 'True-ish';
+  if (k === 'funny') return 'Shift yarn';
+  return 'Quick one';
+}
+
+/** Built-in + Script Property extras (deduped by text). */
+function getHospitalityYarnBank_() {
+  var list = (HOSPITALITY_YARNS_ || []).slice();
+  try {
+    var raw = PropertiesService.getScriptProperties().getProperty('HOSPITALITY_YARNS_EXTRA');
+    if (raw) {
+      var extra = JSON.parse(raw);
+      if (extra && extra.length) {
+        var seen = {};
+        for (var i = 0; i < list.length; i++) seen[String(list[i].t || '')] = true;
+        for (var j = 0; j < extra.length; j++) {
+          var item = extra[j];
+          if (!item || !item.t) continue;
+          var key = String(item.t);
+          if (seen[key]) continue;
+          seen[key] = true;
+          list.push({ k: item.k || 'joke', t: key });
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('getHospitalityYarnBank_ extras: ' + e);
+  }
+  return list;
+}
+
+/**
+ * Stable pick for a calendar day. Year shifts the sequence so the same
+ * calendar date next year does not replay the same yarn.
+ */
+function getHospitalityYarnForDate_(date) {
+  var list = getHospitalityYarnBank_();
+  if (!list || !list.length) {
+    return { kind: 'joke', label: 'Quick one', text: 'Service with a smile — teeth optional after midnight.' };
+  }
+  var d = date instanceof Date ? date : new Date();
+  var start = new Date(d.getFullYear(), 0, 0);
+  var dayOfYear = Math.floor((d - start) / 86400000);
+  var seed = d.getFullYear() * 400 + dayOfYear;
+  var idx = ((seed % list.length) + list.length) % list.length;
+  var yarn = list[idx];
+  return {
+    kind: yarn.k,
+    label: hospitalityYarnKindLabel_(yarn.k),
+    text: yarn.t,
+    index: idx,
+    bankSize: list.length
+  };
+}
+
+/** Public for diagnostics / clasp run. */
+function getHospitalityYarnToday() {
+  return getHospitalityYarnForDate_(new Date());
+}
+
+/**
+ * Append yarns to Script Properties extras (no code redeploy needed for content).
+ * @param {Array<{k?:string,t:string}>} yarns
+ */
+function appendHospitalityYarns(yarns) {
+  if (!yarns || !yarns.length) return { success: false, message: 'No yarns provided' };
+  var props = PropertiesService.getScriptProperties();
+  var existing = [];
+  try {
+    var raw = props.getProperty('HOSPITALITY_YARNS_EXTRA');
+    if (raw) existing = JSON.parse(raw) || [];
+  } catch (e1) {
+    existing = [];
+  }
+  var seen = {};
+  for (var i = 0; i < existing.length; i++) seen[String(existing[i].t || '')] = true;
+  var added = 0;
+  for (var j = 0; j < yarns.length; j++) {
+    var y = yarns[j];
+    if (!y || !y.t) continue;
+    var t = String(y.t).trim();
+    if (!t || seen[t]) continue;
+    seen[t] = true;
+    existing.push({ k: y.k || 'joke', t: t });
+    added++;
+  }
+  props.setProperty('HOSPITALITY_YARNS_EXTRA', JSON.stringify(existing));
+  return {
+    success: true,
+    added: added,
+    extraTotal: existing.length,
+    bankTotal: getHospitalityYarnBank_().length
+  };
+}
