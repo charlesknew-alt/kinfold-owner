@@ -291,10 +291,17 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow70') !== -1, 'menus page cache-bust is flow70');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow70') !== -1, 'hub menus link cache-bust is flow70');
+assert(page.indexOf('flow71') !== -1, 'menus page cache-bust is flow71');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow71') !== -1, 'hub menus link cache-bust is flow71');
 assert(page.indexOf("menu.id === 'specials'") !== -1,
   'Specials Blocks step edits section note');
+assert(page.indexOf('isStaffMode') !== -1 && page.indexOf('mode=staff') !== -1,
+  'menus supports simplified staff mode');
+assert(page.indexOf('STAFF_MENU_IDS') !== -1 && page.indexOf("isStaffMode ? 2 : 4") !== -1,
+  'staff mode uses Dishes → Generate only');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('withStaffMenus') !== -1 &&
+  fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf("sessionRole === 'eightbells'") !== -1,
+  'Eight Bells manager opens menus with mode=staff');
 assert(typeof api.stripAllergyFooter === 'function' && typeof api.cleanDishDescription === 'function',
   'allergy footer strip helpers exported');
 assert(/rice/.test(api.cleanDishDescription(

@@ -518,7 +518,7 @@
       'cardtakings-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=cardday&shell=owner',
       // Standalone Teya CSV reader (browser-only). Does not feed paperwork.
       'cardtakings-windmill': 'card-takings.html?venue=windmill',
-      'menus-eightbells': 'menus.html?v=20260926-flow70',
+      'menus-eightbells': 'menus.html?v=20260926-flow71',
       'rooms-windmill': 'https://rooms.windmilllittleworth.com',
       'payroll': 'https://owner.kinfoldinns.co.uk/payroll.html?v=20260901-xero-pull-timeout',
       'staffhub': 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec'
@@ -880,6 +880,14 @@
         .replace(/[?&]$/, '');
     }
 
+    /** Eight Bells manager Menus — simplified staff UI (same cloud book as owner). */
+    function withStaffMenus(url) {
+      if (!url || typeof url !== 'string') return url;
+      if (url.indexOf('menus.html') === -1) return url;
+      if (/[?&]mode=staff(?:&|$)/.test(url)) return url;
+      return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'mode=staff';
+    }
+
     function openApp(system, pubName, opts) {
       opts = opts || {};
       if (sessionRole && sessionRole !== 'owner') {
@@ -900,6 +908,7 @@
         url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
       }
       if (sessionRole === 'owner') url = withOwnerShell(url);
+      if (system === 'menus-eightbells' && sessionRole === 'eightbells') url = withStaffMenus(url);
       currentSystem = system;
       currentPub = pubName;
       document.getElementById('appTitle').textContent = TITLES[system] || system;
@@ -1008,6 +1017,7 @@
         document.getElementById('appLoader').classList.remove('hidden');
         var frame = document.getElementById('appFrame');
         var url = sessionRole === 'owner' ? withOwnerShell(state.url) : stripOwnerShell(state.url);
+        if (sessionRole === 'eightbells' && state.system === 'menus-eightbells') url = withStaffMenus(url);
         frame.src = url;
         frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
         setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);

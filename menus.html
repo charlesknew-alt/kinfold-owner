@@ -23,6 +23,11 @@
     .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
     .ps-venue-name { font-family: var(--serif); font-size: 22px; font-weight: 500; }
     html.iframed .ps-header { display: none; } /* HARD: never restore display:block for iframed/varlo-header */
+    html.staff-mode h1::after {
+      content: ' · Floor';
+      font-size: 0.55em; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--ink-soft); font-family: var(--sans); font-weight: 700; vertical-align: middle;
+    }
     main { max-width: 720px; margin: 0 auto; padding: 16px 16px 120px; }
     h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 5vw, 34px); }
     .lede { color: var(--ink-soft); margin: 6px 0 16px; font-size: 14.5px; max-width: 40em; }
@@ -256,6 +261,15 @@
   <main>
     <h1>Menus</h1>
     <p class="lede" id="pageLede">A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.</p>
+    <script>
+      // Early lede for staff (full boot script sets the rest); avoids owner copy flash.
+      (function () {
+        if (/(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''))) {
+          var el = document.getElementById('pageLede');
+          if (el) el.textContent = 'Update today’s dishes, then generate the print sheet. Same menus as the owner page — kept simple for the floor.';
+        }
+      })();
+    </script>
     <div class="view-toggle no-print" id="viewToggle" role="tablist" aria-label="Menus view">
       <button type="button" class="soft on" data-view="edit" id="viewEdit">Edit &amp; generate</button>
       <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
@@ -263,11 +277,15 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow70"></script>
-  <script src="menus-print.js?v=20260926-flow70"></script>
-  <script src="menus-ingest.js?v=20260926-flow70"></script>
+  <script src="menus.js?v=20260926-flow71"></script>
+  <script src="menus-print.js?v=20260926-flow71"></script>
+  <script src="menus-ingest.js?v=20260926-flow71"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
+
+    // Eight Bells manager hub opens menus.html?mode=staff — same cloud book, shorter UI.
+    var isStaffMode = /(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''));
+    if (isStaffMode) document.documentElement.classList.add('staff-mode');
 
     var STORAGE = 'eb-menus-v2';
     var META_STORAGE = 'eb-menus-meta-v1';
@@ -280,13 +298,13 @@
     var promoBank = loadPromoBank();
     var promoTicks = loadPromoTicks();
     var sectionLayout = loadSectionLayout();
-    var menuId = 'main';
+    var menuId = isStaffMode ? 'specials' : 'main';
     var mode = 'complete';
     var dishId = '';
     var includes = loadIncludes();
     var pendingReview = null;
     var editingPromoId = '';
-    var flowStep = 1; // 1 dishes · 2 blocks · 3 wording · 4 generate
+    var flowStep = 1; // staff: 1 dishes · 2 generate · owner: + blocks + wording
     var viewMode = 'edit'; // edit | history
     var historyFilter = 'all';
     var historyCache = [];
@@ -298,12 +316,27 @@
     var cloudSyncNote = '';
     var cloudPullDone = false;
 
-    var FLOW_STEPS = [
-      { id: 1, key: 'dishes', label: 'Dishes' },
-      { id: 2, key: 'blocks', label: 'Blocks' },
-      { id: 3, key: 'wording', label: 'Wording' },
-      { id: 4, key: 'generate', label: 'Generate' }
-    ];
+    // Manager: day-to-day printables only (owner keeps Party / Little Bells / Lunch club).
+    var STAFF_MENU_IDS = ['specials', 'main', 'sunday', 'sandwiches', 'desserts'];
+
+    var FLOW_STEPS = isStaffMode
+      ? [
+          { id: 1, key: 'dishes', label: 'Dishes' },
+          { id: 2, key: 'generate', label: 'Generate' }
+        ]
+      : [
+          { id: 1, key: 'dishes', label: 'Dishes' },
+          { id: 2, key: 'blocks', label: 'Blocks' },
+          { id: 3, key: 'wording', label: 'Wording' },
+          { id: 4, key: 'generate', label: 'Generate' }
+        ];
+
+    function visibleMenus() {
+      if (!isStaffMode) return EBMenus.MENUS;
+      return EBMenus.MENUS.filter(function (m) {
+        return STAFF_MENU_IDS.indexOf(m.id) !== -1;
+      });
+    }
 
     function loadSectionLayout() {
       try {
@@ -536,10 +569,14 @@
         return;
       }
       if (lede) {
-        var base = 'A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. Dishes and wording stay in sync on every phone and PC.';
+        var base = isStaffMode
+          ? 'Update today’s dishes, then generate the print sheet. Same menus as the owner page — kept simple for the floor.'
+          : 'A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. Dishes and wording stay in sync on every phone and PC.';
         lede.textContent = cloudSyncNote ? (base + ' · ' + cloudSyncNote) : base;
       }
       if (picker) picker.style.display = '';
+      if (isStaffMode && flowStep > FLOW_STEPS.length) flowStep = FLOW_STEPS.length;
+      if (isStaffMode && mode === 'paste') mode = 'complete';
       renderPicker();
       renderEditor();
     }
@@ -561,7 +598,7 @@
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
         html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
-        EBMenus.MENUS.forEach(function (m) {
+        visibleMenus().forEach(function (m) {
           html += '<option value="' + escapeAttr(m.id) + '"' + (historyFilter === m.id ? ' selected' : '') + '>' +
             escapeAttr(m.name) + '</option>';
         });
@@ -645,7 +682,11 @@
     function renderPicker() {
       var box = document.getElementById('menuPicker');
       box.innerHTML = '';
-      EBMenus.MENUS.forEach(function (menu) {
+      var menus = visibleMenus();
+      if (isStaffMode && !menus.some(function (m) { return m.id === menuId; })) {
+        menuId = (menus[0] && menus[0].id) || 'specials';
+      }
+      menus.forEach(function (menu) {
         var b = document.createElement('button');
         b.type = 'button';
         b.setAttribute('role', 'tab');
@@ -675,26 +716,31 @@
       var el = document.getElementById('editor');
       var list = dishes();
       var html = '';
+      var genStepId = isStaffMode ? 2 : 4;
 
       html += renderFlowRail(menu, list);
 
       // —— 1. Dishes ——
       html += flowStepShell(1, 'Dishes', menu.name,
-        list.length ? (list.length + ' dish' + (list.length === 1 ? '' : 'es') + ' · ' + sectionCount(list) + ' sections') : 'Empty — upload or add dishes',
+        list.length
+          ? (list.length + ' dish' + (list.length === 1 ? '' : 'es') + ' · ' + sectionCount(list) + ' sections')
+          : (isStaffMode ? 'Empty — add dishes below' : 'Empty — upload or add dishes'),
         renderDishesStep(menu, list));
 
-      // —— 2. Blocks (section layout) ——
-      html += flowStepShell(2, 'Blocks', 'How sections sit on the sheet',
-        blockSummary(menu),
-        renderBlocksStep(menu, list));
+      if (!isStaffMode) {
+        // —— 2. Blocks (section layout) ——
+        html += flowStepShell(2, 'Blocks', 'How sections sit on the sheet',
+          blockSummary(menu),
+          renderBlocksStep(menu, list));
 
-      // —— 3. Wording ——
-      html += flowStepShell(3, 'Wording', 'Events & selling lines',
-        wordingSummary(menu),
-        renderWordingStep(menu));
+        // —— 3. Wording ——
+        html += flowStepShell(3, 'Wording', 'Events & selling lines',
+          wordingSummary(menu),
+          renderWordingStep(menu));
+      }
 
-      // —— 4. Generate ——
-      html += flowStepShell(4, 'Generate', 'Print sheet',
+      // —— Generate (step 2 staff / step 4 owner) ——
+      html += flowStepShell(genStepId, 'Generate', 'Print sheet',
         generateSummary(),
         renderGenerateStep(menu));
 
@@ -782,38 +828,70 @@
       return html;
     }
 
+    function renderStaffSpecialsNote(list) {
+      var defaultsSp = EBMenus.defaultSectionLayout();
+      var noteSecs = EBMenus.SPECIALS_SECTIONS || ['Special Starters', 'Special Mains', 'Special Desserts'];
+      var html = '<div class="include-box" style="margin-bottom:14px"><h3>Specials board note</h3>';
+      html += '<p class="note" style="margin:0 0 10px">Line under the Specials title in the frilly box. Clear for none. Same wording when Specials are ticked onto Main / Sunday.</p>';
+      noteSecs.forEach(function (sec) {
+        var ruleSp = sectionLayout[sec] || defaultsSp[sec] || { note: '' };
+        var nIn = (list || []).filter(function (d) { return d.section === sec; }).length;
+        html += '<label class="field">' + escapeAttr(sec) +
+          (nIn ? ' · ' + nIn + ' dish' + (nIn === 1 ? '' : 'es') : '') + '</label>';
+        html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
+          escapeAttr(ruleSp.note || '') + '</textarea>';
+      });
+      html += '</div>';
+      return html;
+    }
+
     function renderDishesStep(menu, list) {
       var html = '';
-      html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
+      if (isStaffMode) {
+        html += '<p class="step-lede">Edit today’s dishes, tick allergens, then generate. Layout and event wording stay as the owner set them.</p>';
+      } else {
+        html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
+      }
 
       var extras = EBMenus.includableMenus(menuId);
       if (extras.length) {
         html += '<div class="include-box"><h3>Also put on this sheet</h3>';
         html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print.</p><div class="include-row">';
         extras.forEach(function (m) {
+          // Staff: only offer Specials (and other visible menus) as includes
+          if (isStaffMode && STAFF_MENU_IDS.indexOf(m.id) === -1) return;
           var on = !!(includes[menuId] && includes[menuId][m.id]);
           html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(m.name) + '</label>';
         });
         html += '</div></div>';
       }
 
+      if (isStaffMode && menu.id === 'specials') {
+        html += renderStaffSpecialsNote(list);
+      }
+
       if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
         html += renderDishForm(menu);
-      } else if (mode === 'paste') {
+      } else if (mode === 'paste' && !isStaffMode) {
         html += renderPasteBlock(menu);
       }
 
       html += renderComplete();
       html += '<div class="toolbar-row no-print">';
       html += '<button type="button" class="soft" data-mode="add">Add a dish</button>';
-      html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
+      if (!isStaffMode) {
+        html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
+      }
       html += '</div>';
-      html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
-      html += '<button class="link" id="doClear" type="button">Clear this menu</button>';
-      html += '<span>·</span>';
-      html += '<button class="link" id="doReset" type="button">Put sample menus back</button>';
-      html += '</div>';
-      html += flowNav(null, 2, 'Next · Blocks');
+      if (!isStaffMode) {
+        html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
+        html += '<button class="link" id="doClear" type="button">Clear this menu</button>';
+        html += '<span>·</span>';
+        html += '<button class="link" id="doReset" type="button">Put sample menus back</button>';
+        html += '</div>';
+      }
+      if (isStaffMode) html += flowNav(null, 2, 'Next · Generate');
+      else html += flowNav(null, 2, 'Next · Blocks');
       return html;
     }
 
@@ -968,7 +1046,11 @@
 
     function renderGenerateStep(menu) {
       var html = '';
-      html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Each generate is saved under <strong>Print history</strong> (shared cloud + this device) with its week / Sunday date and Roman numeral.</p>';
+      if (isStaffMode) {
+        html += '<p class="step-lede">Check the plan, then generate. Sheets are saved under <strong>Print history</strong> for reprinting later.</p>';
+      } else {
+        html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Each generate is saved under <strong>Print history</strong> (shared cloud + this device) with its week / Sunday date and Roman numeral.</p>';
+      }
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
       html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
       html += '<div class="bar-copy" id="generateHint"></div>';
@@ -976,7 +1058,7 @@
       html += '<button type="button" class="go" id="doGenerate">Generate menu</button>';
       html += '<button type="button" class="ghost" id="doPrintHint">Print / PDF</button>';
       html += '</div></div></div>';
-      html += flowNav(3, null);
+      html += flowNav(isStaffMode ? 1 : 3, null);
       return html;
     }
 
@@ -1546,7 +1628,8 @@
         mode = 'paste';
         render();
       };
-      document.getElementById('doReset').onclick = function () {
+      var doReset = document.getElementById('doReset');
+      if (doReset) doReset.onclick = function () {
         if (!confirm('Replace all menus with the sample set?')) return;
         book = EBMenus.seed();
         metaBook = {};
