@@ -75,6 +75,41 @@
     return 'Sunday ' + ordinalDate(nextSunday(d));
   }
 
+  /**
+   * Staff-facing sheet name for PDF / download folders, e.g.
+   * "Main menu Wk 21st Sep — LXIII" or "Sunday menu Sun 28th Sep — II".
+   */
+  function printSheetLabel(menuName, ver) {
+    var name = String(menuName || 'Menu').replace(/\s+/g, ' ').trim() || 'Menu';
+    ver = ver || {};
+    var roman = String(ver.roman || '').trim();
+    var weekBit = '';
+    if (!ver.hideDate && ver.week) {
+      var m = String(ver.week).match(/^(Week of|Sunday)\s+(\d{1,2}(?:st|nd|rd|th))\s+([A-Za-z]+)/i);
+      if (m) {
+        var mon = m[3].slice(0, 3);
+        weekBit = (/^sunday/i.test(m[1]) ? 'Sun ' : 'Wk ') + m[2] + ' ' + mon;
+      } else {
+        weekBit = String(ver.week).replace(/^Week of\s+/i, 'Wk ');
+      }
+    }
+    var parts = [name];
+    if (weekBit) parts.push(weekBit);
+    if (roman) parts.push('— ' + roman);
+    return parts.join(' ');
+  }
+
+  function printFileName(menuName, ver, ext) {
+    var label = printSheetLabel(menuName, ver);
+    var safe = label
+      .replace(/[\/\\?%*:|"<>]/g, '-')
+      .replace(/\s*—\s*/g, ' - ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    ext = String(ext || 'html').replace(/^\./, '');
+    return safe + (ext ? '.' + ext : '');
+  }
+
   function weekKey(d) {
     var mon = weekStart(d);
     return mon.getFullYear() + '-' + (mon.getMonth() + 1) + '-' + mon.getDate();
@@ -2024,7 +2059,7 @@
       : (menu.kind === 'party' ? ' Standardised party layout.' : '');
 
     var html = (
-      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(menu.name) + ' — ' + esc(ver.roman) + '</title>' +
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(printSheetLabel(menu.name, ver)) + '</title>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
@@ -2696,10 +2731,11 @@
 
   function downloadPrintHtml(entry) {
     if (!entry || !entry.html) return false;
-    var name = 'eight-bells-' +
-      String(entry.menuId || 'menu') + '-' +
-      String(entry.weekKey || dayKeyFromMs(entry.generatedAt || Date.now())).replace(/\s+/g, '') + '-' +
-      String(entry.roman || 'x') + '.html';
+    var name = printFileName(entry.menuName || entry.menuId || 'menu', {
+      roman: entry.roman,
+      week: entry.week,
+      hideDate: entry.hideDate
+    }, 'html');
     var blob = new Blob([entry.html], { type: 'text/html;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -2761,6 +2797,8 @@
     toRoman: toRoman,
     weekLabel: weekLabel,
     sundayLabel: sundayLabel,
+    printSheetLabel: printSheetLabel,
+    printFileName: printFileName,
     weekKey: weekKey,
     nextPrintVersion: nextPrintVersion,
     wrapGuillotine: wrapGuillotine,

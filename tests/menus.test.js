@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow52') !== -1, 'menus page cache-bust is flow52');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow52') !== -1, 'hub menus link cache-bust is flow52');
+assert(page.indexOf('flow53') !== -1, 'menus page cache-bust is flow53');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow53') !== -1, 'hub menus link cache-bust is flow53');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -383,6 +383,16 @@ require(path.join(root, 'menus-print.js'));
 var print = global.EBMenuPrint;
 assert(print.toRoman(1) === 'I' && print.toRoman(2) === 'II' && print.toRoman(4) === 'IV', 'Roman numerals');
 assert(/Week of \d/.test(print.weekLabel(new Date('2026-09-21T12:00:00Z'))), 'week label');
+assert(print.printSheetLabel('Main menu', {
+  week: 'Week of 21st September 2026',
+  roman: 'LXIII'
+}) === 'Main menu Wk 21st Sep — LXIII', 'print sheet label includes menu, Wk date and version');
+assert(print.printFileName('Main menu', {
+  week: 'Week of 21st September 2026',
+  roman: 'LXIII'
+}, 'html') === 'Main menu Wk 21st Sep - LXIII.html', 'download filename keeps week in the name');
+assert(/Wk 21st Sep/.test(printJs) || printJs.indexOf('printSheetLabel') !== -1,
+  'print title uses printSheetLabel for PDF save names');
 assert(print.sundayLabel, 'sundayLabel exported');
 assert(/^Sunday \d/.test(print.sundayLabel(new Date('2026-09-22T12:00:00Z'))), 'sunday label uses next/current Sunday');
 var sunVer = print.nextPrintVersion('sunday');

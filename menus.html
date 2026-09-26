@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260925-flow52"></script>
-  <script src="menus-print.js?v=20260925-flow52"></script>
-  <script src="menus-ingest.js?v=20260925-flow52"></script>
+  <script src="menus.js?v=20260926-flow53"></script>
+  <script src="menus-print.js?v=20260926-flow53"></script>
+  <script src="menus-ingest.js?v=20260926-flow53"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -578,10 +578,12 @@
           html += '<h3>' + escapeAttr(g.label) + '</h3>';
           g.items.forEach(function (row) {
             var when = EBMenuPrint.timeLabelFromMs(row.generatedAt);
-            var weekBit = row.hideDate ? ('Print ' + (row.roman || '')) : ((row.week || '') + ' · ' + (row.roman || ''));
+            var sheetName = (EBMenuPrint.printSheetLabel
+              ? EBMenuPrint.printSheetLabel(row.menuName || row.menuId, row)
+              : ((row.menuName || row.menuId) + ' · ' + (row.week || '') + ' · ' + (row.roman || '')));
             html += '<div class="history-row" data-history-id="' + escapeAttr(row.id) + '">';
-            html += '<div><div class="who">' + escapeAttr(row.menuName || row.menuId) + '</div>';
-            html += '<div class="meta">' + escapeAttr(weekBit) + ' · generated ' + escapeAttr(when) + '</div></div>';
+            html += '<div><div class="who">' + escapeAttr(sheetName) + '</div>';
+            html += '<div class="meta">generated ' + escapeAttr(when) + '</div></div>';
             html += '<div class="actions">';
             html += '<button type="button" class="go" data-history-open="' + escapeAttr(row.id) + '">Open / print</button>';
             html += '<button type="button" class="soft" data-history-download="' + escapeAttr(row.id) + '">Download</button>';
