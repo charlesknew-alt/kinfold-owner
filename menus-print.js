@@ -1451,9 +1451,15 @@
     return rule.width === 'full' || rule.width === 'both';
   }
 
+  /** Blocks “Full width” lock (not Best fit). Must print full-bleed — never a half-column. */
+  function lockedFullWidth(rule) {
+    return !!(rule && wantsFull(rule) && !wantsColumn(rule));
+  }
+
   /**
    * Little Bells respects Blocks width.
-   * column → sit beside Desserts (preferred) or Sides; full → stacked section.
+   * column → sit beside a partner that also allows Column (Desserts preferred, else Sides);
+   * full → stacked section. Locked Full partners are never forced into the pair.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint) {
     if (!bag.littleBells || !bag.littleBells.dishes || !bag.littleBells.dishes.length) {
@@ -1474,7 +1480,9 @@
         usedSides: false
       };
     }
-    if (bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
+    // Honour Blocks: only pair with Desserts when that section allows Column / Best fit.
+    var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
+    if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
       var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide');
       var pair = '<section class="sec little-desserts-row">' +
         '<div class="cols cols-balanced cols-little-desserts">' +
@@ -1483,7 +1491,9 @@
         '</div></section>';
       return { html: pair, usedDesserts: true, usedSides: false };
     }
-    if (sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
+    // Same for Sides — Full width Sides stay full-bleed; only Column / Best fit may sit beside kids.
+    var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
+    if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide');
       var withSides = '<section class="sec little-sides-row">' +
         '<div class="cols cols-balanced cols-little-sides">' +
@@ -1492,7 +1502,7 @@
         '</div></section>';
       return { html: withSides, usedDesserts: false, usedSides: true };
     }
-    // Column with no partner — still half-width, not a full-bleed stack
+    // Column with no eligible partner — still half-width, not a full-bleed stack
     var solo = '<section class="sec little-solo-row">' +
       '<div class="cols cols-balanced">' +
       '<div class="col col-little"><div class="col-body">' + kidsInner + '</div></div>' +
@@ -1847,7 +1857,12 @@
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
       }
-      var littleP1 = renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint);
+      // Locked Full Desserts: don't pull Sides up beside kids (order: kids → puddings → sides).
+      var dessertsFullP1 = !!(lockedFullWidth(dessRule) &&
+        bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length);
+      var littleP1 = renderLittleBellsRow(
+        bag, littleRule, dessRule, sideRule, dessertsFullP1 ? null : sidesPrint
+      );
       p1 += littleP1.html;
       if (bag.desserts && !littleP1.usedDesserts) {
         p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
@@ -1881,7 +1896,12 @@
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
     }
-    var littleP2 = renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint);
+    // Locked Full Desserts: kids column alone (not beside Sides), then desserts, then sides.
+    var dessertsFullP2 = !!(lockedFullWidth(dessRule) &&
+      bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length);
+    var littleP2 = renderLittleBellsRow(
+      bag, littleRule, dessRule, sideRule, dessertsFullP2 ? null : sidesPrint
+    );
     p2 += littleP2.html;
     if (bag.desserts && !littleP2.usedDesserts) {
       p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
