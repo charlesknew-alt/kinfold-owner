@@ -1090,8 +1090,11 @@
     if (bag.classics) front += sectionUnits(bag.classics, false);
     if (bag.burgers) front += sectionUnits(bag.burgers, false);
 
+    var roastCost = bag.sundayRoasts ? sectionUnits(bag.sundayRoasts, false) : 0;
     var back = chrome;
-    if (bag.sundayRoasts) back += sectionUnits(bag.sundayRoasts, false);
+    // Sunday Roasts start on the back tally; may move to page 1 below when
+    // page 1 would otherwise be sparse (typical Sunday: starters + empty half page).
+    if (bag.sundayRoasts) back += roastCost;
     if (bag.mains) back += sectionUnits(bag.mains, false);
     if (bag.specialMains) back += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) back += sectionUnits(bag.littleBells, true);
@@ -1099,6 +1102,27 @@
     if (bag.specialDesserts) back += sectionUnits(bag.specialDesserts, true);
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
+
+    // Balance: pull Sunday Roasts onto page 1 when openers are light and the
+    // roast/mains/desserts stack would jam page 2 (the uploaded Sunday IV case).
+    var roastsOnP1 = false;
+    if (bag.sundayRoasts && roastCost > 0) {
+      var frontWithRoasts = front + roastCost;
+      var backWithoutRoasts = back - roastCost;
+      var p1HasRoom = frontWithRoasts <= PAGE - 8;
+      var p1Sparse = front < PAGE * 0.48;
+      var p2Heavier = backWithoutRoasts >= frontWithRoasts - 6;
+      if (p1HasRoom && p1Sparse && p2Heavier) {
+        roastsOnP1 = true;
+        front = frontWithRoasts;
+        back = backWithoutRoasts;
+      } else if (p1HasRoom && menu.id === 'sunday' && p1Sparse) {
+        // Sunday hero: roasts sit after starters on page 1 whenever they fit.
+        roastsOnP1 = true;
+        front = frontWithRoasts;
+        back = backWithoutRoasts;
+      }
+    }
     // Named fillings always print on Main/Sunday; 0 dishes → Tip box only when tip is on
     var sandDishCount = sandwichDishesOf(bag).length;
     var sandRule = { tip: true, sell: '', note: '', frame: true };
@@ -1125,12 +1149,21 @@
       mode: 'single',
       bag: bag,
       promos: promos || [],
-      p1: { rooms: false, sandwiches: false, footLogo: false, footPromos: false, classicsSplit: 0, sidesOnP1: false },
+      p1: {
+        rooms: false,
+        sandwiches: false,
+        footLogo: false,
+        footPromos: false,
+        classicsSplit: 0,
+        sidesOnP1: false,
+        sundayRoasts: !!roastsOnP1
+      },
       p2: null,
       leftover: { p1: 0, p2: 0 },
       summary: '',
       fillers: []
     };
+    if (roastsOnP1) layout.fillers.push('Sunday Roasts (page 1 — balance)');
     if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
 
     // —— Food load vs type range: one page when it fits at max→min sizes ——
@@ -1271,6 +1304,7 @@
       var p2Crowded = p2left < 14 ||
         (bag.mains && bag.desserts && (bag.mains.dishes || []).length >= 5) ||
         (bag.mains && (bag.mains.dishes || []).length >= 7) ||
+        (!!bag.sundayRoasts && !layout.p1.sundayRoasts && bag.desserts) ||
         tightBack;
       var sideCost = bag.sides ? sectionUnits(bag.sides, false) : 0;
       if (bag.sides && layout.p2.sidesOnP2 && sideCost > 0) {
@@ -1582,6 +1616,13 @@
       }
     });
 
+    // Sunday Roasts on page 1 (after starters, before promo/classics footers) when balanced here.
+    var roastsOnPage1 = !!(bag.sundayRoasts && (layout.pages === 1 || p1opts.sundayRoasts));
+    if (roastsOnPage1) {
+      p1 += '<section class="sec">' +
+        sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
+    }
+
     if (showColBlock && classicsAsColumn) {
       // Logo already in top-band when starters/nibbles sit there — columns start level below
       var logoInTop = nibblesInTop || startersInTop;
@@ -1752,10 +1793,6 @@
     }
 
     if (layout.pages === 1) {
-      if (bag.sundayRoasts) {
-        p1 += '<section class="sec">' +
-          sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
-      }
       if (bag.mains) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
@@ -1785,7 +1822,7 @@
     // Week / Sunday date only on page 1 — page 2 keeps the quiet Roman only.
     p2 += trackerBar(ver, { hideDate: true });
     p2 += '<div class="page-body page-body-start">';
-    if (bag.sundayRoasts) {
+    if (bag.sundayRoasts && !p1opts.sundayRoasts) {
       p2 += '<section class="sec">' +
         sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
     }
