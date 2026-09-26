@@ -251,8 +251,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow54') !== -1, 'menus page cache-bust is flow54');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow54') !== -1, 'hub menus link cache-bust is flow54');
+assert(page.indexOf('flow55') !== -1, 'menus page cache-bust is flow55');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow55') !== -1, 'hub menus link cache-bust is flow55');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -541,6 +541,41 @@ assert(api.tidyDishFields({
   price: '7.95',
   tags: ''
 }).tags === 'gf option', 'hardwired gf available becomes a tag');
+
+function assertTidy(raw, expectName, expectTags, label) {
+  var got = api.tidyDishFields(raw);
+  assert(got.name === expectName, label + ' name → ' + JSON.stringify(got.name));
+  assert(got.tags === expectTags, label + ' tags → ' + JSON.stringify(got.tags));
+}
+assertTidy({ name: 'Mushroom Risotto Vegan', tags: '' }, 'Mushroom Risotto', 'vg',
+  'trailing Vegan leaves the title');
+assertTidy({ name: 'Butternut Squash Vegetarian', tags: '' }, 'Butternut Squash', 'v',
+  'trailing Vegetarian leaves the title');
+assertTidy({ name: 'Brownie Gluten Free', tags: '' }, 'Brownie', 'gf',
+  'trailing Gluten Free leaves the title');
+assertTidy({ name: 'Mushroom Risotto (vg)', tags: '' }, 'Mushroom Risotto', 'vg',
+  'parenthetical vg leaves no empty brackets');
+assertTidy({ name: 'Soup (vg) (gf)', tags: '' }, 'Soup', 'vg & gf',
+  'paired parenthetical markers become tags');
+assertTidy({ name: 'Mushroom Risotto || vg', tags: '' }, 'Mushroom Risotto', 'vg',
+  'double-pipe OCR leftover is cleared');
+assertTidy({ name: 'Sticky Toffee || Vegan', tags: '' }, 'Sticky Toffee', 'vg',
+  'double-pipe + full word Vegan becomes vg');
+assertTidy({ name: 'Vegan Burger', tags: '' }, 'Vegan Burger', 'vg',
+  'product-style Vegan Burger keeps the name and ticks vg');
+assertTidy({
+  name: 'Stuffed Squash',
+  description: 'herbed quinoa and vegan gravy',
+  tags: ''
+}, 'Stuffed Squash', '', 'mid-phrase vegan gravy stays in the description');
+assert(api.tidyDishFields({
+  name: 'Stuffed Squash',
+  description: 'herbed quinoa and vegan gravy',
+  tags: ''
+}).description === 'herbed quinoa and vegan gravy', 'vegan gravy wording is kept');
+assert(typeof api.tidyBook === 'function', 'tidyBook exported');
+assert(api.tidyBook({ main: [{ name: 'Olives (vg)', tags: '' }] }).main[0].tags === 'vg',
+  'tidyBook lifts tags across a saved book');
 
 assert(printJs.indexOf('border-image') !== -1, 'scallops use border-image (no stretch through text)');
 assert(printJs.indexOf('background-size:100% 100%') === -1, 'no stretched full-bleed frame fill');

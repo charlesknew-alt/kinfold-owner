@@ -263,9 +263,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow54"></script>
-  <script src="menus-print.js?v=20260926-flow54"></script>
-  <script src="menus-ingest.js?v=20260926-flow54"></script>
+  <script src="menus.js?v=20260926-flow55"></script>
+  <script src="menus-print.js?v=20260926-flow55"></script>
+  <script src="menus-ingest.js?v=20260926-flow55"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -367,7 +367,7 @@
         if (saved && saved.main) {
           var seeded = EBMenus.seed();
           if (!saved.party) saved.party = seeded.party;
-          return saved;
+          return EBMenus.tidyBook ? EBMenus.tidyBook(saved) : saved;
         }
       } catch (e) {}
       return EBMenus.seed();
@@ -414,7 +414,7 @@
         if (Array.isArray(state.book[k]) && state.book[k].length) hasDish = true;
       });
       if (!hasDish) return false;
-      book = state.book;
+      book = EBMenus.tidyBook ? EBMenus.tidyBook(state.book) : state.book;
       if (!book.main) {
         var seeded = EBMenus.seed();
         if (!book.party) book.party = seeded.party;
@@ -1813,12 +1813,16 @@
       if (!next.name) return;
       if (mode === 'add') {
         next.id = EBMenus.dish(next.section, next.name).id + '-' + Date.now();
+        next = EBMenus.tidyDishFields(next);
         dishes().push(next);
         dishId = next.id;
         mode = 'complete';
       } else if (mode === 'replace' || mode === 'adjust') {
         var item = currentDish();
         if (!item) return;
+        next.id = item.id;
+        next.fromMenu = item.fromMenu;
+        next = EBMenus.tidyDishFields(next);
         Object.keys(next).forEach(function (k) { item[k] = next[k]; });
         mode = 'complete';
       }

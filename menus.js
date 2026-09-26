@@ -513,24 +513,87 @@
     return n;
   }
 
-  function pullTags(name) {
+  /** Map long dietary words to the short codes staff tick on the form. */
+  function dietaryWordsToCodes(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\bgluten[\s-]*free\b/g, 'gf')
+      .replace(/\bvegetarian\b/g, 'v')
+      .replace(/\bvegan\b/g, 'vg')
+      .replace(/\bve\b/g, 'vg')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Pull hardwired dietary markers (gf / v / vg, vegan, vegetarian, gluten-free,
+   * parentheticals, || OCR leftovers) into tags. Titles also strip trailing
+   * full words; descriptions keep mid-phrase wording like “vegan gravy”.
+   */
+  function pullTags(name, opts) {
+    opts = opts || {};
+    var fromTitle = !!opts.fromTitle;
     var tags = [];
     var clean = String(name || '');
+    var mark = '(?:gluten[\\s-]*free|vegan|vegetarian|gf|vg|v|ve)';
+    var markGroup = mark + '(?:\\s*(?:\\/|&|,)\\s*' + mark + ')*';
+
+    function take(hit) {
+      var coded = dietaryWordsToCodes(String(hit || '').replace(/\s+/g, ' ').trim());
+      if (coded) tags.push(coded);
+      return ' ';
+    }
+
     // OCR often leaves “gf available” / “with available gf” in the dish title
     clean = clean.replace(/\bwith\s+available\b/ig, ' ');
-    clean = clean.replace(/\bgf\s+available\b/ig, ' gf option ');
-    clean = clean.replace(/\bvg\s+available\b/ig, ' vg option ');
-    clean = clean.replace(/\bv\s+available\b/ig, ' v option ');
+    clean = clean.replace(new RegExp('\\b(' + mark + ')\\s+available\\b', 'ig'), function (_, m) {
+      return ' ' + dietaryWordsToCodes(m) + ' option ';
+    });
     clean = clean.replace(/\bavailable\b/ig, ' option ');
     clean = clean.replace(/\bve\b/ig, ' vg ');
     clean = clean.replace(/\blunch\s*club\b/ig, ' ').replace(/\[lunch\]/ig, ' ');
+
+    // Parenthetical markers: (vg), (vegan), (gf / v), (vegetarian)
+    clean = clean.replace(new RegExp('\\(\\s*' + markGroup + '(?:\\s+option)?\\s*\\)', 'ig'), function (hit) {
+      return take(hit.replace(/^\(|\)$/g, ''));
+    });
+
+    // Pipe / double-pipe OCR leftovers: “|| vg”, “| Vegan”, “|| gf available”
+    clean = clean.replace(new RegExp('(?:\\|\\||\\|)\\s*(' + markGroup + '(?:\\s+(?:with\\s+)?option)?)\\b', 'ig'), function (_, hit) {
+      return take(hit);
+    });
+
+    // Letter codes + option phrasing (after full words above have been coded where needed)
     var re = /\b(?:gf|vg|v)(?:\s*(?:\/|&)\s*(?:gf|vg|v))*(?:\s+(?:with\s+)?(?:gf|vg|v(?:\s*(?:\/|&)\s*(?:gf|vg|v))*)?\s*option)?\b/ig;
     clean = clean.replace(re, function (hit) {
-      tags.push(hit.trim().replace(/\s+/g, ' '));
-      return ' ';
+      return take(hit);
     });
+
+    // Trailing full words after real dish text (“Risotto Vegan”, “Brownie Gluten Free”).
+    // Never match a title that is only the marker word. Descriptions keep mid-phrase
+    // wording like “vegan gravy” because that does not sit as a trailing tag.
+    clean = clean.replace(new RegExp('([\\s,–—\\-]+|\\|+)(' + markGroup + ')(?:\\s+option)?\\s*$', 'ig'), function (_, sep, hit) {
+      return take(hit);
+    });
+
+    if (fromTitle) {
+      // Leading dietary word as a hardwired prefix (“Vegan Mushroom Risotto” → tags).
+      // Product-style names (“Vegan Burger”) keep the word but still tick the checkbox.
+      clean = clean.replace(new RegExp('^(' + mark + ')\\s+(?=[A-ZÀ-Ý])', 'i'), function (full, hit) {
+        var rest = clean.slice(full.length);
+        take(hit);
+        if (/^(burger|lasagne|lasagna|pie|tart|salad|stew|curry|chilli|chili|soup|risotto|pasta|pizza|wrap|taco|bowl)\b/i.test(rest)) {
+          return full;
+        }
+        return ' ';
+      });
+    }
+
     clean = clean.replace(/\boption\b/ig, ' ');
-    clean = clean.replace(/\s{2,}/g, ' ').replace(/^[\s,–-]+|[\s,–-]+$/g, '');
+    clean = clean.replace(/\(\s*\)/g, ' ');
+    clean = clean.replace(/\|\|/g, ' ');
+    clean = clean.replace(/(^|\s)\|(?=\s|$)/g, ' ');
+    clean = clean.replace(/\s{2,}/g, ' ').replace(/^[\s,–—|.\-]+|[\s,–—|.\-]+$/g, '');
     return { name: clean, tags: tags.join(' ').replace(/\s+/g, ' ').trim() };
   }
 
@@ -550,8 +613,8 @@
    */
   function tidyDishFields(raw) {
     raw = raw || {};
-    var namePull = pullTags(raw.name || '');
-    var descPull = pullTags(raw.description || '');
+    var namePull = pullTags(raw.name || '', { fromTitle: true });
+    var descPull = pullTags(raw.description || '', { fromTitle: false });
     var merged = formatMarks(parseMarks(
       [raw.tags || '', namePull.tags || '', descPull.tags || ''].filter(Boolean).join(' ')
     ));
@@ -567,6 +630,19 @@
     };
   }
 
+  /** Lift hardwired dietary markers across every menu in a saved book. */
+  function tidyBook(book) {
+    var out = {};
+    Object.keys(book || {}).forEach(function (k) {
+      if (!Array.isArray(book[k])) {
+        out[k] = book[k];
+        return;
+      }
+      out[k] = book[k].map(function (d) { return tidyDishFields(d); });
+    });
+    return out;
+  }
+
   function parsePaste(text) {
     var lines = String(text || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean);
     var section = '';
@@ -580,7 +656,7 @@
       var price = priceOf(lines[i]);
       var rawName = price ? lines[i].slice(0, lines[i].length - price.raw.length).trim() : lines[i];
       var lunch = /\[lunch\]|\blunch\s*club\b/i.test(lines[i]);
-      var pulled = pullTags(rawName);
+      var pulled = pullTags(rawName, { fromTitle: true });
       var description = '';
       // Keep joining wrap lines (PDF often splits “served with…” across rows).
       if (price) {
@@ -863,7 +939,7 @@
       if (dangling && price && !/\//.test(price)) {
         price = dangling[1] + '/' + price.replace(/^£/, '');
       }
-      list.push({
+      list.push(tidyDishFields({
         id: slug(section + '-' + name + '-' + i),
         section: section,
         name: name,
@@ -871,7 +947,7 @@
         price: price,
         tags: normalizeAiTags(d.tags || ''),
         lunchClub: false
-      });
+      }));
     });
     list = tidyOrphanDescriptions(assignSections(list));
     return {
@@ -1329,6 +1405,7 @@
     tidyOrphanDescriptions: tidyOrphanDescriptions,
     normalizeDescription: normalizeDescription,
     tidyDishFields: tidyDishFields,
+    tidyBook: tidyBook,
     pullTags: pullTags,
     isHeading: isHeading
   };
