@@ -291,8 +291,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow68') !== -1, 'menus page cache-bust is flow68');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow68') !== -1, 'hub menus link cache-bust is flow68');
+assert(page.indexOf('flow69') !== -1, 'menus page cache-bust is flow69');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow69') !== -1, 'hub menus link cache-bust is flow69');
 assert(page.indexOf("menu.id === 'specials'") !== -1,
   'Specials Blocks step edits section note');
 assert(typeof api.stripAllergyFooter === 'function' && typeof api.cleanDishDescription === 'function',
@@ -340,6 +340,8 @@ assert(printJs.indexOf('specials-beside') !== -1,
   'Specials beside-course blocks are marked specials-beside');
 assert(printJs.indexOf('specials-beside-title') !== -1,
   'Main-sheet Specials box uses compact specials-beside-title');
+assert(/\.specials-beside[^{]*specials-beside-title\{[^}]*text-align:\s*left/.test(printJs),
+  'Specials beside-course title is left-aligned');
 assert(/gone/i.test(api.sectionLayoutFor('Special Starters').note || '') &&
   /gone/i.test(api.sectionLayoutFor('Special Mains').note || ''),
   'Specials section default note is when-gone (editable in Blocks)');
