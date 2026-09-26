@@ -240,6 +240,72 @@
     return list;
   }
 
+  /**
+   * Numeric price for sell-order (handles “8.25/14.95”, £, MP).
+   * Dual prices use the higher figure so the share/main plate ranks as expensive.
+   */
+  function parseSellPrice(price) {
+    var s = String(price || '').replace(/£/g, ' ').replace(/,/g, '');
+    var nums = s.match(/\d+(?:\.\d{1,2})?/g);
+    if (!nums || !nums.length) return 0;
+    var max = 0;
+    nums.forEach(function (n) {
+      var v = parseFloat(n);
+      if (v > max) max = v;
+    });
+    return max;
+  }
+
+  /**
+   * Interesting selling order within one section — not import order.
+   * Leads with the dearest dish, then alternates high/low so expensive plates
+   * stay visible and the list does not read as a dull price ladder.
+   */
+  function sellOrderWithinSection(dishes) {
+    var list = (dishes || []).slice();
+    if (list.length < 2) return list;
+    var priced = [];
+    var unpriced = [];
+    list.forEach(function (d, i) {
+      var p = parseSellPrice(d && d.price);
+      if (p > 0) priced.push({ d: d, p: p, i: i });
+      else unpriced.push({ d: d, i: i });
+    });
+    priced.sort(function (a, b) {
+      if (b.p !== a.p) return b.p - a.p;
+      return a.i - b.i;
+    });
+    var out = [];
+    var lo = 0;
+    var hi = priced.length - 1;
+    var takeHigh = true;
+    while (lo <= hi) {
+      if (takeHigh) out.push(priced[lo++].d);
+      else out.push(priced[hi--].d);
+      takeHigh = !takeHigh;
+    }
+    unpriced.sort(function (a, b) { return a.i - b.i; });
+    unpriced.forEach(function (row) { out.push(row.d); });
+    return out;
+  }
+
+  /** Section order + interesting sell order within each section (for print). */
+  function orderDishesForSell(dishes) {
+    var bySec = sortDishesBySection(dishes || []);
+    var out = [];
+    var i = 0;
+    while (i < bySec.length) {
+      var sec = bySec[i].section;
+      var chunk = [];
+      while (i < bySec.length && bySec[i].section === sec) {
+        chunk.push(bySec[i]);
+        i += 1;
+      }
+      out = out.concat(sellOrderWithinSection(chunk));
+    }
+    return out;
+  }
+
   /** Meta for set menus (Christmas / party) — title + course prices + paper + blurb kinds. */
   function emptyMeta() {
     return {
@@ -1401,6 +1467,9 @@
     normalizeSectionName: normalizeSectionName,
     assignSections: assignSections,
     sortDishesBySection: sortDishesBySection,
+    parseSellPrice: parseSellPrice,
+    sellOrderWithinSection: sellOrderWithinSection,
+    orderDishesForSell: orderDishesForSell,
     sectionRank: sectionRank,
     defaultSectionLayout: defaultSectionLayout,
     normalizeSectionLayout: normalizeSectionLayout,
