@@ -518,6 +518,7 @@
     return String(s || '')
       .toLowerCase()
       .replace(/\bgluten[\s-]*free\b/g, 'gf')
+      .replace(/\bdairy[\s-]*free\b/g, 'df')
       .replace(/\bvegetarian\b/g, 'v')
       .replace(/\bvegan\b/g, 'vg')
       .replace(/\bve\b/g, 'vg')
@@ -526,17 +527,19 @@
   }
 
   /**
-   * Pull hardwired dietary markers (gf / v / vg, vegan, vegetarian, gluten-free,
-   * parentheticals, || OCR leftovers) into tags. Titles also strip trailing
-   * full words; descriptions keep mid-phrase wording like “vegan gravy”.
+   * Pull hardwired dietary markers (gf / v / vg / df, vegan, vegetarian,
+   * gluten-free, dairy-free, parentheticals, || OCR leftovers) into tags.
+   * Titles also strip trailing full words; descriptions keep mid-phrase
+   * wording like “vegan gravy”.
    */
   function pullTags(name, opts) {
     opts = opts || {};
     var fromTitle = !!opts.fromTitle;
     var tags = [];
     var clean = String(name || '');
-    var mark = '(?:gluten[\\s-]*free|vegan|vegetarian|gf|vg|v|ve)';
+    var mark = '(?:gluten[\\s-]*free|dairy[\\s-]*free|vegan|vegetarian|gf|vg|df|v|ve)';
     var markGroup = mark + '(?:\\s*(?:\\/|&|,)\\s*' + mark + ')*';
+    var code = '(?:gf|vg|df|v)';
 
     function take(hit) {
       var coded = dietaryWordsToCodes(String(hit || '').replace(/\s+/g, ' ').trim());
@@ -553,18 +556,22 @@
     clean = clean.replace(/\bve\b/ig, ' vg ');
     clean = clean.replace(/\blunch\s*club\b/ig, ' ').replace(/\[lunch\]/ig, ' ');
 
-    // Parenthetical markers: (vg), (vegan), (gf / v), (vegetarian)
+    // Parenthetical markers: (vg), (vegan), (gf / v), (df), (dairy free)
     clean = clean.replace(new RegExp('\\(\\s*' + markGroup + '(?:\\s+option)?\\s*\\)', 'ig'), function (hit) {
       return take(hit.replace(/^\(|\)$/g, ''));
     });
 
-    // Pipe / double-pipe OCR leftovers: “|| vg”, “| Vegan”, “|| gf available”
+    // Pipe / double-pipe OCR leftovers: “|| vg”, “| Vegan”, “|| df”
     clean = clean.replace(new RegExp('(?:\\|\\||\\|)\\s*(' + markGroup + '(?:\\s+(?:with\\s+)?option)?)\\b', 'ig'), function (_, hit) {
       return take(hit);
     });
 
     // Letter codes + option phrasing (after full words above have been coded where needed)
-    var re = /\b(?:gf|vg|v)(?:\s*(?:\/|&)\s*(?:gf|vg|v))*(?:\s+(?:with\s+)?(?:gf|vg|v(?:\s*(?:\/|&)\s*(?:gf|vg|v))*)?\s*option)?\b/ig;
+    var re = new RegExp(
+      '\\b' + code + '(?:\\s*(?:\\/|&)\\s*' + code + ')*(?:\\s+(?:with\\s+)?(?:' + code +
+        '(?:\\s*(?:\\/|&)\\s*' + code + ')*)?\\s*option)?\\b',
+      'ig'
+    );
     clean = clean.replace(re, function (hit) {
       return take(hit);
     });
@@ -833,7 +840,12 @@
   }
 
   function emptyMarks() {
-    return { gf: false, gfOpt: false, v: false, vOpt: false, vg: false, vgOpt: false };
+    return {
+      gf: false, gfOpt: false,
+      v: false, vOpt: false,
+      vg: false, vgOpt: false,
+      df: false, dfOpt: false
+    };
   }
 
   function parseMarks(tags) {
@@ -843,48 +855,49 @@
     if (/v with gf option/.test(t)) {
       m.v = true;
       m.gfOpt = true;
-      return m;
-    }
-    if (/gf with vg option/.test(t)) {
+    } else if (/gf with vg option/.test(t)) {
       m.gf = true;
       m.vgOpt = true;
-      return m;
-    }
-    if (/vg\s*(?:&|\/)\s*gf(\s+option)?/.test(t)) {
+    } else if (/vg\s*(?:&|\/)\s*gf(\s+option)?/.test(t)) {
       m.vg = true;
       m.gf = true;
       if (/option/.test(t)) m.gfOpt = true;
-      return m;
+    } else {
+      if (/\bgf(\s+option)?\b/.test(t)) {
+        m.gf = true;
+        if (/gf\s+option/.test(t)) m.gfOpt = true;
+      }
+      if (/\bvg(\s+option)?\b/.test(t)) {
+        m.vg = true;
+        if (/vg\s+option/.test(t)) m.vgOpt = true;
+      }
+      // word-boundary v that is not part of vg
+      var withoutVg = t.replace(/vg(\s+option)?/g, ' ');
+      if (/(^|[^a-z])v(\s+option)?([^a-z]|$)/.test(withoutVg)) {
+        m.v = true;
+        if (/v\s+option/.test(withoutVg)) m.vOpt = true;
+      }
     }
-    if (/\bgf(\s+option)?\b/.test(t)) {
-      m.gf = true;
-      if (/gf\s+option/.test(t)) m.gfOpt = true;
-    }
-    if (/\bvg(\s+option)?\b/.test(t)) {
-      m.vg = true;
-      if (/vg\s+option/.test(t)) m.vgOpt = true;
-    }
-    // word-boundary v that is not part of vg
-    var withoutVg = t.replace(/vg(\s+option)?/g, ' ');
-    if (/(^|[^a-z])v(\s+option)?([^a-z]|$)/.test(withoutVg)) {
-      m.v = true;
-      if (/v\s+option/.test(withoutVg)) m.vOpt = true;
+    if (/\bdf(\s+option)?\b/.test(t) || /\bdairy[\s-]*free(\s+option)?\b/.test(t)) {
+      m.df = true;
+      if (/\bdf\s+option\b/.test(t) || /\bdairy[\s-]*free\s+option\b/.test(t)) m.dfOpt = true;
     }
     return m;
   }
 
   function formatMarks(m) {
     m = m || emptyMarks();
-    if (m.v && m.gfOpt && !m.gf && !m.vg) return 'v with gf option';
-    if (m.gf && m.vgOpt && !m.vg && !m.v) return 'gf with vg option';
-    if (m.vg && m.gf && !m.v) {
-      if (m.gfOpt || m.vgOpt) return 'vg & gf option';
-      return 'vg & gf';
-    }
     var parts = [];
-    if (m.gf) parts.push(m.gfOpt ? 'gf option' : 'gf');
-    if (m.v) parts.push(m.vOpt ? 'v option' : 'v');
-    if (m.vg) parts.push(m.vgOpt ? 'vg option' : 'vg');
+    if (m.v && m.gfOpt && !m.gf && !m.vg) parts.push('v with gf option');
+    else if (m.gf && m.vgOpt && !m.vg && !m.v) parts.push('gf with vg option');
+    else if (m.vg && m.gf && !m.v) {
+      parts.push((m.gfOpt || m.vgOpt) ? 'vg & gf option' : 'vg & gf');
+    } else {
+      if (m.gf) parts.push(m.gfOpt ? 'gf option' : 'gf');
+      if (m.v) parts.push(m.vOpt ? 'v option' : 'v');
+      if (m.vg) parts.push(m.vgOpt ? 'vg option' : 'vg');
+    }
+    if (m.df) parts.push(m.dfOpt ? 'df option' : 'df');
     return parts.join(', ');
   }
 
@@ -961,7 +974,10 @@
   function normalizeAiTags(t) {
     t = String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
     t = t.replace(/\bavailable\b/g, 'option').replace(/\bav\b/g, 'option');
-    t = t.replace(/\bgluten free\b/g, 'gf').replace(/\bvegetarian\b/g, 'v').replace(/\bvegan\b/g, 'vg');
+    t = t.replace(/\bgluten free\b/g, 'gf')
+      .replace(/\bdairy free\b/g, 'df')
+      .replace(/\bvegetarian\b/g, 'v')
+      .replace(/\bvegan\b/g, 'vg');
     return formatMarks(parseMarks(t));
   }
 

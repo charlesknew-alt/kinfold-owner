@@ -251,8 +251,13 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow55') !== -1, 'menus page cache-bust is flow55');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow55') !== -1, 'hub menus link cache-bust is flow55');
+assert(page.indexOf('flow56') !== -1, 'menus page cache-bust is flow56');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow56') !== -1, 'hub menus link cache-bust is flow56');
+assert(page.indexOf('data-flag="df"') !== -1 && page.indexOf('dairy free') !== -1,
+  'staff UI has dairy-free (df) checkbox');
+assert(printJs.indexOf('df – dairy free') !== -1, 'print allergy key includes dairy free');
+assert(aiGs.indexOf('df = dairy free') !== -1 || aiGs.indexOf('dairy free') !== -1,
+  'Menu AI prompt knows df / dairy free');
 assert(page.indexOf('No events or selling lines') !== -1, 'wording can force no event blurbs');
 assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bottom blurbs') !== -1,
   'party wording has top/bottom blurb section');
@@ -526,7 +531,12 @@ assert(api.parsePaste('Mains\nVenison Casserole 18.95')[0].name === 'Venison Cas
 assert(api.formatMarks(api.parseMarks('gf option')) === 'gf option', 'gf option round-trips');
 assert(api.formatMarks(api.parseMarks('v with gf option')) === 'v with gf option', 'v with gf option round-trips');
 assert(api.formatMarks(api.parseMarks('vg')) === 'vg', 'vg round-trips');
-assert(api.formatMarks({ gf: true, vgOpt: true, v: false, vg: false, gfOpt: false, vOpt: false }) === 'gf with vg option', 'gf with vg option formats');
+assert(api.formatMarks(api.parseMarks('df')) === 'df', 'df round-trips');
+assert(api.formatMarks(api.parseMarks('gf, df')) === 'gf, df', 'gf + df round-trips');
+assert(api.formatMarks(api.parseMarks('df option')) === 'df option', 'df option round-trips');
+assert(api.formatMarks({ gf: true, vgOpt: true, v: false, vg: false, gfOpt: false, vOpt: false, df: false, dfOpt: false }) === 'gf with vg option', 'gf with vg option formats');
+assert(api.formatMarks(api.parseMarks('v with gf option, df')) === 'v with gf option, df',
+  'special combo keeps df alongside');
 assert(api.normalizeDescription('Served with Ice Cream') === 'served with ice cream',
   'descriptions print lowercase');
 assert(api.tidyDishFields({
@@ -547,6 +557,12 @@ function assertTidy(raw, expectName, expectTags, label) {
   assert(got.name === expectName, label + ' name → ' + JSON.stringify(got.name));
   assert(got.tags === expectTags, label + ' tags → ' + JSON.stringify(got.tags));
 }
+assertTidy({ name: 'Fish & Chips DF', tags: '' }, 'Fish & Chips', 'df',
+  'trailing DF leaves the title for the df checkbox');
+assertTidy({ name: 'Fish & Chips (df)', tags: '' }, 'Fish & Chips', 'df',
+  'parenthetical df leaves no empty brackets');
+assertTidy({ name: 'Cod Dairy Free', tags: '' }, 'Cod', 'df',
+  'trailing Dairy Free becomes df');
 assertTidy({ name: 'Mushroom Risotto Vegan', tags: '' }, 'Mushroom Risotto', 'vg',
   'trailing Vegan leaves the title');
 assertTidy({ name: 'Butternut Squash Vegetarian', tags: '' }, 'Butternut Squash', 'v',

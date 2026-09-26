@@ -185,7 +185,7 @@ function readMenuWithGemini_(body) {
     '      "name": "Dish name only — never a section title",\n' +
     '      "description": "short description",\n' +
     '      "price": "12.95" or "",\n' +
-    '      "tags": "gf / v / vg / gf option / av" lowercase as on menu }\n' +
+    '      "tags": "gf / v / vg / df / gf option / av" lowercase as on menu (df = dairy free) }\n' +
     '  ],\n' +
     '  "notes": "pre-order / deposit line if present",\n' +
     '  "spellingFixes": [\n' +
@@ -199,6 +199,7 @@ function readMenuWithGemini_(body) {
     '- Use kind "party" for set menus (Christmas / party / fixed 2&3 course).\n' +
     '- Do not invent dishes. Prefer fewer clean dishes over OCR junk.\n' +
     '- Normalise AV / GF AVAILABLE into tags like "gf option" or "gf" as appropriate.\n' +
+    '- Put DF / dairy free in tags as "df" (or "df option") — never leave DF hardwired in the dish name.\n' +
     '- SPELLING (critical): Correct clear typos and OCR misreads in names and descriptions.\n' +
     '  List EVERY change in spellingFixes (from → to). Staff must see these in review.\n' +
     '  If nothing was corrected, return "spellingFixes": [] — never omit the field.\n' +
