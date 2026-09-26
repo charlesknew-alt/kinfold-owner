@@ -874,6 +874,21 @@
     bottomCols: 1
   };
 
+  /**
+   * Adult pub type range (pt). Auto-fit steps between max → min; never above max
+   * (oversized type looks like a kids’ menu on a sparse two-pager).
+   * Prefer one A4 when food fits inside this range rather than opening page 2
+   * just to stretch type.
+   */
+  var TYPE_RANGE = {
+    name: { min: 9, max: 11.5 },
+    desc: { min: 8, max: 10 },
+    title: { min: 14, max: 22 },
+    promo: { min: 9, max: 11.5 }
+  };
+  // Unit-model headroom: compact/dense can pack ~this much over PAGE at max type.
+  var ONE_PAGE_DENSE = PAGE + 20;
+
   function dishUnits(d) {
     var u = 1.35;
     if (d.description) {
@@ -1019,47 +1034,58 @@
     };
     if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
 
-    // —— One page if everything (minus optional fillers) fits ——
+    // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
     if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
     if (bag.desserts) oneNeed += sectionUnits(bag.desserts, false);
     if (bag.sides) oneNeed += sectionUnits(bag.sides, false);
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
-    // If we have a natural back half (mains + sides), prefer two pages like Jul/Nov
-    // when the front alone is already chunky, or one page would be cramped.
-    var preferTwo = hasBackContent && (bag.mains || bag.littleBells || bag.desserts) && (
-      front > 55 || oneNeed > PAGE - 4 || bag.count >= 18
-    );
+    // Named sandwich fillings count as food; empty tip box is optional chrome.
+    var foodNeed = oneNeed + (sandDishCount > 0 ? sandCost : 0);
+    // Prefer one page whenever food fits inside the type range (dense step),
+    // instead of opening a sparse two-pager with cartoony oversized type.
+    var preferOne = foodNeed <= ONE_PAGE_DENSE;
 
-    if (!preferTwo && oneNeed <= PAGE) {
+    if (preferOne) {
       layout.pages = 1;
       layout.fit = 'one';
       layout.mode = 'single';
-      var left1 = PAGE - oneNeed;
-      // Pack Stay a While / events into leftover — leave a safety margin so
-      // browser density steps are not forced into clipping on page 1.
+      var left1 = PAGE - foodNeed;
       var add;
-      var safety = 6;
+      // Feature panels only with real spare room — never pad a near-full sheet.
       if (wantPromoBox) {
-        add = tryAdd(left1, promoCost + safety);
-        if (add.ok) { layout.p1.rooms = true; left1 = add.left + safety; layout.fillers.push(promoLabel); }
-      }
-      if (wantSandwiches) {
-        add = tryAdd(left1, sandCost + (bag.sides ? 0 : 0));
+        add = tryAdd(left1, promoCost + 14);
         if (add.ok) {
-          layout.p1.sandwiches = true;
+          layout.p1.rooms = true;
           left1 = add.left;
-          layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches box (page 1)');
+          layout.fillers.push(promoLabel);
+        } else if (foodNeed > PAGE - 10) {
+          layout.fillers.push('No feature panels (one page within type range)');
         }
       }
-      if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
-      add = tryAdd(left1, COST.footLogo);
+      if (wantSandwiches) {
+        if (sandDishCount > 0) {
+          layout.p1.sandwiches = true;
+          layout.fillers.push('Sandwiches (page 1)');
+        } else {
+          add = tryAdd(left1, sandCost + 4);
+          if (add.ok) {
+            layout.p1.sandwiches = true;
+            left1 = add.left;
+            layout.fillers.push('Sandwiches box (page 1)');
+          }
+        }
+      }
+      if (bag.sides) layout.p1.sidesOnP1 = true;
+      add = tryAdd(left1, COST.footLogo + 6);
       if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
-      layout.leftover.p1 = left1;
-      // Burgers + Classics stack on the right; events fill the left (balanced columns).
+      if (foodNeed > PAGE) {
+        layout.fillers.push('Type stepped down within range so everything fits one page');
+      }
+      layout.leftover.p1 = Math.max(0, left1);
       layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
-    } else if (hasBackContent || oneNeed > PAGE) {
+    } else if (hasBackContent || foodNeed > ONE_PAGE_DENSE) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
       layout.fit = front > PAGE + 8 || back > PAGE + 12 ? 'over' : 'two';
@@ -1187,12 +1213,17 @@
     var bits = layout.fillers.length
       ? ' Auto-adds where they fit: ' + layout.fillers.join('; ') + '.'
       : ' Sheet is full — no room for extra selling boxes.';
+    var typeNote = ' Type range: names ' + TYPE_RANGE.name.min + '–' + TYPE_RANGE.name.max +
+      'pt, descriptions ' + TYPE_RANGE.desc.min + '–' + TYPE_RANGE.desc.max +
+      'pt, section titles ' + TYPE_RANGE.title.min + '–' + TYPE_RANGE.title.max + 'pt.';
     layout.summary =
-      (layout.fit === 'one' ? 'Fills one A4 top to bottom (spread gaps if sparse).' :
-        layout.fit === 'two' ? 'Fills two A4 pages top to bottom — same type size on both pages; move boxes so the packed page can stay large; never a third page.' :
+      (layout.fit === 'one' ? 'Fills one A4 within the type range (shrink type before opening page 2).' :
+        layout.fit === 'two' ? 'Two A4 pages — food exceeds one-page capacity at minimum type; same type size on both pages; never a third page.' :
           'Too much for two readable pages. Remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.') +
+      typeNote +
       ' Columns start and finish level. Layout from ' + bag.count + ' dishes.' + bits;
 
+    layout.typeRange = TYPE_RANGE;
     layout.orderedDishes = dishes;
     return layout;
   }
@@ -1689,7 +1720,8 @@
     // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
-        '--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:26pt;--promo:12pt}' +
+        '--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
+        '--name-min:9pt;--name-max:11.5pt;--desc-min:8pt;--desc-max:10pt;--title-min:14pt;--title-max:22pt}' +
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -1755,11 +1787,11 @@
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
       /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
-      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),28pt)!important;letter-spacing:.12em;text-transform:uppercase;margin:0 0 var(--sec-gap);text-align:center;line-height:1.15}' +
+      '.sec-title{font-family:var(--serif)!important;font-weight:700;font-size:min(var(--title),var(--title-max))!important;letter-spacing:.12em;text-transform:uppercase;margin:0 0 var(--sec-gap);text-align:center;line-height:1.15}' +
       '.sec-title.soft-left{text-align:left;letter-spacing:.12em;margin:0 0 var(--sec-gap)}' +
       '.sec-title-spacer{visibility:hidden;margin:0 0 var(--sec-gap)}' +
-      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),26pt);letter-spacing:.11em;margin-bottom:calc(var(--sec-gap) - 2px)}' +
-      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),24pt);letter-spacing:.1em}' +
+      '.scallop .sec-title{text-align:left;font-size:min(calc(var(--title) - 1pt),var(--title-max));letter-spacing:.11em;margin-bottom:calc(var(--sec-gap) - 2px)}' +
+      '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),var(--title-max));letter-spacing:.1em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:var(--sec-gap)}' +
       '.classics-block{margin-top:4px}' +
       '.scallop{margin:0 0 8px;background:#fff;position:relative;height:fit-content;' +
@@ -1774,15 +1806,15 @@
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
       '.dish-line{display:flex;flex-wrap:nowrap;align-items:center;min-width:0;max-width:100%;gap:0;line-height:1.28}' +
-      '.dish-name{font-family:var(--sans);font-weight:700;font-size:var(--name);line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
+      '.dish-name{font-family:var(--sans);font-weight:700;font-size:clamp(var(--name-min),var(--name),var(--name-max));line-height:1.28;min-width:0;flex:0 1 auto;overflow-wrap:anywhere}' +
       '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px;min-width:10px;height:0;align-self:center;transform:translateY(0.35em)}' +
       '.dish-line .lc{width:1em;height:1em;margin:0 0.2em 0 0.08em;flex:0 0 auto;align-self:center;font-size:var(--name);object-fit:contain;display:block}' +
-      '.price{font-family:var(--sans);font-weight:500;font-size:var(--name);line-height:1.28;white-space:nowrap;flex:0 0 auto;padding-left:0}' +
-      '.desc{font-family:var(--sans);font-weight:400;font-size:var(--desc);color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
+      '.price{font-family:var(--sans);font-weight:500;font-size:clamp(var(--name-min),var(--name),var(--name-max));line-height:1.28;white-space:nowrap;flex:0 0 auto;padding-left:0}' +
+      '.desc{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
       '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
-      '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:var(--desc)}' +
+      '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max))}' +
       '.dish-c{text-align:center;margin:0 0 var(--dish-gap)}' +
-      '.dish-c .dish-name{font-family:var(--serif);font-size:var(--name);letter-spacing:.02em}' +
+      '.dish-c .dish-name{font-family:var(--serif);font-size:clamp(var(--name-min),var(--name),var(--name-max));letter-spacing:.02em}' +
       '.dish-c .desc,.dish-c .tags{text-align:center}' +
       '.dish-c .dish-line{display:block}' +
       '.dish-c .dish-leader{display:none}' +
@@ -1841,13 +1873,14 @@
       '.lb-foot{text-align:center;margin-top:8px}' +
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
-      /* Density ladder — readable type first; only tighten if a page truly overflows */
-      '.fill-airy{--dish-gap:16px;--sec-gap:20px;--name:13pt;--desc:11pt;--title:30pt;--promo:13pt}' +
-      '.fill-roomy{--dish-gap:13px;--sec-gap:17px;--name:12.25pt;--desc:10.5pt;--title:27pt;--promo:12.25pt}' +
-      '.fill-normal{--dish-gap:11px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:24pt;--promo:11.5pt}' +
-      '.fill-tight{--dish-gap:8px;--sec-gap:11px;--name:10.75pt;--desc:9.5pt;--title:20pt;--promo:10.5pt}' +
-      '.fill-compact{--dish-gap:5px;--sec-gap:8px;--name:9.75pt;--desc:8.75pt;--title:16pt;--promo:9.5pt}' +
-      '.fill-dense{--dish-gap:3px;--sec-gap:5px;--name:9pt;--desc:8pt;--title:13.5pt;--promo:8.75pt}' +
+      /* Density ladder — capped to TYPE_RANGE (adult pub, not kids’-menu giant type).
+         airy = max; dense = min. Fit script steps down only when a page overflows. */
+      '.fill-airy{--dish-gap:14px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
+      '.fill-roomy{--dish-gap:12px;--sec-gap:14px;--name:11pt;--desc:9.75pt;--title:20pt;--promo:11pt}' +
+      '.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:10.5pt;--desc:9.5pt;--title:18pt;--promo:10.5pt}' +
+      '.fill-tight{--dish-gap:8px;--sec-gap:10px;--name:10pt;--desc:9.25pt;--title:16pt;--promo:10pt}' +
+      '.fill-compact{--dish-gap:5px;--sec-gap:8px;--name:9.5pt;--desc:8.75pt;--title:15pt;--promo:9.5pt}' +
+      '.fill-dense{--dish-gap:3px;--sec-gap:6px;--name:9pt;--desc:8pt;--title:14pt;--promo:9pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
       '.fill-dense .scallop-pad{padding:2px 8px 1px}' +
@@ -1860,11 +1893,11 @@
       '.a5-face .page-body{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-start}' +
       '.a5-face .page-spacer{display:none}' +
       '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
-      /* Density ladder drives A5 type — do not lock a tiny size that leaves the face sparse */
-      '.a5-face.fill-airy{--dish-gap:14px;--sec-gap:16px;--name:12.5pt;--desc:11pt;--title:22pt;--promo:12pt}' +
-      '.a5-face.fill-roomy{--dish-gap:11px;--sec-gap:13px;--name:11.5pt;--desc:10.25pt;--title:18pt;--promo:11pt}' +
-      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:11px;--name:10.75pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
-      '.a5-face.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9.25pt;--title:14pt;--promo:10pt}' +
+      /* A5 density — same name/desc caps as A4; titles slightly smaller on the half-sheet */
+      '.a5-face.fill-airy{--dish-gap:12px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11pt}' +
+      '.a5-face.fill-roomy{--dish-gap:10px;--sec-gap:12px;--name:11pt;--desc:9.75pt;--title:16pt;--promo:10.5pt}' +
+      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:10px;--name:10.5pt;--desc:9.5pt;--title:15pt;--promo:10pt}' +
+      '.a5-face.fill-tight{--dish-gap:7px;--sec-gap:9px;--name:10pt;--desc:9.25pt;--title:14pt;--promo:9.5pt}' +
       '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:5px;--sec-gap:7px;--name:9.25pt;--desc:8.5pt;--title:12.5pt;--promo:9pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
       '.a5-face .party-logo{width:72px}' +
@@ -2797,6 +2830,7 @@
   root.EBMenuPrint = {
     build: build,
     planFluidLayout: planFluidLayout,
+    typeRange: TYPE_RANGE,
     sandwichesBlock: sandwichesBlock,
     partyOccasion: partyOccasion,
     orderDishesForPrint: orderDishesForPrint,
