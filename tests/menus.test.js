@@ -291,8 +291,10 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow67') !== -1, 'menus page cache-bust is flow67');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow67') !== -1, 'hub menus link cache-bust is flow67');
+assert(page.indexOf('flow68') !== -1, 'menus page cache-bust is flow68');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow68') !== -1, 'hub menus link cache-bust is flow68');
+assert(page.indexOf("menu.id === 'specials'") !== -1,
+  'Specials Blocks step edits section note');
 assert(typeof api.stripAllergyFooter === 'function' && typeof api.cleanDishDescription === 'function',
   'allergy footer strip helpers exported');
 assert(/rice/.test(api.cleanDishDescription(
@@ -338,8 +340,21 @@ assert(printJs.indexOf('specials-beside') !== -1,
   'Specials beside-course blocks are marked specials-beside');
 assert(printJs.indexOf('specials-beside-title') !== -1,
   'Main-sheet Specials box uses compact specials-beside-title');
-assert(printJs.indexOf("When it's gone, it's gone") !== -1 || printJs.indexOf('SPECIALS_GONE_NOTE') !== -1,
-  'Specials print carries when-gone note');
+assert(/gone/i.test(api.sectionLayoutFor('Special Starters').note || '') &&
+  /gone/i.test(api.sectionLayoutFor('Special Mains').note || ''),
+  'Specials section default note is when-gone (editable in Blocks)');
+assert(printJs.indexOf('SPECIALS_GONE_NOTE') === -1,
+  'print does not hardwire SPECIALS_GONE_NOTE');
+var noNoteLayout = api.normalizeSectionLayout({
+  'Special Starters': { width: 'full', frame: true, note: '' },
+  'Special Mains': { width: 'full', frame: true, note: '' },
+  'Special Desserts': { width: 'full', frame: true, note: '' }
+});
+var noNoteHtml = printApi.build(api.menuById('main'), api.composeDishes(api.seed(), 'main', { specials: true }), {
+  sectionLayout: noNoteLayout
+});
+assert(!/When it's gone/i.test(noNoteHtml.split('</style>')[1] || noNoteHtml),
+  'cleared Specials note does not print when-gone');
 assert(/function specialsBesideCourse[\s\S]*?specials-beside-title/.test(printJs) &&
   !/function specialsBesideCourse[\s\S]*?specials-course/.test(printJs.split('function specialsBesideCourse')[1].split('function layoutMap')[0]),
   'beside-course Specials box titles Specials only — no Starters/Mains course head');

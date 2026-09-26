@@ -1365,19 +1365,15 @@
   /**
    * Specials for one course on Main / Sunday — frilly Specials box that sits
    * under the matching regular section. No “Starters/Mains” label (context is
-   * the parent course); just Specials + when-gone note + dishes.
+   * the parent course); just Specials + optional Blocks note + dishes.
    */
   function specialsBesideCourse(dishes, plan, sectionKey) {
     dishes = dishes || [];
     if (!dishes.length) return '';
     var rule = ruleFor(sectionKey || 'Special Mains', plan);
-    if (!rule.note) {
-      rule = Object.assign({}, rule, {
-        note: (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone"
-      });
-    }
     if (rule.frame == null) rule.frame = true;
-    // Small “Specials” label only — no Starters/Mains course head (parent section is the cue)
+    // Small “Specials” label only — no Starters/Mains course head (parent section is the cue).
+    // Note comes from Blocks → Extra info (not hardwired).
     var inner = '<div class="sec-title specials-beside-title">Specials</div>';
     var note = String(rule.note || '').trim();
     if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
@@ -1895,7 +1891,17 @@
       } else if (menu.id === 'sandwiches') {
         inner = cardSandwichesInner(dishes);
       } else if (menu.id === 'specials') {
-        var gone = (root.EBMenus && root.EBMenus.SPECIALS_GONE_NOTE) || "When it's gone, it's gone";
+        // Board note from Blocks → Specials section “Extra info” (default in layout; editable)
+        var specialsNote = '';
+        if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+          specialsNote = String(root.EBMenus.sectionLayoutFor('Special Mains', plan && plan.sectionLayout).note || '').trim();
+          if (!specialsNote) {
+            specialsNote = String(root.EBMenus.sectionLayoutFor('Special Starters', plan && plan.sectionLayout).note || '').trim();
+          }
+        } else if (plan && plan.sectionLayout) {
+          specialsNote = String((plan.sectionLayout['Special Mains'] || {}).note ||
+            (plan.sectionLayout['Special Starters'] || {}).note || '').trim();
+        }
         var byCourse = { starters: [], mains: [], desserts: [] };
         (dishes || []).forEach(function (d) {
           var sec = String(d.section || '');
@@ -1910,7 +1916,7 @@
         ].filter(function (c) { return c.list.length; });
         var showCourseHeads = courses.length > 1;
         inner = scallop(
-          '<div class="sec-note" style="text-align:center">' + esc(gone) + '</div>' +
+          (specialsNote ? '<div class="sec-note" style="text-align:center">' + esc(specialsNote).replace(/\n/g, '<br>') + '</div>' : '') +
           courses.map(function (c) {
             return (showCourseHeads ? '<div class="specials-course">' + esc(c.label) + '</div>' : '') +
               c.list.map(function (d) { return dishCentered(d); }).join('');
