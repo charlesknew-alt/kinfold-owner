@@ -291,8 +291,18 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow74') !== -1, 'menus page cache-bust is flow74');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow74') !== -1, 'hub menus link cache-bust is flow74');
+assert(page.indexOf('flow75') !== -1, 'menus page cache-bust is flow75');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow75') !== -1, 'hub menus link cache-bust is flow75');
+assert(api.SECTIONS.indexOf('Sunday Roasts') !== -1, 'Sunday Roasts is a canonical section');
+assert(api.normalizeSectionName('Sunday roasts') === 'Sunday Roasts', 'legacy Sunday roasts maps to Sunday Roasts');
+assert(api.normalizeSectionName('roasts') === 'Sunday Roasts', 'roasts heading maps to Sunday Roasts');
+assert(api.guessSection('Sunday Roasts', 'Sirloin of Beef', '') === 'Sunday Roasts', 'guess keeps Sunday Roasts');
+assert(/roast potatoes|Yorkshire/i.test(api.sectionLayoutFor('Sunday Roasts').note || ''),
+  'Sunday Roasts has a default description note like other categories');
+assert((api.seed().sunday || []).some(function (d) { return d.section === 'Sunday Roasts'; }),
+  'sample Sunday menu uses Sunday Roasts section');
+assert(api.tidyDishFields({ section: 'Sunday roasts', name: 'Beef' }).section === 'Sunday Roasts',
+  'tidyDishFields migrates Sunday roasts spelling');
 assert(/id="menuFile"[^>]*\bmultiple\b/.test(page) || /<input[^>]*id="menuFile"[^>]*multiple/.test(page),
   'upload input allows multiple files');
 assert(page.indexOf('several files at once') !== -1, 'upload copy explains multi-select');
@@ -576,6 +586,14 @@ assert(print.printFileName('Main menu', {
 assert(/Wk 21st Sep/.test(printJs) || printJs.indexOf('printSheetLabel') !== -1,
   'print title uses printSheetLabel for PDF save names');
 assert(print.sundayLabel, 'sundayLabel exported');
+var sundayPrint = print.build(
+  api.menuById('sunday'),
+  api.seed().sunday,
+  { sectionLayout: api.normalizeSectionLayout({}) }
+);
+assert(/Sunday Roasts/i.test(sundayPrint), 'Sunday print shows Sunday Roasts heading');
+assert(/Yorkshire pudding|roast potatoes/i.test(sundayPrint), 'Sunday Roasts note prints under the title');
+assert(/sec-note/i.test(sundayPrint), 'Sunday Roasts description uses section note markup');
 assert(/^Sunday \d/.test(print.sundayLabel(new Date('2026-09-22T12:00:00Z'))), 'sunday label uses next/current Sunday');
 var sunVer = print.nextPrintVersion('sunday');
 assert(/^Sunday /.test(sunVer.week), 'Sunday print uses Sunday date not Week of');
