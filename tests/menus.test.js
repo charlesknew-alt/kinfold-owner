@@ -200,6 +200,14 @@ assert(api.SECTIONS.indexOf('Special Starters') !== -1 && api.SECTIONS.indexOf('
 assert(api.MENUS.some(function (m) { return m.id === 'specials'; }), 'Specials is a menu tab');
 assert(api.includableMenus('main').some(function (m) { return m.id === 'specials'; }),
   'Specials can be ticked onto Main menu');
+assert(api.includableMenus('sunday').some(function (m) { return m.id === 'little-bells'; }),
+  'Little Bells (kids) can be ticked onto Sunday');
+assert(api.includableMenus('main').some(function (m) { return m.id === 'little-bells'; }),
+  'Little Bells (kids) can be ticked onto Main');
+assert(page.indexOf("'little-bells'") !== -1 && page.indexOf('Little Bells (kids)') !== -1,
+  'staff Menus offer Little Bells kids include checkbox');
+assert(page.indexOf("STAFF_MENU_IDS") !== -1 && /little-bells/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
+  'staff menu list includes little-bells');
 assert(api.sectionOptions('specials').join('|') === 'Special Starters|Special Mains|Special Desserts',
   'Specials menu dropdown is course-only');
 assert(api.sectionLayoutFor('Special Mains').frame === true &&
@@ -212,6 +220,11 @@ assert(composedSpecials.some(function (d) { return d.section === 'Special Starte
 assert(composedSpecials.every(function (d) {
   return d.fromMenu !== 'specials' || /^Special /.test(d.section);
 }), 'Specials dishes never land in regular Starters/Mains/Desserts');
+var sundayWithKids = api.composeDishes(api.seed(), 'sunday', { 'little-bells': true });
+assert(sundayWithKids.some(function (d) { return d.fromMenu === 'little-bells'; }),
+  'ticking Little Bells pulls kids dishes onto Sunday');
+assert(sundayWithKids.some(function (d) { return d.section === 'Little Bells'; }),
+  'kids dishes keep Little Bells section on Sunday sheet');
 assert(api.SECTIONS.indexOf('Little Bells') !== -1, 'Little Bells is a canonical section');
 assert(api.guessSection('Little Bells', 'Beef Burger, Fries & Dressed Salad', '') === 'Little Bells',
   'Little Bells keeps kids burger (not Burgers)');
@@ -291,8 +304,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow75') !== -1, 'menus page cache-bust is flow75');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow75') !== -1, 'hub menus link cache-bust is flow75');
+assert(page.indexOf('flow76') !== -1, 'menus page cache-bust is flow76');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow76') !== -1, 'hub menus link cache-bust is flow76');
 assert(api.SECTIONS.indexOf('Sunday Roasts') !== -1, 'Sunday Roasts is a canonical section');
 assert(api.normalizeSectionName('Sunday roasts') === 'Sunday Roasts', 'legacy Sunday roasts maps to Sunday Roasts');
 assert(api.normalizeSectionName('roasts') === 'Sunday Roasts', 'roasts heading maps to Sunday Roasts');
