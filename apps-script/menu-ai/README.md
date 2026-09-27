@@ -53,9 +53,13 @@ Until that is done, Print history **Email** returns a permission error. After Al
 
 ### From address / Send mail as
 
-Menu emails send from the **primary Google account** (display name “Eight Bells Menus”) so delivery works. The `@kinfoldinns.co.uk` address is used as **Reply-To**.
+Menu emails send from the **primary Google account** (`charlesknew@gmail.com`, display name “Eight Bells Menus”) so delivery works. `admin@kinfoldinns.co.uk` is set as **Reply-To**.
 
-Sending **From** `admin@kinfoldinns.co.uk` needs a working Gmail → Settings → Accounts → **Send mail as** SMTP login. If that SMTP is Outlook/Microsoft and the password is wrong, Gmail bounces with “Authentication unsuccessful” / “Send mail as … misconfigured”. Fix those settings first, then set Script Property `MENU_EMAIL_USE_FROM=1` (optional `MENU_EMAIL_FROM=admin@kinfoldinns.co.uk`) to turn From-alias back on.
+**Why this differs from PubSystem / other sheets:** those scripts use `MailApp.sendEmail` with **no `from` alias** — they never touch Gmail “Send mail as”. Menu AI tried `GmailApp.sendEmail({ from: 'admin@kinfoldinns.co.uk' })`, which forces Gmail to relay via the Outlook SMTP stored for that Send-as entry. Apps Script accepts the call, then Gmail bounces with Outlook `Authentication unsuccessful` (same bounce you saw).
+
+`GmailApp.getAliases()` on this account returns: `admin@kinfoldinns.co.uk`, `freeholds@absoluteliving.co.uk`, `charlienew@hotmail.com`, `charles@charlesknew.com`.
+
+To send **From** `admin@` again: fix Send mail as SMTP for that address in Gmail (or run Menu AI as a Workspace user whose primary address is `admin@`), then set Script Property `MENU_EMAIL_USE_FROM=1`.
 
 ## Layout review (optional)
 
