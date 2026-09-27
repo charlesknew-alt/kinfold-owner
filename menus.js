@@ -595,14 +595,28 @@
   /**
    * Word-by-word catalogue match for autocomplete.
    * Each typed word must match a later name word (prefix), in order.
+   * opts.section — limit to one category (e.g. Replace dish → same section).
+   * opts.allowEmpty — if query is blank and section is set, return that category’s dishes.
    */
   function searchDishCatalogue(catalogue, query, opts) {
     opts = opts || {};
     var limit = parseInt(opts.limit, 10) || 12;
     var q = String(query || '').trim().toLowerCase();
-    if (!q) return [];
+    var section = String(opts.section || '').trim();
+    if (!q) {
+      if (opts.allowEmpty && section && section !== 'all') {
+        return filterDishCatalogue(catalogue, { query: '', section: section, limit: limit });
+      }
+      return [];
+    }
     var words = q.split(/\s+/).filter(Boolean);
     var list = normalizeDishCatalogue(catalogue);
+    if (section && section !== 'all') {
+      var secLower = section.toLowerCase();
+      list = list.filter(function (item) {
+        return String(item.section || '').toLowerCase() === secLower;
+      });
+    }
     var scored = [];
     list.forEach(function (item) {
       var name = String(item.name || '').toLowerCase();

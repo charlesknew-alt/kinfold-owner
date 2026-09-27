@@ -374,9 +374,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow95"></script>
-  <script src="menus-print.js?v=20260927-flow95"></script>
-  <script src="menus-ingest.js?v=20260927-flow95"></script>
+  <script src="menus.js?v=20260927-flow96"></script>
+  <script src="menus-print.js?v=20260927-flow96"></script>
+  <script src="menus-ingest.js?v=20260927-flow96"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1574,8 +1574,11 @@
       var item = (mode === 'adjust' || mode === 'replace') ? currentDish() : blank();
       if (!item) item = blank();
       html += '<h3>' + (mode === 'add' ? 'Add a dish' : (mode === 'replace' ? 'Replace dish' : 'Adjust dish')) + '</h3>';
-      if (mode === 'replace') html += '<p class="note">Type the new dish — same slot on the menu. Matches from past menus appear on the right.</p>';
-      else html += '<p class="note">Type a name — past dishes with the same words show on the right. Click one to reuse it, or keep typing for a new dish.</p>';
+      if (mode === 'replace') {
+        html += '<p class="note">Type the new dish for this slot — past dishes in the <strong>same category</strong> appear on the right. Click one to fill every field, or keep typing for something new.</p>';
+      } else {
+        html += '<p class="note">Type a name — past dishes with the same words show on the right. Click one to reuse it, or keep typing for a new dish.</p>';
+      }
       if (mode === 'adjust' || mode === 'replace') {
         html += '<label class="field">Dish</label><select id="pick">';
         dishes().forEach(function (d) {
@@ -1599,8 +1602,15 @@
       if (mode === 'adjust' && item.id) html += '<button class="link" id="doRemove" type="button">Remove this dish</button>';
       html += '</div></div>';
       html += '<aside class="dish-suggest" id="dishSuggest" aria-live="polite">';
-      html += '<h4>Past dishes</h4>';
-      html += '<p class="hint">Word-by-word matches from saved menus. Click to fill.</p>';
+      if (mode === 'replace') {
+        html += '<h4>Same category</h4>';
+        html += '<p class="hint" id="dishSuggestHint">Past dishes in ' +
+          escapeAttr(formItem.section || 'this category') +
+          '. Click to fill name, description, price and allergens — or keep typing.</p>';
+      } else {
+        html += '<h4>Past dishes</h4>';
+        html += '<p class="hint" id="dishSuggestHint">Word-by-word matches from saved menus. Click to fill.</p>';
+      }
       html += '<div class="dish-suggest-list" id="dishSuggestList"></div>';
       html += '</aside></div></div>';
       return html;
@@ -2425,7 +2435,8 @@
       var nameEl = document.getElementById('name');
       var descEl = document.getElementById('description');
       var priceEl = document.getElementById('price');
-      if (sec && entry.section) sec.value = entry.section;
+      // Replace keeps the slot’s category; Add/Adjust can take the catalogue section.
+      if (sec && entry.section && mode !== 'replace') sec.value = entry.section;
       if (nameEl) nameEl.value = entry.name || '';
       if (descEl) descEl.value = entry.description || '';
       if (priceEl) priceEl.value = entry.price || '';
@@ -2437,16 +2448,49 @@
       paintDishSuggest(nameEl ? nameEl.value : '');
     }
 
+    function dishSuggestSection() {
+      var secEl = document.getElementById('section');
+      if (secEl && secEl.value) return String(secEl.value);
+      if (mode === 'replace' || mode === 'adjust') {
+        var cur = currentDish();
+        if (cur && cur.section) return String(cur.section);
+      }
+      return '';
+    }
+
     function paintDishSuggest(query) {
       var listEl = document.getElementById('dishSuggestList');
+      var hintEl = document.getElementById('dishSuggestHint');
       if (!listEl || !EBMenus.searchDishCatalogue) return;
-      var matches = EBMenus.searchDishCatalogue(dishCatalogue, query, { limit: 10 });
+      var section = dishSuggestSection();
+      var sameCategory = mode === 'replace';
+      if (hintEl && sameCategory && section) {
+        hintEl.innerHTML = 'Past dishes in <strong>' + escapeAttr(section) +
+          '</strong>. Click to fill name, description, price and allergens — or keep typing.';
+      }
+      var matches = EBMenus.searchDishCatalogue(dishCatalogue, query, {
+        limit: sameCategory ? 16 : 10,
+        section: sameCategory ? section : '',
+        allowEmpty: sameCategory
+      });
       if (!String(query || '').trim()) {
-        listEl.innerHTML = '<p class="dish-suggest-empty">Start typing a name to see past dishes.</p>';
-        return;
+        if (sameCategory && matches.length) {
+          // Fall through — show the category list with no name filter.
+        } else if (sameCategory && section) {
+          listEl.innerHTML = '<p class="dish-suggest-empty">No past dishes in ' +
+            escapeAttr(section) + ' yet — keep typing for a new one.</p>';
+          return;
+        } else {
+          listEl.innerHTML = '<p class="dish-suggest-empty">Start typing a name to see past dishes.</p>';
+          return;
+        }
       }
       if (!matches.length) {
-        listEl.innerHTML = '<p class="dish-suggest-empty">No past match — keep typing for a new dish.</p>';
+        listEl.innerHTML = '<p class="dish-suggest-empty">' +
+          (sameCategory
+            ? 'No match in ' + escapeAttr(section || 'this category') + ' — keep typing for a new dish.'
+            : 'No past match — keep typing for a new dish.') +
+          '</p>';
         return;
       }
       var html = '';
@@ -2476,6 +2520,7 @@
     function bindDishSuggest() {
       var nameEl = document.getElementById('name');
       var listEl = document.getElementById('dishSuggestList');
+      var secEl = document.getElementById('section');
       if (!nameEl || !listEl) return;
       paintDishSuggest(nameEl.value || '');
       nameEl.addEventListener('input', function () {
@@ -2484,6 +2529,11 @@
       nameEl.addEventListener('focus', function () {
         paintDishSuggest(nameEl.value || '');
       });
+      if (secEl) {
+        secEl.addEventListener('change', function () {
+          paintDishSuggest(nameEl.value || '');
+        });
+      }
     }
 
     /** Sunday: pick dishes from this week's Main and/or Specials without retyping. */

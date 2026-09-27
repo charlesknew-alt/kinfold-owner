@@ -307,8 +307,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow95') !== -1, 'menus page cache-bust is flow95');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow95') !== -1, 'hub menus link cache-bust is flow95');
+assert(page.indexOf('flow96') !== -1, 'menus page cache-bust is flow96');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow96') !== -1, 'hub menus link cache-bust is flow96');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
@@ -358,6 +358,10 @@ assert(typeof api.upsertDishCatalogue === 'function' && typeof api.searchDishCat
   'dish catalogue upsert and search are available');
 assert(page.indexOf('dishSuggest') !== -1 && page.indexOf('bindDishSuggest') !== -1,
   'dish form shows past-dish autocomplete while typing');
+assert(page.indexOf('Same category') !== -1 && page.indexOf('allowEmpty') !== -1,
+  'Replace dish suggests catalogue items in the same category');
+assert(page.indexOf("mode !== 'replace'") !== -1,
+  'Replace keeps the slot category when filling from a past dish');
 assert(page.indexOf('doFromWeek') !== -1 && page.indexOf('openWeekPickForSunday') !== -1,
   'Sunday can pull selected dishes from this week’s Main and Specials');
 assert(page.indexOf('From this week’s Main / Specials') !== -1,
@@ -377,6 +381,10 @@ assert(sirloin && sirloin.price === '22.50' && sirloin.priceHistory.length === 2
   'catalogue keeps price history with dates');
 assert(api.searchDishCatalogue(catSmoke, 'beef short')[0].name.indexOf('Short Rib') !== -1,
   'catalogue search matches word by word');
+assert(api.searchDishCatalogue(catSmoke, '', { section: 'Mains', allowEmpty: true }).length === 2,
+  'same-category suggest lists dishes when the name field is still empty');
+assert(api.searchDishCatalogue(catSmoke, 'sirloin', { section: 'Starters' }).length === 0,
+  'same-category suggest ignores dishes outside the slot section');
 assert(api.filterDishCatalogue(catSmoke, { query: '', section: 'all' }).length === 2,
   'All dishes filter lists the full catalogue when search is empty');
 assert(api.filterDishCatalogue(catSmoke, { query: 'sirloin', section: 'Mains' })[0].name.indexOf('Sirloin') !== -1,
