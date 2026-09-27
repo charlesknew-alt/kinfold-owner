@@ -3139,9 +3139,32 @@
     }).catch(function () {});
   }
 
-  /** Push device-only sheets up so the other phone/PC can see them once. */
+  /**
+   * Drop local sheets that are not in the shared cloud index.
+   * Otherwise a PC that never ran Delete keeps resurrecting sheets
+   * deleted on the phone (and used to re-upload them too).
+   */
+  function purgeLocalNotInCloud(cloudIds) {
+    var known = cloudIds || {};
+    return localListOnly().then(function (rows) {
+      var orphans = (rows || []).filter(function (r) { return r && r.id && !known[r.id]; });
+      if (!orphans.length) return Promise.resolve();
+      var chain = Promise.resolve();
+      orphans.forEach(function (meta) {
+        chain = chain.then(function () { return localDeleteOnly(meta.id); });
+      });
+      return chain;
+    });
+  }
+
+  /**
+   * Seed an empty cloud from this device once. Never re-upload sheets that
+   * are missing from a non-empty cloud — those were deleted elsewhere.
+   */
   function migrateLocalToCloud(cloudIds) {
     var known = cloudIds || {};
+    var cloudCount = Object.keys(known).length;
+    if (cloudCount > 0) return Promise.resolve();
     return localListOnly().then(function (rows) {
       var missing = (rows || []).filter(function (r) { return r && r.id && !known[r.id]; });
       if (!missing.length) return;
@@ -3380,18 +3403,17 @@
       var cloudItems = Array.isArray(data.items) ? data.items : [];
       var known = {};
       cloudItems.forEach(function (r) { if (r && r.id) known[r.id] = true; });
-      // Fire-and-forget: upload any sheets that only exist on this device.
-      migrateLocalToCloud(known);
-      // Always merge local backup — empty cloud must not hide device saves.
-      return localListOnly().then(function (localItems) {
-        var byId = {};
-        (localItems || []).forEach(function (r) {
-          if (r && r.id) byId[r.id] = asRow(r, 'local');
+      // Cloud index is source of truth when reachable. Purge local orphans so
+      // deletes on the phone stick on the PC. Only seed cloud when it is empty.
+      return purgeLocalNotInCloud(known).then(function () {
+        migrateLocalToCloud(known);
+        if (cloudItems.length) {
+          return sortHistoryNewest(cloudItems.map(function (r) { return asRow(r, 'cloud'); }));
+        }
+        // Empty cloud — show local until seed upload finishes.
+        return localListOnly().then(function (localItems) {
+          return sortHistoryNewest((localItems || []).map(function (r) { return asRow(r, 'local'); }));
         });
-        cloudItems.forEach(function (r) {
-          if (r && r.id) byId[r.id] = asRow(r, 'cloud');
-        });
-        return sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
       });
     }).catch(function () {
       return localListOnly();

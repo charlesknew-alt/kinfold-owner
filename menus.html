@@ -374,9 +374,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow96"></script>
-  <script src="menus-print.js?v=20260927-flow96"></script>
-  <script src="menus-ingest.js?v=20260927-flow96"></script>
+  <script src="menus.js?v=20260927-flow98"></script>
+  <script src="menus-print.js?v=20260927-flow98"></script>
+  <script src="menus-ingest.js?v=20260927-flow98"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -673,6 +673,22 @@
         return false;
       });
     }
+    /** True when remote has dishes on a menu that local is empty for (e.g. Sunday). */
+    function remoteHasMenusLocalMissing_(remoteBook) {
+      if (!remoteBook || typeof remoteBook !== 'object') return false;
+      var keys = Object.keys(remoteBook);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var remoteList = remoteBook[k];
+        var localList = book[k];
+        if (Array.isArray(remoteList) && remoteList.length &&
+            (!Array.isArray(localList) || !localList.length)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     function pullMenusFromCloud() {
       if (!window.EBMenuIngest || typeof EBMenuIngest.cloudPost !== 'function') {
         cloudPullDone = true;
@@ -682,7 +698,12 @@
       return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
         var remote = data && data.state;
         var remoteAt = remote ? (Number(remote.updatedAt) || 0) : 0;
-        if (remote && remoteAt > cloudUpdatedAt) {
+        // Prefer cloud when it is newer, or when this PC is missing a menu
+        // the phone still has (stale local timestamps must not wipe Sunday).
+        var preferRemote = remote && remoteAt && (
+          remoteAt > cloudUpdatedAt || remoteHasMenusLocalMissing_(remote.book)
+        );
+        if (preferRemote) {
           if (applyCloudState(remote)) {
             cloudSyncNote = 'Loaded latest menus from cloud';
             cloudPullDone = true;
@@ -697,8 +718,8 @@
             return true;
           });
         }
-        if (remote && remoteAt && remoteAt < cloudUpdatedAt) {
-          // Local is newer — upload.
+        if (remote && remoteAt && remoteAt < cloudUpdatedAt && !remoteHasMenusLocalMissing_(remote.book)) {
+          // Local is newer and not missing remote menus — upload.
           return pushMenusToCloud().then(function () {
             cloudPullDone = true;
             return true;
