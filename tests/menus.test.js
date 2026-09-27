@@ -307,10 +307,33 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow86') !== -1, 'menus page cache-bust is flow86');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow86') !== -1, 'hub menus link cache-bust is flow86');
+assert(page.indexOf('flow87') !== -1, 'menus page cache-bust is flow87');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow87') !== -1, 'hub menus link cache-bust is flow87');
 assert(page.indexOf('cloud / local delete continues in the background') !== -1,
   'history Remove deletes in the background without reloading the list');
+assert(typeof api.upsertDishCatalogue === 'function' && typeof api.searchDishCatalogue === 'function',
+  'dish catalogue upsert and search are available');
+assert(page.indexOf('dishSuggest') !== -1 && page.indexOf('bindDishSuggest') !== -1,
+  'dish form shows past-dish autocomplete while typing');
+assert(page.indexOf('doFromMain') !== -1 && page.indexOf('openMainPickForSunday') !== -1,
+  'Sunday can pull selected dishes from this week’s Main');
+assert(aiGs.indexOf('dishCatalogue') !== -1,
+  'cloud menus state stores the shared dish catalogue');
+var catSmoke = api.upsertDishCatalogue([], [
+  api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'sauce', '19.95', ''),
+  api.dish('Mains', 'Sirloin of Beef', 'pink', '21.95', 'gf')
+], { date: '2026-09-20' });
+catSmoke = api.upsertDishCatalogue(catSmoke, [
+  api.dish('Mains', 'Sirloin of Beef', 'pink', '22.50', 'gf')
+], { date: '2026-09-27' });
+assert(catSmoke.length === 2, 'catalogue dedupes the same dish title');
+var sirloin = catSmoke.filter(function (c) { return /Sirloin/.test(c.name); })[0];
+assert(sirloin && sirloin.price === '22.50' && sirloin.priceHistory.length === 2,
+  'catalogue keeps price history with dates');
+assert(api.searchDishCatalogue(catSmoke, 'beef short')[0].name.indexOf('Short Rib') !== -1,
+  'catalogue search matches word by word');
+assert(api.dishFromCatalogueEntry(sirloin).name === 'Sirloin of Beef',
+  'catalogue entry can be cloned onto a menu');
 assert(printJs.indexOf('cols-little-solo') !== -1 && printJs.indexOf('levelOppositeColumns') !== -1,
   'opposite columns are leveled with food then feature panels');
 assert(printJs.indexOf('function noteUnits') !== -1,
