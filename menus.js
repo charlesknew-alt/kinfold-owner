@@ -453,6 +453,206 @@
     return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
+  /** Stable catalogue key — same title = same product (avoids duplicates). */
+  function dishCatalogueKey(name) {
+    return slug(cleanDishName(String(name || '').trim()));
+  }
+
+  function isoDateToday(d) {
+    var x = d ? new Date(d) : new Date();
+    if (isNaN(x.getTime())) x = new Date();
+    var m = x.getMonth() + 1;
+    var day = x.getDate();
+    return x.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  var CATALOGUE_MAX_ = 600;
+  var CATALOGUE_PRICE_HISTORY_MAX_ = 24;
+
+  function emptyDishCatalogue() {
+    return [];
+  }
+
+  function normalizeDishCatalogue(raw) {
+    if (!Array.isArray(raw)) return emptyDishCatalogue();
+    var byKey = {};
+    raw.forEach(function (row) {
+      if (!row || !row.name) return;
+      var key = String(row.key || dishCatalogueKey(row.name) || '').trim();
+      if (!key) return;
+      var history = Array.isArray(row.priceHistory) ? row.priceHistory : [];
+      var cleanHist = [];
+      history.forEach(function (h) {
+        if (!h) return;
+        var price = String(h.price != null ? h.price : '').trim();
+        var date = String(h.date || '').trim();
+        if (!date) return;
+        cleanHist.push({ price: price, date: date });
+      });
+      cleanHist = cleanHist.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+      var entry = {
+        key: key,
+        section: String(row.section || 'Mains'),
+        name: String(row.name || '').trim(),
+        description: String(row.description || ''),
+        tags: String(row.tags || ''),
+        price: String(row.price != null ? row.price : (cleanHist[0] && cleanHist[0].price) || ''),
+        priceHistory: cleanHist,
+        lastSeen: String(row.lastSeen || (cleanHist[0] && cleanHist[0].date) || ''),
+        seenCount: parseInt(row.seenCount, 10) || 1
+      };
+      var prev = byKey[key];
+      if (!prev || String(entry.lastSeen) >= String(prev.lastSeen)) byKey[key] = entry;
+      else {
+        // Keep older lastSeen winner but merge any unique price history.
+        var seen = {};
+        prev.priceHistory.forEach(function (h) { seen[h.date + '|' + h.price] = true; });
+        entry.priceHistory.forEach(function (h) {
+          var k = h.date + '|' + h.price;
+          if (!seen[k]) prev.priceHistory.push(h);
+        });
+        prev.priceHistory.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+        prev.priceHistory = prev.priceHistory.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+        byKey[key] = prev;
+      }
+    });
+    return Object.keys(byKey).map(function (k) { return byKey[k]; }).sort(function (a, b) {
+      return String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')) ||
+        String(a.name).localeCompare(String(b.name));
+    });
+  }
+
+  function pruneDishCatalogue(list) {
+    var sorted = normalizeDishCatalogue(list);
+    if (sorted.length <= CATALOGUE_MAX_) return sorted;
+    return sorted.slice(0, CATALOGUE_MAX_);
+  }
+
+  /**
+   * Upsert dishes into the shared catalogue (dedupe by title).
+   * Price history grows when the price changes; lastSeen always updates.
+   */
+  function upsertDishCatalogue(catalogue, dishes, opts) {
+    opts = opts || {};
+    var date = String(opts.date || isoDateToday());
+    var list = normalizeDishCatalogue(catalogue);
+    var byKey = {};
+    list.forEach(function (e) { byKey[e.key] = e; });
+    (dishes || []).forEach(function (d) {
+      if (!d || !d.name || isJunkDishName(d.name)) return;
+      var tidy = tidyDishFields(d);
+      var key = dishCatalogueKey(tidy.name);
+      if (!key) return;
+      var price = String(tidy.price || '').trim();
+      var prev = byKey[key];
+      if (!prev) {
+        byKey[key] = {
+          key: key,
+          section: tidy.section || 'Mains',
+          name: tidy.name,
+          description: tidy.description || '',
+          tags: tidy.tags || '',
+          price: price,
+          priceHistory: price || date ? [{ price: price, date: date }] : [],
+          lastSeen: date,
+          seenCount: 1
+        };
+        return;
+      }
+      prev.section = tidy.section || prev.section;
+      prev.name = tidy.name || prev.name;
+      if (tidy.description) prev.description = tidy.description;
+      if (tidy.tags) prev.tags = tidy.tags;
+      prev.price = price || prev.price;
+      prev.lastSeen = date;
+      prev.seenCount = (prev.seenCount || 1) + 1;
+      var last = prev.priceHistory && prev.priceHistory[0];
+      if (!last || String(last.price) !== price) {
+        prev.priceHistory = [{ price: price, date: date }].concat(prev.priceHistory || []);
+        prev.priceHistory = prev.priceHistory.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+      } else if (String(last.date) !== date) {
+        // Same price, new day — bump the date on the latest stamp.
+        last.date = date;
+      }
+    });
+    return pruneDishCatalogue(Object.keys(byKey).map(function (k) { return byKey[k]; }));
+  }
+
+  /** Upsert every dish from a menu book into the catalogue. */
+  function upsertDishCatalogueFromBook(catalogue, book, opts) {
+    var all = [];
+    var b = book || {};
+    Object.keys(b).forEach(function (menuKey) {
+      if (Array.isArray(b[menuKey])) all = all.concat(b[menuKey]);
+    });
+    return upsertDishCatalogue(catalogue, all, opts);
+  }
+
+  function mergeDishCatalogues(a, b) {
+    return pruneDishCatalogue([].concat(normalizeDishCatalogue(a), normalizeDishCatalogue(b)));
+  }
+
+  /**
+   * Word-by-word catalogue match for autocomplete.
+   * Each typed word must match a later name word (prefix), in order.
+   */
+  function searchDishCatalogue(catalogue, query, opts) {
+    opts = opts || {};
+    var limit = parseInt(opts.limit, 10) || 12;
+    var q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    var words = q.split(/\s+/).filter(Boolean);
+    var list = normalizeDishCatalogue(catalogue);
+    var scored = [];
+    list.forEach(function (item) {
+      var name = String(item.name || '').toLowerCase();
+      if (!name) return;
+      var nameWords = name.split(/\s+/).filter(Boolean);
+      var i = 0;
+      var ok = true;
+      for (var w = 0; w < words.length; w++) {
+        var needle = words[w];
+        var found = false;
+        for (; i < nameWords.length; i++) {
+          if (nameWords[i].indexOf(needle) === 0) {
+            found = true;
+            i += 1;
+            break;
+          }
+        }
+        if (!found) { ok = false; break; }
+      }
+      if (!ok && name.indexOf(q) === -1) return;
+      var score = 0;
+      if (name === q) score += 100;
+      else if (name.indexOf(q) === 0) score += 60;
+      else if (name.indexOf(q) !== -1) score += 30;
+      score += Math.min(20, item.seenCount || 0);
+      if (item.lastSeen) score += 1;
+      scored.push({ item: item, score: score });
+    });
+    scored.sort(function (a, b) {
+      return b.score - a.score || String(b.item.lastSeen || '').localeCompare(String(a.item.lastSeen || ''));
+    });
+    return scored.slice(0, limit).map(function (s) { return s.item; });
+  }
+
+  /** Clone a catalogue (or live menu) dish onto a target menu with a fresh id. */
+  function dishFromCatalogueEntry(entry, opts) {
+    opts = opts || {};
+    var section = opts.section || (entry && entry.section) || 'Mains';
+    var d = dish(
+      section,
+      (entry && entry.name) || 'Dish',
+      (entry && entry.description) || '',
+      (entry && entry.price) || '',
+      (entry && entry.tags) || '',
+      false
+    );
+    d.id = d.id + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    return tidyDishFields(d);
+  }
+
   function seed() {
     return {
       main: [
@@ -1747,6 +1947,15 @@
     tidyDishFields: tidyDishFields,
     tidyBook: tidyBook,
     pullTags: pullTags,
-    isHeading: isHeading
+    isHeading: isHeading,
+    dishCatalogueKey: dishCatalogueKey,
+    emptyDishCatalogue: emptyDishCatalogue,
+    normalizeDishCatalogue: normalizeDishCatalogue,
+    upsertDishCatalogue: upsertDishCatalogue,
+    upsertDishCatalogueFromBook: upsertDishCatalogueFromBook,
+    mergeDishCatalogues: mergeDishCatalogues,
+    searchDishCatalogue: searchDishCatalogue,
+    dishFromCatalogueEntry: dishFromCatalogueEntry,
+    isoDateToday: isoDateToday
   };
 })(typeof window !== 'undefined' ? window : global);

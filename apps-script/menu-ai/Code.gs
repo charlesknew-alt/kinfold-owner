@@ -585,7 +585,9 @@ function saveMenusState_(raw) {
     includes: raw.includes && typeof raw.includes === 'object' ? raw.includes : {},
     promoBank: Array.isArray(raw.promoBank) ? raw.promoBank : [],
     promoTicks: raw.promoTicks && typeof raw.promoTicks === 'object' ? raw.promoTicks : {},
-    sectionLayout: raw.sectionLayout && typeof raw.sectionLayout === 'object' ? raw.sectionLayout : {}
+    sectionLayout: raw.sectionLayout && typeof raw.sectionLayout === 'object' ? raw.sectionLayout : {},
+    // Shared dish catalogue (deduped titles + price history) for autocomplete.
+    dishCatalogue: Array.isArray(raw.dishCatalogue) ? raw.dishCatalogue : []
   };
   propWrite_('MENUS', JSON.stringify(state));
   return { ok: true, source: 'props', updatedAt: updatedAt };

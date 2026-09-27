@@ -33,7 +33,7 @@ Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix i
 
 The same web app stores staff data in **Script Properties** (no extra Drive login):
 
-- `MENUS_*` — live dishes, party blurbs, promo bank, layout (same on PC and phone)
+- `MENUS_*` — live dishes, party blurbs, promo bank, layout, **dish catalogue** (deduped titles + price history for autocomplete; same on PC and phone)
 - `HISTIDX` + `HIST_{id}_*` — recent generated print sheets (capped to fit Apps Script quota)
 
 Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`.

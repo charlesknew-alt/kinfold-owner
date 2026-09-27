@@ -19,7 +19,7 @@
     }
     body { font-family: var(--sans); background: var(--white-warm); color: var(--ink); line-height: 1.45; }
     .ps-header { background: var(--paint); border-bottom: 1px solid var(--paint-deep); padding: 14px 20px; }
-    .ps-header-inner { max-width: 720px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .ps-header-inner { max-width: 960px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
     .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
     .ps-venue-name { font-family: var(--serif); font-size: 22px; font-weight: 500; }
     html.iframed .ps-header { display: none; } /* HARD: never restore display:block for iframed/varlo-header */
@@ -28,7 +28,7 @@
       font-size: 0.55em; letter-spacing: 0.08em; text-transform: uppercase;
       color: var(--ink-soft); font-family: var(--sans); font-weight: 700; vertical-align: middle;
     }
-    main { max-width: 720px; margin: 0 auto; padding: 16px 16px 120px; }
+    main { max-width: 960px; margin: 0 auto; padding: 16px 16px 120px; }
     h1 { font-family: var(--serif); font-weight: 500; font-size: clamp(26px, 5vw, 34px); }
     .lede { color: var(--ink-soft); margin: 6px 0 16px; font-size: 14.5px; max-width: 40em; }
     .menus { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -117,6 +117,45 @@
     .view-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
     .view-toggle button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
+    .dish-form-layout {
+      display: grid; gap: 14px; align-items: start;
+    }
+    @media (min-width: 760px) {
+      .dish-form-layout { grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); }
+    }
+    .dish-suggest {
+      border: 1px solid var(--line); border-radius: 14px; background: var(--paint-wash);
+      padding: 12px; min-height: 120px;
+    }
+    .dish-suggest h4 {
+      font-family: var(--serif); font-weight: 500; font-size: 16px; margin: 0 0 6px;
+    }
+    .dish-suggest .hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 10px; }
+    .dish-suggest-list { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow: auto; }
+    .dish-suggest-item {
+      display: block; width: 100%; text-align: left; border: 1px solid var(--line);
+      background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer;
+      font-family: var(--sans); color: var(--ink);
+    }
+    .dish-suggest-item:hover, .dish-suggest-item:focus { border-color: var(--ink); outline: none; }
+    .dish-suggest-item .sn { font-weight: 700; font-size: 13.5px; }
+    .dish-suggest-item .sd { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+    .dish-suggest-item .sm { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+    .dish-suggest-empty { font-size: 12.5px; color: var(--ink-soft); }
+    .main-pick-overlay {
+      position: fixed; inset: 0; z-index: 40; background: rgba(28,22,16,.45);
+      display: flex; align-items: flex-start; justify-content: center; padding: 24px 12px; overflow: auto;
+    }
+    .main-pick-card {
+      width: min(640px, 100%); background: #fff; border-radius: 16px; padding: 18px 16px;
+      border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(0,0,0,.18);
+    }
+    .main-pick-list { max-height: 55vh; overflow: auto; margin: 10px 0 14px; }
+    .main-pick-sec { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700;
+      color: var(--ink-soft); margin: 12px 0 6px; }
+    .main-pick-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0;
+      border-bottom: 1px solid var(--line); font-size: 14px; }
+    .main-pick-row:last-child { border-bottom: 0; }
     input[type=text], input[type=url], input[type=date], select, textarea {
       width: 100%; font: inherit; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--white-warm); color: var(--ink);
     }
@@ -278,9 +317,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow86"></script>
-  <script src="menus-print.js?v=20260926-flow86"></script>
-  <script src="menus-ingest.js?v=20260926-flow86"></script>
+  <script src="menus.js?v=20260926-flow87"></script>
+  <script src="menus-print.js?v=20260926-flow87"></script>
+  <script src="menus-ingest.js?v=20260926-flow87"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -294,12 +333,14 @@
     var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
     var LAYOUT_STORAGE = 'eb-menu-section-layout-v2';
     var LAYOUT_STORAGE_LEGACY = 'eb-menu-section-layout-v1';
+    var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1';
     var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at';
     var book = load();
     var metaBook = loadMeta();
     var promoBank = loadPromoBank();
     var promoTicks = loadPromoTicks();
     var layoutBook = loadSectionLayoutBook();
+    var dishCatalogue = loadDishCatalogue();
     var menuId = isStaffMode ? 'specials' : 'main';
     var mode = 'complete';
     var dishId = '';
@@ -450,6 +491,21 @@
         return out;
       } catch (e) { return {}; }
     }
+    function loadDishCatalogue() {
+      try {
+        var raw = JSON.parse(localStorage.getItem(CATALOGUE_STORAGE) || '[]');
+        var list = EBMenus.normalizeDishCatalogue ? EBMenus.normalizeDishCatalogue(raw) : (Array.isArray(raw) ? raw : []);
+        // First visit: seed catalogue from whatever menus are already on this device.
+        if (!list.length && book) {
+          list = EBMenus.upsertDishCatalogueFromBook
+            ? EBMenus.upsertDishCatalogueFromBook([], book, { date: EBMenus.isoDateToday() })
+            : list;
+        }
+        return list;
+      } catch (e) {
+        return [];
+      }
+    }
     function saveLocalOnly() {
       localStorage.setItem(STORAGE, JSON.stringify(book));
       localStorage.setItem(META_STORAGE, JSON.stringify(metaBook));
@@ -457,10 +513,19 @@
       localStorage.setItem(PROMO_STORAGE, JSON.stringify(promoBank));
       localStorage.setItem(PROMO_TICKS, JSON.stringify(promoTicks));
       localStorage.setItem(LAYOUT_STORAGE, JSON.stringify(layoutBook));
+      try {
+        localStorage.setItem(CATALOGUE_STORAGE, JSON.stringify(dishCatalogue || []));
+      } catch (eCat) {}
       try { localStorage.setItem(CLOUD_AT_KEY, String(cloudUpdatedAt || 0)); } catch (e) {}
     }
     function save() {
       cloudUpdatedAt = Date.now();
+      // Every menu save upserts dishes into the shared catalogue (deduped by title).
+      if (EBMenus.upsertDishCatalogueFromBook) {
+        dishCatalogue = EBMenus.upsertDishCatalogueFromBook(dishCatalogue, book, {
+          date: EBMenus.isoDateToday()
+        });
+      }
       saveLocalOnly();
       queueCloudPush();
     }
@@ -473,7 +538,8 @@
         promoBank: promoBank,
         promoTicks: promoTicks,
         // Per-menu Blocks book (main / sunday / …). Legacy flat maps migrate on load.
-        sectionLayout: layoutBook
+        sectionLayout: layoutBook,
+        dishCatalogue: dishCatalogue || []
       };
     }
     function applyCloudState(state) {
@@ -501,6 +567,12 @@
       layoutBook = EBMenus.normalizeSectionLayoutBook
         ? EBMenus.normalizeSectionLayoutBook(state.sectionLayout)
         : (state.sectionLayout && typeof state.sectionLayout === 'object' ? state.sectionLayout : layoutBook);
+      // Merge remote catalogue with local so neither side wipes the other.
+      if (EBMenus.mergeDishCatalogues) {
+        dishCatalogue = EBMenus.mergeDishCatalogues(dishCatalogue, state.dishCatalogue || []);
+      } else if (Array.isArray(state.dishCatalogue)) {
+        dishCatalogue = state.dishCatalogue;
+      }
       cloudUpdatedAt = Number(state.updatedAt) || Date.now();
       saveLocalOnly();
       if (!book[menuId] || !book[menuId].length) {
@@ -937,6 +1009,9 @@
       html += '<div class="toolbar-row no-print">';
       html += '<button type="button" class="soft" data-mode="add">Add a dish</button>';
       html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
+      if (menuId === 'sunday') {
+        html += '<button type="button" class="soft" id="doFromMain">From this week’s Main</button>';
+      }
       html += '</div>';
       html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
       html += '<button class="link" id="doClear" type="button">Clear this menu</button>';
@@ -1143,7 +1218,8 @@
       var item = (mode === 'adjust' || mode === 'replace') ? currentDish() : blank();
       if (!item) item = blank();
       html += '<h3>' + (mode === 'add' ? 'Add a dish' : (mode === 'replace' ? 'Replace dish' : 'Adjust dish')) + '</h3>';
-      if (mode === 'replace') html += '<p class="note">Type the new dish — same slot on the menu.</p>';
+      if (mode === 'replace') html += '<p class="note">Type the new dish — same slot on the menu. Matches from past menus appear on the right.</p>';
+      else html += '<p class="note">Type a name — past dishes with the same words show on the right. Click one to reuse it, or keep typing for a new dish.</p>';
       if (mode === 'adjust' || mode === 'replace') {
         html += '<label class="field">Dish</label><select id="pick">';
         dishes().forEach(function (d) {
@@ -1153,6 +1229,8 @@
       }
       var formItem = mode === 'replace' ? blank() : item;
       if (mode === 'replace') formItem.section = item.section;
+      html += '<div class="dish-form-layout">';
+      html += '<div class="dish-form-fields">';
       html += '<label class="field">Section</label>' + sectionSelectHtml(formItem.section || 'Mains', 'id="section"');
       html += field('Name', 'name', formItem.name);
       html += field('Description', 'description', formItem.description);
@@ -1164,6 +1242,11 @@
       html += '<button class="link" data-mode="complete" type="button">Cancel</button>';
       if (mode === 'adjust' && item.id) html += '<button class="link" id="doRemove" type="button">Remove this dish</button>';
       html += '</div></div>';
+      html += '<aside class="dish-suggest" id="dishSuggest" aria-live="polite">';
+      html += '<h4>Past dishes</h4>';
+      html += '<p class="hint">Word-by-word matches from saved menus. Click to fill.</p>';
+      html += '<div class="dish-suggest-list" id="dishSuggestList"></div>';
+      html += '</aside></div></div>';
       return html;
     }
 
@@ -1684,6 +1767,9 @@
       if (doSave) doSave.onclick = onSave;
       var doRemove = document.getElementById('doRemove');
       if (doRemove) doRemove.onclick = onRemove;
+      bindDishSuggest();
+      var doFromMain = document.getElementById('doFromMain');
+      if (doFromMain) doFromMain.onclick = openMainPickForSunday;
       var doClear = document.getElementById('doClear');
       if (doClear) doClear.onclick = function () {
         if (!confirm('Clear every dish on ' + EBMenus.menuById(menuId).name + ' and start again?')) return;
@@ -1970,6 +2056,174 @@
     }
     function blank() {
       return { section: dishes()[0] ? dishes()[0].section : 'Mains', name: '', description: '', price: '', tags: '', lunchClub: false };
+    }
+
+    function applyCatalogueEntryToForm(entry) {
+      if (!entry) return;
+      var sec = document.getElementById('section');
+      var nameEl = document.getElementById('name');
+      var descEl = document.getElementById('description');
+      var priceEl = document.getElementById('price');
+      if (sec && entry.section) sec.value = entry.section;
+      if (nameEl) nameEl.value = entry.name || '';
+      if (descEl) descEl.value = entry.description || '';
+      if (priceEl) priceEl.value = entry.price || '';
+      var marks = EBMenus.parseMarks(entry.tags || '');
+      ['gf', 'gfOpt', 'v', 'vOpt', 'vg', 'vgOpt', 'df', 'dfOpt'].forEach(function (k) {
+        var el = document.getElementById('form-' + k);
+        if (el) el.checked = !!marks[k];
+      });
+      paintDishSuggest(nameEl ? nameEl.value : '');
+    }
+
+    function paintDishSuggest(query) {
+      var listEl = document.getElementById('dishSuggestList');
+      if (!listEl || !EBMenus.searchDishCatalogue) return;
+      var matches = EBMenus.searchDishCatalogue(dishCatalogue, query, { limit: 10 });
+      if (!String(query || '').trim()) {
+        listEl.innerHTML = '<p class="dish-suggest-empty">Start typing a name to see past dishes.</p>';
+        return;
+      }
+      if (!matches.length) {
+        listEl.innerHTML = '<p class="dish-suggest-empty">No past match — keep typing for a new dish.</p>';
+        return;
+      }
+      var html = '';
+      matches.forEach(function (m, i) {
+        var priceBits = (m.priceHistory || []).slice(0, 3).map(function (h) {
+          return (h.price || '—') + ' · ' + h.date;
+        }).join(' → ');
+        html += '<button type="button" class="dish-suggest-item" data-catalogue-i="' + i + '">';
+        html += '<div class="sn">' + escapeAttr(m.name) +
+          (m.price ? ' · ' + escapeAttr(m.price) : '') + '</div>';
+        if (m.description) html += '<div class="sd">' + escapeAttr(m.description) + '</div>';
+        html += '<div class="sm">' + escapeAttr(m.section || '') +
+          (m.tags ? ' · ' + escapeAttr(m.tags) : '') +
+          (m.lastSeen ? ' · last ' + escapeAttr(m.lastSeen) : '') +
+          (priceBits ? ' · ' + escapeAttr(priceBits) : '') + '</div>';
+        html += '</button>';
+      });
+      listEl.innerHTML = html;
+      listEl.querySelectorAll('[data-catalogue-i]').forEach(function (btn) {
+        btn.onclick = function () {
+          var i = parseInt(btn.getAttribute('data-catalogue-i'), 10);
+          applyCatalogueEntryToForm(matches[i]);
+        };
+      });
+    }
+
+    function bindDishSuggest() {
+      var nameEl = document.getElementById('name');
+      var listEl = document.getElementById('dishSuggestList');
+      if (!nameEl || !listEl) return;
+      paintDishSuggest(nameEl.value || '');
+      nameEl.addEventListener('input', function () {
+        paintDishSuggest(nameEl.value || '');
+      });
+      nameEl.addEventListener('focus', function () {
+        paintDishSuggest(nameEl.value || '');
+      });
+    }
+
+    /** Sunday: pick dishes from this week's Main menu without retyping. */
+    function openMainPickForSunday() {
+      var mainList = (book.main || []).slice();
+      if (!mainList.length) {
+        alert('Main menu is empty — add dishes there first, then pull them onto Sunday.');
+        return;
+      }
+      var existing = document.querySelector('.main-pick-overlay');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      var overlay = document.createElement('div');
+      overlay.className = 'main-pick-overlay';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-label', 'Pick from Main menu');
+      var card = document.createElement('div');
+      card.className = 'main-pick-card';
+      var html = '<h3 style="font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 6px">From this week’s Main</h3>';
+      html += '<p class="note" style="margin:0 0 8px">Tick dishes to copy onto Sunday (same title, description, allergens, price). Sunday Roasts stay as they are.</p>';
+      html += '<div class="toolbar-row" style="margin:0 0 8px">';
+      html += '<button type="button" class="link" id="mainPickAll">Select all</button>';
+      html += '<button type="button" class="link" id="mainPickNone">Clear</button>';
+      html += '</div>';
+      html += '<div class="main-pick-list">';
+      var lastSec = '';
+      mainList.forEach(function (d, i) {
+        if (d.section !== lastSec) {
+          lastSec = d.section;
+          html += '<div class="main-pick-sec">' + escapeAttr(lastSec) + '</div>';
+        }
+        html += '<label class="main-pick-row">';
+        html += '<input type="checkbox" data-main-pick="' + i + '">';
+        html += '<span><strong>' + escapeAttr(d.name) + '</strong>';
+        if (d.price) html += ' · ' + escapeAttr(d.price);
+        if (d.tags) html += ' <em style="color:var(--green)">' + escapeAttr(d.tags) + '</em>';
+        if (d.description) html += '<br><span style="color:var(--ink-soft);font-size:13px">' + escapeAttr(d.description) + '</span>';
+        html += '</span></label>';
+      });
+      html += '</div>';
+      html += '<div class="toolbar-row">';
+      html += '<button type="button" class="go" id="mainPickAdd">Add selected to Sunday</button>';
+      html += '<button type="button" class="soft" id="mainPickCancel">Cancel</button>';
+      html += '</div>';
+      card.innerHTML = html;
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      function close() {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }
+      document.getElementById('mainPickCancel').onclick = close;
+      overlay.addEventListener('click', function (ev) {
+        if (ev.target === overlay) close();
+      });
+      document.getElementById('mainPickAll').onclick = function () {
+        overlay.querySelectorAll('[data-main-pick]').forEach(function (cb) { cb.checked = true; });
+      };
+      document.getElementById('mainPickNone').onclick = function () {
+        overlay.querySelectorAll('[data-main-pick]').forEach(function (cb) { cb.checked = false; });
+      };
+      document.getElementById('mainPickAdd').onclick = function () {
+        var added = 0;
+        var sunday = book.sunday || (book.sunday = []);
+        var have = {};
+        sunday.forEach(function (d) {
+          var k = EBMenus.dishCatalogueKey ? EBMenus.dishCatalogueKey(d.name) : String(d.name || '').toLowerCase();
+          if (k) have[k] = true;
+        });
+        overlay.querySelectorAll('[data-main-pick]:checked').forEach(function (cb) {
+          var i = parseInt(cb.getAttribute('data-main-pick'), 10);
+          var src = mainList[i];
+          if (!src) return;
+          var key = EBMenus.dishCatalogueKey ? EBMenus.dishCatalogueKey(src.name) : String(src.name || '').toLowerCase();
+          // Skip exact duplicates already on Sunday; still allow Roasts + same-named mains.
+          if (key && have[key] && String(src.section || '') === 'Sunday Roasts') return;
+          if (key && have[key]) return;
+          var clone = EBMenus.dishFromCatalogueEntry
+            ? EBMenus.dishFromCatalogueEntry(src, { section: src.section })
+            : EBMenus.tidyDishFields({
+                id: (src.id || 'd') + '-sun-' + Date.now() + added,
+                section: src.section,
+                name: src.name,
+                description: src.description,
+                price: src.price,
+                tags: src.tags,
+                lunchClub: !!src.lunchClub
+              });
+          sunday.push(clone);
+          if (key) have[key] = true;
+          added += 1;
+        });
+        if (!added) {
+          alert('Tick at least one dish that is not already on Sunday.');
+          return;
+        }
+        if (EBMenus.sortDishesBySection) book.sunday = EBMenus.sortDishesBySection(sunday);
+        save();
+        close();
+        mode = 'complete';
+        render();
+      };
     }
     function readMarks(prefix) {
       return EBMenus.formatMarks({
