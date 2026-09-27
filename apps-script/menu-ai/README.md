@@ -38,7 +38,8 @@ The same web app stores staff data in **Script Properties** (no extra Drive logi
 
 Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`.
 
-Redeploy after pulling. Local browser storage remains a backup / offline cache.
+After pulling, push with `clasp push` from this folder, then update the live web-app deployment
+(`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
 
 ## Layout review (optional)
 

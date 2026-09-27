@@ -307,8 +307,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow88') !== -1, 'menus page cache-bust is flow88');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow88') !== -1, 'hub menus link cache-bust is flow88');
+assert(page.indexOf('flow89') !== -1, 'menus page cache-bust is flow89');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow89') !== -1, 'hub menus link cache-bust is flow89');
+assert(page.indexOf('withFlowNav') !== -1 && page.indexOf('flow-nav-top') !== -1,
+  'menu creation steps have Next/Back at top and bottom');
+assert(printJs.indexOf('pub@eightbellsbolney.com') !== -1,
+  'print history Email defaults to pub@eightbellsbolney.com');
 assert(printJs.indexOf('discardPreview') !== -1 && printJs.indexOf('id="saveToMenus"') !== -1,
   'preview toolbar is Save or Discard (no print)');
 assert(printJs.indexOf('EBMenusOnPrintSaved') !== -1 && page.indexOf('EBMenusOnPrintSaved') !== -1,
