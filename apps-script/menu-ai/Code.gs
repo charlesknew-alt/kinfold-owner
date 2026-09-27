@@ -61,8 +61,16 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout; or imageBase64 for AI read'
+    hint: 'POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout; or imageBase64 for AI read',
+    mailQuota: (function () {
+      try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
+    })()
   });
+}
+
+/** Run once from the Apps Script editor (owner) to grant MailApp send permission. */
+function authorizeMail_() {
+  return { ok: true, remaining: MailApp.getRemainingDailyQuota() };
 }
 
 function doOptions() {

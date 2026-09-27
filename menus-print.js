@@ -2968,7 +2968,7 @@
   var HISTORY_MAX = 60;
   /** Live Menu AI web app — also stores shared print history in Drive. */
   var HISTORY_CLOUD_DEFAULT =
-    'https://script.google.com/macros/s/AKfycbyVjmwHDUL9jRtrskiiATFPgNCv2vPfcBiKjcaO0r_pcXulNS49u_qxbxYuPVc0sJGHgQ/exec';
+    'https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec';
   /** Default To: address when Emailing a saved sheet from Print history. */
   var HISTORY_EMAIL_DEFAULT = 'pub@eightbellsbolney.com';
 

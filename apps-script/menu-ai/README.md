@@ -41,6 +41,16 @@ Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistor
 After pulling, push with `clasp push` from this folder, then update the live web-app deployment
 (`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
 
+### One-time MailApp authorisation (Email button)
+
+After adding mail scopes, the **script owner** must grant send permission once:
+
+1. Open the Menu AI project in [script.google.com](https://script.google.com)
+2. Select function `authorizeMail_` → **Run**
+3. Review permissions → Allow
+
+Until that is done, Print history **Email** returns a permission error. After Allow, Email sends on click with no mail-client popup.
+
 ## Layout review (optional)
 
 Redeploy the same web app after pulling updates. Generate can POST `{ "action": "reviewLayout", "layout": { … } }` so Gemini checks page balance before the print preview opens. Without a redeploy, Generate still works and skips that step.

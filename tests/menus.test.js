@@ -321,6 +321,8 @@ assert(page.indexOf('withFlowNav') !== -1 && page.indexOf('flow-nav-top') !== -1
   'menu creation steps have Next/Back at top and bottom');
 assert(printJs.indexOf('pub@eightbellsbolney.com') !== -1,
   'print history Email defaults to pub@eightbellsbolney.com');
+assert(printJs.indexOf('AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw') !== -1,
+  'cloud URL points at Menu AI deployment with emailPrintHistory');
 assert(printJs.indexOf('discardPreview') !== -1 && printJs.indexOf('id="saveToMenus"') !== -1,
   'preview toolbar is Save or Discard (no print)');
 assert(printJs.indexOf('EBMenusOnPrintSaved') !== -1 && page.indexOf('EBMenusOnPrintSaved') !== -1,
