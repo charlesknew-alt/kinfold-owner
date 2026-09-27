@@ -369,14 +369,15 @@
       <button type="button" class="soft on" data-view="edit" id="viewEdit">Edit &amp; generate</button>
       <button type="button" class="soft" data-view="catalogue" id="viewCatalogue">All dishes</button>
       <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
+      <button type="button" class="soft" id="doSyncNow" title="Reload shared menus from the cloud">Sync now</button>
       <a class="soft" href="menus-guide.html" target="_blank" rel="noopener" id="viewGuide" style="text-decoration:none;display:inline-flex;align-items:center">Quick guide</a>
     </div>
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow99"></script>
-  <script src="menus-print.js?v=20260927-flow99"></script>
-  <script src="menus-ingest.js?v=20260927-flow99"></script>
+  <script src="menus.js?v=20260927-flow100"></script>
+  <script src="menus-print.js?v=20260927-flow100"></script>
+  <script src="menus-ingest.js?v=20260927-flow100"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -706,6 +707,24 @@
         cloudSyncNote = 'Using menus on this device (cloud unreachable)';
         cloudPullDone = true;
         return false;
+      });
+    }
+
+    /** Force every device onto the same cloud book (ignores local cache timestamp). */
+    function syncNowFromCloud() {
+      cloudSyncNote = 'Syncing shared menus…';
+      cloudPullDone = false;
+      try { localStorage.removeItem(CLOUD_AT_KEY); } catch (e0) {}
+      cloudUpdatedAt = 0;
+      var ed = document.getElementById('editor');
+      if (ed && viewMode === 'edit') {
+        ed.innerHTML = '<p class="note">Syncing shared menus from the cloud…</p>';
+      }
+      return pullMenusFromCloud().then(function () {
+        if (viewMode === 'history') renderHistory();
+        else if (viewMode === 'catalogue') renderCatalogue();
+        else render();
+        return true;
       });
     }
     function loadIncludes() {
@@ -3128,8 +3147,29 @@
     });
     dishId = (dishes()[0] && dishes()[0].id) || '';
     try {
-      render();
-      pullMenusFromCloud();
+      var syncBtn = document.getElementById('doSyncNow');
+      if (syncBtn) {
+        syncBtn.onclick = function () {
+          syncBtn.disabled = true;
+          syncNowFromCloud().then(function () {
+            syncBtn.disabled = false;
+          }, function () {
+            syncBtn.disabled = false;
+            render();
+          });
+        };
+      }
+      // Pull shared cloud first so phones/PCs do not flash different local books.
+      var edBoot = document.getElementById('editor');
+      if (edBoot) edBoot.innerHTML = '<p class="note">Syncing shared menus…</p>';
+      pullMenusFromCloud().then(function () { render(); }, function () { render(); });
+      // When switching back to this tab/app, reload shared state.
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') pullMenusFromCloud();
+      });
+      window.addEventListener('focus', function () {
+        pullMenusFromCloud();
+      });
     } catch (bootErr) {
       var ed = document.getElementById('editor');
       if (ed) {

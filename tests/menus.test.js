@@ -26,7 +26,8 @@ assert(page.indexOf('Arranging your menu') !== -1, 'generate shows arranging ste
 assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order');
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
 assert(page.indexOf("getElementById('doGenerate').onclick") === -1, 'do not bind Generate before step renders');
-assert(/try\s*\{\s*render\(\)/.test(page), 'boot wraps render in try/catch');
+assert(/try\s*\{/.test(page) && page.indexOf('pullMenusFromCloud()') !== -1,
+  'boot wraps cloud sync in try/catch');
 assert(page.indexOf('function renderPlanHtml') !== -1, 'renderPlanHtml is defined');
 assert(page.indexOf('flow-rail') !== -1 && page.indexOf('data-flow-step') !== -1, 'flow route step rail');
 assert(page.indexOf('Blocks') !== -1 && page.indexOf('section-block') !== -1, 'section blocks in flow');
@@ -311,8 +312,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow99') !== -1, 'menus page cache-bust is flow99');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow99') !== -1, 'hub menus link cache-bust is flow99');
+assert(page.indexOf('flow100') !== -1, 'menus page cache-bust is flow100');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow100') !== -1, 'hub menus link cache-bust is flow100');
+assert(page.indexOf('doSyncNow') !== -1 && page.indexOf('syncNowFromCloud') !== -1,
+  'Sync now forces every device onto the shared cloud book');
+assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('CLOUD_DEFAULT_URL') !== -1,
+  'shared cloud URL helper exists');
+assert(ingestJs.indexOf('Do not use a per-device custom AI URL') !== -1,
+  'cloud sync ignores per-device custom AI URLs');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,

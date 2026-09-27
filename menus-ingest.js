@@ -13,9 +13,12 @@
   var CLOUD_DEFAULT_URL =
     'https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec';
 
+  /**
+   * Shared menus + print history MUST use one URL on every phone/PC.
+   * Do not use a per-device custom AI URL here — that splits the cloud store.
+   */
   function getCloudUrl() {
-    var custom = getAiUrl();
-    return custom || CLOUD_DEFAULT_URL;
+    return CLOUD_DEFAULT_URL;
   }
 
   function cloudPost(body) {
