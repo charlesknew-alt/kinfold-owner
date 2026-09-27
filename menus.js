@@ -1075,15 +1075,12 @@
     });
 
     if (fromTitle) {
-      // Leading dietary word as a hardwired prefix (“Vegan Mushroom Risotto” → tags).
-      // Product-style names (“Vegan Burger”) keep the word but still tick the checkbox.
+      // Leading dietary word (“Vegan Katsu Curry”, “Vegetarian Lasagne”):
+      // always tick the checkbox AND keep the word in the printed name.
+      // Stripping it on save made Adjust/rename look broken (Katsu Curry).
       clean = clean.replace(new RegExp('^(' + mark + ')\\s+(?=[A-ZÀ-Ý])', 'i'), function (full, hit) {
-        var rest = clean.slice(full.length);
         take(hit);
-        if (/^(burger|lasagne|lasagna|pie|tart|salad|stew|curry|chilli|chili|soup|risotto|pasta|pizza|wrap|taco|bowl)\b/i.test(rest)) {
-          return full;
-        }
-        return ' ';
+        return full;
       });
     }
 

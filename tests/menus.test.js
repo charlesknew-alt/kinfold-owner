@@ -312,8 +312,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow109') !== -1, 'menus page cache-bust is flow109');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow109') !== -1, 'hub menus link cache-bust is flow109');
+assert(page.indexOf('flow112') !== -1, 'menus page cache-bust is flow112');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow112') !== -1, 'hub menus link cache-bust is flow112');
+assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
+  'Adjust/Replace form opens inline under the dish being edited');
+assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
+  'Adjust/Save keeps the typed dish name (Vegan Katsu Curry)');
+assert(page.indexOf('under the name field') !== -1 && page.indexOf('dishSuggest') !== -1,
+  'past-dish suggestions sit under the name field');
 assert(page.indexOf('Last-write-wins') !== -1 || page.indexOf('remoteAt > cloudUpdatedAt') !== -1,
   'cloud pull does not wipe a newer local Save');
 assert(/return orderDishesForSell\(list\)/.test(fs.readFileSync(path.join(root, 'menus.js'), 'utf8')),
@@ -1165,7 +1171,13 @@ assertTidy({ name: 'Mushroom Risotto || vg', tags: '' }, 'Mushroom Risotto', 'vg
 assertTidy({ name: 'Sticky Toffee || Vegan', tags: '' }, 'Sticky Toffee', 'vg',
   'double-pipe + full word Vegan becomes vg');
 assertTidy({ name: 'Vegan Burger', tags: '' }, 'Vegan Burger', 'vg',
-  'product-style Vegan Burger keeps the name and ticks vg');
+  'leading Vegan Burger keeps the name and ticks vg');
+assertTidy({ name: 'Vegan Katsu Curry', tags: '' }, 'Vegan Katsu Curry', 'vg',
+  'Adjust/rename keeps Vegan Katsu Curry (does not strip to Katsu Curry)');
+assertTidy({ name: 'Vegan Mushroom Risotto', tags: '' }, 'Vegan Mushroom Risotto', 'vg',
+  'leading Vegan stays in the printed title');
+assertTidy({ name: 'Vegetarian Lasagne', tags: '' }, 'Vegetarian Lasagne', 'v',
+  'leading Vegetarian stays in the title and ticks v');
 assertTidy({
   name: 'Stuffed Squash',
   description: 'herbed quinoa and vegan gravy',
