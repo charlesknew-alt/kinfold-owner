@@ -53,10 +53,34 @@ function authorizeMail_() {
   return AUTHORIZE_EMAIL_SENDING();
 }
 
+/** Read JSON from text/plain fetch OR form field `payload` (iframe form POST). */
+function readPostBody_(e) {
+  e = e || {};
+  if (e.parameter && e.parameter.payload) {
+    return String(e.parameter.payload);
+  }
+  if (e.postData && e.postData.contents) {
+    var contents = String(e.postData.contents || '');
+    var type = String((e.postData.type || '')).toLowerCase();
+    if (type.indexOf('application/x-www-form-urlencoded') !== -1) {
+      var m = contents.match(/(?:^|&)payload=([^&]*)/);
+      if (m) {
+        try {
+          return decodeURIComponent(m[1].replace(/\+/g, ' '));
+        } catch (err) {
+          return m[1];
+        }
+      }
+    }
+    return contents;
+  }
+  return '{}';
+}
+
 function doPost(e) {
   try {
-    var raw = e && e.postData && e.postData.contents ? e.postData.contents : '{}';
-    var body = JSON.parse(raw);
+    var raw = readPostBody_(e);
+    var body = JSON.parse(raw || '{}');
     var action = body && body.action ? String(body.action) : '';
     // Shared print history (Drive) — same web app URL, works on PC and phone.
     if (action === 'listPrintHistory') {
