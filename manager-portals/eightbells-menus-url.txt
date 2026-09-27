@@ -1,0 +1,6 @@
+# Manager portal Menus URL (manager.eightbellsbolney.com)
+# Still pointed at flow96 in the eightbells-manager repo — Cursor cannot push there.
+# Update the Menus tile URL to:
+https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20260927-flow107
+#
+# Windmill menus: PENDING — must be an entirely separate system (items, fonts, layouts).

@@ -312,8 +312,10 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow106') !== -1, 'menus page cache-bust is flow106');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow106') !== -1, 'hub menus link cache-bust is flow106');
+assert(page.indexOf('flow107') !== -1, 'menus page cache-bust is flow107');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow107') !== -1, 'hub menus link cache-bust is flow107');
+assert(printJs.indexOf('syncPrintHistoryToCloud') !== -1 && page.indexOf('syncPrintHistoryToCloud') !== -1,
+  'Sync now pushes local print history so phone and PC match');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf('entry: meta') !== -1,
   'email POSTs sheet HTML with the mail request');
 assert(ingestJs.indexOf('cloudFormWrite_') !== -1 && ingestJs.indexOf('Never GET-by-id') !== -1,
