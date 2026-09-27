@@ -79,7 +79,12 @@
     .flow-step-body { display: none; padding: 16px; }
     .flow-step.is-open .flow-step-body { display: block; }
     .flow-step .step-lede { font-size: 13.5px; color: var(--ink-soft); margin: 0 0 14px; }
-    .flow-nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .flow-nav {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center;
+      margin: 0; padding: 12px 0; border: 0 solid var(--line);
+    }
+    .flow-nav-top { margin: 0 0 14px; padding-bottom: 12px; border-bottom-width: 1px; }
+    .flow-nav-bottom { margin: 16px 0 0; padding-top: 12px; border-top-width: 1px; }
 
     .section-block {
       border: 1px solid var(--line); border-radius: 14px; margin: 0 0 12px; background: var(--white-warm); overflow: hidden;
@@ -317,9 +322,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow88"></script>
-  <script src="menus-print.js?v=20260926-flow88"></script>
-  <script src="menus-ingest.js?v=20260926-flow88"></script>
+  <script src="menus.js?v=20260926-flow89"></script>
+  <script src="menus-print.js?v=20260926-flow89"></script>
+  <script src="menus-ingest.js?v=20260926-flow89"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -972,13 +977,20 @@
       return html;
     }
 
-    function flowNav(prev, next, nextLabel) {
-      var html = '<div class="flow-nav no-print">';
+    function flowNav(prev, next, nextLabel, pos) {
+      var cls = 'flow-nav no-print' + (pos === 'top' ? ' flow-nav-top' : ' flow-nav-bottom');
+      var html = '<div class="' + cls + '">';
       if (prev) html += '<button type="button" class="soft" data-flow-step="' + prev + '">← Back</button>';
       else html += '<span></span>';
       if (next) html += '<button type="button" class="go" data-flow-step="' + next + '">' + escapeAttr(nextLabel || 'Continue') + ' →</button>';
+      else html += '<span></span>';
       html += '</div>';
       return html;
+    }
+
+    /** Next/Back at top and bottom of each creation step. */
+    function withFlowNav(innerHtml, prev, next, nextLabel) {
+      return flowNav(prev, next, nextLabel, 'top') + (innerHtml || '') + flowNav(prev, next, nextLabel, 'bottom');
     }
 
     function renderStaffSpecialsNote(list) {
@@ -1046,9 +1058,8 @@
         html += '<button class="link" id="doReset" type="button">Put sample menus back</button>';
       }
       html += '</div>';
-      if (isStaffMode) html += flowNav(null, 2, 'Next · Generate');
-      else html += flowNav(null, 2, 'Next · Blocks');
-      return html;
+      if (isStaffMode) return withFlowNav(html, null, 2, 'Next · Generate');
+      return withFlowNav(html, null, 2, 'Next · Blocks');
     }
 
     function renderBlocksStep(menu, list) {
@@ -1074,12 +1085,10 @@
             html += '</div></div>';
           });
           html += '</div>';
-          html += flowNav(1, 3, 'Next · Wording');
-          return html;
+          return withFlowNav(html, 1, 3, 'Next · Wording');
         }
         html += '<p class="step-lede">Sandwich / dessert / card menus print on a fixed card. Layout rules apply to Main and Sunday sheets.</p>';
-        html += flowNav(1, 3, 'Next · Wording');
-        return html;
+        return withFlowNav(html, 1, 3, 'Next · Wording');
       }
       html += '<p class="step-lede">Rules for <strong>this menu only</strong> — Main, Sunday and the others each keep their own. <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit for this page (AI chooses)</strong> lets layout pick. Frilly box = scalloped frame.</p>';
 
@@ -1148,8 +1157,7 @@
       });
       html += '</div>';
       html += '<div class="toolbar-row"><button type="button" class="link" id="doResetLayout">Reset this menu’s blocks to defaults</button></div>';
-      html += flowNav(1, 3, 'Next · Wording');
-      return html;
+      return withFlowNav(html, 1, 3, 'Next · Wording');
     }
 
     function renderWordingStep(menu) {
@@ -1159,8 +1167,7 @@
       if (menu.kind === 'long' || menu.kind === 'party') html += renderPromoTicksBox();
       else html += '<p class="note">Event wording from the bank is for Main, Sunday, and Party sheets (including 2×A5).</p>';
       html += renderWordingBank();
-      html += flowNav(2, 4, 'Next · Generate');
-      return html;
+      return withFlowNav(html, 2, 4, 'Next · Generate');
     }
 
     function blurbKindSelect(id, value) {
@@ -1215,8 +1222,7 @@
       html += '<button type="button" class="go" id="doGenerate">Generate menu</button>';
       html += '<button type="button" class="ghost" id="doPrintHint">Print / PDF</button>';
       html += '</div></div></div>';
-      html += flowNav(isStaffMode ? 1 : 3, null);
-      return html;
+      return withFlowNav(html, isStaffMode ? 1 : 3, null);
     }
 
     function sectionSelectHtml(selected, attrs) {

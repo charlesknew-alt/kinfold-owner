@@ -2969,6 +2969,8 @@
   /** Live Menu AI web app — also stores shared print history in Drive. */
   var HISTORY_CLOUD_DEFAULT =
     'https://script.google.com/macros/s/AKfycbyVjmwHDUL9jRtrskiiATFPgNCv2vPfcBiKjcaO0r_pcXulNS49u_qxbxYuPVc0sJGHgQ/exec';
+  /** Default To: address when Emailing a saved sheet from Print history. */
+  var HISTORY_EMAIL_DEFAULT = 'pub@eightbellsbolney.com';
 
   function historyCloudUrl() {
     try {
@@ -3507,7 +3509,8 @@
         if (a.parentNode) a.parentNode.removeChild(a);
       }, 800);
     } catch (e2) {}
-    var mail = 'mailto:?subject=' + encodeURIComponent(subject) +
+    var mail = 'mailto:' + encodeURIComponent(HISTORY_EMAIL_DEFAULT) +
+      '?subject=' + encodeURIComponent(subject) +
       '&body=' + encodeURIComponent(body);
     try { window.location.href = mail; } catch (e3) {
       try { window.open(mail, '_blank'); } catch (e4) {}
