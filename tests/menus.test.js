@@ -1484,23 +1484,34 @@ ingest.readFiles([{ name: 'a.jpg' }, { name: 'b.jpg' }], function () {}).then(fu
   failed += 1;
   console.error('FAIL  readFiles merge: ' + err);
 }).then(function () {
-return print.savePrintHistory(histSample).then(function () {
-  return print.listPrintHistory();
-}).then(function (rows) {
-  assert(rows.some(function (r) { return r.id === histSample.id && r.roman === 'III'; }),
-    'history lists saved sheet with Roman');
-  return print.getPrintHistory(histSample.id);
-}).then(function (got) {
-  assert(got && /sample main III/.test(got.html || ''), 'history returns stored HTML');
-  return print.deletePrintHistory(histSample.id);
-}).then(function () {
-  if (failed) {
-    console.error('\n' + failed + ' check(s) failed');
+  // Unit tests stay offline for cloud writes — Node’s fetch + Apps Script 302 hangs.
+  var origCloudPost = ingest.cloudPost;
+  ingest.cloudPost = function (body) {
+    var action = body && body.action;
+    if (action === 'savePrintHistory' || action === 'deletePrintHistory' || action === 'saveMenusState') {
+      return Promise.resolve({ ok: true, via: 'test-stub' });
+    }
+    return Promise.reject(new Error('offline_test'));
+  };
+  return print.savePrintHistory(histSample).then(function () {
+    return print.listPrintHistory();
+  }).then(function (rows) {
+    assert(rows.some(function (r) { return r.id === histSample.id && r.roman === 'III'; }),
+      'history lists saved sheet with Roman');
+    return print.getPrintHistory(histSample.id);
+  }).then(function (got) {
+    assert(got && /sample main III/.test(got.html || ''), 'history returns stored HTML');
+    return print.deletePrintHistory(histSample.id);
+  }).then(function () {
+    ingest.cloudPost = origCloudPost;
+    if (failed) {
+      console.error('\n' + failed + ' check(s) failed');
+      process.exit(1);
+    }
+    console.log('\nAll checks passed');
+  }).catch(function (err) {
+    ingest.cloudPost = origCloudPost;
+    console.error('FAIL  history round-trip: ' + err);
     process.exit(1);
-  }
-  console.log('\nAll checks passed');
-}).catch(function (err) {
-  console.error('FAIL  history round-trip: ' + err);
-  process.exit(1);
-});
+  });
 });

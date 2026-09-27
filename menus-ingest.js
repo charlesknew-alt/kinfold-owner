@@ -46,8 +46,9 @@
 
   /**
    * Writes: browser fetch POST with redirect:follow dies on Google’s 302.
-   * mode: 'no-cors' still delivers the POST body (Apps Script runs doPost on
-   * the first hop). Response is opaque — verify with a GET when we can.
+   * In the browser, mode: 'no-cors' still delivers the POST body (Apps Script
+   * runs doPost on the first hop). Response is opaque — verify with GET.
+   * Outside the browser (Node tests), follow Location manually.
    */
   function cloudWrite_(body) {
     var url = getCloudUrl();
@@ -55,14 +56,44 @@
       return Promise.reject(new Error('no_cloud'));
     }
     var payload = JSON.stringify(body || {});
+    var headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+    var inBrowser = typeof document !== 'undefined';
+
+    if (inBrowser) {
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = setTimeout(function () {
+        try { if (ctrl) ctrl.abort(); } catch (e0) {}
+      }, 15000);
+      return fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        credentials: 'omit',
+        headers: headers,
+        body: payload,
+        signal: ctrl ? ctrl.signal : undefined
+      }).then(function () {
+        clearTimeout(timer);
+        return true;
+      }).catch(function (err) {
+        clearTimeout(timer);
+        throw err;
+      });
+    }
+
+    // Node / non-DOM: POST then GET the echo Location (curl-style).
     return fetch(url, {
       method: 'POST',
-      mode: 'no-cors',
-      credentials: 'omit',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: payload
-    }).then(function () {
-      return true;
+      headers: headers,
+      body: payload,
+      redirect: 'manual'
+    }).then(function (res) {
+      var loc = null;
+      try { loc = res.headers.get('Location') || res.headers.get('location'); } catch (e1) {}
+      if (loc) {
+        return fetch(loc, { method: 'GET' }).then(function () { return true; });
+      }
+      if (res.status >= 200 && res.status < 300) return true;
+      throw new Error('cloud_write_http_' + res.status);
     });
   }
 
