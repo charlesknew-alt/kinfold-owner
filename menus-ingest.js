@@ -173,15 +173,20 @@
       if (action === 'savePrintHistory') {
         var id = body.entry && body.entry.id;
         if (!id) return { ok: true, via: 'no-cors' };
-        return cloudGet('getPrintHistory', { id: id }).then(function (data) {
-          if (data && data.entry && data.entry.html) {
-            return { ok: true, via: 'no-cors' };
-          }
-          // Index can lag a beat behind the HTML write.
-          return { ok: true, via: 'no-cors', pending: true };
-        }).catch(function () {
-          return { ok: true, via: 'no-cors', pending: true };
-        });
+        function verifyHtml_(attempt) {
+          return cloudGet('getPrintHistory', { id: id }).then(function (data) {
+            if (data && data.entry && data.entry.html) {
+              return { ok: true, via: 'form', id: id };
+            }
+            if (attempt < 3) {
+              return new Promise(function (resolve) {
+                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 700 * attempt);
+              });
+            }
+            throw new Error('cloud_html_not_visible');
+          });
+        }
+        return verifyHtml_(1);
       }
       if (action === 'deletePrintHistory') {
         return { ok: true, via: 'no-cors' };
@@ -211,8 +216,31 @@
         return Promise.reject(new Error('missing_html'));
       }
       // Never GET-by-id — that path returns Missing sheet HTML when cloud is empty.
-      return cloudWrite_(body).then(function () {
+      return cloudFormWrite_(body).then(function () {
         return { ok: true, to: body.to || '', via: 'form' };
+      });
+    }
+    // Print HTML is large — form POST is more reliable than no-cors fetch.
+    if (action === 'savePrintHistory') {
+      if (!(body.entry && body.entry.html)) {
+        return Promise.reject(new Error('missing_html'));
+      }
+      var histId = body.entry.id;
+      return cloudFormWrite_(body).then(function () {
+        function verifyHtml_(attempt) {
+          return cloudGet('getPrintHistory', { id: histId }).then(function (data) {
+            if (data && data.entry && data.entry.html) {
+              return { ok: true, via: 'form', id: histId };
+            }
+            if (attempt < 4) {
+              return new Promise(function (resolve) {
+                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 600 * attempt);
+              });
+            }
+            throw new Error('cloud_html_not_visible');
+          });
+        }
+        return verifyHtml_(1);
       });
     }
     return cloudWriteAndVerify_(body);

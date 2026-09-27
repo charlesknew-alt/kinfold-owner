@@ -31,15 +31,27 @@ Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix i
 
 ## Shared menus + print history
 
-The same web app stores staff data in **Script Properties** (no extra Drive login):
+The same web app stores staff data for PC ↔ phone:
 
-- `MENUS_*` — live dishes, party blurbs, promo bank, layout, **dish catalogue** (deduped titles + price history for autocomplete; same on PC and phone)
-- `HISTIDX` + `HIST_{id}_*` — recent generated print sheets (capped to fit Apps Script quota)
+- `MENUS_*` (Script Properties) — live dishes, party blurbs, promo bank, layout, **dish catalogue**
+- `HISTIDX` — print history index (metadata only)
+- Print HTML — **Google Drive** folder `Eight Bells Menu Print History` (preferred), with a short **Script Properties** fallback (`HIST_{id}_*`) when Drive is not authorised yet
 
 Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (MailApp → `pub@eightbellsbolney.com` with a **printable PDF**; **Reply-To** your `@kinfoldinns.co.uk` alias. From-alias is off by default — see below).
 
 After pulling, push with `clasp push` from this folder, then update the live web-app deployment
 (`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
+
+### One-time Drive authorisation (phone Download / Print PDF)
+
+Print sheets need Drive so phones can open menus saved on the PC. After adding the Drive scope, the **script owner** must grant access once:
+
+1. Open the Menu AI project in [script.google.com](https://script.google.com)
+2. Select any function (e.g. `listPrintHistory_`) → **Run** → Review permissions → Allow **Google Drive**
+3. On the **PC**: Menus → Print history → **Sync now** (re-uploads HTML)
+4. On the **phone**: Sync now, then Download / Print PDF
+
+Until Drive is allowed, saves still work via Script Properties (newest ~8 sheets) so phone download is not blocked.
 
 ### One-time Gmail authorisation (Email button)
 

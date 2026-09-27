@@ -328,6 +328,13 @@ assert(page.indexOf('sortDishesBySection(dishes())') !== -1,
   'Add/Adjust re-sorts the menu so new dishes sit with their category');
 assert(printJs.indexOf('syncPrintHistoryToCloud') !== -1 && page.indexOf('syncPrintHistoryToCloud') !== -1,
   'Sync now pushes local print history so phone and PC match');
+assert(printJs.indexOf('repairCloudHtmlGaps') !== -1,
+  'Sync repairs cloud index rows that have no Drive HTML (phone download)');
+assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),
+  'cloud history keeps 60 sheets so PC archive reaches the phone');
+assert(aiGs.indexOf('Could not store sheet HTML') !== -1 &&
+  aiGs.indexOf('historyPrunePropsHtml_') !== -1,
+  'save falls back to Script Properties HTML when Drive is unauthorised');
 assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
   'print HTML moves to Drive; purge frees Script Properties quota');
 assert(ingestJs.indexOf('form POST navigates') !== -1 || ingestJs.indexOf('no-cors fetch only') !== -1,
@@ -336,6 +343,11 @@ assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf(
   'email POSTs sheet HTML with the mail request');
 assert(ingestJs.indexOf('cloudFormWrite_') !== -1 && ingestJs.indexOf('Never GET-by-id') !== -1,
   'email uses form POST with HTML — never GET-by-id');
+assert(ingestJs.indexOf("action === 'savePrintHistory'") !== -1 &&
+  ingestJs.indexOf('cloud_html_not_visible') !== -1,
+  'savePrintHistory uses form POST and verifies Drive HTML is readable');
+assert(page.indexOf('not in the cloud yet') !== -1,
+  'phone download explains Sync-on-PC when cloud HTML is missing');
 assert(aiGs.indexOf('readPostBody_') !== -1 && aiGs.indexOf('parameter.payload') !== -1,
   'Menu AI accepts form field payload for iframe POSTs');
 assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,
