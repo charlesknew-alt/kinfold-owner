@@ -3189,6 +3189,14 @@
     });
   }
 
+  function uploadHistoryEntry_(full) {
+    if (!full || !full.html || !full.id) return Promise.resolve(false);
+    return historyCloudPost({
+      action: 'savePrintHistory',
+      entry: full
+    }).then(function () { return true; }).catch(function () { return false; });
+  }
+
   /**
    * Upload device-only sheets that were never deleted in the cloud
    * (e.g. Kate saved on the pub PC while the network blipped).
@@ -3209,17 +3217,14 @@
       var attempted = 0;
       var uploaded = 0;
       var chain = Promise.resolve();
-      missing.slice(0, 20).forEach(function (meta) {
+      missing.slice(0, 40).forEach(function (meta) {
         chain = chain.then(function () {
           return localGetOnly(meta.id).then(function (full) {
             if (!full || !full.html) return;
             attempted += 1;
-            return historyCloudPost({
-              action: 'savePrintHistory',
-              entry: full
-            }).then(function () {
-              uploaded += 1;
-            }).catch(function () {});
+            return uploadHistoryEntry_(full).then(function (ok) {
+              if (ok) uploaded += 1;
+            });
           });
         });
       });
@@ -3232,6 +3237,45 @@
   }
 
   /**
+   * Cloud index can list a sheet whose Drive HTML never landed (phone then
+   * sees “missing from history”). Re-upload from this device when we still
+   * have the HTML locally.
+   */
+  function repairCloudHtmlGaps(cloudItems) {
+    var repaired = 0;
+    var checked = 0;
+    var chain = Promise.resolve();
+    (cloudItems || []).slice(0, 30).forEach(function (meta) {
+      if (!meta || !meta.id) return;
+      chain = chain.then(function () {
+        checked += 1;
+        return historyCloudPost({
+          action: 'getPrintHistory',
+          id: meta.id
+        }).then(function (data) {
+          if (data && data.entry && data.entry.html) return;
+          return localGetOnly(meta.id).then(function (full) {
+            if (!full || !full.html) return;
+            return uploadHistoryEntry_(full).then(function (ok) {
+              if (ok) repaired += 1;
+            });
+          });
+        }).catch(function () {
+          return localGetOnly(meta.id).then(function (full) {
+            if (!full || !full.html) return;
+            return uploadHistoryEntry_(full).then(function (ok) {
+              if (ok) repaired += 1;
+            });
+          });
+        });
+      });
+    });
+    return chain.then(function () {
+      return { repaired: repaired, checked: checked };
+    });
+  }
+
+  /**
    * Push every local-only print sheet to the shared cloud, then return the
    * shared list. Call from Sync now so phone ↔ PC print history matches.
    */
@@ -3239,22 +3283,34 @@
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
       var known = {};
       var deleted = {};
-      (Array.isArray(data.items) ? data.items : []).forEach(function (r) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      items.forEach(function (r) {
         if (r && r.id) known[r.id] = true;
       });
       (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
         if (id) deleted[String(id)] = true;
       });
       return purgeLocalDeleted(deleted).then(function () {
-        return migrateLocalToCloud(known, deleted);
+        return repairCloudHtmlGaps(items);
+      }).then(function (repair) {
+        return migrateLocalToCloud(known, deleted).then(function (stats) {
+          return {
+            uploaded: ((stats && stats.uploaded) || 0) + ((repair && repair.repaired) || 0),
+            repaired: (repair && repair.repaired) || 0
+          };
+        });
       });
     }).then(function (stats) {
       return listPrintHistory().then(function (rows) {
-        return { rows: rows, uploaded: (stats && stats.uploaded) || 0 };
+        return {
+          rows: rows,
+          uploaded: (stats && stats.uploaded) || 0,
+          repaired: (stats && stats.repaired) || 0
+        };
       });
     }).catch(function () {
       return localListOnly().then(function (rows) {
-        return { rows: rows || [], uploaded: 0 };
+        return { rows: rows || [], uploaded: 0, repaired: 0 };
       });
     });
   }
@@ -3511,9 +3567,12 @@
         var entry = data.entry || null;
         if (entry && entry.html) {
           localSaveOnly(normalizeHistoryEntry(entry)).catch(function () {});
+          return entry;
         }
-        return entry;
-      }).catch(function () { return null; });
+        var err = new Error('cloud_html_missing');
+        err.code = 'cloud_html_missing';
+        throw err;
+      });
     });
   }
 
@@ -3539,6 +3598,9 @@
 
   function downloadPrintHtml(entry) {
     if (!entry || !entry.html) return false;
+    // iframe embeds (manager.eightbells…) often block <a download>. Opening the
+    // printable sheet in a new tab works on phone and PC; staff can Save/Print.
+    if (openPrintHtml(entry.html)) return true;
     var name = printFileName(entry.menuName || entry.menuId || 'menu', {
       roman: entry.roman,
       week: entry.week,
@@ -3550,6 +3612,7 @@
     a.href = url;
     a.download = name;
     a.rel = 'noopener';
+    a.target = '_blank';
     document.body.appendChild(a);
     a.click();
     setTimeout(function () {

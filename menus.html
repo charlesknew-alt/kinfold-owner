@@ -387,9 +387,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow114"></script>
-  <script src="menus-print.js?v=20260927-flow114"></script>
-  <script src="menus-ingest.js?v=20260927-flow114"></script>
+  <script src="menus.js?v=20260927-flow115"></script>
+  <script src="menus-print.js?v=20260927-flow115"></script>
+  <script src="menus-ingest.js?v=20260927-flow115"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -763,8 +763,10 @@
           return EBMenuPrint.syncPrintHistoryToCloud();
         }).then(function (hist) {
           var n = (hist && hist.uploaded) || 0;
+          var repaired = (hist && hist.repaired) || 0;
           if (n > 0) {
             cloudSyncNote = 'Shared ' + n + ' print sheet' + (n === 1 ? '' : 's') +
+              (repaired ? ' (repaired ' + repaired + ' for phone download)' : '') +
               ' — Sync now on the other device';
           } else {
             cloudSyncNote = 'Menus and print history synced across devices';
@@ -927,12 +929,14 @@
           var id = btn.getAttribute('data-history-open');
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
-              alert('That sheet is missing from history.');
+              alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try again here.');
               return;
             }
             if (!EBMenuPrint.openPrintHtml(entry.html)) {
               alert('Allow pop-ups to open the menu sheet, then choose Print / save as PDF.');
             }
+          }).catch(function () {
+            alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try again here.');
           });
         };
       });
@@ -945,7 +949,7 @@
           btn.textContent = 'Sending…';
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
-              alert('That sheet is missing from history.');
+              alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Email again.');
               btn.disabled = false;
               btn.textContent = label || 'Email';
               return;
@@ -968,8 +972,8 @@
             btn.disabled = false;
             btn.textContent = label || 'Email';
             var msg = (err && err.message) ? String(err.message) : '';
-            if (/missing.?html|Missing sheet HTML/i.test(msg)) {
-              msg = 'This device could not attach the sheet. Open the sheet once (Print PDF), then try Email again.';
+            if (/cloud_html_missing|Sheet not found|missing.?html|Missing sheet HTML/i.test(msg)) {
+              msg = 'This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Email again.';
             }
             alert('Could not send email. ' + (msg || 'Try again in a moment.'));
           });
@@ -980,10 +984,14 @@
           var id = btn.getAttribute('data-history-download');
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
-              alert('That sheet is missing from history.');
+              alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Download again.');
               return;
             }
-            EBMenuPrint.downloadPrintHtml(entry);
+            if (!EBMenuPrint.downloadPrintHtml(entry)) {
+              alert('Allow pop-ups to open the menu sheet, then Save / Print from there.');
+            }
+          }).catch(function () {
+            alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Download again.');
           });
         };
       });
