@@ -137,8 +137,8 @@
   }
 
   /**
-   * Shared cloud call. Reads + email use GET (CORS JSON). Other writes use
-   * no-cors POST then GET verify.
+   * Shared cloud call. Reads use GET. Email POSTs the HTML (no-cors) so we
+   * never race a separate upload. Other writes use no-cors + GET verify.
    */
   function cloudPost(body) {
     body = body || {};
@@ -151,14 +151,20 @@
       return cloudGet(action, body);
     }
     if (action === 'emailPrintHistory') {
-      // Prefer id — sheet HTML already in cloud. Falls back to write path only if no id.
+      // Must include HTML in the POST — GET-by-id races the cloud upload and
+      // returns "Missing sheet HTML to email" for local-only sheets.
+      if (body.entry && body.entry.html) {
+        return cloudWrite_(body).then(function () {
+          return { ok: true, to: body.to || '', via: 'no-cors' };
+        });
+      }
       if (body.id || (body.entry && body.entry.id)) {
         return cloudGet('emailPrintHistory', {
-          id: body.id || body.entry.id,
+          id: body.id || (body.entry && body.entry.id),
           to: body.to
         });
       }
-      return cloudWriteAndVerify_(body);
+      return Promise.reject(new Error('missing_html'));
     }
     return cloudWriteAndVerify_(body);
   }

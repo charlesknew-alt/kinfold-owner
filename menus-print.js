@@ -3507,19 +3507,11 @@
       dayKey: entry.dayKey,
       html: entry.html
     };
-    // Upload sheet (no-cors), then email by id via GET so we get a real ok/error.
+    // POST the HTML with the email action (no separate upload race).
     return historyCloudPost({
-      action: 'savePrintHistory',
+      action: 'emailPrintHistory',
+      to: to,
       entry: meta
-    }).catch(function () {
-      // Already in cloud or brief glitch — still try email by id.
-      return null;
-    }).then(function () {
-      return historyCloudPost({
-        action: 'emailPrintHistory',
-        id: entry.id,
-        to: to
-      });
     }).then(function (data) {
       return {
         ok: true,
