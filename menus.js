@@ -1075,20 +1075,12 @@
     });
 
     if (fromTitle) {
-      // Leading dietary word: always tick the checkbox. Keep the word in the
-      // printed name for product-style dishes (“Vegan Burger”, “Vegan Katsu
-      // Curry”, “Vegan Mushroom Risotto”) — match the dish type anywhere in
-      // the rest of the title, not only as the immediate next word.
+      // Leading dietary word (“Vegan Katsu Curry”, “Vegetarian Lasagne”):
+      // always tick the checkbox AND keep the word in the printed name.
+      // Stripping it on save made Adjust/rename look broken (Katsu Curry).
       clean = clean.replace(new RegExp('^(' + mark + ')\\s+(?=[A-ZÀ-Ý])', 'i'), function (full, hit) {
-        var rest = clean.slice(full.length);
         take(hit);
-        var product =
-          '\\b(?:burger|lasagne|lasagna|pie|tart|salad|stew|curry|chilli|chili|' +
-          'soup|risotto|pasta|pizza|wrap|taco|bowl|katsu|nuggets?|sausages?)\\b';
-        if (new RegExp(product, 'i').test(rest)) {
-          return full;
-        }
-        return ' ';
+        return full;
       });
     }
 

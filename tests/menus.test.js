@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow110') !== -1, 'menus page cache-bust is flow110');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow110') !== -1, 'hub menus link cache-bust is flow110');
+assert(page.indexOf('flow111') !== -1, 'menus page cache-bust is flow111');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow111') !== -1, 'hub menus link cache-bust is flow111');
 assert(page.indexOf('Last-write-wins') !== -1 || page.indexOf('remoteAt > cloudUpdatedAt') !== -1,
   'cloud pull does not wipe a newer local Save');
 assert(/return orderDishesForSell\(list\)/.test(fs.readFileSync(path.join(root, 'menus.js'), 'utf8')),
@@ -1165,13 +1165,13 @@ assertTidy({ name: 'Mushroom Risotto || vg', tags: '' }, 'Mushroom Risotto', 'vg
 assertTidy({ name: 'Sticky Toffee || Vegan', tags: '' }, 'Sticky Toffee', 'vg',
   'double-pipe + full word Vegan becomes vg');
 assertTidy({ name: 'Vegan Burger', tags: '' }, 'Vegan Burger', 'vg',
-  'product-style Vegan Burger keeps the name and ticks vg');
+  'leading Vegan Burger keeps the name and ticks vg');
 assertTidy({ name: 'Vegan Katsu Curry', tags: '' }, 'Vegan Katsu Curry', 'vg',
-  'product-style Vegan Katsu Curry keeps Vegan on rename/save');
+  'Adjust/rename keeps Vegan Katsu Curry (does not strip to Katsu Curry)');
 assertTidy({ name: 'Vegan Mushroom Risotto', tags: '' }, 'Vegan Mushroom Risotto', 'vg',
-  'product-style Vegan … Risotto keeps Vegan in the title');
-assertTidy({ name: 'Vegan Spicy Asian Plate', tags: '' }, 'Spicy Asian Plate', 'vg',
-  'non-product leading Vegan still lifts into the vg tick only');
+  'leading Vegan stays in the printed title');
+assertTidy({ name: 'Vegetarian Lasagne', tags: '' }, 'Vegetarian Lasagne', 'v',
+  'leading Vegetarian stays in the title and ticks v');
 assertTidy({
   name: 'Stuffed Squash',
   description: 'herbed quinoa and vegan gravy',
