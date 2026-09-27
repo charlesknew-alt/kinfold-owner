@@ -132,7 +132,10 @@ assert(printJs.indexOf('groupHistoryByDay') !== -1, 'print history groups by day
 assert(printJs.indexOf('HISTORY_CLOUD_DEFAULT') !== -1 && printJs.indexOf('listPrintHistory') !== -1,
   'print history syncs via cloud Apps Script URL');
 assert(printJs.indexOf('migrateLocalToCloud') !== -1, 'device-only sheets can upload to shared history');
-assert(printJs.indexOf('purgeLocalNotInCloud') !== -1, 'local orphans deleted when cloud is source of truth');
+assert(printJs.indexOf('purgeLocalDeleted') !== -1, 'tombstoned deletes purge local copies');
+assert(printJs.indexOf('deletedIds') !== -1, 'print history list carries delete tombstones');
+assert(aiGs.indexOf('HISTDEL') !== -1 && aiGs.indexOf('historyMarkDeleted_') !== -1,
+  'Apps Script stores print-history delete tombstones');
 assert(page.indexOf('Print history') !== -1 && page.indexOf('data-view="history"') !== -1,
   'Menus has a Print history view');
 assert(page.indexOf('Shared across phones and PCs') !== -1 || page.indexOf('shared cloud') !== -1,
@@ -308,8 +311,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow98') !== -1, 'menus page cache-bust is flow98');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow98') !== -1, 'hub menus link cache-bust is flow98');
+assert(page.indexOf('flow99') !== -1, 'menus page cache-bust is flow99');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow99') !== -1, 'hub menus link cache-bust is flow99');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
