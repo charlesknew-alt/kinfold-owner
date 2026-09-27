@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#24362c">
+  <title>Manager – The Windmill Inn</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #1c1610;
+      --ink-soft: #3d3429;
+      --cream: #f6f0e6;
+      --paper: #fbf7f0;
+      --rule: #d8cfc0;
+      --brass: #b68a3a;
+      --brass-deep: #8d6824;
+      --forest: #24362c;
+      --forest-mid: #2f4a3b;
+      --rust: #8a3d28;
+      --windmill: #2b6cb0;
+      --windmill-glow: #ebf4ff;
+      --text-dim: #6f6574;
+      --card: #ffffff;
+      --card-hover: var(--paper);
+      --border: var(--rule);
+    }
+    html, body { min-height: 100%; font-family: 'Source Sans 3', 'Segoe UI', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; }
+    ::selection { color: var(--ink); background: #e6d3a4; }
+
+    .login-overlay{position:fixed;inset:0;z-index:300;background:var(--forest);display:flex;align-items:center;justify-content:center;transition:opacity .5s}
+    .login-overlay.hidden{opacity:0;pointer-events:none}
+    .login-overlay::before{content:'';position:absolute;inset:0;opacity:.3;background:radial-gradient(circle at 80% 10%, #b68a3a, transparent 35%), radial-gradient(circle at 10% 90%, #2b6cb0, transparent 40%);pointer-events:none}
+    .login-card{position:relative;background:var(--paper);border:1px solid rgba(246,240,230,0.18);border-radius:24px;padding:40px 32px;width:90%;max-width:400px;text-align:center;box-shadow:0 24px 60px rgba(12,16,12,0.35)}
+    .login-card .icon{font-size:44px;margin-bottom:10px}
+    .login-card h1{font-family:'Fraunces',Georgia,serif;font-size:32px;font-weight:600;letter-spacing:-0.025em;color:var(--ink);margin-bottom:6px}
+    .login-card h2{font-size:11px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--windmill);margin-bottom:20px}
+    .login-card input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--rule);background:#fff;color:var(--ink);font-size:16px;text-align:center;letter-spacing:3px;outline:none;font-family:inherit}
+    .login-card input:focus{border-color:var(--brass)}
+    .login-btn{width:100%;padding:14px 20px;border:none;border-radius:999px;background:var(--forest);color:var(--cream);font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;font-family:inherit}
+    .login-btn:hover{background:var(--forest-mid)}
+    .error{color:var(--rust);font-size:13px;margin-top:12px;display:none}
+    .error.show{display:block}
+
+    .landing { display: none; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; }
+    .landing.show { display: flex; }
+    .landing::before { content: ''; position: absolute; inset: 0; background: radial-gradient(900px 420px at 100% 0%, #b68a3a24, transparent 55%), radial-gradient(700px 380px at 0% 80%, #2b6cb014, transparent 50%); pointer-events: none; }
+    .brand { text-align: center; margin-bottom: 28px; position: relative; }
+    .brand .icon { font-size: 40px; margin-bottom: 8px; }
+    .brand h1 { font-family: 'Fraunces', Georgia, serif; font-size: 44px; font-weight: 600; letter-spacing: -0.025em; color: var(--ink); margin-bottom: 8px; }
+    .brand p { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass-deep); }
+
+    .pub-wrap { max-width: 420px; width: 100%; position: relative; }
+    .pub-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; box-shadow: 0 22px 48px rgba(28,22,16,0.06); }
+    .pub-card:hover { border-color: var(--windmill); }
+    .pub-icon { font-size: 36px; margin-bottom: 12px; }
+    .pub-name { font-family: 'Fraunces', Georgia, serif; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 4px; }
+    .pub-location { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 24px; }
+    .pub-links { display: flex; flex-direction: column; gap: 10px; }
+    .pub-link { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 10px; text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 600; transition: all 0.2s; border: 1px solid var(--rule); background: var(--paper); cursor: pointer; font-family: inherit; width: 100%; text-align: left; }
+    .pub-link:hover { background: #fff; border-color: var(--brass); }
+    .pub-link .link-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+    .pub-link.paperwork .link-icon { background: rgba(245,158,11,0.15); }
+    .pub-link.menus .link-icon { background: rgba(107,45,91,0.12); }
+    .pub-link.rooms .link-icon { background: rgba(45,212,168,0.15); }
+    .pub-link.cardtakings .link-icon { background: rgba(223,194,175,0.18); }
+    .link-label { flex: 1; }
+    .link-label small { display: block; font-size: 11px; font-weight: 400; color: var(--text-dim); margin-top: 2px; }
+    .link-arrow { color: var(--text-dim); font-size: 18px; }
+    .footer { text-align: center; padding: 28px 0 8px; font-size: 12px; color: var(--text-dim); position: relative; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    .sign-out { background:none; border:1px solid var(--rule); color:var(--ink); padding:8px 16px; border-radius:999px; cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; }
+    .sign-out:hover { border-color:var(--brass); }
+
+    .app-view { display: none; position: fixed; inset: 0; z-index: 50; background: var(--cream); flex-direction: column; overflow: hidden; }
+    .app-view.active { display: flex; }
+    .app-bar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: rgba(246,240,230,0.92); border-bottom: 1px solid var(--rule); flex-shrink: 0; backdrop-filter: blur(12px); }
+    .app-bar-back { background: none; border: 1px solid var(--rule); color: var(--ink); padding: 8px 16px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }
+    .app-bar-back:hover { border-color: var(--brass); }
+    .app-bar-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .app-bar-pub { font-size: 12px; color: var(--ink-soft); margin-left: auto; }
+    .app-frame { flex: 1; width: 100%; border: none; overflow: auto; -webkit-overflow-scrolling: touch; background: #fff; }
+    .app-loader { position: absolute; inset: 0; top: 48px; background: var(--cream); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; transition: opacity 0.5s; }
+    .app-loader.hidden { opacity: 0; pointer-events: none; }
+    .spinner { border: 3px solid var(--rule); border-top: 3px solid var(--forest); border-radius: 50%; width: 32px; height: 32px; animation: sp 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    .app-loader p { color: var(--ink-soft); font-size: 13px; }
+
+    @media (max-width: 640px) {
+      .brand h1 { font-size: 36px; }
+      .pub-card { padding: 24px 20px; }
+      .landing { justify-content: flex-start; padding-top: 48px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-overlay" id="login">
+    <div class="login-card">
+      <div class="icon">🍺</div>
+      <h1>The Windmill Inn</h1>
+      <h2>Manager Portal</h2>
+      <input type="password" id="pw" placeholder="Enter PIN" maxlength="6" inputmode="numeric" autocomplete="off">
+      <button class="login-btn" onclick="checkPw()">Sign In</button>
+      <div class="error" id="err">Incorrect PIN</div>
+    </div>
+  </div>
+
+  <div class="landing" id="home">
+    <div class="brand">
+      <div class="icon">🍺</div>
+      <h1>Windmill Inn</h1>
+      <p>Manager Portal</p>
+    </div>
+    <div class="pub-wrap">
+      <div class="pub-card windmill">
+        <div class="pub-icon">🍺</div>
+        <div class="pub-name">The Windmill Inn</div>
+        <div class="pub-location">Littleworth</div>
+        <div class="pub-links">
+          <button type="button" class="pub-link paperwork" onclick="openTool('paperwork','Daily & weekly paperwork')">
+            <span class="link-icon">📋</span>
+            <span class="link-label">Paperwork<small>Cash-up, tabs, week submit</small></span>
+            <span class="link-arrow">›</span>
+          </button>
+          <button type="button" class="pub-link menus" onclick="openTool('menus','Menus')">
+            <span class="link-icon">🍽️</span>
+            <span class="link-label">Menus<small>Specials, Main · print &amp; email</small></span>
+            <span class="link-arrow">›</span>
+          </button>
+          <button type="button" class="pub-link rooms" onclick="openTool('rooms','Rooms')">
+            <span class="link-icon">🛏️</span>
+            <span class="link-label">Rooms<small>Occupancy &amp; 14-day calendar</small></span>
+            <span class="link-arrow">›</span>
+          </button>
+          <button type="button" class="pub-link cardtakings" onclick="openTool('cards','Card takings')">
+            <span class="link-icon">💳</span>
+            <span class="link-label">Card Takings<small>Teya CSV — by machine</small></span>
+            <span class="link-arrow">›</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <button type="button" class="sign-out" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="app-view" id="app">
+    <div class="app-bar">
+      <button type="button" class="app-bar-back" onclick="closeTool()">← Home</button>
+      <span class="app-bar-title" id="appTitle">Tool</span>
+      <span class="app-bar-pub">Windmill Inn</span>
+    </div>
+    <div class="app-loader" id="loader">
+      <div class="spinner"></div>
+      <p>Loading…</p>
+    </div>
+    <iframe class="app-frame" id="f" src="about:blank" allow="clipboard-write"></iframe>
+  </div>
+
+  <script>
+    var PIN = '1978';
+    var HUB = 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec';
+    var TOOLS = {
+      paperwork: HUB,
+      menus: 'https://owner.kinfoldinns.co.uk/menus.html?mode=staff&venue=windmill&v=20260927-flow97',
+      rooms: 'https://rooms.windmilllittleworth.com',
+      cards: 'https://owner.kinfoldinns.co.uk/card-takings.html?venue=windmill'
+    };
+
+    if (sessionStorage.getItem('windmill_auth') === 'yes') {
+      document.getElementById('login').classList.add('hidden');
+      document.getElementById('home').classList.add('show');
+    }
+    document.getElementById('pw').addEventListener('keydown', function(e) { if (e.key === 'Enter') checkPw(); });
+    document.getElementById('pw').focus();
+
+    function checkPw() {
+      if (document.getElementById('pw').value.trim() === PIN) {
+        sessionStorage.setItem('windmill_auth', 'yes');
+        document.getElementById('login').classList.add('hidden');
+        document.getElementById('home').classList.add('show');
+      } else {
+        document.getElementById('err').classList.add('show');
+        document.getElementById('pw').value = '';
+        document.getElementById('pw').focus();
+      }
+    }
+
+    function signOut() {
+      sessionStorage.removeItem('windmill_auth');
+      document.getElementById('home').classList.remove('show');
+      document.getElementById('app').classList.remove('active');
+      document.getElementById('f').src = 'about:blank';
+      document.getElementById('login').classList.remove('hidden');
+      document.getElementById('pw').value = '';
+      document.getElementById('pw').focus();
+    }
+
+    function openTool(id, title) {
+      var url = TOOLS[id];
+      if (!url) return;
+      document.getElementById('home').classList.remove('show');
+      document.getElementById('app').classList.add('active');
+      document.getElementById('appTitle').textContent = title || id;
+      document.getElementById('loader').classList.remove('hidden');
+      var f = document.getElementById('f');
+      f.src = url;
+      f.onload = function() { setTimeout(function(){ document.getElementById('loader').classList.add('hidden'); }, 600); };
+      setTimeout(function(){ document.getElementById('loader').classList.add('hidden'); }, 15000);
+    }
+
+    function closeTool() {
+      document.getElementById('app').classList.remove('active');
+      document.getElementById('f').src = 'about:blank';
+      document.getElementById('home').classList.add('show');
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'navigate' && e.data.url) {
+        document.getElementById('loader').classList.remove('hidden');
+        document.getElementById('f').src = e.data.url;
+        document.getElementById('f').onload = function() {
+          setTimeout(function(){ document.getElementById('loader').classList.add('hidden'); }, 600);
+        };
+        setTimeout(function(){ document.getElementById('loader').classList.add('hidden'); }, 15000);
+      }
+    });
+  </script>
+</body>
+</html>

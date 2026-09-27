@@ -258,18 +258,22 @@
     @keyframes sp { to { transform: rotate(360deg); } }
     .app-loader p { color: var(--ink-soft); font-size: 13px; }
 
-    .rooms-fab{
-      position:fixed; bottom:20px; right:20px; z-index:80;
-      display:none; align-items:center; gap:8px;
-      background:var(--forest); color:var(--cream);
-      padding:12px 18px; border-radius:28px; border:none;
-      font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;
-      box-shadow:0 8px 24px rgba(28,22,16,0.18);
-    }
-    .rooms-fab.show{display:flex;}
-    .menus-fab{ left: 20px; right: auto; }
+    /* Manager department home (same cards as owner, one pub only) */
+    .manager-home { display: none; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; position: relative; background: var(--cream); }
+    .manager-home.active { display: flex; }
+    .manager-home::before { content: ''; position: absolute; inset: 0; background: radial-gradient(900px 420px at 100% 0%, #b68a3a24, transparent 55%), radial-gradient(700px 380px at 0% 80%, #24362c14, transparent 50%); pointer-events: none; }
+    .manager-home .brand { text-align: center; margin-bottom: 28px; position: relative; }
+    .manager-home .brand .icon { font-size: 40px; margin-bottom: 8px; }
+    .manager-home .brand h1 { font-family: 'Fraunces', Georgia, serif; font-size: 44px; font-weight: 600; letter-spacing: -0.025em; color: var(--ink); margin-bottom: 8px; }
+    .manager-home .brand p { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass-deep); }
+    .manager-home .pub-wrap { max-width: 420px; width: 100%; position: relative; }
+    .manager-home .pub-link.pricing .link-icon { background: rgba(182,138,58,0.18); }
+    .manager-home .pub-link.menus .link-icon { background: var(--eightbells-glow); }
+    .pub-link.menus .link-icon { background: var(--eightbells-glow); }
 
     @media (max-width: 640px) {
+      .manager-home { justify-content: flex-start; padding-top: 48px; }
+      .manager-home .brand h1 { font-size: 36px; }
       .pub-grid, .pw-grid { grid-template-columns: 1fr; gap: 16px; }
       .brand h1 { font-size: 40px; }
       .pub-card { padding: 24px 20px; }
@@ -361,6 +365,11 @@
           <a class="pub-link rooms" href="#" onclick="openApp('rooms-windmill','Windmill Inn');return false;">
             <span class="link-icon">🛏️</span>
             <span class="link-label">Rooms<small>Occupancy & 14-day calendar</small></span>
+            <span class="link-arrow">›</span>
+          </a>
+          <a class="pub-link menus" href="#" onclick="openApp('menus-windmill','Windmill Inn');return false;">
+            <span class="link-icon">🍽️</span>
+            <span class="link-label">Menus<small>Specials, Main · print &amp; email</small></span>
             <span class="link-arrow">›</span>
           </a>
           <a class="pub-link payroll" href="#" onclick="openApp('payroll','Windmill Inn');return false;">
@@ -465,35 +474,26 @@
     <iframe class="app-frame" id="appFrame" src="about:blank" allow="clipboard-write"></iframe>
   </div>
 
-  <!-- Manager hub view — never sends shell=owner -->
-  <div class="app-view" id="managerView">
-    <div class="app-bar">
-      <div class="app-bar-brand" aria-hidden="true">
-        <svg class="varlo-mark varlo-mark-sm" viewBox="0 0 48 48" fill="none">
-          <rect x="1.5" y="1.5" width="45" height="45" rx="12" fill="#24362c"/>
-          <path d="M11.2 12.5 24 38.2 36.8 12.5h-6.4L24 29.1 17.6 12.5H11.2Z" fill="#e6c27a"/>
-          <path d="M17.6 12.5 24 29.1 30.4 12.5" stroke="#b68a3a" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>
-        </svg>
-        <span class="app-bar-wordmark">Varlo</span>
-      </div>
-      <span class="app-bar-title" id="managerTitle">Manager</span>
-      <span class="app-bar-pub" id="managerPub"></span>
-      <div class="theme-toggle" data-theme-toggle role="group" aria-label="Colour theme">
-        <button type="button" data-theme-set="day" aria-pressed="false">Day</button>
-        <button type="button" data-theme-set="night" aria-pressed="false">Night</button>
-        <button type="button" data-theme-set="auto" aria-pressed="true">Auto</button>
-      </div>
-      <button class="app-bar-back" onclick="signOut()">Sign out</button>
+  <!-- Manager department home — same card style as owner, one pub only -->
+  <div class="manager-home" id="managerView">
+    <div class="brand">
+      <div class="icon" id="managerIcon">🔔</div>
+      <h1 id="managerTitle">Eight Bells</h1>
+      <p>Manager Portal</p>
     </div>
-    <div class="app-loader" id="managerLoader">
-      <div class="spinner"></div>
-      <p>Loading...</p>
+    <div class="pub-wrap">
+      <div class="pub-card" id="managerPubCard">
+        <div class="pub-icon" id="managerPubIcon">🔔</div>
+        <div class="pub-name" id="managerPubName">The Eight Bells</div>
+        <div class="pub-location" id="managerPub">Bolney</div>
+        <div class="pub-links" id="managerLinks"></div>
+      </div>
     </div>
-    <iframe class="app-frame" id="managerFrame" src="about:blank" allow="clipboard-write"></iframe>
+    <div class="footer">
+      <button class="sign-out" onclick="signOut()">Sign out</button>
+      <div>Varlo</div>
+    </div>
   </div>
-
-  <button type="button" class="rooms-fab" id="roomsFab" onclick="openApp('rooms-windmill','Windmill Inn')">🛏️ Rooms</button>
-  <button type="button" class="rooms-fab menus-fab" id="menusFab" onclick="openApp('menus-eightbells','Eight Bells')">🍽️ Menus</button>
 
   <script>
     // Owner PIN is a last-resort fallback if the auth web app is unreachable.
@@ -503,22 +503,25 @@
     // Standalone Varlo Auth /exec (not a venue paperwork router).
     var AUTH_URL = 'https://script.google.com/macros/s/AKfycbyghJc5aFAK7pqBo5_ih5IGILWungoJnhwWxy_9MImlcH13sKmpfGU6a4NIt0CjLgvN/exec';
 
-    var MANAGER_URLS = {
-      eightbells: 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec',
-      windmill: 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec'
-    };
+    var EB_HUB = 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec';
+    var WM_HUB = 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec';
 
     var URLS = {
       'invoicing': 'https://script.google.com/macros/s/AKfycbw_o2Xb6kidks5eKUyT-C2XoQyQ0QlpVKt895FwUNlulh9q0YLFuO7VYVMImULi3SrE/exec',
-      // Same Eight Bells / Windmill Apps Scripts as the manager portals.
       // shell=owner marks this GitHub owner page so those scripts can allow
       // owner tools here without putting an owner link back on the manager hub.
-      'paperwork-windmill': 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec?page=owner&shell=owner',
-      'paperwork-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=owner&shell=owner',
-      'cardtakings-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=cardday&shell=owner',
+      'paperwork-windmill': WM_HUB + '?page=owner&shell=owner',
+      'paperwork-eightbells': EB_HUB + '?page=owner&shell=owner',
+      // Manager paperwork (no owner shell)
+      'paperwork-mgr-eightbells': EB_HUB,
+      'paperwork-mgr-windmill': WM_HUB,
+      'cardtakings-eightbells': EB_HUB + '?page=cardday&shell=owner',
+      'cardtakings-mgr-eightbells': EB_HUB + '?page=cardday',
       // Standalone Teya CSV reader (browser-only). Does not feed paperwork.
       'cardtakings-windmill': 'card-takings.html?venue=windmill',
-      'menus-eightbells': 'menus.html?v=20260927-flow96',
+      'pricing-eightbells': EB_HUB + '?page=kegcosting',
+      'menus-eightbells': 'menus.html?v=20260927-flow97',
+      'menus-windmill': 'menus.html?venue=windmill&v=20260927-flow97',
       'rooms-windmill': 'https://rooms.windmilllittleworth.com',
       'payroll': 'https://owner.kinfoldinns.co.uk/payroll.html?v=20260901-xero-pull-timeout',
       'staffhub': 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec'
@@ -527,10 +530,15 @@
       'invoicing': '📊 Invoicing',
       'paperwork-windmill': '📋 Paperwork',
       'paperwork-eightbells': '📋 Paperwork',
+      'paperwork-mgr-eightbells': '📋 Paperwork',
+      'paperwork-mgr-windmill': '📋 Paperwork',
       'cardtakings-eightbells': '💳 Card Takings',
+      'cardtakings-mgr-eightbells': '💳 Card Takings',
       'cardtakings-windmill': '💳 Card Takings',
+      'pricing-eightbells': '💷 Drink Pricing',
       'rooms-windmill': '🛏️ Rooms',
       'menus-eightbells': '🍽️ Menus',
+      'menus-windmill': '🍽️ Menus',
       'payroll': '💷 Payroll → Wise',
       'staffhub': '👥 Staff Hub'
     };
@@ -538,12 +546,32 @@
       'invoicing': 'Both Venues',
       'paperwork-windmill': 'Windmill Inn',
       'paperwork-eightbells': 'Eight Bells',
+      'paperwork-mgr-eightbells': 'Eight Bells',
+      'paperwork-mgr-windmill': 'Windmill Inn',
       'cardtakings-eightbells': 'Eight Bells',
+      'cardtakings-mgr-eightbells': 'Eight Bells',
       'cardtakings-windmill': 'Windmill Inn',
+      'pricing-eightbells': 'Eight Bells',
       'rooms-windmill': 'Windmill Inn',
       'menus-eightbells': 'Eight Bells',
+      'menus-windmill': 'Windmill Inn',
       'payroll': 'Both Venues',
       'staffhub': 'Both Venues'
+    };
+
+    var MANAGER_LINKS = {
+      eightbells: [
+        { system: 'paperwork-mgr-eightbells', pub: 'Eight Bells', cls: 'paperwork', icon: '📋', label: 'Paperwork', small: 'Cash-up, tabs, week submit' },
+        { system: 'menus-eightbells', pub: 'Eight Bells', cls: 'menus', icon: '🍽️', label: 'Menus', small: 'Specials, Main, Sunday · print & email' },
+        { system: 'cardtakings-mgr-eightbells', pub: 'Eight Bells', cls: 'cardtakings', icon: '💳', label: 'Card Takings', small: 'Card day figures' },
+        { system: 'pricing-eightbells', pub: 'Eight Bells', cls: 'pricing', icon: '💷', label: 'Drink Pricing', small: 'Bar sell / Price Query' }
+      ],
+      windmill: [
+        { system: 'paperwork-mgr-windmill', pub: 'Windmill Inn', cls: 'paperwork', icon: '📋', label: 'Paperwork', small: 'Cash-up, tabs, week submit' },
+        { system: 'menus-windmill', pub: 'Windmill Inn', cls: 'menus', icon: '🍽️', label: 'Menus', small: 'Specials, Main · print & email' },
+        { system: 'rooms-windmill', pub: 'Windmill Inn', cls: 'rooms', icon: '🛏️', label: 'Rooms', small: 'Occupancy & 14-day calendar' },
+        { system: 'cardtakings-windmill', pub: 'Windmill Inn', cls: 'cardtakings', icon: '💳', label: 'Card Takings', small: 'Teya CSV — by machine' }
+      ]
     };
 
     var currentSystem = null;
@@ -574,8 +602,6 @@
       document.getElementById('landing').style.display = 'none';
       document.getElementById('appView').classList.remove('active');
       document.getElementById('managerView').classList.remove('active');
-      document.getElementById('roomsFab').classList.remove('show');
-      document.getElementById('menusFab').classList.remove('show');
       document.getElementById('pw').focus();
     }
 
@@ -585,22 +611,40 @@
       document.getElementById('landing').style.display = '';
       document.getElementById('appView').classList.remove('active');
       document.getElementById('managerView').classList.remove('active');
-      document.getElementById('roomsFab').classList.remove('show');
-      document.getElementById('menusFab').classList.remove('show');
       refreshPasswordStatus();
+    }
+
+    function renderManagerLinks(role) {
+      var links = MANAGER_LINKS[role] || [];
+      var host = document.getElementById('managerLinks');
+      var html = '';
+      for (var i = 0; i < links.length; i++) {
+        var L = links[i];
+        html += '<button type="button" class="pub-link ' + L.cls + '" onclick="openApp(\'' + L.system + '\',\'' + L.pub + '\')">' +
+          '<span class="link-icon">' + L.icon + '</span>' +
+          '<span class="link-label">' + L.label + '<small>' + L.small + '</small></span>' +
+          '<span class="link-arrow">›</span></button>';
+      }
+      host.innerHTML = html;
     }
 
     function showManager(role) {
       sessionRole = role;
+      var isWm = role === 'windmill';
       document.getElementById('loginOverlay').classList.add('hidden');
       document.getElementById('landing').style.display = 'none';
       document.getElementById('appView').classList.remove('active');
       document.getElementById('managerView').classList.add('active');
-      document.getElementById('managerTitle').textContent = role === 'windmill' ? 'Windmill manager' : 'Eight Bells manager';
-      document.getElementById('managerPub').textContent = role === 'windmill' ? 'Littleworth' : 'Bolney';
-      document.getElementById('roomsFab').classList.toggle('show', role === 'windmill');
-      document.getElementById('menusFab').classList.toggle('show', role === 'eightbells');
-      loadManagerHub(role);
+      document.getElementById('managerIcon').textContent = isWm ? '🍺' : '🔔';
+      document.getElementById('managerPubIcon').textContent = isWm ? '🍺' : '🔔';
+      document.getElementById('managerTitle').textContent = isWm ? 'Windmill Inn' : 'Eight Bells';
+      document.getElementById('managerPubName').textContent = isWm ? 'The Windmill Inn' : 'The Eight Bells';
+      document.getElementById('managerPub').textContent = isWm ? 'Littleworth' : 'Bolney';
+      var card = document.getElementById('managerPubCard');
+      card.classList.remove('windmill', 'eightbells');
+      card.classList.add(isWm ? 'windmill' : 'eightbells');
+      renderManagerLinks(role);
+      history.replaceState({ view: 'manager', role: role }, '', '#' + role);
     }
 
     function restoreSession() {
@@ -642,7 +686,6 @@
       lastOwnerPassword = '';
       sessionRole = null;
       document.getElementById('appFrame').src = 'about:blank';
-      document.getElementById('managerFrame').src = 'about:blank';
       history.replaceState({ view: 'login' }, '', '#');
       showLogin();
     }
@@ -827,17 +870,6 @@
         });
     }
 
-    function loadManagerHub(role) {
-      var url = MANAGER_URLS[role];
-      if (!url) return;
-      url = stripOwnerShell(url);
-      document.getElementById('managerLoader').classList.remove('hidden');
-      var frame = document.getElementById('managerFrame');
-      frame.src = url;
-      frame.onload = function() { setTimeout(function() { document.getElementById('managerLoader').classList.add('hidden'); }, 800); };
-      setTimeout(function() { document.getElementById('managerLoader').classList.add('hidden'); }, 15000);
-    }
-
     document.getElementById('pw').addEventListener('keydown', function(e) { if (e.key === 'Enter') checkPw(); });
 
     var qRole = (location.search.match(/[?&]role=([^&]+)/) || [])[1];
@@ -888,13 +920,18 @@
       return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'mode=staff';
     }
 
+    function managerMayOpen(system) {
+      var links = MANAGER_LINKS[sessionRole] || [];
+      for (var i = 0; i < links.length; i++) {
+        if (links[i].system === system) return true;
+      }
+      return false;
+    }
+
     function openApp(system, pubName, opts) {
       opts = opts || {};
       if (sessionRole && sessionRole !== 'owner') {
-        // Managers may open Rooms (Windmill) or Menus (Eight Bells). Do not send shell=owner.
-        if (system === 'rooms-windmill' && sessionRole !== 'windmill') return;
-        if (system === 'menus-eightbells' && sessionRole !== 'eightbells') return;
-        if (system !== 'rooms-windmill' && system !== 'menus-eightbells') return;
+        if (!managerMayOpen(system)) return;
       }
       var url = URLS[system];
       if (!url) return;
@@ -908,7 +945,11 @@
         url = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
       }
       if (sessionRole === 'owner') url = withOwnerShell(url);
-      if (system === 'menus-eightbells' && sessionRole === 'eightbells') url = withStaffMenus(url);
+      else url = stripOwnerShell(url);
+      if ((system === 'menus-eightbells' || system === 'menus-windmill') &&
+          (sessionRole === 'eightbells' || sessionRole === 'windmill')) {
+        url = withStaffMenus(url);
+      }
       currentSystem = system;
       currentPub = pubName;
       document.getElementById('appTitle').textContent = TITLES[system] || system;
@@ -921,8 +962,6 @@
       document.getElementById('landing').style.display = 'none';
       document.getElementById('managerView').classList.remove('active');
       document.getElementById('appView').classList.add('active');
-      document.getElementById('roomsFab').classList.remove('show');
-      document.getElementById('menusFab').classList.remove('show');
       var hist = { view: 'app', system: system, pub: pubName, url: url };
       if (opts.replace) history.replaceState(hist, '', '#' + system);
       else history.pushState(hist, '', '#' + system);
@@ -955,8 +994,6 @@
       document.getElementById('appFrame').src = 'about:blank';
       if (sessionRole === 'windmill' || sessionRole === 'eightbells') {
         document.getElementById('managerView').classList.add('active');
-        document.getElementById('roomsFab').classList.toggle('show', sessionRole === 'windmill');
-        document.getElementById('menusFab').classList.toggle('show', sessionRole === 'eightbells');
         history.pushState({ view: 'manager', role: sessionRole }, '', '#' + sessionRole);
         return;
       }
@@ -970,17 +1007,14 @@
         var nextUrl = e.data.url;
         if (sessionRole === 'owner') nextUrl = withOwnerShell(nextUrl);
         else nextUrl = stripOwnerShell(nextUrl);
-        var usingManager = sessionRole === 'eightbells' || sessionRole === 'windmill';
-        var frame = document.getElementById(usingManager ? 'managerFrame' : 'appFrame');
-        var loader = document.getElementById(usingManager ? 'managerLoader' : 'appLoader');
+        var frame = document.getElementById('appFrame');
+        var loader = document.getElementById('appLoader');
         loader.classList.remove('hidden');
         frame.src = nextUrl;
         frame.onload = function() { setTimeout(function() { loader.classList.add('hidden'); }, 600); };
         setTimeout(function() { loader.classList.add('hidden'); }, 15000);
-        if (!usingManager) {
-          var page = getPageFromUrl(nextUrl);
-          history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: nextUrl, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
-        }
+        var page = getPageFromUrl(nextUrl);
+        history.pushState({ view: 'app', system: currentSystem, pub: currentPub, url: nextUrl, page: page }, '', '#' + (currentSystem || 'app') + (page ? '/' + page : ''));
       }
       if (e.data.type === 'kinfold-page-change' && e.data.page) {
         document.getElementById('appTitle').textContent = e.data.page;
@@ -991,6 +1025,7 @@
       var state = event.state;
       if (state && state.view === 'manager' && (sessionRole === 'eightbells' || sessionRole === 'windmill')) {
         document.getElementById('appView').classList.remove('active');
+        document.getElementById('appFrame').src = 'about:blank';
         document.getElementById('landing').style.display = 'none';
         document.getElementById('managerView').classList.add('active');
         return;
@@ -1017,7 +1052,10 @@
         document.getElementById('appLoader').classList.remove('hidden');
         var frame = document.getElementById('appFrame');
         var url = sessionRole === 'owner' ? withOwnerShell(state.url) : stripOwnerShell(state.url);
-        if (sessionRole === 'eightbells' && state.system === 'menus-eightbells') url = withStaffMenus(url);
+        if ((state.system === 'menus-eightbells' || state.system === 'menus-windmill') &&
+            (sessionRole === 'eightbells' || sessionRole === 'windmill')) {
+          url = withStaffMenus(url);
+        }
         frame.src = url;
         frame.onload = function() { setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 600); };
         setTimeout(function() { document.getElementById('appLoader').classList.add('hidden'); }, 15000);
