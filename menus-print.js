@@ -3483,7 +3483,8 @@
       return {
         ok: true,
         to: (data && data.to) || to,
-        subject: data && data.subject
+        subject: data && data.subject,
+        filename: data && data.filename
       };
     });
   }

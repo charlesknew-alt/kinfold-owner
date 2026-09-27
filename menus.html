@@ -119,6 +119,36 @@
     .history-row .who { font-weight: 700; font-size: 15px; }
     .history-row .meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
     .history-row .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .catalogue-filters {
+      display: grid; gap: 10px; margin: 0 0 4px;
+    }
+    @media (min-width: 640px) {
+      .catalogue-filters { grid-template-columns: minmax(0, 1.4fr) minmax(140px, 220px); align-items: end; }
+    }
+    .catalogue-filters .field { margin-top: 0; }
+    .catalogue-row {
+      padding: 12px 0; border-bottom: 1px solid var(--line);
+    }
+    .catalogue-row:last-child { border-bottom: 0; }
+    .catalogue-row .who { font-weight: 700; font-size: 15px; }
+    .catalogue-row .meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+    .catalogue-row .desc { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+    .catalogue-row details { margin-top: 8px; }
+    .catalogue-row summary {
+      cursor: pointer; font-size: 12.5px; font-weight: 700; color: var(--ink-soft);
+      letter-spacing: 0.03em; text-transform: uppercase;
+    }
+    .catalogue-hist {
+      list-style: none; margin: 8px 0 0; padding: 0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .catalogue-hist li {
+      display: flex; justify-content: space-between; gap: 12px;
+      font-size: 13px; padding: 4px 0; border-bottom: 1px dotted var(--line);
+    }
+    .catalogue-hist li:last-child { border-bottom: 0; }
+    .catalogue-hist .hp { font-weight: 700; }
+    .catalogue-count { font-size: 13px; color: var(--ink-soft); margin: 8px 0 0; }
     .view-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
     .view-toggle button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
@@ -330,15 +360,16 @@
     </script>
     <div class="view-toggle no-print" id="viewToggle" role="tablist" aria-label="Menus view">
       <button type="button" class="soft on" data-view="edit" id="viewEdit">Edit &amp; generate</button>
+      <button type="button" class="soft" data-view="catalogue" id="viewCatalogue">All dishes</button>
       <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
       <a class="soft" href="menus-guide.html" target="_blank" rel="noopener" id="viewGuide" style="text-decoration:none;display:inline-flex;align-items:center">Quick guide</a>
     </div>
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow92"></script>
-  <script src="menus-print.js?v=20260926-flow92"></script>
-  <script src="menus-ingest.js?v=20260926-flow92"></script>
+  <script src="menus.js?v=20260927-flow93"></script>
+  <script src="menus-print.js?v=20260927-flow93"></script>
+  <script src="menus-ingest.js?v=20260927-flow93"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -367,9 +398,11 @@
     var pendingReview = null;
     var editingPromoId = '';
     var flowStep = 1; // staff: 1 dishes · 2 generate · owner: + blocks + wording
-    var viewMode = 'edit'; // edit | history
+    var viewMode = 'edit'; // edit | catalogue | history
     var historyFilter = 'all';
     var historyCache = [];
+    var catalogueQuery = '';
+    var catalogueSection = 'all';
     var cloudUpdatedAt = (function () {
       try { return parseInt(localStorage.getItem(CLOUD_AT_KEY) || '0', 10) || 0; }
       catch (e) { return 0; }
@@ -694,9 +727,17 @@
       document.querySelectorAll('#viewToggle [data-view]').forEach(function (b) {
         b.classList.toggle('on', b.getAttribute('data-view') === viewMode);
       });
+      if (viewMode === 'catalogue') {
+        if (lede) {
+          lede.textContent = 'Every dish saved from your menus — search by name or category, see current price and the price/date history. Shared on PC and phone.';
+        }
+        if (picker) picker.style.display = 'none';
+        renderCatalogue();
+        return;
+      }
       if (viewMode === 'history') {
         if (lede) {
-          lede.textContent = 'Past generated sheets shared in the cloud — same list on PC and phone. Grouped by day, with week / Sunday label and Roman print number. Open to print again, or download the HTML.';
+          lede.textContent = 'Past generated sheets shared in the cloud — same list on PC and phone. Grouped by day, with week / Sunday label and Roman print number. Email attaches a printable PDF.';
         }
         if (picker) picker.style.display = 'none';
         renderHistory();
@@ -726,7 +767,7 @@
         var html = '';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
-        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (sends to pub@eightbellsbolney.com on click), or Download. ' +
+        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com on click), or Download. ' +
           'Shared across phones and PCs. Newest days first.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
@@ -814,7 +855,9 @@
               }, 1600);
               if (res && res.to) {
                 // Quiet confirmation — no mail-client popup.
-                btn.title = 'Sent to ' + res.to;
+                var tip = 'Sent PDF to ' + res.to;
+                if (res.filename) tip += ' (' + res.filename + ')';
+                btn.title = tip;
               }
             });
           }).catch(function (err) {
@@ -862,6 +905,143 @@
           EBMenuPrint.deletePrintHistory(id).catch(function () {});
         };
       });
+    }
+
+    function formatCatalogueDate(iso) {
+      var s = String(iso || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}/.test(s)) return s || '—';
+      var parts = s.slice(0, 10).split('-');
+      var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      if (isNaN(d.getTime())) return s;
+      try {
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      } catch (e) {
+        return s;
+      }
+    }
+
+    function formatCataloguePrice(p) {
+      var s = String(p != null ? p : '').trim();
+      if (!s) return '—';
+      if (/^£/.test(s) || /^mp$/i.test(s)) return s;
+      if (/^\d/.test(s)) return '£' + s;
+      return s;
+    }
+
+    function renderCatalogue() {
+      var el = document.getElementById('editor');
+      var rows = EBMenus.filterDishCatalogue
+        ? EBMenus.filterDishCatalogue(dishCatalogue, { query: catalogueQuery, section: catalogueSection })
+        : [];
+      var sections = EBMenus.dishCatalogueSections
+        ? EBMenus.dishCatalogueSections(dishCatalogue)
+        : [];
+      // Always offer known section names even if catalogue is empty yet.
+      var known = (EBMenus.SECTIONS || []).concat(EBMenus.SPECIALS_SECTIONS || []);
+      known.forEach(function (s) {
+        if (s && sections.indexOf(s) === -1) sections.push(s);
+      });
+      sections.sort(function (a, b) { return a.localeCompare(b); });
+
+      var html = '';
+      html += '<div class="include-box" style="margin-bottom:14px">';
+      html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">All dishes</h3>';
+      html += '<p class="note" style="margin:0 0 10px">Shared catalogue of every dish saved from your menus — current price, last used date, and price history. ' +
+        'Search by name or filter by category. Grows automatically when you save.</p>';
+      html += '<div class="catalogue-filters">';
+      html += '<div><label class="field" for="catalogueSearch">Search by name</label>';
+      html += '<input type="search" id="catalogueSearch" placeholder="e.g. sirloin, short rib" value="' +
+        escapeAttr(catalogueQuery) + '" autocomplete="off"></div>';
+      html += '<div><label class="field" for="catalogueSection">Category</label>';
+      html += '<select id="catalogueSection">';
+      html += '<option value="all"' + (catalogueSection === 'all' ? ' selected' : '') + '>All categories</option>';
+      sections.forEach(function (sec) {
+        html += '<option value="' + escapeAttr(sec) + '"' +
+          (catalogueSection === sec ? ' selected' : '') + '>' + escapeAttr(sec) + '</option>';
+      });
+      html += '</select></div></div>';
+      html += '<p class="catalogue-count" id="catalogueCount">' + rows.length + ' dish' +
+        (rows.length === 1 ? '' : 'es') + '</p>';
+      html += '</div>';
+
+      if (!(dishCatalogue && dishCatalogue.length)) {
+        html += '<p class="note">No dishes in the catalogue yet. Save a menu (or add dishes and save) and they will appear here with price history.</p>';
+        el.innerHTML = html;
+        bindCatalogue();
+        return;
+      }
+      if (!rows.length) {
+        html += '<p class="note">No dishes match that search. Clear the name or pick another category.</p>';
+        el.innerHTML = html;
+        bindCatalogue();
+        return;
+      }
+
+      rows.forEach(function (item) {
+        var hist = Array.isArray(item.priceHistory) ? item.priceHistory : [];
+        html += '<div class="catalogue-row" data-catalogue-key="' + escapeAttr(item.key || '') + '">';
+        html += '<div class="who">' + escapeAttr(item.name || 'Dish') + '</div>';
+        html += '<div class="meta">' + escapeAttr(item.section || '—') +
+          ' · ' + escapeAttr(formatCataloguePrice(item.price)) +
+          ' · last ' + escapeAttr(formatCatalogueDate(item.lastSeen)) +
+          (item.seenCount > 1 ? ' · seen ' + item.seenCount + '×' : '') +
+          (item.tags ? ' · ' + escapeAttr(item.tags) : '') +
+          '</div>';
+        if (item.description) {
+          html += '<div class="desc">' + escapeAttr(item.description) + '</div>';
+        }
+        if (hist.length) {
+          html += '<details>';
+          html += '<summary>Price history (' + hist.length + ')</summary>';
+          html += '<ul class="catalogue-hist">';
+          hist.forEach(function (h) {
+            html += '<li><span>' + escapeAttr(formatCatalogueDate(h.date)) +
+              '</span><span class="hp">' + escapeAttr(formatCataloguePrice(h.price)) + '</span></li>';
+          });
+          html += '</ul></details>';
+        }
+        html += '</div>';
+      });
+      el.innerHTML = html;
+      bindCatalogue();
+    }
+
+    function bindCatalogue() {
+      var searchEl = document.getElementById('catalogueSearch');
+      var secEl = document.getElementById('catalogueSection');
+      var timer = null;
+      function refreshFromFilters() {
+        catalogueQuery = searchEl ? String(searchEl.value || '') : '';
+        catalogueSection = secEl ? String(secEl.value || 'all') : 'all';
+        renderCatalogue();
+        var again = document.getElementById('catalogueSearch');
+        if (again) {
+          try {
+            again.focus();
+            var len = again.value.length;
+            again.setSelectionRange(len, len);
+          } catch (e) {}
+        }
+      }
+      if (searchEl) {
+        searchEl.oninput = function () {
+          clearTimeout(timer);
+          timer = setTimeout(refreshFromFilters, 160);
+        };
+        searchEl.onkeydown = function (ev) {
+          if (ev.key === 'Enter') {
+            ev.preventDefault();
+            clearTimeout(timer);
+            refreshFromFilters();
+          }
+        };
+      }
+      if (secEl) {
+        secEl.onchange = function () {
+          clearTimeout(timer);
+          refreshFromFilters();
+        };
+      }
     }
 
     function renderPicker() {

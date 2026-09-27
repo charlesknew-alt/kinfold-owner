@@ -307,12 +307,20 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow92') !== -1, 'menus page cache-bust is flow92');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow92') !== -1, 'hub menus link cache-bust is flow92');
+assert(page.indexOf('flow93') !== -1, 'menus page cache-bust is flow93');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow93') !== -1, 'hub menus link cache-bust is flow93');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
   'Menu AI Apps Script can email a saved print sheet');
+assert(aiGs.indexOf('menuHtmlToPdfBlob_') !== -1 && aiGs.indexOf('MimeType.PDF') !== -1,
+  'Email converts the print sheet to a PDF attachment');
+assert(page.indexOf('data-view="catalogue"') !== -1 && page.indexOf('renderCatalogue') !== -1,
+  'All dishes view browses the shared catalogue');
+assert(page.indexOf('catalogueSearch') !== -1 && page.indexOf('catalogueSection') !== -1,
+  'All dishes can search by name and filter by category');
+assert(typeof api.filterDishCatalogue === 'function' && typeof api.dishCatalogueSections === 'function',
+  'catalogue filter helpers are exported');
 assert(page.indexOf('Sending…') !== -1, 'Email button shows sending state');
 assert(page.indexOf('data-dish-delete') !== -1 && page.indexOf('removeDishInstant') !== -1,
   'dish Delete melts away without reloading the list');
@@ -355,6 +363,12 @@ assert(sirloin && sirloin.price === '22.50' && sirloin.priceHistory.length === 2
   'catalogue keeps price history with dates');
 assert(api.searchDishCatalogue(catSmoke, 'beef short')[0].name.indexOf('Short Rib') !== -1,
   'catalogue search matches word by word');
+assert(api.filterDishCatalogue(catSmoke, { query: '', section: 'all' }).length === 2,
+  'All dishes filter lists the full catalogue when search is empty');
+assert(api.filterDishCatalogue(catSmoke, { query: 'sirloin', section: 'Mains' })[0].name.indexOf('Sirloin') !== -1,
+  'All dishes filter matches name and category together');
+assert(api.dishCatalogueSections(catSmoke).indexOf('Mains') !== -1,
+  'catalogue exposes distinct categories for the filter');
 assert(api.dishFromCatalogueEntry(sirloin).name === 'Sirloin of Beef',
   'catalogue entry can be cloned onto a menu');
 assert(printJs.indexOf('cols-little-solo') !== -1 && printJs.indexOf('levelOppositeColumns') !== -1,

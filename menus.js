@@ -637,6 +637,52 @@
     return scored.slice(0, limit).map(function (s) { return s.item; });
   }
 
+  /**
+   * Browse / filter the full dish catalogue (All dishes view).
+   * Empty query = all dishes; optional section filter; sorted by lastSeen then name.
+   */
+  function filterDishCatalogue(catalogue, opts) {
+    opts = opts || {};
+    var q = String(opts.query != null ? opts.query : '').trim();
+    var section = String(opts.section || '').trim();
+    var list = normalizeDishCatalogue(catalogue);
+    if (section && section !== 'all') {
+      var secLower = section.toLowerCase();
+      list = list.filter(function (item) {
+        return String(item.section || '').toLowerCase() === secLower;
+      });
+    }
+    if (q) {
+      // Reuse word-by-word scorer, then keep that order among the section-filtered set.
+      var keys = {};
+      list.forEach(function (item) { keys[item.key] = true; });
+      var matched = searchDishCatalogue(list, q, { limit: list.length || 1 });
+      list = matched.filter(function (item) { return keys[item.key]; });
+    } else {
+      list = list.slice().sort(function (a, b) {
+        return String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')) ||
+          String(a.name || '').localeCompare(String(b.name || ''));
+      });
+    }
+    var limit = parseInt(opts.limit, 10);
+    if (limit > 0) list = list.slice(0, limit);
+    return list;
+  }
+
+  /** Distinct categories present in the catalogue (for the All dishes filter). */
+  function dishCatalogueSections(catalogue) {
+    var seen = {};
+    var out = [];
+    normalizeDishCatalogue(catalogue).forEach(function (item) {
+      var s = String(item.section || '').trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      out.push(s);
+    });
+    out.sort(function (a, b) { return a.localeCompare(b); });
+    return out;
+  }
+
   /** Clone a catalogue (or live menu) dish onto a target menu with a fresh id. */
   function dishFromCatalogueEntry(entry, opts) {
     opts = opts || {};
@@ -1955,6 +2001,8 @@
     upsertDishCatalogueFromBook: upsertDishCatalogueFromBook,
     mergeDishCatalogues: mergeDishCatalogues,
     searchDishCatalogue: searchDishCatalogue,
+    filterDishCatalogue: filterDishCatalogue,
+    dishCatalogueSections: dishCatalogueSections,
     dishFromCatalogueEntry: dishFromCatalogueEntry,
     isoDateToday: isoDateToday
   };

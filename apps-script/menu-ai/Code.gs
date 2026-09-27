@@ -607,21 +607,32 @@ function emailPrintHistory_(body) {
     .replace(/[\/\\?%*:|"<>]/g, '-')
     .replace(/\s+/g, ' ')
     .trim() || 'menu';
-  var filename = safeName + '.html';
-  var blob = Utilities.newBlob(html, 'text/html', filename);
+  var pdfName = safeName + '.pdf';
+  var attachments = [];
+  var attachedAs = '';
+  try {
+    attachments.push(menuHtmlToPdfBlob_(html, pdfName));
+    attachedAs = pdfName;
+  } catch (pdfErr) {
+    // Fallback: HTML attachment if PDF conversion fails on a rare sheet.
+    var htmlName = safeName + '.html';
+    attachments.push(Utilities.newBlob(html, 'text/html', htmlName));
+    attachedAs = htmlName + ' (PDF convert failed: ' +
+      String(pdfErr && pdfErr.message ? pdfErr.message : pdfErr).slice(0, 120) + ')';
+  }
   var plain =
     'Eight Bells menu: ' + subject + '\n\n' +
-    'Open the attached HTML in a browser, then use Print → Save as PDF.\n';
+    'Printable PDF attached (' + attachedAs + ').\n';
   var htmlBody =
     '<p>Eight Bells menu: <strong>' + subject.replace(/</g, '&lt;') + '</strong></p>' +
-    '<p>Open the attached HTML in a browser, then use <strong>Print → Save as PDF</strong>.</p>';
+    '<p>Printable <strong>PDF</strong> attached — ready to print.</p>';
   try {
     MailApp.sendEmail({
       to: to,
       subject: subject,
       body: plain,
       htmlBody: htmlBody,
-      attachments: [blob],
+      attachments: attachments,
       name: 'Eight Bells Menus'
     });
   } catch (err) {
@@ -630,7 +641,44 @@ function emailPrintHistory_(body) {
       error: 'Could not send email: ' + String(err && err.message ? err.message : err)
     };
   }
-  return { ok: true, source: 'mail', to: to, subject: subject, filename: filename };
+  return { ok: true, source: 'mail', to: to, subject: subject, filename: attachedAs };
+}
+
+/**
+ * Turn a saved print-sheet HTML into a PDF blob for email attachment.
+ * Scripts/toolbars stripped so the PDF is the printable menu only.
+ */
+function menuHtmlToPdfBlob_(html, filenamePdf) {
+  var raw = String(html || '');
+  var styles = '';
+  raw.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function (_m, css) {
+    styles += css + '\n';
+    return '';
+  });
+  var bodyHtml = raw;
+  var bodyMatch = raw.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (bodyMatch) bodyHtml = bodyMatch[1];
+  bodyHtml = bodyHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '');
+  styles +=
+    '@page{size:A4;margin:0}' +
+    'html,body{background:#fff!important;margin:0;padding:0}' +
+    '.toolbar,#previewToolbar{display:none!important}' +
+    '.sheet-stack.mode-a5{display:none!important}' +
+    'body.paper-a5 .mode-a5{display:block!important}body.paper-a5 .mode-a4{display:none!important}' +
+    'body.paper-a4 .mode-a5{display:none!important}body.paper-a4 .mode-a4{display:block!important}';
+  var page =
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+    styles +
+    '</style></head><body>' +
+    bodyHtml +
+    '</body></html>';
+  var out = HtmlService.createHtmlOutput(page).setWidth(794).setHeight(1123);
+  var pdf = out.getAs(MimeType.PDF);
+  pdf.setName(String(filenamePdf || 'menu.pdf'));
+  return pdf;
 }
 
 function getMenusState_() {
