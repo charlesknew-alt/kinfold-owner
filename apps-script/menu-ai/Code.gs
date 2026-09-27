@@ -33,6 +33,9 @@ function doPost(e) {
     if (action === 'deletePrintHistory') {
       return json_(deletePrintHistory_(body.id));
     }
+    if (action === 'emailPrintHistory') {
+      return json_(emailPrintHistory_(body));
+    }
     // Shared live menu book (dishes, blurbs, wording, layout) across devices.
     if (action === 'getMenusState') {
       return json_(getMenusState_());
@@ -58,7 +61,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, getMenusState, saveMenusState, reviewLayout; or imageBase64 for AI read'
+    hint: 'POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout; or imageBase64 for AI read'
   });
 }
 
@@ -547,6 +550,65 @@ function deletePrintHistory_(id) {
   var list = historyReadIndex_().filter(function (r) { return r.id !== id; });
   historyWriteIndex_(list);
   return { ok: true, source: 'props', id: id };
+}
+
+var MENU_EMAIL_DEFAULT_ = 'pub@eightbellsbolney.com';
+
+/**
+ * Send a saved print sheet by email (no client mailto popup).
+ * Runs as the script owner via MailApp.
+ */
+function emailPrintHistory_(body) {
+  body = body || {};
+  var props = PropertiesService.getScriptProperties();
+  var to = String(body.to || props.getProperty('MENU_EMAIL_TO') || MENU_EMAIL_DEFAULT_).trim();
+  var entry = body.entry && typeof body.entry === 'object' ? body.entry : {};
+  var html = String(entry.html || '');
+  if (!html && (body.id || entry.id)) {
+    var got = getPrintHistory_(body.id || entry.id);
+    if (got && got.ok && got.entry) {
+      entry = got.entry;
+      html = String(entry.html || '');
+    }
+  }
+  if (!html) return { ok: false, error: 'Missing sheet HTML to email' };
+  if (!to || to.indexOf('@') === -1) return { ok: false, error: 'Bad email address' };
+
+  var menuName = String(entry.menuName || entry.menuId || 'Menu');
+  var week = String(entry.week || '');
+  var roman = String(entry.roman || '');
+  var subjectParts = [menuName];
+  if (week) subjectParts.push(week);
+  if (roman) subjectParts.push(roman);
+  var subject = subjectParts.join(' · ');
+  var safeName = (menuName + (roman ? ' - ' + roman : ''))
+    .replace(/[\/\\?%*:|"<>]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim() || 'menu';
+  var filename = safeName + '.html';
+  var blob = Utilities.newBlob(html, 'text/html', filename);
+  var plain =
+    'Eight Bells menu: ' + subject + '\n\n' +
+    'Open the attached HTML in a browser, then use Print → Save as PDF.\n';
+  var htmlBody =
+    '<p>Eight Bells menu: <strong>' + subject.replace(/</g, '&lt;') + '</strong></p>' +
+    '<p>Open the attached HTML in a browser, then use <strong>Print → Save as PDF</strong>.</p>';
+  try {
+    MailApp.sendEmail({
+      to: to,
+      subject: subject,
+      body: plain,
+      htmlBody: htmlBody,
+      attachments: [blob],
+      name: 'Eight Bells Menus'
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: 'Could not send email: ' + String(err && err.message ? err.message : err)
+    };
+  }
+  return { ok: true, source: 'mail', to: to, subject: subject, filename: filename };
 }
 
 function getMenusState_() {

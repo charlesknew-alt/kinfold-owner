@@ -307,8 +307,13 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow91') !== -1, 'menus page cache-bust is flow91');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow91') !== -1, 'hub menus link cache-bust is flow91');
+assert(page.indexOf('flow92') !== -1, 'menus page cache-bust is flow92');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow92') !== -1, 'hub menus link cache-bust is flow92');
+assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
+  'Email sends via Apps Script MailApp (no mailto popup)');
+assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
+  'Menu AI Apps Script can email a saved print sheet');
+assert(page.indexOf('Sending…') !== -1, 'Email button shows sending state');
 assert(page.indexOf('data-dish-delete') !== -1 && page.indexOf('removeDishInstant') !== -1,
   'dish Delete melts away without reloading the list');
 assert(page.indexOf('dish-row-melt') !== -1, 'dish delete uses melt-away animation');

@@ -336,9 +336,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow91"></script>
-  <script src="menus-print.js?v=20260926-flow91"></script>
-  <script src="menus-ingest.js?v=20260926-flow91"></script>
+  <script src="menus.js?v=20260926-flow92"></script>
+  <script src="menus-print.js?v=20260926-flow92"></script>
+  <script src="menus-ingest.js?v=20260926-flow92"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -726,7 +726,7 @@
         var html = '';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
-        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — open to print PDF, email, or download. ' +
+        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (sends to pub@eightbellsbolney.com on click), or Download. ' +
           'Shared across phones and PCs. Newest days first.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
@@ -795,18 +795,32 @@
       document.querySelectorAll('[data-history-email]').forEach(function (btn) {
         btn.onclick = function () {
           var id = btn.getAttribute('data-history-email');
+          if (btn.disabled) return;
+          var label = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = 'Sending…';
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
               alert('That sheet is missing from history.');
+              btn.disabled = false;
+              btn.textContent = label || 'Email';
               return;
             }
-            if (EBMenuPrint.emailPrintHtml) {
-              EBMenuPrint.emailPrintHtml(entry).catch(function () {
-                alert('Could not start email for that sheet.');
-              });
-            } else {
-              EBMenuPrint.downloadPrintHtml(entry);
-            }
+            return EBMenuPrint.emailPrintHtml(entry).then(function (res) {
+              btn.textContent = 'Sent';
+              setTimeout(function () {
+                btn.disabled = false;
+                btn.textContent = label || 'Email';
+              }, 1600);
+              if (res && res.to) {
+                // Quiet confirmation — no mail-client popup.
+                btn.title = 'Sent to ' + res.to;
+              }
+            });
+          }).catch(function (err) {
+            btn.disabled = false;
+            btn.textContent = label || 'Email';
+            alert('Could not send email. ' + (err && err.message ? err.message : 'Try again in a moment.'));
           });
         };
       });

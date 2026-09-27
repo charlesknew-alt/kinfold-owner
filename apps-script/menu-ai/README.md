@@ -36,7 +36,7 @@ The same web app stores staff data in **Script Properties** (no extra Drive logi
 - `MENUS_*` — live dishes, party blurbs, promo bank, layout, **dish catalogue** (deduped titles + price history for autocomplete; same on PC and phone)
 - `HISTIDX` + `HIST_{id}_*` — recent generated print sheets (capped to fit Apps Script quota)
 
-Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`.
+Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (MailApp → `pub@eightbellsbolney.com`, override with Script Property `MENU_EMAIL_TO`).
 
 After pulling, push with `clasp push` from this folder, then update the live web-app deployment
 (`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
