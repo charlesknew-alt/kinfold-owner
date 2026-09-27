@@ -381,9 +381,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow106"></script>
-  <script src="menus-print.js?v=20260927-flow106"></script>
-  <script src="menus-ingest.js?v=20260927-flow106"></script>
+  <script src="menus.js?v=20260927-flow107"></script>
+  <script src="menus-print.js?v=20260927-flow107"></script>
+  <script src="menus-ingest.js?v=20260927-flow107"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -725,31 +725,44 @@
       else render();
     }
 
-    /** Force every device onto the same cloud book (ignores local cache timestamp). */
+    /** Force every device onto the same cloud book + print history. */
     function syncNowFromCloud() {
       cloudSyncNote = 'Syncing shared menus…';
       cloudPullDone = false;
       var ed = document.getElementById('editor');
-      if (ed && (viewMode === 'edit' || viewMode === 'panels')) {
-        ed.innerHTML = '<p class="note">Syncing shared menus from the cloud…</p>';
+      if (ed && (viewMode === 'edit' || viewMode === 'panels' || viewMode === 'history')) {
+        ed.innerHTML = '<p class="note">Syncing shared menus and print history…</p>';
       }
       return pullMenusFromCloud().then(function (pulled) {
+        var uploadMenus = Promise.resolve(pulled);
         // If cloud is still empty, upload this device’s book so others can see it.
         if (!pulled && (book.sunday || book.main || book.specials)) {
           cloudUpdatedAt = Date.now();
-          return pushMenusToCloud().then(function () {
-            cloudSyncNote = 'Uploaded this device’s menus to the shared cloud — Sync now on other devices';
-            refreshAfterSync_();
-            return true;
-          }).catch(function (err) {
-            cloudSyncNote = 'Could not upload to cloud — try Sync now again (' +
-              (err && err.message ? err.message : 'error') + ')';
-            refreshAfterSync_();
-            return false;
-          });
+          uploadMenus = pushMenusToCloud().then(function () { return true; });
         }
-        refreshAfterSync_();
-        return true;
+        return uploadMenus.then(function () {
+          // Phone has Sunday sheets locally — push them so the pub PC can see them.
+          if (!EBMenuPrint || typeof EBMenuPrint.syncPrintHistoryToCloud !== 'function') {
+            return { uploaded: 0 };
+          }
+          cloudSyncNote = 'Sharing print history across devices…';
+          return EBMenuPrint.syncPrintHistoryToCloud();
+        }).then(function (hist) {
+          var n = (hist && hist.uploaded) || 0;
+          if (n > 0) {
+            cloudSyncNote = 'Shared ' + n + ' print sheet' + (n === 1 ? '' : 's') +
+              ' — Sync now on the other device';
+          } else {
+            cloudSyncNote = 'Menus and print history synced across devices';
+          }
+          refreshAfterSync_();
+          return true;
+        }).catch(function (err) {
+          cloudSyncNote = 'Could not sync — try Sync now again (' +
+            (err && err.message ? err.message : 'error') + ')';
+          refreshAfterSync_();
+          return false;
+        });
       });
     }
     function loadIncludes() {
@@ -810,6 +823,8 @@
       renderEditor();
     }
 
+    var historyPushBusy_ = false;
+
     function renderHistory() {
       var el = document.getElementById('editor');
       el.innerHTML = '<p class="note">Loading print history…</p>';
@@ -823,7 +838,7 @@
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
         html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com on click; Reply-To kinfoldinns), or Download. ' +
-          'Shared across phones and PCs. Newest days first.</p>';
+          'Shared across phones and PCs. Newest days first. Tap <strong>Sync now</strong> on the device that has the sheets, then on the other.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
         html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
@@ -833,10 +848,29 @@
         });
         html += '</select></div>';
         if (!filtered.length) {
-          html += '<p class="note">Nothing saved yet. Generate a menu, then click <strong>Save</strong> on the preview (or Discard to keep editing). Saved sheets appear here for Print PDF or Email.</p>';
+          html += '<p class="note">Nothing on this device yet. If your phone has Sunday sheets, open Menus on the <strong>phone</strong>, tap <strong>Sync now</strong>, then Sync now here. Or generate and <strong>Save</strong> a preview.</p>';
           el.innerHTML = html;
           bindHistory();
+          // Still try a cloud pull+push in case sheets just landed.
+          if (!historyPushBusy_ && EBMenuPrint.syncPrintHistoryToCloud) {
+            historyPushBusy_ = true;
+            EBMenuPrint.syncPrintHistoryToCloud().then(function (res) {
+              historyPushBusy_ = false;
+              if (viewMode === 'history' && res && res.rows && res.rows.length) renderHistory();
+            }).catch(function () { historyPushBusy_ = false; });
+          }
           return;
+        }
+        // Local-only sheets (phone) → upload so the pub PC can see them.
+        if (!historyPushBusy_ && EBMenuPrint.syncPrintHistoryToCloud) {
+          var hasLocal = (rows || []).some(function (r) { return r && r.source === 'local'; });
+          if (hasLocal) {
+            historyPushBusy_ = true;
+            EBMenuPrint.syncPrintHistoryToCloud().then(function (res) {
+              historyPushBusy_ = false;
+              if (viewMode === 'history' && res && res.uploaded > 0) renderHistory();
+            }).catch(function () { historyPushBusy_ = false; });
+          }
         }
         var groups = EBMenuPrint.groupHistoryByDay(filtered);
         groups.forEach(function (g) {

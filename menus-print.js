@@ -3165,25 +3165,62 @@
       var missing = (rows || []).filter(function (r) {
         return r && r.id && !known[r.id] && !gone[r.id];
       });
-      if (!missing.length) return;
+      if (!missing.length) return { uploaded: 0, attempted: 0 };
       // Newest first so the sheet just made (Sunday 11:16) uploads before older ones.
       missing.sort(function (a, b) {
         return (b.generatedAt || 0) - (a.generatedAt || 0);
       });
+      var attempted = 0;
+      var uploaded = 0;
       var chain = Promise.resolve();
       missing.slice(0, 20).forEach(function (meta) {
         chain = chain.then(function () {
           return localGetOnly(meta.id).then(function (full) {
             if (!full || !full.html) return;
+            attempted += 1;
             return historyCloudPost({
               action: 'savePrintHistory',
               entry: full
+            }).then(function () {
+              uploaded += 1;
             }).catch(function () {});
           });
         });
       });
-      return chain;
-    }).catch(function () {});
+      return chain.then(function () {
+        return { uploaded: uploaded, attempted: attempted };
+      });
+    }).catch(function () {
+      return { uploaded: 0, attempted: 0 };
+    });
+  }
+
+  /**
+   * Push every local-only print sheet to the shared cloud, then return the
+   * shared list. Call from Sync now so phone ↔ PC print history matches.
+   */
+  function syncPrintHistoryToCloud() {
+    return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
+      var known = {};
+      var deleted = {};
+      (Array.isArray(data.items) ? data.items : []).forEach(function (r) {
+        if (r && r.id) known[r.id] = true;
+      });
+      (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
+        if (id) deleted[String(id)] = true;
+      });
+      return purgeLocalDeleted(deleted).then(function () {
+        return migrateLocalToCloud(known, deleted);
+      });
+    }).then(function (stats) {
+      return listPrintHistory().then(function (rows) {
+        return { rows: rows, uploaded: (stats && stats.uploaded) || 0 };
+      });
+    }).catch(function () {
+      return localListOnly().then(function (rows) {
+        return { rows: rows || [], uploaded: 0 };
+      });
+    });
   }
 
   function getLastBuild() {
@@ -3580,6 +3617,7 @@
     getLastBuild: getLastBuild,
     savePrintHistory: savePrintHistory,
     listPrintHistory: listPrintHistory,
+    syncPrintHistoryToCloud: syncPrintHistoryToCloud,
     getPrintHistory: getPrintHistory,
     deletePrintHistory: deletePrintHistory,
     groupHistoryByDay: groupHistoryByDay,
