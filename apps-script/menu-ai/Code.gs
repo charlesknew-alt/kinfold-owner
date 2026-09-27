@@ -17,16 +17,24 @@
  * EMAIL (Print history → Email button):
  * Run AUTHORIZE_EMAIL_SENDING once (dropdown above ▶ Run), then Allow.
  * Sends to pub@eightbellsbolney.com with no mail-client popup.
+ * From address: your Gmail “Send mail as” @kinfoldinns.co.uk alias
+ * (override with Script Property MENU_EMAIL_FROM).
  */
 
 /**
  * ★ ONE-TIME: select this in the function dropdown (top toolbar) → Run → Allow.
  * Grants permission so Print history Email can send without a mail-client popup.
+ * Also logs which Gmail Send-as aliases Apps Script can use (kinfoldinns.co.uk).
  */
 function AUTHORIZE_EMAIL_SENDING() {
   var remaining = MailApp.getRemainingDailyQuota();
+  var aliases = [];
+  try { aliases = GmailApp.getAliases() || []; } catch (err) { aliases = []; }
+  var from = resolveMenuEmailFrom_(aliases);
   Logger.log('Mail authorised. Remaining daily quota: ' + remaining);
-  return { ok: true, remaining: remaining };
+  Logger.log('Gmail Send-as aliases: ' + JSON.stringify(aliases));
+  Logger.log('Menu emails will send from: ' + (from || '(primary Google account)'));
+  return { ok: true, remaining: remaining, aliases: aliases, from: from };
 }
 
 /** @deprecated use AUTHORIZE_EMAIL_SENDING */
@@ -575,10 +583,37 @@ function deletePrintHistory_(id) {
 }
 
 var MENU_EMAIL_DEFAULT_ = 'pub@eightbellsbolney.com';
+/** Prefer this domain among Gmail “Send mail as” aliases (see Gmail → Accounts). */
+var MENU_EMAIL_FROM_DOMAIN_ = 'kinfoldinns.co.uk';
+
+/**
+ * Pick the From address: Script Property MENU_EMAIL_FROM if it is a known alias,
+ * else the first @kinfoldinns.co.uk Send-as alias on the script owner’s Gmail.
+ */
+function resolveMenuEmailFrom_(aliases) {
+  var props = PropertiesService.getScriptProperties();
+  var preferred = String(props.getProperty('MENU_EMAIL_FROM') || '').trim();
+  var list = Array.isArray(aliases) ? aliases : [];
+  if (!list.length) {
+    try { list = GmailApp.getAliases() || []; } catch (err) { list = []; }
+  }
+  if (preferred) {
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i]).toLowerCase() === preferred.toLowerCase()) return list[i];
+    }
+  }
+  var domain = '@' + MENU_EMAIL_FROM_DOMAIN_.toLowerCase();
+  for (var j = 0; j < list.length; j++) {
+    if (String(list[j]).toLowerCase().slice(-domain.length) === domain) return list[j];
+  }
+  // Property set but not yet in getAliases() — still try (Gmail may accept it).
+  if (preferred && preferred.indexOf('@') !== -1) return preferred;
+  return '';
+}
 
 /**
  * Send a saved print sheet by email (no client mailto popup).
- * Runs as the script owner via MailApp.
+ * Uses GmailApp so From can be a Gmail “Send mail as” @kinfoldinns.co.uk alias.
  */
 function emailPrintHistory_(body) {
   body = body || {};
@@ -626,22 +661,43 @@ function emailPrintHistory_(body) {
   var htmlBody =
     '<p>Eight Bells menu: <strong>' + subject.replace(/</g, '&lt;') + '</strong></p>' +
     '<p>Printable <strong>PDF</strong> attached — ready to print.</p>';
+  var from = resolveMenuEmailFrom_();
+  var mailOpts = {
+    htmlBody: htmlBody,
+    attachments: attachments,
+    name: 'Eight Bells Menus'
+  };
+  if (from) mailOpts.from = from;
   try {
-    MailApp.sendEmail({
-      to: to,
-      subject: subject,
-      body: plain,
-      htmlBody: htmlBody,
-      attachments: attachments,
-      name: 'Eight Bells Menus'
-    });
+    // GmailApp honours “Send mail as” aliases; MailApp always uses the primary account.
+    GmailApp.sendEmail(to, subject, plain, mailOpts);
   } catch (err) {
-    return {
-      ok: false,
-      error: 'Could not send email: ' + String(err && err.message ? err.message : err)
-    };
+    // Fallback without From if alias/scope hiccups — still deliver the PDF.
+    try {
+      MailApp.sendEmail({
+        to: to,
+        subject: subject,
+        body: plain,
+        htmlBody: htmlBody,
+        attachments: attachments,
+        name: 'Eight Bells Menus'
+      });
+      from = '';
+    } catch (err2) {
+      return {
+        ok: false,
+        error: 'Could not send email: ' + String(err && err.message ? err.message : err)
+      };
+    }
   }
-  return { ok: true, source: 'mail', to: to, subject: subject, filename: attachedAs };
+  return {
+    ok: true,
+    source: 'gmail',
+    to: to,
+    from: from || null,
+    subject: subject,
+    filename: attachedAs
+  };
 }
 
 /**

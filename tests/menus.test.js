@@ -307,14 +307,20 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow93') !== -1, 'menus page cache-bust is flow93');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow93') !== -1, 'hub menus link cache-bust is flow93');
+assert(page.indexOf('flow94') !== -1, 'menus page cache-bust is flow94');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow94') !== -1, 'hub menus link cache-bust is flow94');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
-assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
+assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('GmailApp.sendEmail') !== -1,
   'Menu AI Apps Script can email a saved print sheet');
 assert(aiGs.indexOf('menuHtmlToPdfBlob_') !== -1 && aiGs.indexOf('MimeType.PDF') !== -1,
   'Email converts the print sheet to a PDF attachment');
+assert(aiGs.indexOf('resolveMenuEmailFrom_') !== -1 && aiGs.indexOf('kinfoldinns.co.uk') !== -1,
+  'Email prefers a kinfoldinns.co.uk Gmail Send-as alias');
+assert(aiGs.indexOf('MENU_EMAIL_FROM') !== -1,
+  'MENU_EMAIL_FROM script property can pin the From alias');
+assert(fs.readFileSync(path.join(root, 'apps-script/menu-ai/appsscript.json'), 'utf8').indexOf('gmail.send') !== -1,
+  'Apps Script manifest requests Gmail send scope for alias From');
 assert(page.indexOf('data-view="catalogue"') !== -1 && page.indexOf('renderCatalogue') !== -1,
   'All dishes view browses the shared catalogue');
 assert(page.indexOf('catalogueSearch') !== -1 && page.indexOf('catalogueSection') !== -1,

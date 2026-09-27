@@ -3483,6 +3483,7 @@
       return {
         ok: true,
         to: (data && data.to) || to,
+        from: data && data.from,
         subject: data && data.subject,
         filename: data && data.filename
       };

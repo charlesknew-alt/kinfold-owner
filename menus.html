@@ -367,9 +367,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow93"></script>
-  <script src="menus-print.js?v=20260927-flow93"></script>
-  <script src="menus-ingest.js?v=20260927-flow93"></script>
+  <script src="menus.js?v=20260927-flow94"></script>
+  <script src="menus-print.js?v=20260927-flow94"></script>
+  <script src="menus-ingest.js?v=20260927-flow94"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -767,7 +767,7 @@
         var html = '';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
-        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com on click), or Download. ' +
+        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com from your kinfoldinns.co.uk address on click), or Download. ' +
           'Shared across phones and PCs. Newest days first.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
@@ -856,6 +856,7 @@
               if (res && res.to) {
                 // Quiet confirmation — no mail-client popup.
                 var tip = 'Sent PDF to ' + res.to;
+                if (res.from) tip += ' from ' + res.from;
                 if (res.filename) tip += ' (' + res.filename + ')';
                 btn.title = tip;
               }
