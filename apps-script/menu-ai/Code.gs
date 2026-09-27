@@ -498,7 +498,8 @@ function reviewLayoutWithGemini_(body) {
  * Print HTML in Drive (Script Properties 500KB quota is too small for sheets).
  */
 
-var HISTORY_MAX_ = 12;
+/** Match client HISTORY_MAX so PC/phone keep the same shared archive. */
+var HISTORY_MAX_ = 60;
 /** Ids removed on any device — stop other PCs re-uploading them. */
 var HISTORY_DELETED_MAX_ = 80;
 var PROP_CHUNK_ = 8500;
@@ -736,12 +737,23 @@ function savePrintHistory_(raw) {
   // HTML lives in Drive — Script Properties only hold the small index.
   // Drop legacy property chunks first so quota errors clear.
   propDelete_('HIST_' + safe);
+  var driveOk = false;
   try {
     historyWriteHtmlDrive_(safe, String(raw.html));
+    driveOk = !!historyReadHtmlDrive_(safe);
   } catch (e) {
-    // Drive scope may need a one-time re-auth after deploy — still keep index.
+    // Drive scope may need a one-time re-auth after deploy.
     if (isQuotaError_(e)) purgeHistoryProps_();
-    try { historyWriteHtmlDrive_(safe, String(raw.html)); } catch (e2) {}
+    try {
+      historyWriteHtmlDrive_(safe, String(raw.html));
+      driveOk = !!historyReadHtmlDrive_(safe);
+    } catch (e2) {
+      driveOk = false;
+    }
+  }
+  // Never index a sheet the phone cannot download (meta without HTML).
+  if (!driveOk) {
+    return { ok: false, error: 'Could not store sheet HTML in Drive — open the script, re-authorise, then Save again' };
   }
   var list = historyReadIndex_().filter(function (r) { return r.id !== meta.id; });
   list.unshift(meta);

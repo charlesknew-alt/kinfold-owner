@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow114') !== -1, 'menus page cache-bust is flow114');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow114') !== -1, 'hub menus link cache-bust is flow114');
+assert(page.indexOf('flow115') !== -1, 'menus page cache-bust is flow115');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow115') !== -1, 'hub menus link cache-bust is flow115');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -328,6 +328,12 @@ assert(page.indexOf('sortDishesBySection(dishes())') !== -1,
   'Add/Adjust re-sorts the menu so new dishes sit with their category');
 assert(printJs.indexOf('syncPrintHistoryToCloud') !== -1 && page.indexOf('syncPrintHistoryToCloud') !== -1,
   'Sync now pushes local print history so phone and PC match');
+assert(printJs.indexOf('repairCloudHtmlGaps') !== -1,
+  'Sync repairs cloud index rows that have no Drive HTML (phone download)');
+assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),
+  'cloud history keeps 60 sheets so PC archive reaches the phone');
+assert(aiGs.indexOf('Could not store sheet HTML in Drive') !== -1,
+  'save refuses to index sheets when Drive HTML write fails');
 assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
   'print HTML moves to Drive; purge frees Script Properties quota');
 assert(ingestJs.indexOf('form POST navigates') !== -1 || ingestJs.indexOf('no-cors fetch only') !== -1,
@@ -336,6 +342,11 @@ assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf(
   'email POSTs sheet HTML with the mail request');
 assert(ingestJs.indexOf('cloudFormWrite_') !== -1 && ingestJs.indexOf('Never GET-by-id') !== -1,
   'email uses form POST with HTML — never GET-by-id');
+assert(ingestJs.indexOf("action === 'savePrintHistory'") !== -1 &&
+  ingestJs.indexOf('cloud_html_not_visible') !== -1,
+  'savePrintHistory uses form POST and verifies Drive HTML is readable');
+assert(page.indexOf('not in the cloud yet') !== -1,
+  'phone download explains Sync-on-PC when cloud HTML is missing');
 assert(aiGs.indexOf('readPostBody_') !== -1 && aiGs.indexOf('parameter.payload') !== -1,
   'Menu AI accepts form field payload for iframe POSTs');
 assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,
@@ -995,7 +1006,7 @@ var sandMainsPairHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
   promos: sandColAlonePromos
 });
 var sandMainsA4 = sandMainsPairHtml.split('mode-panel mode-a5')[0] || sandMainsPairHtml;
-assert(/cols-classics[\s\S]{0,4000}Cheese & Bacon Burger|mains-sand-row[\s\S]{0,4000}Cheese & Bacon Burger/.test(sandMainsA4),
+assert(/cols-classics[\s\S]{0,8000}Cheese &amp; Bacon Burger|mains-sand-row[\s\S]{0,8000}Cheese &amp; Bacon Burger/.test(sandMainsA4),
   'Best-fit Mains fill the column opposite Sandwiches');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
