@@ -164,21 +164,27 @@
     .view-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
     .view-toggle button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
-    .dish-form-layout {
-      display: grid; gap: 14px; align-items: start;
+    .dish-form-layout { display: block; }
+    .dish-form-inline {
+      margin: 8px 0 14px; border: 1px solid var(--line);
     }
-    @media (min-width: 760px) {
-      .dish-form-layout { grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); }
-    }
+    .dish-row.is-editing { background: rgba(255,255,255,.7); }
     .dish-suggest {
-      border: 1px solid var(--line); border-radius: 14px; background: var(--paint-wash);
-      padding: 12px; min-height: 120px;
+      border: 1px solid var(--line); border-radius: 14px; background: #fff;
+      padding: 10px 12px; margin: 8px 0 4px;
     }
     .dish-suggest h4 {
       font-family: var(--serif); font-weight: 500; font-size: 16px; margin: 0 0 6px;
     }
     .dish-suggest .hint { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 10px; }
-    .dish-suggest-list { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow: auto; }
+    .dish-suggest-list {
+      display: flex; flex-direction: column; gap: 6px;
+      max-height: min(240px, 40vh); overflow: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (min-width: 900px) {
+      .dish-suggest-list { max-height: 280px; }
+    }
     .dish-suggest-item {
       display: block; width: 100%; text-align: left; border: 1px solid var(--line);
       background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer;
@@ -381,9 +387,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow111"></script>
-  <script src="menus-print.js?v=20260927-flow111"></script>
-  <script src="menus-ingest.js?v=20260927-flow111"></script>
+  <script src="menus.js?v=20260927-flow112"></script>
+  <script src="menus-print.js?v=20260927-flow112"></script>
+  <script src="menus-ingest.js?v=20260927-flow112"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1483,10 +1489,11 @@
         html += renderStaffSpecialsNote(list);
       }
 
-      if (mode === 'add' || mode === 'adjust' || mode === 'replace') {
-        html += renderDishForm(menu);
-      } else if (mode === 'paste') {
+      if (mode === 'paste') {
         html += renderPasteBlock(menu);
+      } else if (mode === 'add' && !pendingAddSection) {
+        // Global Add — form at top. Section Add / Adjust / Replace sit inline in the list.
+        html += renderDishForm(menu, { inline: false });
       }
 
       html += renderComplete();
@@ -1700,8 +1707,10 @@
       return html;
     }
 
-    function renderDishForm(menu) {
-      var html = '<div class="form-card no-print">';
+    function renderDishForm(menu, opts) {
+      opts = opts || {};
+      var inline = !!opts.inline;
+      var html = '<div class="form-card no-print' + (inline ? ' dish-form-inline' : '') + '" id="dishFormCard">';
       if ((mode === 'adjust' || mode === 'replace') && !dishes().length) {
         html += '<p class="note">This menu is empty. Add a dish, or paste a whole menu.</p></div>';
         return html;
@@ -1710,11 +1719,12 @@
       if (!item) item = blank();
       html += '<h3>' + (mode === 'add' ? 'Add a dish' : (mode === 'replace' ? 'Replace dish' : 'Adjust dish')) + '</h3>';
       if (mode === 'replace') {
-        html += '<p class="note">Type the new dish for this slot — past dishes in the <strong>same category</strong> appear on the right. Click one to fill every field, or keep typing for something new.</p>';
+        html += '<p class="note">Type the new dish — past dishes in the <strong>same category</strong> appear under the name. Tap one to fill, or keep typing.</p>';
       } else {
-        html += '<p class="note">Type a name — past dishes with the same words show on the right. Click one to reuse it, or keep typing for a new dish.</p>';
+        html += '<p class="note">Type a name — past matches appear <strong>under the name field</strong>. Tap one to reuse, or keep typing.</p>';
       }
-      if (mode === 'adjust' || mode === 'replace') {
+      // Inline under the row — no second dish picker (you are already on that dish).
+      if ((mode === 'adjust' || mode === 'replace') && !inline) {
         html += '<label class="field">Dish</label><select id="pick">';
         dishes().forEach(function (d) {
           html += '<option value="' + d.id + '"' + (d.id === dishId ? ' selected' : '') + '>' + escapeAttr(d.section + ' — ' + d.name) + '</option>';
@@ -1723,10 +1733,22 @@
       }
       var formItem = mode === 'replace' ? blank() : item;
       if (mode === 'replace') formItem.section = item.section;
-      html += '<div class="dish-form-layout">';
-      html += '<div class="dish-form-fields">';
+      html += '<div class="dish-form-layout"><div class="dish-form-fields">';
       html += '<label class="field">Section</label>' + sectionSelectHtml(formItem.section || 'Mains', 'id="section"');
       html += field('Name', 'name', formItem.name);
+      // Suggest sits under the name on phone/tablet/desktop so it is easy to tap.
+      html += '<aside class="dish-suggest" id="dishSuggest" aria-live="polite">';
+      if (mode === 'replace') {
+        html += '<h4>Same category</h4>';
+        html += '<p class="hint" id="dishSuggestHint">Past dishes in ' +
+          escapeAttr(formItem.section || 'this category') +
+          '. Tap to fill name, description, price and allergens.</p>';
+      } else {
+        html += '<h4>Past dishes</h4>';
+        html += '<p class="hint" id="dishSuggestHint">Matches from saved menus — tap to fill.</p>';
+      }
+      html += '<div class="dish-suggest-list" id="dishSuggestList"></div>';
+      html += '</aside>';
       html += field('Description', 'description', formItem.description);
       html += field('Price', 'price', formItem.price);
       html += marksEditor(mode === 'replace' ? formItem : item, 'form');
@@ -1735,19 +1757,7 @@
       html += '<button class="go" id="doSave" type="button">' + saveLabel + '</button>';
       html += '<button class="link" data-mode="complete" type="button">Cancel</button>';
       if (mode === 'adjust' && item.id) html += '<button class="link" id="doRemove" type="button">Remove this dish</button>';
-      html += '</div></div>';
-      html += '<aside class="dish-suggest" id="dishSuggest" aria-live="polite">';
-      if (mode === 'replace') {
-        html += '<h4>Same category</h4>';
-        html += '<p class="hint" id="dishSuggestHint">Past dishes in ' +
-          escapeAttr(formItem.section || 'this category') +
-          '. Click to fill name, description, price and allergens — or keep typing.</p>';
-      } else {
-        html += '<h4>Past dishes</h4>';
-        html += '<p class="hint" id="dishSuggestHint">Word-by-word matches from saved menus. Click to fill.</p>';
-      }
-      html += '<div class="dish-suggest-list" id="dishSuggestList"></div>';
-      html += '</aside></div></div>';
+      html += '</div></div></div></div>';
       return html;
     }
 
@@ -1971,18 +1981,42 @@
         'Add to ' + escapeAttr(sec) + '</button></div>';
     }
 
+    function scrollToDishForm_() {
+      requestAnimationFrame(function () {
+        var form = document.getElementById('dishFormCard') || document.querySelector('.form-card');
+        if (form) form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        var nameEl = document.getElementById('name');
+        if (nameEl && (mode === 'add' || mode === 'adjust' || mode === 'replace')) {
+          try { nameEl.focus({ preventScroll: true }); } catch (eF) { try { nameEl.focus(); } catch (e2) {} }
+        }
+      });
+    }
+
     function renderComplete() {
       var list = EBMenus.sortDishesBySection(dishes());
-      if (!list.length) return '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
+      var menu = EBMenus.menuById(menuId);
+      if ((mode === 'adjust' || mode === 'replace') && list.length && !currentDish()) {
+        dishId = list[0].id;
+      }
+      if (!list.length) {
+        var empty = '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
+        if (mode === 'add') empty += renderDishForm(menu, { inline: true });
+        return empty;
+      }
       var showLunch = menuId !== 'lunch-club';
       var defaults = EBMenus.defaultSectionLayout();
       var menuRules = layoutFor(menuId);
       var html = '';
       var section = '';
       var open = false;
+      var formPlaced = false;
       list.forEach(function (d, idx) {
         if (d.section !== section) {
           if (open) {
+            if (mode === 'add' && pendingAddSection === section && !formPlaced) {
+              html += renderDishForm(menu, { inline: true });
+              formPlaced = true;
+            }
             html += sectionAddFooter_(section);
             html += '</div></div>';
           }
@@ -1999,8 +2033,9 @@
           html += '<div class="section-block-body">';
           open = true;
         }
+        var editing = (mode === 'adjust' || mode === 'replace') && d.id === dishId;
         var m = EBMenus.parseMarks(d.tags);
-        html += '<div class="dish-row" data-id="' + d.id + '">';
+        html += '<div class="dish-row' + (editing ? ' is-editing' : '') + '" data-id="' + d.id + '">';
         html += '<div><div class="name">' + escapeAttr(d.name);
         if (d.price && menuId !== 'lunch-club') html += ' <span style="font-weight:500">' + escapeAttr(d.price) + '</span>';
         html += '</div>';
@@ -2030,11 +2065,23 @@
         if (idx > 0) html += '<option value="merge-up">Merge ↑ into dish above</option>';
         html += '<option value="remove">Delete</option>';
         html += '</select></div></div>';
+        // Adjust / Replace form sits under the dish being edited (not at page top).
+        if (editing) {
+          html += renderDishForm(menu, { inline: true });
+          formPlaced = true;
+        }
         if (idx === list.length - 1 && open) {
+          if (mode === 'add' && pendingAddSection === section && !formPlaced) {
+            html += renderDishForm(menu, { inline: true });
+            formPlaced = true;
+          }
           html += sectionAddFooter_(section);
           html += '</div></div>';
         }
       });
+      if ((mode === 'adjust' || mode === 'replace') && !formPlaced) {
+        html += renderDishForm(menu, { inline: true });
+      }
       return html;
     }
 
@@ -2065,8 +2112,7 @@
           mode = 'add';
           flowStep = 1;
           render();
-          var form = document.querySelector('.form-card');
-          if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          scrollToDishForm_();
         };
       });
       document.querySelectorAll('[data-mode]').forEach(function (b) {
@@ -2088,8 +2134,7 @@
           flowStep = 1;
           render();
           if (next === 'add' || next === 'adjust' || next === 'replace' || next === 'paste') {
-            var form = document.querySelector('.form-card');
-            if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            scrollToDishForm_();
           }
         };
       });
@@ -2147,8 +2192,7 @@
           }
           mode = act;
           render();
-          var form = document.querySelector('.form-card');
-          if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          scrollToDishForm_();
         };
       });
       var doGen = document.getElementById('doGenerate');
@@ -2278,7 +2322,11 @@
         box.onchange = function () { applyFlag(box.getAttribute('data-id'), box.getAttribute('data-flag'), box.checked); };
       });
       var pick = document.getElementById('pick');
-      if (pick) pick.onchange = function () { dishId = pick.value; render(); };
+      if (pick) pick.onchange = function () {
+        dishId = pick.value;
+        render();
+        scrollToDishForm_();
+      };
       var doPaste = document.getElementById('doPaste');
       if (doPaste) doPaste.onclick = onPaste;
       var doUpload = document.getElementById('doUpload');
@@ -2865,10 +2913,15 @@
     function onSave() {
       var next = readForm();
       if (!next.name) return;
+      // Keep exactly what staff typed in Name (e.g. Vegan Katsu Curry).
+      // tidyDishFields still lifts tags / cleans description, but must not
+      // rewrite the printed title on Adjust / Add / Replace.
+      var typedName = next.name;
       var staySection = next.section || pendingAddSection || '';
       if (mode === 'add') {
         next.id = EBMenus.dish(next.section, next.name).id + '-' + Date.now();
         next = EBMenus.tidyDishFields(next);
+        next.name = (EBMenus.cleanDishName ? EBMenus.cleanDishName(typedName) : typedName) || typedName;
         dishes().push(next);
         dishId = next.id;
         mode = 'complete';
@@ -2878,6 +2931,7 @@
         next.id = item.id;
         next.fromMenu = item.fromMenu;
         next = EBMenus.tidyDishFields(next);
+        next.name = (EBMenus.cleanDishName ? EBMenus.cleanDishName(typedName) : typedName) || typedName;
         Object.keys(next).forEach(function (k) { item[k] = next[k]; });
         staySection = next.section || item.section || '';
         mode = 'complete';

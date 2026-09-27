@@ -312,8 +312,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow111') !== -1, 'menus page cache-bust is flow111');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow111') !== -1, 'hub menus link cache-bust is flow111');
+assert(page.indexOf('flow112') !== -1, 'menus page cache-bust is flow112');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow112') !== -1, 'hub menus link cache-bust is flow112');
+assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
+  'Adjust/Replace form opens inline under the dish being edited');
+assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
+  'Adjust/Save keeps the typed dish name (Vegan Katsu Curry)');
+assert(page.indexOf('under the name field') !== -1 && page.indexOf('dishSuggest') !== -1,
+  'past-dish suggestions sit under the name field');
 assert(page.indexOf('Last-write-wins') !== -1 || page.indexOf('remoteAt > cloudUpdatedAt') !== -1,
   'cloud pull does not wipe a newer local Save');
 assert(/return orderDishesForSell\(list\)/.test(fs.readFileSync(path.join(root, 'menus.js'), 'utf8')),
