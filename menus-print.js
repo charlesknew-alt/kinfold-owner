@@ -1899,9 +1899,14 @@
 
       // Orphan column (e.g. Sandwiches alone): span food full-width, two feature
       // panels as a footer row — never leave a tall empty hole beside a column.
-      // Exception: Blocks “Column” lock on Sides must stay half-width (never full-bleed).
+      // Exception: Blocks “Column” lock on Sides or Sandwiches must stay half-width
+      // (never full-bleed) — pair with feature panels in the opposite column instead.
       var sidesLockedCol = !!(p1opts.sidesOnP1 && sidesPrint && lockedColumnWidth(sideRule));
-      if (orphanColumnHole(leftFoodU, rightFoodU) && !(leftHasFood && rightHasFood) && !sidesLockedCol) {
+      var sandLockedCol = !!(
+        (sandOnLeftCol || sandOnRightCol) && lockedColumnWidth(sandRule)
+      );
+      if (orphanColumnHole(leftFoodU, rightFoodU) && !(leftHasFood && rightHasFood) &&
+          !sidesLockedCol && !sandLockedCol) {
         p1 += '<section class="sec classics-block">';
         if (!logoInTop) {
           p1 += '<div class="top-band top-band-logo"><div class="top-left"></div>' +
@@ -2323,7 +2328,7 @@
       '.specials-course:first-of-type{margin-top:4px}' +
       '.specials-course-left{text-align:left;text-decoration:none;font-size:10pt;letter-spacing:.08em;margin:6px 0 3px}' +
       /* Main/Sunday: Specials frilly box under each course — full width like the course above */
-      '.specials-beside{width:100%;max-width:100%;align-self:stretch;box-sizing:border-box}' +
+      '.specials-beside{width:100%;max-width:100%;align-self:stretch;box-sizing:border-box;margin:0 0 10px}' +
       '.specials-beside > .scallop,.specials-beside .scallop{' +
         'width:100%!important;max-width:100%;box-sizing:border-box;display:block}' +
       /* Title centred in the box; pad matches unframed dish gutters so prices share a line */

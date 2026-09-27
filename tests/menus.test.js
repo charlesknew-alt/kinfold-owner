@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow112') !== -1, 'menus page cache-bust is flow112');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow112') !== -1, 'hub menus link cache-bust is flow112');
+assert(page.indexOf('flow113') !== -1, 'menus page cache-bust is flow113');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow113') !== -1, 'hub menus link cache-bust is flow113');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -938,6 +938,43 @@ assert(!/<section class="sec"><div class="sec-title soft-left">Sides/.test(a4Onl
   'Blocks Column Sides are not orphaned to a full-bleed section');
 assert(/bottom-cols[\s\S]{0,500}SideItem0|col-sides[\s\S]{0,300}SideItem0|column-solo-row[\s\S]{0,300}SideItem0/.test(a4Only),
   'Blocks Column Sides stay in a column under Desserts');
+
+// Starters + Specials + Sandwiches (Column) with no Burgers/Classics — must NOT
+// orphan Sandwiches to full-bleed (Blocks Column lock).
+var sandColAloneDishes = [
+  api.dish('Starters', 'Buffalo Cauliflower Wings', 'mayo', '8.25', 'vg'),
+  api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+  api.dish('Starters', 'Breaded Prawns', 'katsu', '8.95', ''),
+  api.dish('Starters', 'Hoi Sin Jackfruit Bau Buns', 'chilli', '8.95', 'vg'),
+  api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf'),
+  api.dish('Sandwiches', 'Crayfish Marie Rose', 'salad', '11.95', ''),
+  api.dish('Sandwiches', 'BLT', 'bacon', '10.95', ''),
+  api.dish('Sandwiches', 'Fish Finger', 'tartare', '11.95', ''),
+  api.dish('Sandwiches', 'Prawn Cocktail', 'marie rose', '11.95', ''),
+  api.dish('Sandwiches', 'Gochujang Chicken', 'slaw', '11.95', '')
+];
+var sandColAloneLayout = api.normalizeSectionLayout({
+  Starters: { width: 'full', frame: false },
+  'Special Starters': { width: 'full', frame: true },
+  Sandwiches: {
+    width: 'column', frame: false, tip: true,
+    note: '(12 – 2.45 pm Mon to Fri)', sell: 'Ask.'
+  }
+});
+var sandColAlonePromos = [
+  { title: 'Stay a While', body: 'rooms' },
+  { title: 'Gatherings', body: 'events' },
+  { title: 'Next Pub Quiz', body: 'quiz' }
+];
+var sandColAloneHtml = print.build(api.menuById('main'), sandColAloneDishes, {
+  sectionLayout: sandColAloneLayout,
+  promos: sandColAlonePromos
+});
+var sandColA4 = sandColAloneHtml.split('mode-panel mode-a5')[0] || sandColAloneHtml;
+assert(/cols-classics[\s\S]{0,2500}Sandwiches/i.test(sandColA4),
+  'Blocks Column Sandwiches stay in a column when alone under Specials');
+assert(printJs.indexOf('sandLockedCol') !== -1,
+  'print respects Sandwiches Column lock against orphan full-bleed');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
 var jammedSunday = [
