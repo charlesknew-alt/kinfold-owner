@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow114') !== -1, 'menus page cache-bust is flow114');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow114') !== -1, 'hub menus link cache-bust is flow114');
+assert(page.indexOf('flow116') !== -1, 'menus page cache-bust is flow116');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow116') !== -1, 'hub menus link cache-bust is flow116');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -995,7 +995,7 @@ var sandMainsPairHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
   promos: sandColAlonePromos
 });
 var sandMainsA4 = sandMainsPairHtml.split('mode-panel mode-a5')[0] || sandMainsPairHtml;
-assert(/cols-classics[\s\S]{0,4000}Cheese & Bacon Burger|mains-sand-row[\s\S]{0,4000}Cheese & Bacon Burger/.test(sandMainsA4),
+assert(/cols-classics[\s\S]{0,8000}Cheese &amp; Bacon Burger|mains-sand-row[\s\S]{0,8000}Cheese &amp; Bacon Burger/.test(sandMainsA4),
   'Best-fit Mains fill the column opposite Sandwiches');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
@@ -1233,6 +1233,12 @@ assertTidy({ name: 'Vegan Burger', tags: '' }, 'Vegan Burger', 'vg',
   'leading Vegan Burger keeps the name and ticks vg');
 assertTidy({ name: 'Vegan Katsu Curry', tags: '' }, 'Vegan Katsu Curry', 'vg',
   'Adjust/rename keeps Vegan Katsu Curry (does not strip to Katsu Curry)');
+assertTidy({ name: 'Katsu Curry', tags: 'vg' }, 'Vegan Katsu Curry', 'vg',
+  'stuck Katsu Curry + vg restores Vegan Katsu Curry on Sunday/Main');
+assert(api.dishCatalogueKey('Vegan Katsu Curry') === api.dishCatalogueKey('Katsu Curry') &&
+  api.dishCatalogueKey('Katsu Curry') === 'katsu-curry',
+  'catalogue key treats Vegan Katsu Curry as the same dish as Katsu Curry');
+
 assertTidy({ name: 'Vegan Mushroom Risotto', tags: '' }, 'Vegan Mushroom Risotto', 'vg',
   'leading Vegan stays in the printed title');
 assertTidy({ name: 'Vegetarian Lasagne', tags: '' }, 'Vegetarian Lasagne', 'v',
