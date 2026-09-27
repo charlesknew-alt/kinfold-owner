@@ -317,9 +317,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow87"></script>
-  <script src="menus-print.js?v=20260926-flow87"></script>
-  <script src="menus-ingest.js?v=20260926-flow87"></script>
+  <script src="menus.js?v=20260926-flow88"></script>
+  <script src="menus-print.js?v=20260926-flow88"></script>
+  <script src="menus-ingest.js?v=20260926-flow88"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -358,6 +358,13 @@
     var cloudPushTimer = null;
     var cloudSyncNote = '';
     var cloudPullDone = false;
+
+    // Preview Save → stamp history, then jump here so staff can Print PDF / Email.
+    window.EBMenusOnPrintSaved = function () {
+      viewMode = 'history';
+      try { window.focus(); } catch (e) {}
+      render();
+    };
 
     // Manager: day-to-day printables (owner keeps Party / Lunch club).
     // Little Bells is included so Sunday/Main can tick the kids menu onto the sheet.
@@ -700,8 +707,8 @@
         var html = '';
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
-        html += '<p class="note" style="margin:0 0 10px">Shared across phones and PCs (cloud via the Menu AI script). ' +
-          'Also kept on this browser as a backup. Newest days first.</p>';
+        html += '<p class="note" style="margin:0 0 10px">Saved sheets only — open to print PDF, email, or download. ' +
+          'Shared across phones and PCs. Newest days first.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
         html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
@@ -711,7 +718,7 @@
         });
         html += '</select></div>';
         if (!filtered.length) {
-          html += '<p class="note">Nothing saved yet. Generate a menu, then click <strong>Save to menus</strong> on the print sheet to stamp its week and Roman numeral here.</p>';
+          html += '<p class="note">Nothing saved yet. Generate a menu, then click <strong>Save</strong> on the preview (or Discard to keep editing). Saved sheets appear here for Print PDF or Email.</p>';
           el.innerHTML = html;
           bindHistory();
           return;
@@ -729,7 +736,8 @@
             html += '<div><div class="who">' + escapeAttr(sheetName) + '</div>';
             html += '<div class="meta">generated ' + escapeAttr(when) + '</div></div>';
             html += '<div class="actions">';
-            html += '<button type="button" class="go" data-history-open="' + escapeAttr(row.id) + '">Open / print</button>';
+            html += '<button type="button" class="go" data-history-open="' + escapeAttr(row.id) + '">Print PDF</button>';
+            html += '<button type="button" class="soft" data-history-email="' + escapeAttr(row.id) + '">Email</button>';
             html += '<button type="button" class="soft" data-history-download="' + escapeAttr(row.id) + '">Download</button>';
             html += '<button type="button" class="link" data-history-delete="' + escapeAttr(row.id) + '">Remove</button>';
             html += '</div></div>';
@@ -760,7 +768,25 @@
               return;
             }
             if (!EBMenuPrint.openPrintHtml(entry.html)) {
-              alert('Allow pop-ups to open the menu sheet, then print it.');
+              alert('Allow pop-ups to open the menu sheet, then choose Print / save as PDF.');
+            }
+          });
+        };
+      });
+      document.querySelectorAll('[data-history-email]').forEach(function (btn) {
+        btn.onclick = function () {
+          var id = btn.getAttribute('data-history-email');
+          EBMenuPrint.getPrintHistory(id).then(function (entry) {
+            if (!entry || !entry.html) {
+              alert('That sheet is missing from history.');
+              return;
+            }
+            if (EBMenuPrint.emailPrintHtml) {
+              EBMenuPrint.emailPrintHtml(entry).catch(function () {
+                alert('Could not start email for that sheet.');
+              });
+            } else {
+              EBMenuPrint.downloadPrintHtml(entry);
             }
           });
         };
@@ -796,7 +822,7 @@
             if (el && !el.querySelector('.history-empty-note')) {
               var note = document.createElement('p');
               note.className = 'note history-empty-note';
-              note.innerHTML = 'Nothing saved yet. Generate a menu, then click <strong>Save to menus</strong> on the print sheet to stamp its week and Roman numeral here.';
+              note.innerHTML = 'Nothing saved yet. Generate a menu, then click <strong>Save</strong> on the preview to stamp it here.';
               el.appendChild(note);
             }
           }
@@ -1178,9 +1204,9 @@
     function renderGenerateStep(menu) {
       var html = '';
       if (isStaffMode) {
-        html += '<p class="step-lede">Check the plan, then generate. On the print sheet, click <strong>Save to menus</strong> to stamp a version into Print history.</p>';
+        html += '<p class="step-lede">Check the plan, then generate. On the preview: <strong>Save</strong> stamps Print history (then opens it), or <strong>Discard</strong> to keep editing. Print PDF and Email from history.</p>';
       } else {
-        html += '<p class="step-lede">Check the plan, then generate the branded print sheet. Click <strong>Save to menus</strong> on that sheet to stamp its week / Sunday date and Roman numeral into <strong>Print history</strong> (shared cloud + this device). Preview generates do not fill history.</p>';
+        html += '<p class="step-lede">Check the plan, then generate. Preview is Save or Discard only — Save stamps the week / Roman into <strong>Print history</strong> and takes you there to Print PDF or Email. Discard closes the preview so you can edit.</p>';
       }
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
       html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
@@ -2578,7 +2604,7 @@
         if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
         if (hint) hint.disabled = false;
         if (!w) {
-          alert('Allow pop-ups to open the branded menu sheet, then print it to PDF.');
+          alert('Allow pop-ups to open the menu preview, then Save or Discard.');
           return;
         }
         result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
@@ -2591,8 +2617,7 @@
         var html = EBMenuPrint.build(menu, result.dishes, result.plan);
         w.document.write(html);
         w.document.close();
-        // Print history + Roman stamp happen only when staff click Save to menus
-        // on the print sheet — not on every generate preview.
+        // Preview is Save or Discard only. Save stamps history and returns here.
       }
 
       var i = 0;

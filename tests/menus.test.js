@@ -136,10 +136,10 @@ assert(page.indexOf('Print history') !== -1 && page.indexOf('data-view="history"
   'Menus has a Print history view');
 assert(page.indexOf('Shared across phones and PCs') !== -1 || page.indexOf('shared cloud') !== -1,
   'print history UI says it is shared across devices');
-assert(page.indexOf('Save to menus') !== -1 && printJs.indexOf('saveToMenus') !== -1,
-  'print sheet Save to menus stamps history (not every generate)');
+assert(printJs.indexOf('saveToMenus') !== -1 && printJs.indexOf('discardPreview') !== -1,
+  'preview Save stamps history (not every generate); Discard closes without saving');
 assert(printJs.indexOf('peekPrintVersion') !== -1 && printJs.indexOf('commitPrintVersion') !== -1,
-  'version numbers are peeked on preview and committed on Save to menus');
+  'version numbers are peeked on preview and committed on Save');
 assert(page.indexOf('pullMenusFromCloud') !== -1 && page.indexOf('saveMenusState') !== -1,
   'live menu book syncs to cloud for all devices');
 assert(page.indexOf('sync on every phone and PC') !== -1 || page.indexOf('Menus synced across devices') !== -1,
@@ -307,8 +307,15 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow87') !== -1, 'menus page cache-bust is flow87');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow87') !== -1, 'hub menus link cache-bust is flow87');
+assert(page.indexOf('flow88') !== -1, 'menus page cache-bust is flow88');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow88') !== -1, 'hub menus link cache-bust is flow88');
+assert(printJs.indexOf('discardPreview') !== -1 && printJs.indexOf('id="saveToMenus"') !== -1,
+  'preview toolbar is Save or Discard (no print)');
+assert(printJs.indexOf('EBMenusOnPrintSaved') !== -1 && page.indexOf('EBMenusOnPrintSaved') !== -1,
+  'Save jumps parent view to Print history');
+assert(page.indexOf('data-history-email') !== -1 && printJs.indexOf('emailPrintHtml') !== -1,
+  'print history can email a saved sheet');
+assert(page.indexOf('Print PDF') !== -1, 'print history offers Print PDF');
 assert(page.indexOf('cloud / local delete continues in the background') !== -1,
   'history Remove deletes in the background without reloading the list');
 assert(typeof api.upsertDishCatalogue === 'function' && typeof api.searchDishCatalogue === 'function',
