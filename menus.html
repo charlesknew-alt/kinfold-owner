@@ -387,9 +387,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow113"></script>
-  <script src="menus-print.js?v=20260927-flow113"></script>
-  <script src="menus-ingest.js?v=20260927-flow113"></script>
+  <script src="menus.js?v=20260927-flow114"></script>
+  <script src="menus-print.js?v=20260927-flow114"></script>
+  <script src="menus-ingest.js?v=20260927-flow114"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -3219,15 +3219,15 @@
           if (layout.p1) layout.p1.footLogo = false;
           if (layout.p2) layout.p2.footLogo = false;
         }
-        if (advice.sandwichesOn === 'page1') {
-          layout.p1.sandwiches = true;
-          if (layout.p2) layout.p2.sandwiches = false;
+        if (advice.sandwichesOn === 'page2' && layout.p2) {
+          layout.p1.sandwiches = false;
+          layout.p2.sandwiches = true;
         } else if (advice.sandwichesOn === 'omit') {
           layout.p1.sandwiches = false;
           if (layout.p2) layout.p2.sandwiches = false;
-        } else if (advice.sandwichesOn === 'page2' && layout.p2) {
-          layout.p1.sandwiches = false;
-          layout.p2.sandwiches = true;
+        } else if (advice.sandwichesOn === 'page1' && !layout.p2) {
+          // One-page sheet only — two-page menus keep Sandwiches quieter on page 2.
+          layout.p1.sandwiches = true;
         }
         if (advice.sidesOn === 'page1' && layout.p1) {
           layout.p1.sidesOnP1 = true;
@@ -3278,11 +3278,8 @@
           out.sidesOn = 'page1';
           out.notes = 'Local check: move Sides to page 1 so both pages share one type size.';
         }
-        if (layout && layout.p1 && layout.p1.sandwiches) out.sandwichesOn = 'page1';
-        else if (layout && layout.p2 && layout.p2.sandwiches && (layout.leftover && layout.leftover.p1 > 8)) {
-          out.sandwichesOn = 'page1';
-          out.notes = 'Local check: move Sandwiches box to page 1 so page 2 type can enlarge.';
-        }
+        if (layout && layout.p2 && layout.p2.sandwiches) out.sandwichesOn = 'page2';
+        else if (layout && layout.p1 && layout.p1.sandwiches) out.sandwichesOn = 'page1';
         return out;
       }
 

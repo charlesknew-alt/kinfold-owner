@@ -394,10 +394,10 @@ function reviewLayoutWithGemini_(body) {
     'SHARED TYPE SCALE (CRITICAL — blanket policy for every menu):\n' +
     '- Titles, dish names and descriptions must be the SAME size on page 1 and page 2.\n' +
     '- Never leave page 1 enlarged/airy while page 2 is compact/smaller — one density for the whole menu.\n' +
-    '- Maximise that shared size: the packed page is the ceiling. Move Sandwiches (incl. tip/sell box), ' +
-    'Sides, or feature panels OFF the packed page onto the roomier page so both can enlarge together.\n' +
-    '- Prefer sandwichesOn page1 (named fillings OR tip/sell box) whenever page 2 holds mains + desserts — ' +
-    'do not park the sandwich sell box on page 2 next to desserts if page 1 has room.\n' +
+    '- Maximise that shared size: the packed page is the ceiling. Move Sides or feature panels ' +
+    'OFF the packed page onto the roomier page so both can enlarge together.\n' +
+    '- Sandwiches (fillings or tip/sell box) stay on page 2 in a column — quieter, lower-margin. ' +
+    'Do not pull them onto page 1 to even leftover. Only use sandwichesOn page1 if page 2 cannot fit them.\n' +
     '- Prefer fewer feature panels on the packed page over shrinking type. One panel is enough when two ' +
     'would force smaller shared type.\n' +
     '- Feature panels are LITTLE promotions — never a tall empty frame. Balance columns with food ' +
@@ -405,8 +405,8 @@ function reviewLayoutWithGemini_(body) {
     '- dropFootLogo: true when keeping the page-2 logo would force tight/compact type — readable mains/desserts ' +
     'beat a second logo. Always prefer larger shared type over decorative chrome.\n' +
     '- After type is set, both pages should fill top→bottom (no blank bottom third with content jammed up).\n' +
-    '- Moving Sandwiches / Sides / feature boxes between pages to equalise fill is required when it raises ' +
-    'shared type; inventing a third page is not.\n' +
+    '- Moving Sides / feature boxes between pages to equalise fill is required when it raises ' +
+    'shared type; inventing a third page is not. Leave Sandwiches on page 2.\n' +
     'COLUMN BALANCE RULES (mandatory before okToPrint):\n' +
     '- Read layout.columns (leftFood / rightFood / shorter). If shorter is left or right, panels MUST be 1 or 2.\n' +
     '- panels:0 is only allowed when shorter is "even".\n' +
@@ -421,9 +421,9 @@ function reviewLayoutWithGemini_(body) {
     '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
     '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
-    '5. PAGE 1: LEFT often Sandwiches/events/Sharing; RIGHT = Burgers then Pub Classics.\n' +
+    '5. PAGE 1: LEFT often Sharing/events; RIGHT = Burgers then Pub Classics. Sandwiches prefer page 2 column.\n' +
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
-    '7. Prefer sandwichesOn page1 (fillings or sell box) so page 2 mains/desserts can stay large. ' +
+    '7. Prefer sandwichesOn page2 (fillings or sell box), always as a column. ' +
     'Move sidesOn to page1 when that raises the shared density.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
     '9. SECTION WIDTH “both” / best-fit: choose column OR full for balance on THIS sheet.\n' +
@@ -452,8 +452,8 @@ function reviewLayoutWithGemini_(body) {
   }
   var density = String(advice.density || 'normal').toLowerCase();
   if (['airy', 'roomy', 'normal', 'tight', 'compact'].indexOf(density) === -1) density = 'normal';
-  var sandwichesOn = String(advice.sandwichesOn || 'page1').toLowerCase();
-  if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page1';
+  var sandwichesOn = String(advice.sandwichesOn || 'page2').toLowerCase();
+  if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page2';
   var sidesOn = String(advice.sidesOn || '').toLowerCase();
   if (['page1', 'page2'].indexOf(sidesOn) === -1) sidesOn = '';
 
