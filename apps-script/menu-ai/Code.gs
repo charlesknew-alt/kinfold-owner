@@ -75,11 +75,12 @@ function doPost(e) {
       return json_(emailPrintHistory_(body));
     }
     // Shared live menu book (dishes, blurbs, wording, layout) across devices.
+    // venue=windmill stores separately so Eight Bells / Windmill do not collide.
     if (action === 'getMenusState') {
-      return json_(getMenusState_());
+      return json_(getMenusState_(body.venue || body.state && body.state.venue));
     }
     if (action === 'saveMenusState') {
-      return json_(saveMenusState_(body.state || body));
+      return json_(saveMenusState_(body.state || body, body.venue));
     }
     // Optional: check a planned print layout before staff export.
     if (action === 'reviewLayout') {
@@ -782,8 +783,14 @@ function menuHtmlToPdfBlob_(html, filenamePdf) {
   return pdf;
 }
 
-function getMenusState_() {
-  var raw = propRead_('MENUS');
+function menusPropKey_(venue) {
+  var v = String(venue || '').toLowerCase();
+  if (v === 'windmill' || v === 'wm') return 'MENUS_WINDMILL';
+  return 'MENUS';
+}
+
+function getMenusState_(venue) {
+  var raw = propRead_(menusPropKey_(venue));
   if (!raw) return { ok: true, source: 'props', state: null };
   try {
     var parsed = JSON.parse(raw);
@@ -803,7 +810,7 @@ function getMenusState_() {
   }
 }
 
-function saveMenusState_(raw) {
+function saveMenusState_(raw, venue) {
   if (!raw || typeof raw !== 'object') {
     return { ok: false, error: 'Missing state' };
   }
@@ -822,6 +829,6 @@ function saveMenusState_(raw) {
     // Shared dish catalogue (deduped titles + price history) for autocomplete.
     dishCatalogue: Array.isArray(raw.dishCatalogue) ? raw.dishCatalogue : []
   };
-  propWrite_('MENUS', JSON.stringify(state));
+  propWrite_(menusPropKey_(venue || raw.venue), JSON.stringify(state));
   return { ok: true, source: 'props', updatedAt: updatedAt };
 }

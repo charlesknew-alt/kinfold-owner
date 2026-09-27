@@ -348,7 +348,7 @@
   <header class="ps-header">
     <div class="ps-header-inner">
       <div>
-        <div class="ps-venue-eyebrow">The Eight Bells · Bolney</div>
+        <div class="ps-venue-eyebrow" id="venueEyebrow">The Eight Bells · Bolney</div>
         <div class="ps-venue-name">Menus</div>
       </div>
     </div>
@@ -374,24 +374,32 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow96"></script>
-  <script src="menus-print.js?v=20260927-flow96"></script>
-  <script src="menus-ingest.js?v=20260927-flow96"></script>
+  <script src="menus.js?v=20260927-flow97"></script>
+  <script src="menus-print.js?v=20260927-flow97"></script>
+  <script src="menus-ingest.js?v=20260927-flow97"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
-    // Eight Bells manager hub opens menus.html?mode=staff — same cloud book, shorter UI.
+    // Manager hubs open menus.html?mode=staff — same cloud book, shorter UI.
+    // venue=windmill keeps Windmill dishes separate from Eight Bells.
     var isStaffMode = /(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''));
+    var menuVenue = /(?:\?|&)venue=windmill(?:&|$)/.test(String(location.search || '')) ? 'windmill' : 'eightbells';
     if (isStaffMode) document.documentElement.classList.add('staff-mode');
+    if (menuVenue === 'windmill') {
+      var eyebrow = document.getElementById('venueEyebrow');
+      if (eyebrow) eyebrow.textContent = 'The Windmill Inn · Littleworth';
+      document.title = 'Menus – The Windmill Inn';
+    }
 
-    var STORAGE = 'eb-menus-v2';
-    var META_STORAGE = 'eb-menus-meta-v1';
-    var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
-    var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
-    var LAYOUT_STORAGE = 'eb-menu-section-layout-v2';
-    var LAYOUT_STORAGE_LEGACY = 'eb-menu-section-layout-v1';
-    var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1';
-    var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at';
+    var venueKey = menuVenue === 'windmill' ? 'wm' : 'eb';
+    var STORAGE = venueKey + '-menus-v2';
+    var META_STORAGE = venueKey + '-menus-meta-v1';
+    var PROMO_STORAGE = venueKey + '-menu-promo-bank-v1';
+    var PROMO_TICKS = venueKey + '-menu-promo-ticks-v1';
+    var LAYOUT_STORAGE = venueKey + '-menu-section-layout-v2';
+    var LAYOUT_STORAGE_LEGACY = venueKey + '-menu-section-layout-v1';
+    var CATALOGUE_STORAGE = venueKey + '-dish-catalogue-v1';
+    var CLOUD_AT_KEY = venueKey + '-menus-cloud-updated-at';
     var book = load();
     var metaBook = loadMeta();
     var promoBank = loadPromoBank();
@@ -662,6 +670,7 @@
       cloudSyncNote = 'Saving to cloud…';
       return EBMenuIngest.cloudPost({
         action: 'saveMenusState',
+        venue: menuVenue,
         state: buildCloudState()
       }).then(function (data) {
         if (data && data.updatedAt) cloudUpdatedAt = Number(data.updatedAt) || cloudUpdatedAt;
@@ -679,7 +688,7 @@
         return Promise.resolve(false);
       }
       cloudSyncNote = 'Loading shared menus…';
-      return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
+      return EBMenuIngest.cloudPost({ action: 'getMenusState', venue: menuVenue }).then(function (data) {
         var remote = data && data.state;
         var remoteAt = remote ? (Number(remote.updatedAt) || 0) : 0;
         if (remote && remoteAt > cloudUpdatedAt) {
