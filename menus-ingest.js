@@ -103,8 +103,8 @@
 
   /**
    * Writes: browser fetch POST with redirect:follow dies on Google’s 302.
-   * Prefer form POST for large bodies; no-cors fetch as fallback.
-   * Outside the browser (Node tests), follow Location manually.
+   * Use no-cors fetch only — form POST navigates the whole tab on phones
+   * (shows raw Apps Script JSON). Outside the browser, follow Location.
    */
   function cloudWrite_(body) {
     var url = getCloudUrl();
@@ -116,26 +116,23 @@
     var inBrowser = typeof document !== 'undefined';
 
     if (inBrowser) {
-      // Form POST first — delivers email HTML even when cloud history is empty.
-      return cloudFormWrite_(body).catch(function () {
-        var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        var timer = setTimeout(function () {
-          try { if (ctrl) ctrl.abort(); } catch (e0) {}
-        }, 15000);
-        return fetch(url, {
-          method: 'POST',
-          mode: 'no-cors',
-          credentials: 'omit',
-          headers: headers,
-          body: payload,
-          signal: ctrl ? ctrl.signal : undefined
-        }).then(function () {
-          clearTimeout(timer);
-          return true;
-        }).catch(function (err) {
-          clearTimeout(timer);
-          throw err;
-        });
+      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = setTimeout(function () {
+        try { if (ctrl) ctrl.abort(); } catch (e0) {}
+      }, 20000);
+      return fetch(url, {
+        method: 'POST',
+        mode: 'no-cors',
+        credentials: 'omit',
+        headers: headers,
+        body: payload,
+        signal: ctrl ? ctrl.signal : undefined
+      }).then(function () {
+        clearTimeout(timer);
+        return true;
+      }).catch(function (err) {
+        clearTimeout(timer);
+        throw err;
       });
     }
 

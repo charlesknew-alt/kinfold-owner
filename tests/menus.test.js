@@ -151,12 +151,12 @@ assert(page.indexOf('sync on every phone and PC') !== -1 || page.indexOf('Menus 
   'UI mentions menus stay in sync across devices');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('cloudPost') !== -1,
   'ingest exposes shared cloud POST helper');
-assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('propWrite_') !== -1,
-  'Menu AI Apps Script stores print history in Script Properties');
+assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
+  'Menu AI Apps Script stores print HTML in Drive (not Script Properties)');
 assert(aiGs.indexOf('getMenusState_') !== -1 && aiGs.indexOf("propRead_('MENUS')") !== -1,
   'Menu AI Apps Script stores live menus state in Script Properties');
-assert(aiGs.indexOf('DriveApp') === -1,
-  'shared menus/history do not require Drive OAuth');
+assert(aiGs.indexOf('drive.file') !== -1 || fs.readFileSync(path.join(root, 'apps-script/menu-ai/appsscript.json'), 'utf8').indexOf('drive.file') !== -1,
+  'Drive scope is script-owner drive.file (no per-device OAuth)');
 assert(printJs.indexOf('Lunch club in allergy footer') !== -1,
   'layout plan notes lunch club lives with allergens');
 assert(printJs.indexOf('function lunchClubBox') === -1 && printJs.indexOf('lunch-box') === -1,
@@ -312,10 +312,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow107') !== -1, 'menus page cache-bust is flow107');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow107') !== -1, 'hub menus link cache-bust is flow107');
+assert(page.indexOf('flow108') !== -1, 'menus page cache-bust is flow108');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow108') !== -1, 'hub menus link cache-bust is flow108');
 assert(printJs.indexOf('syncPrintHistoryToCloud') !== -1 && page.indexOf('syncPrintHistoryToCloud') !== -1,
   'Sync now pushes local print history so phone and PC match');
+assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
+  'print HTML moves to Drive; purge frees Script Properties quota');
+assert(ingestJs.indexOf('form POST navigates') !== -1 || ingestJs.indexOf('no-cors fetch only') !== -1,
+  'cloud writes avoid form POST that navigates phones to JSON');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf('entry: meta') !== -1,
   'email POSTs sheet HTML with the mail request');
 assert(ingestJs.indexOf('cloudFormWrite_') !== -1 && ingestJs.indexOf('Never GET-by-id') !== -1,
