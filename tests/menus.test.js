@@ -307,8 +307,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow89') !== -1, 'menus page cache-bust is flow89');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow89') !== -1, 'hub menus link cache-bust is flow89');
+assert(page.indexOf('flow90') !== -1, 'menus page cache-bust is flow90');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow90') !== -1, 'hub menus link cache-bust is flow90');
 assert(page.indexOf('withFlowNav') !== -1 && page.indexOf('flow-nav-top') !== -1,
   'menu creation steps have Next/Back at top and bottom');
 assert(printJs.indexOf('pub@eightbellsbolney.com') !== -1,
@@ -326,8 +326,10 @@ assert(typeof api.upsertDishCatalogue === 'function' && typeof api.searchDishCat
   'dish catalogue upsert and search are available');
 assert(page.indexOf('dishSuggest') !== -1 && page.indexOf('bindDishSuggest') !== -1,
   'dish form shows past-dish autocomplete while typing');
-assert(page.indexOf('doFromMain') !== -1 && page.indexOf('openMainPickForSunday') !== -1,
-  'Sunday can pull selected dishes from this week’s Main');
+assert(page.indexOf('doFromWeek') !== -1 && page.indexOf('openWeekPickForSunday') !== -1,
+  'Sunday can pull selected dishes from this week’s Main and Specials');
+assert(page.indexOf('From this week’s Main / Specials') !== -1,
+  'Sunday picker button names Main and Specials');
 assert(aiGs.indexOf('dishCatalogue') !== -1,
   'cloud menus state stores the shared dish catalogue');
 var catSmoke = api.upsertDishCatalogue([], [

@@ -322,9 +322,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow89"></script>
-  <script src="menus-print.js?v=20260926-flow89"></script>
-  <script src="menus-ingest.js?v=20260926-flow89"></script>
+  <script src="menus.js?v=20260926-flow90"></script>
+  <script src="menus-print.js?v=20260926-flow90"></script>
+  <script src="menus-ingest.js?v=20260926-flow90"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1048,7 +1048,7 @@
       html += '<button type="button" class="soft" data-mode="add">Add a dish</button>';
       html += '<button type="button" class="soft" data-mode="paste">Upload / paste whole menu</button>';
       if (menuId === 'sunday') {
-        html += '<button type="button" class="soft" id="doFromMain">From this week’s Main</button>';
+        html += '<button type="button" class="soft" id="doFromWeek">From this week’s Main / Specials</button>';
       }
       html += '</div>';
       html += '<div class="note no-print" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">';
@@ -1800,8 +1800,8 @@
       var doRemove = document.getElementById('doRemove');
       if (doRemove) doRemove.onclick = onRemove;
       bindDishSuggest();
-      var doFromMain = document.getElementById('doFromMain');
-      if (doFromMain) doFromMain.onclick = openMainPickForSunday;
+      var doFromWeek = document.getElementById('doFromWeek');
+      if (doFromWeek) doFromWeek.onclick = openWeekPickForSunday;
       var doClear = document.getElementById('doClear');
       if (doClear) doClear.onclick = function () {
         if (!confirm('Clear every dish on ' + EBMenus.menuById(menuId).name + ' and start again?')) return;
@@ -2157,11 +2157,20 @@
       });
     }
 
-    /** Sunday: pick dishes from this week's Main menu without retyping. */
-    function openMainPickForSunday() {
-      var mainList = (book.main || []).slice();
-      if (!mainList.length) {
-        alert('Main menu is empty — add dishes there first, then pull them onto Sunday.');
+    /** Sunday: pick dishes from this week's Main and/or Specials without retyping. */
+    function openWeekPickForSunday() {
+      var sources = [
+        { id: 'main', label: 'Main menu', dishes: (book.main || []).slice() },
+        { id: 'specials', label: 'Specials', dishes: (book.specials || []).slice() }
+      ];
+      var pickList = [];
+      sources.forEach(function (src) {
+        src.dishes.forEach(function (d) {
+          pickList.push({ source: src.id, sourceLabel: src.label, dish: d });
+        });
+      });
+      if (!pickList.length) {
+        alert('Main and Specials are empty — add dishes there first, then pull them onto Sunday.');
         return;
       }
       var existing = document.querySelector('.main-pick-overlay');
@@ -2169,28 +2178,40 @@
       var overlay = document.createElement('div');
       overlay.className = 'main-pick-overlay';
       overlay.setAttribute('role', 'dialog');
-      overlay.setAttribute('aria-label', 'Pick from Main menu');
+      overlay.setAttribute('aria-label', 'Pick from this week’s Main or Specials');
       var card = document.createElement('div');
       card.className = 'main-pick-card';
-      var html = '<h3 style="font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 6px">From this week’s Main</h3>';
+      var html = '<h3 style="font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 6px">From this week’s Main / Specials</h3>';
       html += '<p class="note" style="margin:0 0 8px">Tick dishes to copy onto Sunday (same title, description, allergens, price). Sunday Roasts stay as they are.</p>';
       html += '<div class="toolbar-row" style="margin:0 0 8px">';
       html += '<button type="button" class="link" id="mainPickAll">Select all</button>';
       html += '<button type="button" class="link" id="mainPickNone">Clear</button>';
       html += '</div>';
       html += '<div class="main-pick-list">';
+      var lastGroup = '';
       var lastSec = '';
-      mainList.forEach(function (d, i) {
-        if (d.section !== lastSec) {
-          lastSec = d.section;
-          html += '<div class="main-pick-sec">' + escapeAttr(lastSec) + '</div>';
+      pickList.forEach(function (row, i) {
+        var group = row.sourceLabel;
+        if (group !== lastGroup) {
+          lastGroup = group;
+          lastSec = '';
+          html += '<div class="main-pick-sec" style="margin-top:' + (i ? '16px' : '0') +
+            ';font-size:13px;letter-spacing:.06em">' + escapeAttr(group) + '</div>';
+        }
+        var sec = row.dish.section || 'Dishes';
+        if (sec !== lastSec) {
+          lastSec = sec;
+          html += '<div class="main-pick-sec" style="opacity:.85">' + escapeAttr(sec) + '</div>';
         }
         html += '<label class="main-pick-row">';
-        html += '<input type="checkbox" data-main-pick="' + i + '">';
-        html += '<span><strong>' + escapeAttr(d.name) + '</strong>';
-        if (d.price) html += ' · ' + escapeAttr(d.price);
-        if (d.tags) html += ' <em style="color:var(--green)">' + escapeAttr(d.tags) + '</em>';
-        if (d.description) html += '<br><span style="color:var(--ink-soft);font-size:13px">' + escapeAttr(d.description) + '</span>';
+        html += '<input type="checkbox" data-week-pick="' + i + '">';
+        html += '<span><strong>' + escapeAttr(row.dish.name) + '</strong>';
+        if (row.dish.price) html += ' · ' + escapeAttr(row.dish.price);
+        if (row.dish.tags) html += ' <em style="color:var(--green)">' + escapeAttr(row.dish.tags) + '</em>';
+        if (row.dish.description) {
+          html += '<br><span style="color:var(--ink-soft);font-size:13px">' +
+            escapeAttr(row.dish.description) + '</span>';
+        }
         html += '</span></label>';
       });
       html += '</div>';
@@ -2210,10 +2231,10 @@
         if (ev.target === overlay) close();
       });
       document.getElementById('mainPickAll').onclick = function () {
-        overlay.querySelectorAll('[data-main-pick]').forEach(function (cb) { cb.checked = true; });
+        overlay.querySelectorAll('[data-week-pick]').forEach(function (cb) { cb.checked = true; });
       };
       document.getElementById('mainPickNone').onclick = function () {
-        overlay.querySelectorAll('[data-main-pick]').forEach(function (cb) { cb.checked = false; });
+        overlay.querySelectorAll('[data-week-pick]').forEach(function (cb) { cb.checked = false; });
       };
       document.getElementById('mainPickAdd').onclick = function () {
         var added = 0;
@@ -2223,13 +2244,12 @@
           var k = EBMenus.dishCatalogueKey ? EBMenus.dishCatalogueKey(d.name) : String(d.name || '').toLowerCase();
           if (k) have[k] = true;
         });
-        overlay.querySelectorAll('[data-main-pick]:checked').forEach(function (cb) {
-          var i = parseInt(cb.getAttribute('data-main-pick'), 10);
-          var src = mainList[i];
+        overlay.querySelectorAll('[data-week-pick]:checked').forEach(function (cb) {
+          var i = parseInt(cb.getAttribute('data-week-pick'), 10);
+          var row = pickList[i];
+          var src = row && row.dish;
           if (!src) return;
           var key = EBMenus.dishCatalogueKey ? EBMenus.dishCatalogueKey(src.name) : String(src.name || '').toLowerCase();
-          // Skip exact duplicates already on Sunday; still allow Roasts + same-named mains.
-          if (key && have[key] && String(src.section || '') === 'Sunday Roasts') return;
           if (key && have[key]) return;
           var clone = EBMenus.dishFromCatalogueEntry
             ? EBMenus.dishFromCatalogueEntry(src, { section: src.section })
@@ -2242,6 +2262,8 @@
                 tags: src.tags,
                 lunchClub: !!src.lunchClub
               });
+          if (row.source === 'specials') clone.fromMenu = 'specials';
+          else if (row.source === 'main') clone.fromMenu = 'main';
           sunday.push(clone);
           if (key) have[key] = true;
           added += 1;
