@@ -149,6 +149,13 @@
     .catalogue-hist li:last-child { border-bottom: 0; }
     .catalogue-hist .hp { font-weight: 700; }
     .catalogue-count { font-size: 13px; color: var(--ink-soft); margin: 8px 0 0; }
+    .catalogue-row .catalogue-add {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px;
+    }
+    .catalogue-row .catalogue-add select {
+      min-width: 140px; max-width: 220px; flex: 1 1 140px;
+    }
+    .catalogue-row .catalogue-add .go { flex: 0 0 auto; }
     .view-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
     .view-toggle button.on { background: var(--ink); color: var(--paint); border-color: var(--ink); }
     label.field { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 10px 0 4px; }
@@ -367,9 +374,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow94"></script>
-  <script src="menus-print.js?v=20260927-flow94"></script>
-  <script src="menus-ingest.js?v=20260927-flow94"></script>
+  <script src="menus.js?v=20260927-flow95"></script>
+  <script src="menus-print.js?v=20260927-flow95"></script>
+  <script src="menus-ingest.js?v=20260927-flow95"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -403,6 +410,7 @@
     var historyCache = [];
     var catalogueQuery = '';
     var catalogueSection = 'all';
+    var catalogueAddMenuId = '';
     var cloudUpdatedAt = (function () {
       try { return parseInt(localStorage.getItem(CLOUD_AT_KEY) || '0', 10) || 0; }
       catch (e) { return 0; }
@@ -948,7 +956,7 @@
       html += '<div class="include-box" style="margin-bottom:14px">';
       html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">All dishes</h3>';
       html += '<p class="note" style="margin:0 0 10px">Shared catalogue of every dish saved from your menus — current price, last used date, and price history. ' +
-        'Search by name or filter by category. Grows automatically when you save.</p>';
+        'Search by name or filter by category. Use <strong>Add to menu</strong> to drop a dish onto a menu — it files into the right category automatically.</p>';
       html += '<div class="catalogue-filters">';
       html += '<div><label class="field" for="catalogueSearch">Search by name</label>';
       html += '<input type="search" id="catalogueSearch" placeholder="e.g. sirloin, short rib" value="' +
@@ -978,6 +986,13 @@
         return;
       }
 
+      var menus = visibleMenus();
+      var defaultTarget = catalogueAddMenuId || menuId || (menus[0] && menus[0].id) || 'main';
+      if (!menus.some(function (m) { return m.id === defaultTarget; })) {
+        defaultTarget = (menus[0] && menus[0].id) || 'main';
+      }
+      catalogueAddMenuId = defaultTarget;
+
       rows.forEach(function (item) {
         var hist = Array.isArray(item.priceHistory) ? item.priceHistory : [];
         html += '<div class="catalogue-row" data-catalogue-key="' + escapeAttr(item.key || '') + '">';
@@ -1001,10 +1016,72 @@
           });
           html += '</ul></details>';
         }
+        html += '<div class="catalogue-add">';
+        html += '<select class="catalogue-target" aria-label="Add to which menu" data-catalogue-target>';
+        menus.forEach(function (m) {
+          html += '<option value="' + escapeAttr(m.id) + '"' +
+            (m.id === defaultTarget ? ' selected' : '') + '>' + escapeAttr(m.name) + '</option>';
+        });
+        html += '</select>';
+        html += '<button type="button" class="go" data-catalogue-add="' +
+          escapeAttr(item.key || '') + '">Add to menu</button>';
+        html += '</div>';
         html += '</div>';
       });
       el.innerHTML = html;
       bindCatalogue();
+    }
+
+    function addCatalogueDishToMenu(entry, targetMenuId) {
+      if (!entry || !entry.name) return { ok: false, error: 'Missing dish' };
+      var tid = String(targetMenuId || '').trim();
+      var menuMeta = EBMenus.menuById ? EBMenus.menuById(tid) : null;
+      if (!tid || !menuMeta) return { ok: false, error: 'Pick a menu' };
+      if (!book[tid]) book[tid] = [];
+      var list = book[tid];
+      var key = entry.key || (EBMenus.dishCatalogueKey && EBMenus.dishCatalogueKey(entry.name)) || '';
+      if (key) {
+        var dup = list.some(function (d) {
+          var k = EBMenus.dishCatalogueKey ? EBMenus.dishCatalogueKey(d.name) : '';
+          return k && k === key;
+        });
+        if (dup) {
+          return {
+            ok: false,
+            error: 'Already on ' + (menuMeta.name || tid),
+            duplicate: true,
+            menuName: menuMeta.name || tid
+          };
+        }
+      }
+      var section = EBMenus.sectionForTargetMenu
+        ? EBMenus.sectionForTargetMenu(entry.section, entry.name, entry.description, tid)
+        : (entry.section || 'Mains');
+      var clone = EBMenus.dishFromCatalogueEntry
+        ? EBMenus.dishFromCatalogueEntry(entry, {
+            menuId: tid,
+            section: section,
+            lunchClub: tid === 'lunch-club'
+          })
+        : EBMenus.tidyDishFields({
+            id: 'cat-' + Date.now(),
+            section: section,
+            name: entry.name,
+            description: entry.description || '',
+            price: entry.price || '',
+            tags: entry.tags || '',
+            lunchClub: tid === 'lunch-club'
+          });
+      list.push(clone);
+      if (EBMenus.sortDishesBySection) book[tid] = EBMenus.sortDishesBySection(list);
+      save();
+      return {
+        ok: true,
+        menuId: tid,
+        menuName: menuMeta.name || tid,
+        section: clone.section || section,
+        name: clone.name
+      };
     }
 
     function bindCatalogue() {
@@ -1043,6 +1120,44 @@
           refreshFromFilters();
         };
       }
+      document.querySelectorAll('[data-catalogue-target]').forEach(function (sel) {
+        sel.onchange = function () {
+          catalogueAddMenuId = String(sel.value || '');
+          // Keep every row’s dropdown in sync with the last choice.
+          document.querySelectorAll('[data-catalogue-target]').forEach(function (other) {
+            if (other !== sel) other.value = catalogueAddMenuId;
+          });
+        };
+      });
+      document.querySelectorAll('[data-catalogue-add]').forEach(function (btn) {
+        btn.onclick = function () {
+          var key = btn.getAttribute('data-catalogue-add');
+          var row = btn.closest ? btn.closest('.catalogue-row') : null;
+          var sel = row ? row.querySelector('[data-catalogue-target]') : null;
+          var target = sel ? String(sel.value || '') : catalogueAddMenuId;
+          catalogueAddMenuId = target;
+          var entry = (dishCatalogue || []).filter(function (e) {
+            return e && e.key === key;
+          })[0];
+          if (!entry) {
+            alert('That dish is missing from the catalogue.');
+            return;
+          }
+          var res = addCatalogueDishToMenu(entry, target);
+          if (!res.ok) {
+            alert(res.error || 'Could not add dish.');
+            return;
+          }
+          var label = btn.textContent;
+          btn.textContent = 'Added';
+          btn.disabled = true;
+          btn.title = 'Added to ' + res.menuName + ' · ' + (res.section || '');
+          setTimeout(function () {
+            btn.disabled = false;
+            btn.textContent = label || 'Add to menu';
+          }, 1400);
+        };
+      });
     }
 
     function renderPicker() {
