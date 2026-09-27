@@ -374,9 +374,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow96"></script>
-  <script src="menus-print.js?v=20260927-flow96"></script>
-  <script src="menus-ingest.js?v=20260927-flow96"></script>
+  <script src="menus.js?v=20260927-flow99"></script>
+  <script src="menus-print.js?v=20260927-flow99"></script>
+  <script src="menus-ingest.js?v=20260927-flow99"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -682,23 +682,18 @@
       return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
         var remote = data && data.state;
         var remoteAt = remote ? (Number(remote.updatedAt) || 0) : 0;
-        if (remote && remoteAt > cloudUpdatedAt) {
+        // Cloud is the shared book for every phone/PC. Always load it when
+        // present — never let a stale local timestamp overwrite Kate’s Sunday.
+        if (remote && remoteAt) {
           if (applyCloudState(remote)) {
-            cloudSyncNote = 'Loaded latest menus from cloud';
+            cloudSyncNote = 'Menus synced across devices';
             cloudPullDone = true;
             render();
             return true;
           }
         }
         if ((!remote || !remoteAt) && cloudUpdatedAt > 0) {
-          // This device has edits; seed the empty cloud store.
-          return pushMenusToCloud().then(function () {
-            cloudPullDone = true;
-            return true;
-          });
-        }
-        if (remote && remoteAt && remoteAt < cloudUpdatedAt) {
-          // Local is newer — upload.
+          // Empty cloud — seed once from this device.
           return pushMenusToCloud().then(function () {
             cloudPullDone = true;
             return true;

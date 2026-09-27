@@ -422,7 +422,9 @@ function reviewLayoutWithGemini_(body) {
  *   HISTIDX + HIST_{id}_* — generated print sheets (capped for quota)
  */
 
-var HISTORY_MAX_ = 12;
+var HISTORY_MAX_ = 40;
+/** Ids removed on any device — stop other PCs re-uploading them. */
+var HISTORY_DELETED_MAX_ = 200;
 var PROP_CHUNK_ = 8500;
 
 function propDeletePrefix_(props, prefix) {
@@ -518,10 +520,48 @@ function historyMetaOnly_(entry) {
   };
 }
 
+function historyReadDeleted_() {
+  try {
+    var parsed = JSON.parse(propRead_('HISTDEL') || '[]');
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function historyWriteDeleted_(ids) {
+  var list = [];
+  var seen = {};
+  (ids || []).forEach(function (id) {
+    id = String(id || '');
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    list.push(id);
+  });
+  if (list.length > HISTORY_DELETED_MAX_) {
+    list = list.slice(-HISTORY_DELETED_MAX_);
+  }
+  propWrite_('HISTDEL', JSON.stringify(list));
+}
+
+function historyMarkDeleted_(id) {
+  id = historySafeId_(id);
+  if (!id) return;
+  var list = historyReadDeleted_().filter(function (x) { return x !== id; });
+  list.push(id);
+  historyWriteDeleted_(list);
+}
+
+function historyUnmarkDeleted_(id) {
+  id = historySafeId_(id);
+  if (!id) return;
+  historyWriteDeleted_(historyReadDeleted_().filter(function (x) { return x !== id; }));
+}
+
 function listPrintHistory_() {
   var list = historyPrune_(historyReadIndex_());
   historyWriteIndex_(list);
-  return { ok: true, source: 'props', items: list };
+  return { ok: true, source: 'props', items: list, deletedIds: historyReadDeleted_() };
 }
 
 function savePrintHistory_(raw) {
@@ -535,6 +575,8 @@ function savePrintHistory_(raw) {
   var safe = historySafeId_(meta.id);
   if (!safe) return { ok: false, error: 'Bad history id' };
   meta.id = safe;
+  // Explicit save from a device re-adds the sheet (clears a prior delete tombstone).
+  historyUnmarkDeleted_(safe);
   try {
     propWrite_('HIST_' + safe, String(raw.html));
   } catch (e) {
@@ -590,6 +632,7 @@ function deletePrintHistory_(id) {
   historyDeleteHtml_(id);
   var list = historyReadIndex_().filter(function (r) { return r.id !== id; });
   historyWriteIndex_(list);
+  historyMarkDeleted_(id);
   return { ok: true, source: 'props', id: id };
 }
 

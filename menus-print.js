@@ -3139,18 +3139,39 @@
     }).catch(function () {});
   }
 
-  /** Push device-only sheets up so the other phone/PC can see them once. */
-  function migrateLocalToCloud(cloudIds) {
-    var known = cloudIds || {};
+  /** Drop local copies of sheets that were deleted on another device. */
+  function purgeLocalDeleted(deletedIds) {
+    var gone = deletedIds || {};
     return localListOnly().then(function (rows) {
-      var missing = (rows || []).filter(function (r) { return r && r.id && !known[r.id]; });
+      var drop = (rows || []).filter(function (r) { return r && r.id && gone[r.id]; });
+      if (!drop.length) return Promise.resolve();
+      var chain = Promise.resolve();
+      drop.forEach(function (meta) {
+        chain = chain.then(function () { return localDeleteOnly(meta.id); });
+      });
+      return chain;
+    });
+  }
+
+  /**
+   * Upload device-only sheets that were never deleted in the cloud
+   * (e.g. Kate saved on the pub PC while the network blipped).
+   * Skip tombstoned ids so deletes stay deleted everywhere.
+   */
+  function migrateLocalToCloud(cloudIds, deletedIds) {
+    var known = cloudIds || {};
+    var gone = deletedIds || {};
+    return localListOnly().then(function (rows) {
+      var missing = (rows || []).filter(function (r) {
+        return r && r.id && !known[r.id] && !gone[r.id];
+      });
       if (!missing.length) return;
-      // Upload oldest first so prune keeps newest; cap burst.
+      // Newest first so the sheet just made (Sunday 11:16) uploads before older ones.
       missing.sort(function (a, b) {
-        return (a.generatedAt || 0) - (b.generatedAt || 0);
+        return (b.generatedAt || 0) - (a.generatedAt || 0);
       });
       var chain = Promise.resolve();
-      missing.slice(-20).forEach(function (meta) {
+      missing.slice(0, 20).forEach(function (meta) {
         chain = chain.then(function () {
           return localGetOnly(meta.id).then(function (full) {
             if (!full || !full.html) return;
@@ -3379,19 +3400,23 @@
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
       var cloudItems = Array.isArray(data.items) ? data.items : [];
       var known = {};
+      var deleted = {};
       cloudItems.forEach(function (r) { if (r && r.id) known[r.id] = true; });
-      // Fire-and-forget: upload any sheets that only exist on this device.
-      migrateLocalToCloud(known);
-      // Always merge local backup — empty cloud must not hide device saves.
-      return localListOnly().then(function (localItems) {
-        var byId = {};
-        (localItems || []).forEach(function (r) {
-          if (r && r.id) byId[r.id] = asRow(r, 'local');
+      (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
+        if (id) deleted[String(id)] = true;
+      });
+      // Shared list = cloud. Upload any local-only sheet not tombstoned
+      // (Kate’s pub PC → everyone). Drop local copies of deletes.
+      return purgeLocalDeleted(deleted).then(function () {
+        return migrateLocalToCloud(known, deleted);
+      }).then(function () {
+        // Re-list after migrate so Sunday 11:16 appears on this device too.
+        return historyCloudPost({ action: 'listPrintHistory' }).then(function (data2) {
+          var items = Array.isArray(data2.items) ? data2.items : cloudItems;
+          return sortHistoryNewest(items.map(function (r) { return asRow(r, 'cloud'); }));
+        }).catch(function () {
+          return sortHistoryNewest(cloudItems.map(function (r) { return asRow(r, 'cloud'); }));
         });
-        cloudItems.forEach(function (r) {
-          if (r && r.id) byId[r.id] = asRow(r, 'cloud');
-        });
-        return sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
       });
     }).catch(function () {
       return localListOnly();
