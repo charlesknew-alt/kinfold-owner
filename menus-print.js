@@ -3494,20 +3494,32 @@
     opts = opts || {};
     if (!entry || !entry.html) return Promise.reject(new Error('missing_html'));
     var to = String(opts.to || HISTORY_EMAIL_DEFAULT || '').trim();
+    var meta = {
+      id: entry.id,
+      menuId: entry.menuId,
+      menuName: entry.menuName,
+      roman: entry.roman,
+      n: entry.n,
+      week: entry.week,
+      weekKey: entry.weekKey,
+      hideDate: entry.hideDate,
+      generatedAt: entry.generatedAt,
+      dayKey: entry.dayKey,
+      html: entry.html
+    };
+    // Upload sheet (no-cors), then email by id via GET so we get a real ok/error.
     return historyCloudPost({
-      action: 'emailPrintHistory',
-      to: to,
-      entry: {
+      action: 'savePrintHistory',
+      entry: meta
+    }).catch(function () {
+      // Already in cloud or brief glitch — still try email by id.
+      return null;
+    }).then(function () {
+      return historyCloudPost({
+        action: 'emailPrintHistory',
         id: entry.id,
-        menuId: entry.menuId,
-        menuName: entry.menuName,
-        roman: entry.roman,
-        n: entry.n,
-        week: entry.week,
-        weekKey: entry.weekKey,
-        hideDate: entry.hideDate,
-        html: entry.html
-      }
+        to: to
+      });
     }).then(function (data) {
       return {
         ok: true,
