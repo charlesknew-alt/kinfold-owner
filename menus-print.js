@@ -2968,7 +2968,7 @@
   var HISTORY_MAX = 60;
   /** Live Menu AI web app — also stores shared print history in Drive. */
   var HISTORY_CLOUD_DEFAULT =
-    'https://script.google.com/macros/s/AKfycbyVjmwHDUL9jRtrskiiATFPgNCv2vPfcBiKjcaO0r_pcXulNS49u_qxbxYuPVc0sJGHgQ/exec';
+    'https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec';
   /** Default To: address when Emailing a saved sheet from Print history. */
   var HISTORY_EMAIL_DEFAULT = 'pub@eightbellsbolney.com';
 
@@ -3458,64 +3458,34 @@
   }
 
   /**
-   * Email a saved sheet: prefer native share (phone), else download the HTML
-   * and open mailto so staff can attach the file.
+   * Email a saved sheet via Menu AI Apps Script (MailApp) — one click, no
+   * mail-client popup. Defaults to pub@eightbellsbolney.com.
    */
-  function emailPrintHtml(entry) {
-    if (!entry || !entry.html) return Promise.resolve(false);
-    var label = printSheetLabel(entry.menuName || entry.menuId || 'Menu', entry);
-    var name = printFileName(entry.menuName || entry.menuId || 'menu', {
-      roman: entry.roman,
-      week: entry.week,
-      hideDate: entry.hideDate
-    }, 'html');
-    var subject = label;
-    var body = 'Please find the Eight Bells menu attached (' + label + ').' +
-      '\n\nIf the file did not attach automatically, attach the downloaded HTML and open it in a browser to Print → Save as PDF.';
-    var blob = new Blob([entry.html], { type: 'text/html;charset=utf-8' });
-    var file = null;
-    try {
-      if (typeof File !== 'undefined') {
-        file = new File([blob], name, { type: 'text/html' });
+  function emailPrintHtml(entry, opts) {
+    opts = opts || {};
+    if (!entry || !entry.html) return Promise.reject(new Error('missing_html'));
+    var to = String(opts.to || HISTORY_EMAIL_DEFAULT || '').trim();
+    return historyCloudPost({
+      action: 'emailPrintHistory',
+      to: to,
+      entry: {
+        id: entry.id,
+        menuId: entry.menuId,
+        menuName: entry.menuName,
+        roman: entry.roman,
+        n: entry.n,
+        week: entry.week,
+        weekKey: entry.weekKey,
+        hideDate: entry.hideDate,
+        html: entry.html
       }
-    } catch (e0) { file = null; }
-    if (file && typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
-      try {
-        if (navigator.canShare({ files: [file] })) {
-          return navigator.share({
-            files: [file],
-            title: label,
-            text: body
-          }).then(function () { return true; }).catch(function () {
-            return emailPrintHtmlMailto_(name, subject, body, blob);
-          });
-        }
-      } catch (e1) {}
-    }
-    return Promise.resolve(emailPrintHtmlMailto_(name, subject, body, blob));
-  }
-
-  function emailPrintHtmlMailto_(name, subject, body, blob) {
-    try {
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = name;
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () {
-        try { URL.revokeObjectURL(url); } catch (e) {}
-        if (a.parentNode) a.parentNode.removeChild(a);
-      }, 800);
-    } catch (e2) {}
-    var mail = 'mailto:' + encodeURIComponent(HISTORY_EMAIL_DEFAULT) +
-      '?subject=' + encodeURIComponent(subject) +
-      '&body=' + encodeURIComponent(body);
-    try { window.location.href = mail; } catch (e3) {
-      try { window.open(mail, '_blank'); } catch (e4) {}
-    }
-    return true;
+    }).then(function (data) {
+      return {
+        ok: true,
+        to: (data && data.to) || to,
+        subject: data && data.subject
+      };
+    });
   }
 
   function partyCss() {

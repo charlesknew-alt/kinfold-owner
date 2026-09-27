@@ -11,7 +11,7 @@
   var AI_URL_KEY = 'eb-menu-ai-url';
   /** Same Menu AI web app — also stores shared menus + print history in Drive. */
   var CLOUD_DEFAULT_URL =
-    'https://script.google.com/macros/s/AKfycbyVjmwHDUL9jRtrskiiATFPgNCv2vPfcBiKjcaO0r_pcXulNS49u_qxbxYuPVc0sJGHgQ/exec';
+    'https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec';
 
   function getCloudUrl() {
     var custom = getAiUrl();
