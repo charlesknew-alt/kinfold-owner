@@ -36,7 +36,7 @@ The same web app stores staff data in **Script Properties** (no extra Drive logi
 - `MENUS_*` — live dishes, party blurbs, promo bank, layout, **dish catalogue** (deduped titles + price history for autocomplete; same on PC and phone)
 - `HISTIDX` + `HIST_{id}_*` — recent generated print sheets (capped to fit Apps Script quota)
 
-Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (GmailApp → `pub@eightbellsbolney.com` with a **printable PDF** attachment, **From** your Gmail “Send mail as” `@kinfoldinns.co.uk` alias; override with Script Properties `MENU_EMAIL_TO` / `MENU_EMAIL_FROM`).
+Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (MailApp → `pub@eightbellsbolney.com` with a **printable PDF**; **Reply-To** your `@kinfoldinns.co.uk` alias. From-alias is off by default — see below).
 
 After pulling, push with `clasp push` from this folder, then update the live web-app deployment
 (`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
@@ -48,11 +48,14 @@ After adding mail / Gmail scopes, the **script owner** must grant send permissio
 1. Open the Menu AI project in [script.google.com](https://script.google.com)
 2. Select function `AUTHORIZE_EMAIL_SENDING` → **Run**
 3. Review permissions → Allow
-4. Check **Executions / Logs** — it lists your Gmail Send-as aliases and which `@kinfoldinns.co.uk` address will be used as From
-
-The From address must already exist under Gmail → Settings → Accounts → **Send mail as**. Optional Script Property `MENU_EMAIL_FROM` pins a specific alias.
 
 Until that is done, Print history **Email** returns a permission error. After Allow, Email sends on click with no mail-client popup.
+
+### From address / Send mail as
+
+Menu emails send from the **primary Google account** (display name “Eight Bells Menus”) so delivery works. The `@kinfoldinns.co.uk` address is used as **Reply-To**.
+
+Sending **From** `admin@kinfoldinns.co.uk` needs a working Gmail → Settings → Accounts → **Send mail as** SMTP login. If that SMTP is Outlook/Microsoft and the password is wrong, Gmail bounces with “Authentication unsuccessful” / “Send mail as … misconfigured”. Fix those settings first, then set Script Property `MENU_EMAIL_USE_FROM=1` (optional `MENU_EMAIL_FROM=admin@kinfoldinns.co.uk`) to turn From-alias back on.
 
 ## Layout review (optional)
 

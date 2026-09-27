@@ -311,14 +311,16 @@ assert(page.indexOf('flow95') !== -1, 'menus page cache-bust is flow95');
 assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow95') !== -1, 'hub menus link cache-bust is flow95');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
-assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('GmailApp.sendEmail') !== -1,
+assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
   'Menu AI Apps Script can email a saved print sheet');
 assert(aiGs.indexOf('menuHtmlToPdfBlob_') !== -1 && aiGs.indexOf('MimeType.PDF') !== -1,
   'Email converts the print sheet to a PDF attachment');
 assert(aiGs.indexOf('resolveMenuEmailFrom_') !== -1 && aiGs.indexOf('kinfoldinns.co.uk') !== -1,
-  'Email prefers a kinfoldinns.co.uk Gmail Send-as alias');
-assert(aiGs.indexOf('MENU_EMAIL_FROM') !== -1,
-  'MENU_EMAIL_FROM script property can pin the From alias');
+  'Email can use a kinfoldinns.co.uk address as Reply-To');
+assert(aiGs.indexOf('MENU_EMAIL_USE_FROM') !== -1 && aiGs.indexOf('menuEmailUseFromAlias_') !== -1,
+  'From alias is opt-in via MENU_EMAIL_USE_FROM after Send-as SMTP works');
+assert(aiGs.indexOf('replyTo') !== -1,
+  'menu emails set Reply-To to the kinfoldinns alias');
 assert(fs.readFileSync(path.join(root, 'apps-script/menu-ai/appsscript.json'), 'utf8').indexOf('gmail.send') !== -1,
   'Apps Script manifest requests Gmail send scope for alias From');
 assert(page.indexOf('data-view="catalogue"') !== -1 && page.indexOf('renderCatalogue') !== -1,

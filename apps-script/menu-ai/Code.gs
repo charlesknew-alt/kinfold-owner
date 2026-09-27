@@ -17,8 +17,10 @@
  * EMAIL (Print history → Email button):
  * Run AUTHORIZE_EMAIL_SENDING once (dropdown above ▶ Run), then Allow.
  * Sends to pub@eightbellsbolney.com with no mail-client popup.
- * From address: your Gmail “Send mail as” @kinfoldinns.co.uk alias
- * (override with Script Property MENU_EMAIL_FROM).
+ * Reply-To: your @kinfoldinns.co.uk Send-as alias (when present).
+ * From alias is OFF by default — Gmail “Send mail as” via Outlook SMTP was
+ * bouncing with “Authentication unsuccessful”. Set Script Property
+ * MENU_EMAIL_USE_FROM=1 after fixing Gmail → Accounts → Send mail as.
  */
 
 /**
@@ -30,11 +32,20 @@ function AUTHORIZE_EMAIL_SENDING() {
   var remaining = MailApp.getRemainingDailyQuota();
   var aliases = [];
   try { aliases = GmailApp.getAliases() || []; } catch (err) { aliases = []; }
-  var from = resolveMenuEmailFrom_(aliases);
+  var replyTo = resolveMenuEmailFrom_(aliases);
+  var useFrom = menuEmailUseFromAlias_();
   Logger.log('Mail authorised. Remaining daily quota: ' + remaining);
   Logger.log('Gmail Send-as aliases: ' + JSON.stringify(aliases));
-  Logger.log('Menu emails will send from: ' + (from || '(primary Google account)'));
-  return { ok: true, remaining: remaining, aliases: aliases, from: from };
+  Logger.log('Menu emails From alias enabled: ' + useFrom +
+    ' → From: ' + (useFrom && replyTo ? replyTo : '(primary Google account)') +
+    '; Reply-To: ' + (replyTo || '(none)'));
+  return {
+    ok: true,
+    remaining: remaining,
+    aliases: aliases,
+    replyTo: replyTo,
+    useFrom: useFrom
+  };
 }
 
 /** @deprecated use AUTHORIZE_EMAIL_SENDING */
@@ -587,8 +598,8 @@ var MENU_EMAIL_DEFAULT_ = 'pub@eightbellsbolney.com';
 var MENU_EMAIL_FROM_DOMAIN_ = 'kinfoldinns.co.uk';
 
 /**
- * Pick the From address: Script Property MENU_EMAIL_FROM if it is a known alias,
- * else the first @kinfoldinns.co.uk Send-as alias on the script owner’s Gmail.
+ * Pick the kinfoldinns Send-as alias: Script Property MENU_EMAIL_FROM if known,
+ * else the first @kinfoldinns.co.uk alias on the script owner’s Gmail.
  */
 function resolveMenuEmailFrom_(aliases) {
   var props = PropertiesService.getScriptProperties();
@@ -606,14 +617,25 @@ function resolveMenuEmailFrom_(aliases) {
   for (var j = 0; j < list.length; j++) {
     if (String(list[j]).toLowerCase().slice(-domain.length) === domain) return list[j];
   }
-  // Property set but not yet in getAliases() — still try (Gmail may accept it).
   if (preferred && preferred.indexOf('@') !== -1) return preferred;
   return '';
 }
 
 /**
+ * Opt-in: use Gmail “Send mail as” From. Default off — Outlook SMTP for
+ * admin@kinfoldinns.co.uk was returning “Authentication unsuccessful” bounces.
+ * Set Script Property MENU_EMAIL_USE_FROM=1 after fixing Send mail as.
+ */
+function menuEmailUseFromAlias_() {
+  var props = PropertiesService.getScriptProperties();
+  var raw = String(props.getProperty('MENU_EMAIL_USE_FROM') || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
+
+/**
  * Send a saved print sheet by email (no client mailto popup).
- * Uses GmailApp so From can be a Gmail “Send mail as” @kinfoldinns.co.uk alias.
+ * Sends from the script owner’s primary Gmail (reliable) with Reply-To set to
+ * the kinfoldinns alias. Optional From alias via MENU_EMAIL_USE_FROM=1.
  */
 function emailPrintHistory_(body) {
   body = body || {};
@@ -661,18 +683,36 @@ function emailPrintHistory_(body) {
   var htmlBody =
     '<p>Eight Bells menu: <strong>' + subject.replace(/</g, '&lt;') + '</strong></p>' +
     '<p>Printable <strong>PDF</strong> attached — ready to print.</p>';
-  var from = resolveMenuEmailFrom_();
+  var alias = resolveMenuEmailFrom_();
+  var useFrom = menuEmailUseFromAlias_() && !!alias;
+  var fromUsed = useFrom ? alias : '';
   var mailOpts = {
     htmlBody: htmlBody,
     attachments: attachments,
     name: 'Eight Bells Menus'
   };
-  if (from) mailOpts.from = from;
+  // Reply-To keeps kinfoldinns in the thread without forcing broken Send-as SMTP.
+  if (alias) mailOpts.replyTo = alias;
+  if (fromUsed) mailOpts.from = fromUsed;
+
+  var source = 'gmail';
   try {
-    // GmailApp honours “Send mail as” aliases; MailApp always uses the primary account.
-    GmailApp.sendEmail(to, subject, plain, mailOpts);
+    if (fromUsed) {
+      GmailApp.sendEmail(to, subject, plain, mailOpts);
+    } else {
+      // Primary account — same path that delivered HTML menus before the From alias.
+      MailApp.sendEmail({
+        to: to,
+        subject: subject,
+        body: plain,
+        htmlBody: htmlBody,
+        attachments: attachments,
+        name: 'Eight Bells Menus',
+        replyTo: alias || undefined
+      });
+      source = 'mail';
+    }
   } catch (err) {
-    // Fallback without From if alias/scope hiccups — still deliver the PDF.
     try {
       MailApp.sendEmail({
         to: to,
@@ -680,9 +720,11 @@ function emailPrintHistory_(body) {
         body: plain,
         htmlBody: htmlBody,
         attachments: attachments,
-        name: 'Eight Bells Menus'
+        name: 'Eight Bells Menus',
+        replyTo: alias || undefined
       });
-      from = '';
+      fromUsed = '';
+      source = 'mail';
     } catch (err2) {
       return {
         ok: false,
@@ -692,9 +734,10 @@ function emailPrintHistory_(body) {
   }
   return {
     ok: true,
-    source: 'gmail',
+    source: source,
     to: to,
-    from: from || null,
+    from: fromUsed || null,
+    replyTo: alias || null,
     subject: subject,
     filename: attachedAs
   };
