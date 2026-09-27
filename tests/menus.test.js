@@ -312,14 +312,21 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow100') !== -1, 'menus page cache-bust is flow100');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow100') !== -1, 'hub menus link cache-bust is flow100');
+assert(page.indexOf('flow101') !== -1, 'menus page cache-bust is flow101');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow101') !== -1, 'hub menus link cache-bust is flow101');
 assert(page.indexOf('doSyncNow') !== -1 && page.indexOf('syncNowFromCloud') !== -1,
   'Sync now forces every device onto the shared cloud book');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('CLOUD_DEFAULT_URL') !== -1,
   'shared cloud URL helper exists');
 assert(ingestJs.indexOf('Do not use a per-device custom AI URL') !== -1,
   'cloud sync ignores per-device custom AI URLs');
+assert(ingestJs.indexOf('cloudBridgeCall_') !== -1 && ingestJs.indexOf('eb-menu-cloud') !== -1,
+  'cloud writes use Apps Script iframe bridge (avoids POST 302 break)');
+assert(ingestJs.indexOf('cloudGet') !== -1, 'cloud reads use fast GET');
+assert(aiGs.indexOf('cloudBridgeHtml_') !== -1 && aiGs.indexOf('bridgeApi') !== -1,
+  'Menu AI serves cloud bridge for GitHub Pages');
+assert(printJs.indexOf('Do not wait on uploads') !== -1,
+  'print history renders before background migrate');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,

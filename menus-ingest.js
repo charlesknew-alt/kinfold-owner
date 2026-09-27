@@ -21,27 +21,122 @@
     return CLOUD_DEFAULT_URL;
   }
 
-  function cloudPost(body) {
-    var url = getCloudUrl();
+  var bridgeReadyPromise = null;
+  var bridgeFrame = null;
+  var bridgePending = {};
+
+  function parseCloudJson_(t) {
+    var data;
+    try { data = JSON.parse(t); } catch (e) {
+      throw new Error('cloud_bad_json');
+    }
+    if (!data || !data.ok) {
+      throw new Error((data && data.error) || 'cloud_fail');
+    }
+    return data;
+  }
+
+  /** Fast GET path — works with Apps Script CORS (POST /exec 302 is broken in browsers). */
+  function cloudGet(action, params) {
+    var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
+    if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
     if (!url || typeof fetch !== 'function') {
       return Promise.reject(new Error('no_cloud'));
     }
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body || {})
-    }).then(function (res) {
-      return res.text().then(function (t) {
-        var data;
-        try { data = JSON.parse(t); } catch (e) {
-          throw new Error('cloud_bad_json');
+    return fetch(url, { method: 'GET', credentials: 'omit' }).then(function (res) {
+      return res.text().then(parseCloudJson_);
+    });
+  }
+
+  function ensureCloudBridge_() {
+    if (bridgeReadyPromise) return bridgeReadyPromise;
+    if (typeof document === 'undefined') {
+      return Promise.reject(new Error('no_document'));
+    }
+    bridgeReadyPromise = new Promise(function (resolve, reject) {
+      var iframe = document.createElement('iframe');
+      iframe.setAttribute('title', 'Menu cloud bridge');
+      iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;clip:rect(0,0,0,0);';
+      iframe.src = getCloudUrl() + '?bridge=1';
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        reject(new Error('bridge_timeout'));
+      }, 20000);
+      function onMsg(ev) {
+        var d = ev.data;
+        if (!d || typeof d !== 'object') return;
+        if (d.type === 'eb-menu-cloud-ready' && !settled) {
+          settled = true;
+          clearTimeout(timer);
+          bridgeFrame = iframe;
+          resolve(iframe);
+          return;
         }
+        if (d.type === 'eb-menu-cloud-result' && d.id && bridgePending[d.id]) {
+          var p = bridgePending[d.id];
+          delete bridgePending[d.id];
+          if (d.error) p.reject(new Error(d.error));
+          else p.resolve(d.result);
+        }
+      }
+      window.addEventListener('message', onMsg);
+      document.body.appendChild(iframe);
+    }).catch(function (err) {
+      bridgeReadyPromise = null;
+      throw err;
+    });
+    return bridgeReadyPromise;
+  }
+
+  function cloudBridgeCall_(action, body) {
+    return ensureCloudBridge_().then(function (iframe) {
+      return new Promise(function (resolve, reject) {
+        var id = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+        bridgePending[id] = { resolve: resolve, reject: reject };
+        try {
+          iframe.contentWindow.postMessage({
+            type: 'eb-menu-cloud',
+            id: id,
+            action: action,
+            body: body || {}
+          }, '*');
+        } catch (e) {
+          delete bridgePending[id];
+          reject(e);
+          return;
+        }
+        setTimeout(function () {
+          if (!bridgePending[id]) return;
+          delete bridgePending[id];
+          reject(new Error('bridge_call_timeout'));
+        }, 45000);
+      }).then(function (data) {
         if (!data || !data.ok) {
           throw new Error((data && data.error) || 'cloud_fail');
         }
         return data;
       });
     });
+  }
+
+  /**
+   * Shared cloud call. Reads use GET (fast). Writes use a hidden Apps Script
+   * iframe bridge — browser fetch POST to /exec dies on Google’s 302 redirect,
+   * which left every phone/PC stuck on its own localStorage copy.
+   */
+  function cloudPost(body) {
+    body = body || {};
+    var action = String(body.action || '');
+    if (!action) return Promise.reject(new Error('missing_action'));
+    if (action === 'getMenusState' || action === 'listPrintHistory') {
+      return cloudGet(action, body);
+    }
+    if (action === 'getPrintHistory' || action === 'deletePrintHistory') {
+      return cloudGet(action, body);
+    }
+    return cloudBridgeCall_(action, body);
   }
 
   function loadScript(src) {

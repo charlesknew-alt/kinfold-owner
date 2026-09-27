@@ -375,9 +375,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow100"></script>
-  <script src="menus-print.js?v=20260927-flow100"></script>
-  <script src="menus-ingest.js?v=20260927-flow100"></script>
+  <script src="menus.js?v=20260927-flow101"></script>
+  <script src="menus-print.js?v=20260927-flow101"></script>
+  <script src="menus-ingest.js?v=20260927-flow101"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -714,13 +714,22 @@
     function syncNowFromCloud() {
       cloudSyncNote = 'Syncing shared menus…';
       cloudPullDone = false;
-      try { localStorage.removeItem(CLOUD_AT_KEY); } catch (e0) {}
-      cloudUpdatedAt = 0;
       var ed = document.getElementById('editor');
       if (ed && viewMode === 'edit') {
         ed.innerHTML = '<p class="note">Syncing shared menus from the cloud…</p>';
       }
-      return pullMenusFromCloud().then(function () {
+      return pullMenusFromCloud().then(function (pulled) {
+        // If cloud is still empty, upload this device’s book so others can see it.
+        if (!pulled && (book.sunday || book.main || book.specials)) {
+          cloudUpdatedAt = Date.now();
+          return pushMenusToCloud().then(function () {
+            cloudSyncNote = 'Uploaded this device’s menus to the shared cloud';
+            if (viewMode === 'history') renderHistory();
+            else if (viewMode === 'catalogue') renderCatalogue();
+            else render();
+            return true;
+          });
+        }
         if (viewMode === 'history') renderHistory();
         else if (viewMode === 'catalogue') renderCatalogue();
         else render();

@@ -93,17 +93,72 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  if (e && e.parameter && String(e.parameter.models || '') === '1') {
+  var p = (e && e.parameter) || {};
+  // Hidden iframe bridge so GitHub Pages can call this script reliably
+  // (browser fetch POST to /exec breaks on Google’s 302 redirect).
+  if (String(p.bridge || '') === '1') {
+    return HtmlService.createHtmlOutput(cloudBridgeHtml_())
+      .setTitle('Menu cloud bridge')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  if (String(p.models || '') === '1') {
     return json_(listGeminiModels_());
   }
+  // GET reads (fast, CORS-friendly) — same actions as POST.
+  var action = String(p.action || '');
+  if (action === 'listPrintHistory') return json_(listPrintHistory_());
+  if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
+  if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
+  if (action === 'getMenusState') return json_(getMenusState_());
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout; or imageBase64 for AI read',
+    hint: 'GET/POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout; or ?bridge=1',
     mailQuota: (function () {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
   });
+}
+
+/**
+ * Called from the bridge iframe via google.script.run — bypasses fetch/302 issues.
+ */
+function bridgeApi(action, body) {
+  action = String(action || '');
+  body = body && typeof body === 'object' ? body : {};
+  try {
+    if (action === 'listPrintHistory') return listPrintHistory_();
+    if (action === 'savePrintHistory') return savePrintHistory_(body.entry || body);
+    if (action === 'getPrintHistory') return getPrintHistory_(body.id || (body.entry && body.entry.id));
+    if (action === 'deletePrintHistory') return deletePrintHistory_(body.id);
+    if (action === 'emailPrintHistory') return emailPrintHistory_(body);
+    if (action === 'getMenusState') return getMenusState_();
+    if (action === 'saveMenusState') return saveMenusState_(body.state || body);
+    if (action === 'reviewLayout') return reviewLayoutWithGemini_(body);
+    return { ok: false, error: 'Unknown action: ' + action };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message ? err.message : err) };
+  }
+}
+
+function cloudBridgeHtml_() {
+  return [
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><title>cloud bridge</title></head><body>',
+    '<script>',
+    'function reply(src,origin,id,result,error){',
+    '  try{ src.postMessage({type:"eb-menu-cloud-result",id:id,result:result||null,error:error||null}, origin||"*"); }catch(e){}',
+    '}',
+    'window.addEventListener("message",function(ev){',
+    '  var msg=ev.data; if(!msg||msg.type!=="eb-menu-cloud") return;',
+    '  var origin=ev.origin||"*";',
+    '  google.script.run',
+    '    .withSuccessHandler(function(result){ reply(ev.source,origin,msg.id,result,null); })',
+    '    .withFailureHandler(function(err){ reply(ev.source,origin,msg.id,null,String(err&&err.message?err.message:err)); })',
+    '    .bridgeApi(msg.action, msg.body||{});',
+    '});',
+    'try{ parent.postMessage({type:"eb-menu-cloud-ready"}, "*"); }catch(e){}',
+    '</script></body></html>'
+  ].join('');
 }
 
 function doOptions() {
