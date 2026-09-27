@@ -17,16 +17,24 @@
  * EMAIL (Print history → Email button):
  * Run AUTHORIZE_EMAIL_SENDING once (dropdown above ▶ Run), then Allow.
  * Sends to pub@eightbellsbolney.com with no mail-client popup.
+ * From address: your Gmail “Send mail as” @kinfoldinns.co.uk alias
+ * (override with Script Property MENU_EMAIL_FROM).
  */
 
 /**
  * ★ ONE-TIME: select this in the function dropdown (top toolbar) → Run → Allow.
  * Grants permission so Print history Email can send without a mail-client popup.
+ * Also logs which Gmail Send-as aliases Apps Script can use (kinfoldinns.co.uk).
  */
 function AUTHORIZE_EMAIL_SENDING() {
   var remaining = MailApp.getRemainingDailyQuota();
+  var aliases = [];
+  try { aliases = GmailApp.getAliases() || []; } catch (err) { aliases = []; }
+  var from = resolveMenuEmailFrom_(aliases);
   Logger.log('Mail authorised. Remaining daily quota: ' + remaining);
-  return { ok: true, remaining: remaining };
+  Logger.log('Gmail Send-as aliases: ' + JSON.stringify(aliases));
+  Logger.log('Menu emails will send from: ' + (from || '(primary Google account)'));
+  return { ok: true, remaining: remaining, aliases: aliases, from: from };
 }
 
 /** @deprecated use AUTHORIZE_EMAIL_SENDING */
@@ -575,10 +583,37 @@ function deletePrintHistory_(id) {
 }
 
 var MENU_EMAIL_DEFAULT_ = 'pub@eightbellsbolney.com';
+/** Prefer this domain among Gmail “Send mail as” aliases (see Gmail → Accounts). */
+var MENU_EMAIL_FROM_DOMAIN_ = 'kinfoldinns.co.uk';
+
+/**
+ * Pick the From address: Script Property MENU_EMAIL_FROM if it is a known alias,
+ * else the first @kinfoldinns.co.uk Send-as alias on the script owner’s Gmail.
+ */
+function resolveMenuEmailFrom_(aliases) {
+  var props = PropertiesService.getScriptProperties();
+  var preferred = String(props.getProperty('MENU_EMAIL_FROM') || '').trim();
+  var list = Array.isArray(aliases) ? aliases : [];
+  if (!list.length) {
+    try { list = GmailApp.getAliases() || []; } catch (err) { list = []; }
+  }
+  if (preferred) {
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i]).toLowerCase() === preferred.toLowerCase()) return list[i];
+    }
+  }
+  var domain = '@' + MENU_EMAIL_FROM_DOMAIN_.toLowerCase();
+  for (var j = 0; j < list.length; j++) {
+    if (String(list[j]).toLowerCase().slice(-domain.length) === domain) return list[j];
+  }
+  // Property set but not yet in getAliases() — still try (Gmail may accept it).
+  if (preferred && preferred.indexOf('@') !== -1) return preferred;
+  return '';
+}
 
 /**
  * Send a saved print sheet by email (no client mailto popup).
- * Runs as the script owner via MailApp.
+ * Uses GmailApp so From can be a Gmail “Send mail as” @kinfoldinns.co.uk alias.
  */
 function emailPrintHistory_(body) {
   body = body || {};
@@ -607,30 +642,99 @@ function emailPrintHistory_(body) {
     .replace(/[\/\\?%*:|"<>]/g, '-')
     .replace(/\s+/g, ' ')
     .trim() || 'menu';
-  var filename = safeName + '.html';
-  var blob = Utilities.newBlob(html, 'text/html', filename);
+  var pdfName = safeName + '.pdf';
+  var attachments = [];
+  var attachedAs = '';
+  try {
+    attachments.push(menuHtmlToPdfBlob_(html, pdfName));
+    attachedAs = pdfName;
+  } catch (pdfErr) {
+    // Fallback: HTML attachment if PDF conversion fails on a rare sheet.
+    var htmlName = safeName + '.html';
+    attachments.push(Utilities.newBlob(html, 'text/html', htmlName));
+    attachedAs = htmlName + ' (PDF convert failed: ' +
+      String(pdfErr && pdfErr.message ? pdfErr.message : pdfErr).slice(0, 120) + ')';
+  }
   var plain =
     'Eight Bells menu: ' + subject + '\n\n' +
-    'Open the attached HTML in a browser, then use Print → Save as PDF.\n';
+    'Printable PDF attached (' + attachedAs + ').\n';
   var htmlBody =
     '<p>Eight Bells menu: <strong>' + subject.replace(/</g, '&lt;') + '</strong></p>' +
-    '<p>Open the attached HTML in a browser, then use <strong>Print → Save as PDF</strong>.</p>';
+    '<p>Printable <strong>PDF</strong> attached — ready to print.</p>';
+  var from = resolveMenuEmailFrom_();
+  var mailOpts = {
+    htmlBody: htmlBody,
+    attachments: attachments,
+    name: 'Eight Bells Menus'
+  };
+  if (from) mailOpts.from = from;
   try {
-    MailApp.sendEmail({
-      to: to,
-      subject: subject,
-      body: plain,
-      htmlBody: htmlBody,
-      attachments: [blob],
-      name: 'Eight Bells Menus'
-    });
+    // GmailApp honours “Send mail as” aliases; MailApp always uses the primary account.
+    GmailApp.sendEmail(to, subject, plain, mailOpts);
   } catch (err) {
-    return {
-      ok: false,
-      error: 'Could not send email: ' + String(err && err.message ? err.message : err)
-    };
+    // Fallback without From if alias/scope hiccups — still deliver the PDF.
+    try {
+      MailApp.sendEmail({
+        to: to,
+        subject: subject,
+        body: plain,
+        htmlBody: htmlBody,
+        attachments: attachments,
+        name: 'Eight Bells Menus'
+      });
+      from = '';
+    } catch (err2) {
+      return {
+        ok: false,
+        error: 'Could not send email: ' + String(err && err.message ? err.message : err)
+      };
+    }
   }
-  return { ok: true, source: 'mail', to: to, subject: subject, filename: filename };
+  return {
+    ok: true,
+    source: 'gmail',
+    to: to,
+    from: from || null,
+    subject: subject,
+    filename: attachedAs
+  };
+}
+
+/**
+ * Turn a saved print-sheet HTML into a PDF blob for email attachment.
+ * Scripts/toolbars stripped so the PDF is the printable menu only.
+ */
+function menuHtmlToPdfBlob_(html, filenamePdf) {
+  var raw = String(html || '');
+  var styles = '';
+  raw.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function (_m, css) {
+    styles += css + '\n';
+    return '';
+  });
+  var bodyHtml = raw;
+  var bodyMatch = raw.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (bodyMatch) bodyHtml = bodyMatch[1];
+  bodyHtml = bodyHtml
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '');
+  styles +=
+    '@page{size:A4;margin:0}' +
+    'html,body{background:#fff!important;margin:0;padding:0}' +
+    '.toolbar,#previewToolbar{display:none!important}' +
+    '.sheet-stack.mode-a5{display:none!important}' +
+    'body.paper-a5 .mode-a5{display:block!important}body.paper-a5 .mode-a4{display:none!important}' +
+    'body.paper-a4 .mode-a5{display:none!important}body.paper-a4 .mode-a4{display:block!important}';
+  var page =
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+    styles +
+    '</style></head><body>' +
+    bodyHtml +
+    '</body></html>';
+  var out = HtmlService.createHtmlOutput(page).setWidth(794).setHeight(1123);
+  var pdf = out.getAs(MimeType.PDF);
+  pdf.setName(String(filenamePdf || 'menu.pdf'));
+  return pdf;
 }
 
 function getMenusState_() {

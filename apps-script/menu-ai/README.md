@@ -36,18 +36,21 @@ The same web app stores staff data in **Script Properties** (no extra Drive logi
 - `MENUS_*` — live dishes, party blurbs, promo bank, layout, **dish catalogue** (deduped titles + price history for autocomplete; same on PC and phone)
 - `HISTIDX` + `HIST_{id}_*` — recent generated print sheets (capped to fit Apps Script quota)
 
-Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (MailApp → `pub@eightbellsbolney.com`, override with Script Property `MENU_EMAIL_TO`).
+Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (GmailApp → `pub@eightbellsbolney.com` with a **printable PDF** attachment, **From** your Gmail “Send mail as” `@kinfoldinns.co.uk` alias; override with Script Properties `MENU_EMAIL_TO` / `MENU_EMAIL_FROM`).
 
 After pulling, push with `clasp push` from this folder, then update the live web-app deployment
 (`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
 
-### One-time MailApp authorisation (Email button)
+### One-time Gmail authorisation (Email button)
 
-After adding mail scopes, the **script owner** must grant send permission once:
+After adding mail / Gmail scopes, the **script owner** must grant send permission once:
 
 1. Open the Menu AI project in [script.google.com](https://script.google.com)
-2. Select function `authorizeMail_` → **Run**
+2. Select function `AUTHORIZE_EMAIL_SENDING` → **Run**
 3. Review permissions → Allow
+4. Check **Executions / Logs** — it lists your Gmail Send-as aliases and which `@kinfoldinns.co.uk` address will be used as From
+
+The From address must already exist under Gmail → Settings → Accounts → **Send mail as**. Optional Script Property `MENU_EMAIL_FROM` pins a specific alias.
 
 Until that is done, Print history **Email** returns a permission error. After Allow, Email sends on click with no mail-client popup.
 
