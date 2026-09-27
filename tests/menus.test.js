@@ -332,8 +332,9 @@ assert(printJs.indexOf('repairCloudHtmlGaps') !== -1,
   'Sync repairs cloud index rows that have no Drive HTML (phone download)');
 assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),
   'cloud history keeps 60 sheets so PC archive reaches the phone');
-assert(aiGs.indexOf('Could not store sheet HTML in Drive') !== -1,
-  'save refuses to index sheets when Drive HTML write fails');
+assert(aiGs.indexOf('Could not store sheet HTML') !== -1 &&
+  aiGs.indexOf('historyPrunePropsHtml_') !== -1,
+  'save falls back to Script Properties HTML when Drive is unauthorised');
 assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
   'print HTML moves to Drive; purge frees Script Properties quota');
 assert(ingestJs.indexOf('form POST navigates') !== -1 || ingestJs.indexOf('no-cors fetch only') !== -1,

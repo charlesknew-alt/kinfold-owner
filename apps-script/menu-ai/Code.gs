@@ -593,28 +593,52 @@ function historyWriteIndex_(list) {
   propWrite_('HISTIDX', JSON.stringify(list || []));
 }
 
-/** Drive folder for print HTML (avoids Script Properties 500KB cap). */
+/**
+ * Drive folder for print HTML (avoids Script Properties 500KB cap).
+ * Returns null when Drive is not authorised — callers fall back to props.
+ */
 function historyHtmlFolder_() {
   var props = PropertiesService.getScriptProperties();
   var id = String(props.getProperty('HIST_FOLDER_ID') || '');
   if (id) {
     try { return DriveApp.getFolderById(id); } catch (e) {}
   }
-  var folder = DriveApp.createFolder('Eight Bells Menu Print History');
-  try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
-  return folder;
+  try {
+    var folder = DriveApp.createFolder('Eight Bells Menu Print History');
+    try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
+    return folder;
+  } catch (e3) {
+    return null;
+  }
 }
 
 function historyWriteHtmlDrive_(id, html) {
   var safe = historySafeId_(id);
-  if (!safe) return;
+  if (!safe) throw new Error('Bad history id for Drive write');
   var folder = historyHtmlFolder_();
+  if (!folder) {
+    throw new Error(
+      'Drive not authorised — open Apps Script, Run any function, accept Drive access, then Sync again'
+    );
+  }
   var name = safe + '.html';
   var existing = folder.getFilesByName(name);
   while (existing.hasNext()) {
     try { existing.next().setTrashed(true); } catch (e) {}
   }
-  folder.createFile(name, String(html || ''), MimeType.HTML);
+  var blob = Utilities.newBlob(String(html || ''), MimeType.HTML, name);
+  var file = folder.createFile(blob);
+  if (!file || !file.getId()) throw new Error('Drive createFile returned empty');
+}
+
+/** Keep only the newest N Script-Properties HTML blobs (quota is ~500KB). */
+var HISTORY_PROPS_HTML_MAX_ = 8;
+
+function historyPrunePropsHtml_(list) {
+  var sorted = historySortNewest_(list || []);
+  sorted.slice(HISTORY_PROPS_HTML_MAX_).forEach(function (drop) {
+    if (drop && drop.id) propDelete_('HIST_' + historySafeId_(drop.id));
+  });
 }
 
 function historyReadHtmlDrive_(id) {
@@ -734,30 +758,46 @@ function savePrintHistory_(raw) {
   meta.id = safe;
   // Explicit save from a device re-adds the sheet (clears a prior delete tombstone).
   historyUnmarkDeleted_(safe);
-  // HTML lives in Drive — Script Properties only hold the small index.
-  // Drop legacy property chunks first so quota errors clear.
+  // Prefer Drive for HTML; fall back to Script Properties so phone can still
+  // download when Drive OAuth has not been granted yet.
   propDelete_('HIST_' + safe);
-  var driveOk = false;
+  var htmlText = String(raw.html);
+  var source = '';
+  var driveErr = '';
   try {
-    historyWriteHtmlDrive_(safe, String(raw.html));
-    driveOk = !!historyReadHtmlDrive_(safe);
+    historyWriteHtmlDrive_(safe, htmlText);
+    if (historyReadHtmlDrive_(safe)) source = 'drive';
+    else driveErr = 'Drive write OK but file not readable';
   } catch (e) {
-    // Drive scope may need a one-time re-auth after deploy.
-    if (isQuotaError_(e)) purgeHistoryProps_();
+    driveErr = String(e && e.message ? e.message : e);
+  }
+  if (!source) {
     try {
-      historyWriteHtmlDrive_(safe, String(raw.html));
-      driveOk = !!historyReadHtmlDrive_(safe);
-    } catch (e2) {
-      driveOk = false;
+      propWrite_('HIST_' + safe, htmlText);
+      if (propRead_('HIST_' + safe)) source = 'props';
+    } catch (eProp) {
+      if (isQuotaError_(eProp)) {
+        // Drop older prop HTML and retry once.
+        historyPrunePropsHtml_(historyReadIndex_());
+        try {
+          propWrite_('HIST_' + safe, htmlText);
+          if (propRead_('HIST_' + safe)) source = 'props';
+        } catch (eProp2) {}
+      }
     }
   }
   // Never index a sheet the phone cannot download (meta without HTML).
-  if (!driveOk) {
-    return { ok: false, error: 'Could not store sheet HTML in Drive — open the script, re-authorise, then Save again' };
+  if (!source) {
+    return {
+      ok: false,
+      error: 'Could not store sheet HTML — authorise Drive in Apps Script, then Sync again' +
+        (driveErr ? ' (' + driveErr + ')' : '')
+    };
   }
   var list = historyReadIndex_().filter(function (r) { return r.id !== meta.id; });
   list.unshift(meta);
   list = historyPrune_(list);
+  if (source === 'props') historyPrunePropsHtml_(list);
   try {
     historyWriteIndex_(list);
   } catch (e2) {
@@ -768,7 +808,14 @@ function savePrintHistory_(raw) {
       throw e2;
     }
   }
-  return { ok: true, source: 'drive', entry: meta };
+  return {
+    ok: true,
+    source: source,
+    entry: meta,
+    warning: source === 'props'
+      ? 'Stored in Script Properties (Drive not authorised yet — re-auth Apps Script for full archive)'
+      : ''
+  };
 }
 
 function getPrintHistory_(id) {
