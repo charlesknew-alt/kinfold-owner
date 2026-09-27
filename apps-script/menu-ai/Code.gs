@@ -13,7 +13,26 @@
  * 4. Copy the Web app URL into Menus → Upload / paste → “AI reader URL”
  *
  * Free Gemini quota applies to your Google AI Studio project (AI credits).
+ *
+ * EMAIL (Print history → Email button):
+ * Run AUTHORIZE_EMAIL_SENDING once (dropdown above ▶ Run), then Allow.
+ * Sends to pub@eightbellsbolney.com with no mail-client popup.
  */
+
+/**
+ * ★ ONE-TIME: select this in the function dropdown (top toolbar) → Run → Allow.
+ * Grants permission so Print history Email can send without a mail-client popup.
+ */
+function AUTHORIZE_EMAIL_SENDING() {
+  var remaining = MailApp.getRemainingDailyQuota();
+  Logger.log('Mail authorised. Remaining daily quota: ' + remaining);
+  return { ok: true, remaining: remaining };
+}
+
+/** @deprecated use AUTHORIZE_EMAIL_SENDING */
+function authorizeMail_() {
+  return AUTHORIZE_EMAIL_SENDING();
+}
 
 function doPost(e) {
   try {
@@ -66,11 +85,6 @@ function doGet(e) {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
   });
-}
-
-/** Run once from the Apps Script editor (owner) to grant MailApp send permission. */
-function authorizeMail_() {
-  return { ok: true, remaining: MailApp.getRemainingDailyQuota() };
 }
 
 function doOptions() {
