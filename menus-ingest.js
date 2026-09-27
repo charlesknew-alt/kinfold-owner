@@ -36,6 +36,7 @@
   function cloudGet(action, params) {
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
     if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
+    if (params && params.to) url += '&to=' + encodeURIComponent(params.to);
     if (!url || typeof fetch !== 'function') {
       return Promise.reject(new Error('no_cloud'));
     }
@@ -130,14 +131,14 @@
       if (action === 'deletePrintHistory') {
         return { ok: true, via: 'no-cors' };
       }
-      // emailPrintHistory / reviewLayout — fire-and-forget
+      // reviewLayout — fire-and-forget
       return { ok: true, via: 'no-cors' };
     });
   }
 
   /**
-   * Shared cloud call. Reads use GET. Writes use no-cors POST (the HtmlService
-   * iframe bridge cannot talk to nested google.script sandboxes from GitHub Pages).
+   * Shared cloud call. Reads + email use GET (CORS JSON). Other writes use
+   * no-cors POST then GET verify.
    */
   function cloudPost(body) {
     body = body || {};
@@ -148,6 +149,16 @@
     }
     if (action === 'getPrintHistory' || action === 'deletePrintHistory') {
       return cloudGet(action, body);
+    }
+    if (action === 'emailPrintHistory') {
+      // Prefer id — sheet HTML already in cloud. Falls back to write path only if no id.
+      if (body.id || (body.entry && body.entry.id)) {
+        return cloudGet('emailPrintHistory', {
+          id: body.id || body.entry.id,
+          to: body.to
+        });
+      }
+      return cloudWriteAndVerify_(body);
     }
     return cloudWriteAndVerify_(body);
   }

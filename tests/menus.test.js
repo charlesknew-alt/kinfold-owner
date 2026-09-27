@@ -312,8 +312,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow103') !== -1, 'menus page cache-bust is flow103');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow103') !== -1, 'hub menus link cache-bust is flow103');
+assert(page.indexOf('flow104') !== -1, 'menus page cache-bust is flow104');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow104') !== -1, 'hub menus link cache-bust is flow104');
+assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf('savePrintHistory') !== -1,
+  'email uploads sheet then emails by id via GET');
+assert(aiGs.indexOf("action === 'emailPrintHistory'") !== -1 && /doGet[\s\S]*emailPrintHistory/.test(aiGs),
+  'Menu AI doGet can email a saved sheet by id');
+assert(ingestJs.indexOf("action === 'emailPrintHistory'") !== -1 && ingestJs.indexOf("cloudGet('emailPrintHistory'") !== -1,
+  'cloud email uses GET so the browser can read ok/error');
 assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,
   'each subcategory has an Add to section button');
 assert(page.indexOf('pendingAddSection') !== -1 && page.indexOf('rememberScroll_') !== -1,

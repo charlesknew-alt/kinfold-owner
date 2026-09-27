@@ -110,6 +110,10 @@ function doGet(e) {
   if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
   if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
   if (action === 'getMenusState') return json_(getMenusState_());
+  // Email by id — HTML is already in Script Properties (avoids broken browser POST).
+  if (action === 'emailPrintHistory') {
+    return json_(emailPrintHistory_({ id: p.id, to: p.to }));
+  }
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
