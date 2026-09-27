@@ -372,6 +372,7 @@
     </script>
     <div class="view-toggle no-print" id="viewToggle" role="tablist" aria-label="Menus view">
       <button type="button" class="soft on" data-view="edit" id="viewEdit">Edit &amp; generate</button>
+      <button type="button" class="soft" data-view="panels" id="viewPanels">Feature panels</button>
       <button type="button" class="soft" data-view="catalogue" id="viewCatalogue">All dishes</button>
       <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
       <button type="button" class="soft" id="doSyncNow" title="Reload shared menus from the cloud">Sync now</button>
@@ -380,9 +381,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow102"></script>
-  <script src="menus-print.js?v=20260927-flow102"></script>
-  <script src="menus-ingest.js?v=20260927-flow102"></script>
+  <script src="menus.js?v=20260927-flow103"></script>
+  <script src="menus-print.js?v=20260927-flow103"></script>
+  <script src="menus-ingest.js?v=20260927-flow103"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -413,7 +414,7 @@
     var pendingAddSection = ''; // Add from a subcategory → pre-fill Section
     var pendingScroll = null;   // { y, section } — keep place after save / cancel
     var flowStep = 1; // staff: 1 dishes · 2 generate · owner: + blocks + wording
-    var viewMode = 'edit'; // edit | catalogue | history
+    var viewMode = 'edit'; // edit | panels | catalogue | history
     var historyFilter = 'all';
     var historyCache = [];
     var catalogueQuery = '';
@@ -717,12 +718,19 @@
       });
     }
 
+    function refreshAfterSync_() {
+      if (viewMode === 'history') renderHistory();
+      else if (viewMode === 'catalogue') renderCatalogue();
+      else if (viewMode === 'panels') renderFeaturePanels();
+      else render();
+    }
+
     /** Force every device onto the same cloud book (ignores local cache timestamp). */
     function syncNowFromCloud() {
       cloudSyncNote = 'Syncing shared menus…';
       cloudPullDone = false;
       var ed = document.getElementById('editor');
-      if (ed && viewMode === 'edit') {
+      if (ed && (viewMode === 'edit' || viewMode === 'panels')) {
         ed.innerHTML = '<p class="note">Syncing shared menus from the cloud…</p>';
       }
       return pullMenusFromCloud().then(function (pulled) {
@@ -730,16 +738,17 @@
         if (!pulled && (book.sunday || book.main || book.specials)) {
           cloudUpdatedAt = Date.now();
           return pushMenusToCloud().then(function () {
-            cloudSyncNote = 'Uploaded this device’s menus to the shared cloud';
-            if (viewMode === 'history') renderHistory();
-            else if (viewMode === 'catalogue') renderCatalogue();
-            else render();
+            cloudSyncNote = 'Uploaded this device’s menus to the shared cloud — Sync now on other devices';
+            refreshAfterSync_();
             return true;
+          }).catch(function (err) {
+            cloudSyncNote = 'Could not upload to cloud — try Sync now again (' +
+              (err && err.message ? err.message : 'error') + ')';
+            refreshAfterSync_();
+            return false;
           });
         }
-        if (viewMode === 'history') renderHistory();
-        else if (viewMode === 'catalogue') renderCatalogue();
-        else render();
+        refreshAfterSync_();
         return true;
       });
     }
@@ -765,6 +774,14 @@
       document.querySelectorAll('#viewToggle [data-view]').forEach(function (b) {
         b.classList.toggle('on', b.getAttribute('data-view') === viewMode);
       });
+      if (viewMode === 'panels') {
+        if (lede) {
+          lede.textContent = 'Shared feature panels for every menu — Stay a While, pub quizzes, events. Edit once here; tick which lines print on each menu under Wording.';
+        }
+        if (picker) picker.style.display = 'none';
+        renderFeaturePanels();
+        return;
+      }
       if (viewMode === 'catalogue') {
         if (lede) {
           lede.textContent = 'Every dish saved from your menus — search by name or category, see current price and the price/date history. Shared on PC and phone.';
@@ -1545,12 +1562,25 @@
 
     function renderWordingStep(menu) {
       var html = '';
-      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want, tick <strong>No events</strong> for none, or leave blank and we’ll auto-pick (never past dates).</p>';
+      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want on <strong>this</strong> sheet. The shared bank lives under <strong>Feature panels</strong> at the top (no need to open Main first).</p>';
       if (menu.kind === 'party') html += renderPartyBlurbsBox();
       if (menu.kind === 'long' || menu.kind === 'party') html += renderPromoTicksBox();
       else html += '<p class="note">Event wording from the bank is for Main, Sunday, and Party sheets (including 2×A5).</p>';
-      html += renderWordingBank();
+      html += '<p class="note" style="margin:12px 0 8px"><button type="button" class="soft" data-view-jump="panels">Open Feature panels</button> — edit the shared bank for every menu.</p>';
       return withFlowNav(html, 2, 4, 'Next · Generate');
+    }
+
+    function renderFeaturePanels() {
+      var el = document.getElementById('editor');
+      var html = '';
+      html += '<div class="include-box" style="margin-bottom:14px">';
+      html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px">Feature panels</h3>';
+      html += '<p class="note" style="margin:0">Shared across Main, Sunday, Specials and Party. Add Stay a While, quizzes and events here. ' +
+        'On each menu’s <strong>Wording</strong> step, tick which lines print on that sheet.</p>';
+      html += '</div>';
+      html += renderWordingBank();
+      el.innerHTML = html;
+      bindEditor();
     }
 
     function blurbKindSelect(id, value) {
@@ -1964,6 +1994,14 @@
 
     function bindEditor() {
       bindDateField();
+      document.querySelectorAll('[data-view-jump]').forEach(function (b) {
+        b.onclick = function () {
+          var next = b.getAttribute('data-view-jump');
+          if (!next) return;
+          viewMode = next;
+          render();
+        };
+      });
       document.querySelectorAll('[data-flow-step]').forEach(function (b) {
         b.onclick = function (ev) {
           ev.preventDefault();

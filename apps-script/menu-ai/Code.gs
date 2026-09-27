@@ -142,22 +142,12 @@ function bridgeApi(action, body) {
 }
 
 function cloudBridgeHtml_() {
+  // Kept for diagnostics. Live clients write via no-cors POST (nested HtmlService
+  // sandboxes cannot receive postMessage from the parent GitHub Pages iframe).
   return [
     '<!DOCTYPE html><html><head><meta charset="utf-8"><title>cloud bridge</title></head><body>',
-    '<script>',
-    'function reply(src,origin,id,result,error){',
-    '  try{ src.postMessage({type:"eb-menu-cloud-result",id:id,result:result||null,error:error||null}, origin||"*"); }catch(e){}',
-    '}',
-    'window.addEventListener("message",function(ev){',
-    '  var msg=ev.data; if(!msg||msg.type!=="eb-menu-cloud") return;',
-    '  var origin=ev.origin||"*";',
-    '  google.script.run',
-    '    .withSuccessHandler(function(result){ reply(ev.source,origin,msg.id,result,null); })',
-    '    .withFailureHandler(function(err){ reply(ev.source,origin,msg.id,null,String(err&&err.message?err.message:err)); })',
-    '    .bridgeApi(msg.action, msg.body||{});',
-    '});',
-    'try{ parent.postMessage({type:"eb-menu-cloud-ready"}, "*"); }catch(e){}',
-    '</script></body></html>'
+    '<p>Menu cloud bridge — clients use no-cors POST + GET verify.</p>',
+    '</body></html>'
   ].join('');
 }
 
