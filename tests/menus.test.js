@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow115') !== -1, 'menus page cache-bust is flow115');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow115') !== -1, 'hub menus link cache-bust is flow115');
+assert(page.indexOf('flow116') !== -1, 'menus page cache-bust is flow116');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow116') !== -1, 'hub menus link cache-bust is flow116');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -1245,6 +1245,12 @@ assertTidy({ name: 'Vegan Burger', tags: '' }, 'Vegan Burger', 'vg',
   'leading Vegan Burger keeps the name and ticks vg');
 assertTidy({ name: 'Vegan Katsu Curry', tags: '' }, 'Vegan Katsu Curry', 'vg',
   'Adjust/rename keeps Vegan Katsu Curry (does not strip to Katsu Curry)');
+assertTidy({ name: 'Katsu Curry', tags: 'vg' }, 'Vegan Katsu Curry', 'vg',
+  'stuck Katsu Curry + vg restores Vegan Katsu Curry on Sunday/Main');
+assert(api.dishCatalogueKey('Vegan Katsu Curry') === api.dishCatalogueKey('Katsu Curry') &&
+  api.dishCatalogueKey('Katsu Curry') === 'katsu-curry',
+  'catalogue key treats Vegan Katsu Curry as the same dish as Katsu Curry');
+
 assertTidy({ name: 'Vegan Mushroom Risotto', tags: '' }, 'Vegan Mushroom Risotto', 'vg',
   'leading Vegan stays in the printed title');
 assertTidy({ name: 'Vegetarian Lasagne', tags: '' }, 'Vegetarian Lasagne', 'v',

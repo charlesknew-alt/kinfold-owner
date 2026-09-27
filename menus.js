@@ -453,9 +453,33 @@
     return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   }
 
+  /**
+   * Drop a leading dietary word for catalogue identity so
+   * “Vegan Katsu Curry” and “Katsu Curry” are one product — renaming
+   * updates the same row instead of leaving a stale non-Vegan suggestion.
+   */
+  function dietaryTitleCore_(name) {
+    return String(name || '')
+      .replace(/^(vegan|vegetarian|gluten[\s-]*free|dairy[\s-]*free)\s+/i, '')
+      .trim();
+  }
+
   /** Stable catalogue key — same title = same product (avoids duplicates). */
   function dishCatalogueKey(name) {
-    return slug(cleanDishName(String(name || '').trim()));
+    return slug(cleanDishName(dietaryTitleCore_(name)));
+  }
+
+  /** Prefer “Vegan …” / “Vegetarian …” over the bare title when merging. */
+  function preferDietaryTitle_(a, b) {
+    var an = String(a || '').trim();
+    var bn = String(b || '').trim();
+    if (!an) return bn;
+    if (!bn) return an;
+    var aDiet = /^(vegan|vegetarian)\b/i.test(an);
+    var bDiet = /^(vegan|vegetarian)\b/i.test(bn);
+    if (aDiet && !bDiet) return an;
+    if (bDiet && !aDiet) return bn;
+    return an.length >= bn.length ? an : bn;
   }
 
   function isoDateToday(d) {
@@ -502,9 +526,24 @@
         seenCount: parseInt(row.seenCount, 10) || 1
       };
       var prev = byKey[key];
-      if (!prev || String(entry.lastSeen) >= String(prev.lastSeen)) byKey[key] = entry;
-      else {
+      if (!prev) {
+        byKey[key] = entry;
+      } else if (String(entry.lastSeen) >= String(prev.lastSeen)) {
+        entry.name = preferDietaryTitle_(entry.name, prev.name);
+        entry.seenCount = Math.max(entry.seenCount || 1, prev.seenCount || 1);
+        // Merge unique price history from the older row.
+        var seenNew = {};
+        (entry.priceHistory || []).forEach(function (h) { seenNew[h.date + '|' + h.price] = true; });
+        (prev.priceHistory || []).forEach(function (h) {
+          var k = h.date + '|' + h.price;
+          if (!seenNew[k]) entry.priceHistory.push(h);
+        });
+        entry.priceHistory.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+        entry.priceHistory = entry.priceHistory.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+        byKey[key] = entry;
+      } else {
         // Keep older lastSeen winner but merge any unique price history.
+        prev.name = preferDietaryTitle_(prev.name, entry.name);
         var seen = {};
         prev.priceHistory.forEach(function (h) { seen[h.date + '|' + h.price] = true; });
         entry.priceHistory.forEach(function (h) {
@@ -560,6 +599,7 @@
         return;
       }
       prev.section = tidy.section || prev.section;
+      // Latest typed title wins (Vegan Katsu Curry or bare Katsu Curry).
       prev.name = tidy.name || prev.name;
       if (tidy.description) prev.description = tidy.description;
       if (tidy.tags) prev.tags = tidy.tags;
@@ -1115,10 +1155,16 @@
     ));
     var section = String(raw.section || '').trim();
     if (section) section = normalizeSectionName(section);
+    var name = cleanDishName(namePull.name);
+    // Stuck cloud rows: “Katsu Curry” + vg (no leading Vegan) after an earlier
+    // strip-on-save bug. Restore the printed title staff expect.
+    if (/^katsu\s+curry$/i.test(name) && /\bvg\b/i.test(merged) && !/\bvg\s+option\b/i.test(merged)) {
+      name = 'Vegan Katsu Curry';
+    }
     return {
       id: raw.id,
       section: section,
-      name: cleanDishName(namePull.name),
+      name: name,
       description: normalizeDescription(cleanDishDescription(descPull.name)),
       price: raw.price || '',
       tags: merged,
