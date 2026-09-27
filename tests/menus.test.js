@@ -307,8 +307,11 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow90') !== -1, 'menus page cache-bust is flow90');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow90') !== -1, 'hub menus link cache-bust is flow90');
+assert(page.indexOf('flow91') !== -1, 'menus page cache-bust is flow91');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow91') !== -1, 'hub menus link cache-bust is flow91');
+assert(page.indexOf('data-dish-delete') !== -1 && page.indexOf('removeDishInstant') !== -1,
+  'dish Delete melts away without reloading the list');
+assert(page.indexOf('dish-row-melt') !== -1, 'dish delete uses melt-away animation');
 assert(page.indexOf('withFlowNav') !== -1 && page.indexOf('flow-nav-top') !== -1,
   'menu creation steps have Next/Back at top and bottom');
 assert(printJs.indexOf('pub@eightbellsbolney.com') !== -1,

@@ -227,13 +227,27 @@
     .dish-row {
       display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; align-items: start;
       padding: 12px 0; border-bottom: 1px solid var(--line);
+      transition: opacity .22s ease, transform .28s ease, max-height .3s ease, padding .28s ease, margin .28s ease, border-width .28s ease;
     }
     @media (min-width: 640px) {
       .dish-row { grid-template-columns: minmax(0,1fr) auto auto; gap: 10px; }
     }
+    .dish-row.dish-row-melt {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+      max-height: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin: 0 !important;
+      border-bottom-width: 0 !important;
+      overflow: hidden;
+      pointer-events: none;
+    }
     .dish-row .name { font-weight: 700; font-size: 15px; }
     .dish-row .meta { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
     .dish-row .tag { color: var(--green); font-style: italic; font-size: 13px; }
+    .dish-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+    .dish-actions .dish-del { color: #8a3d28; white-space: nowrap; }
     .dish-row select.section-pick, .form-card select#section {
       display: block; width: 100%; max-width: 220px; margin-top: 4px;
       font: 600 13px var(--sans); padding: 7px 10px; border: 1px solid var(--line);
@@ -322,9 +336,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260926-flow90"></script>
-  <script src="menus-print.js?v=20260926-flow90"></script>
-  <script src="menus-ingest.js?v=20260926-flow90"></script>
+  <script src="menus.js?v=20260926-flow91"></script>
+  <script src="menus-print.js?v=20260926-flow91"></script>
+  <script src="menus-ingest.js?v=20260926-flow91"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1544,10 +1558,13 @@
         html += '<label><input type="checkbox" data-flag="vg" data-id="' + d.id + '"' + (m.vg ? ' checked' : '') + '><span class="letter">vg</span></label>';
         html += '<label><input type="checkbox" data-flag="df" data-id="' + d.id + '"' + (m.df ? ' checked' : '') + '><span class="letter">df</span></label>';
         html += '</div>';
-        html += '<div class="dish-actions no-print"><select data-dish-action="' + escapeAttr(d.id) + '" aria-label="Edit ' + escapeAttr(d.name) + '">';
+        html += '<div class="dish-actions no-print">';
+        html += '<button type="button" class="link dish-del" data-dish-delete="' + escapeAttr(d.id) +
+          '" aria-label="Delete ' + escapeAttr(d.name) + '">Delete</button>';
+        html += '<select data-dish-action="' + escapeAttr(d.id) + '" aria-label="Edit ' + escapeAttr(d.name) + '">';
         html += '<option value="">Edit…</option><option value="adjust">Adjust</option><option value="replace">Replace</option>';
         if (idx > 0) html += '<option value="merge-up">Merge ↑ into dish above</option>';
-        html += '<option value="remove">Remove</option>';
+        html += '<option value="remove">Delete</option>';
         html += '</select></div></div>';
         if (idx === list.length - 1 && open) html += '</div></div>';
       });
@@ -1625,12 +1642,7 @@
             return;
           }
           if (act === 'remove') {
-            if (!confirm('Remove this dish?')) return;
-            book[menuId] = dishes().filter(function (d) { return d.id !== id; });
-            dishId = (dishes()[0] && dishes()[0].id) || '';
-            save();
-            mode = 'complete';
-            render();
+            removeDishInstant(id, sel.closest ? sel.closest('.dish-row') : null);
             return;
           }
           mode = act;
@@ -1799,6 +1811,13 @@
       if (doSave) doSave.onclick = onSave;
       var doRemove = document.getElementById('doRemove');
       if (doRemove) doRemove.onclick = onRemove;
+      document.querySelectorAll('[data-dish-delete]').forEach(function (btn) {
+        btn.onclick = function (ev) {
+          ev.preventDefault();
+          var id = btn.getAttribute('data-dish-delete');
+          removeDishInstant(id, btn.closest ? btn.closest('.dish-row') : null);
+        };
+      });
       bindDishSuggest();
       var doFromWeek = document.getElementById('doFromWeek');
       if (doFromWeek) doFromWeek.onclick = openWeekPickForSunday;
@@ -2323,11 +2342,47 @@
       render();
     }
     function onRemove() {
-      book[menuId] = dishes().filter(function (d) { return d.id !== dishId; });
-      dishId = (dishes()[0] && dishes()[0].id) || '';
-      save();
+      removeDishInstant(dishId, null);
       mode = 'complete';
+      // Form remove still needs a light re-render so the editor leaves adjust mode.
       render();
+    }
+
+    /**
+     * Instant delete: melt the row away, keep deleting others while save/cloud
+     * continues in the background (no full list reload).
+     */
+    function removeDishInstant(id, rowEl) {
+      if (!id) return;
+      book[menuId] = dishes().filter(function (d) { return d.id !== id; });
+      if (dishId === id) dishId = (dishes()[0] && dishes()[0].id) || '';
+      save();
+      var row = rowEl || null;
+      if (!row) {
+        document.querySelectorAll('.dish-row[data-id]').forEach(function (el) {
+          if (el.getAttribute('data-id') === id) row = el;
+        });
+      }
+      if (!row || !row.parentNode) return;
+      var sectionBlock = row.closest ? row.closest('.section-block') : null;
+      try {
+        row.style.maxHeight = row.offsetHeight + 'px';
+        // Force layout so max-height transition runs.
+        void row.offsetHeight;
+      } catch (e0) {}
+      row.classList.add('dish-row-melt');
+      row.style.maxHeight = '0';
+      setTimeout(function () {
+        if (row.parentNode) row.parentNode.removeChild(row);
+        if (!sectionBlock) return;
+        var left = sectionBlock.querySelectorAll('.dish-row:not(.dish-row-melt)');
+        if (!left.length) {
+          if (sectionBlock.parentNode) sectionBlock.parentNode.removeChild(sectionBlock);
+          return;
+        }
+        var chip = sectionBlock.querySelector('.section-block-head .chip');
+        if (chip) chip.textContent = String(left.length);
+      }, 300);
     }
     function onPaste() {
       var text = document.getElementById('paste').value;
