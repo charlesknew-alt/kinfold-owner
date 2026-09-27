@@ -381,9 +381,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow108"></script>
-  <script src="menus-print.js?v=20260927-flow108"></script>
-  <script src="menus-ingest.js?v=20260927-flow108"></script>
+  <script src="menus.js?v=20260927-flow109"></script>
+  <script src="menus-print.js?v=20260927-flow109"></script>
+  <script src="menus-ingest.js?v=20260927-flow109"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -691,15 +691,23 @@
       return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
         var remote = data && data.state;
         var remoteAt = remote ? (Number(remote.updatedAt) || 0) : 0;
-        // Cloud is the shared book for every phone/PC. Always load it when
-        // present — never let a stale local timestamp overwrite Kate’s Sunday.
-        if (remote && remoteAt) {
+        // Last-write-wins by updatedAt — so Save on this device is not wiped
+        // by an older cloud copy a moment later (focus / Sync / tab return).
+        if (remote && remoteAt > cloudUpdatedAt) {
           if (applyCloudState(remote)) {
             cloudSyncNote = 'Menus synced across devices';
             cloudPullDone = true;
             render();
             return true;
           }
+        }
+        if (remote && remoteAt && remoteAt < cloudUpdatedAt) {
+          // This device has newer edits — push them so phone/PC stay aligned.
+          return pushMenusToCloud().then(function () {
+            cloudSyncNote = 'Uploaded this device’s latest edits';
+            cloudPullDone = true;
+            return true;
+          });
         }
         if ((!remote || !remoteAt) && cloudUpdatedAt > 0) {
           // Empty cloud — seed once from this device.
@@ -2873,6 +2881,11 @@
         Object.keys(next).forEach(function (k) { item[k] = next[k]; });
         staySection = next.section || item.section || '';
         mode = 'complete';
+      }
+      // Keep categories together after Add / Adjust (new dishes used to sit at
+      // the end and split Desserts / Mains in the Generate preview).
+      if (EBMenus.sortDishesBySection) {
+        book[menuId] = EBMenus.sortDishesBySection(dishes());
       }
       pendingAddSection = '';
       rememberScroll_(staySection);

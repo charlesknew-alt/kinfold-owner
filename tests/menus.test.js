@@ -312,8 +312,14 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow108') !== -1, 'menus page cache-bust is flow108');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow108') !== -1, 'hub menus link cache-bust is flow108');
+assert(page.indexOf('flow109') !== -1, 'menus page cache-bust is flow109');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow109') !== -1, 'hub menus link cache-bust is flow109');
+assert(page.indexOf('Last-write-wins') !== -1 || page.indexOf('remoteAt > cloudUpdatedAt') !== -1,
+  'cloud pull does not wipe a newer local Save');
+assert(/return orderDishesForSell\(list\)/.test(fs.readFileSync(path.join(root, 'menus.js'), 'utf8')),
+  'composeDishes groups sections like the PDF (no split categories in preview)');
+assert(page.indexOf('sortDishesBySection(dishes())') !== -1,
+  'Add/Adjust re-sorts the menu so new dishes sit with their category');
 assert(printJs.indexOf('syncPrintHistoryToCloud') !== -1 && page.indexOf('syncPrintHistoryToCloud') !== -1,
   'Sync now pushes local print history so phone and PC match');
 assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
