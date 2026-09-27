@@ -2677,9 +2677,9 @@
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
       '</style></head><body class="' + bodyClass + '">' +
-      '<div class="toolbar">' +
-        '<button type="button" id="printSheet">Print / save as PDF</button>' +
-        '<button type="button" id="saveToMenus">Save to menus</button>' +
+      '<div class="toolbar" id="previewToolbar">' +
+        '<button type="button" id="saveToMenus">Save</button>' +
+        '<button type="button" id="discardPreview">Discard</button>' +
         (landscape ? '<span class="hint">Card menu — two identical copies on landscape A4 for the guillotine.</span>' :
           '<label class="paper-opt"><input type="radio" name="paper" value="a4"' +
             (defaultPaper === 'a4' ? ' checked' : '') +
@@ -2688,9 +2688,7 @@
             (defaultPaper === 'a5' ? ' checked' : '') +
             ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint" id="printHint">' + esc(dateHint) +
-        ' — fill top to bottom; readable type only; allergy line kept clear.' +
-        esc(fillerHint) +
-        ' Click Save to menus to stamp this print version into history.</span>' +
+        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.</span>' +
       '</div>' +
       a4Stack + a5Stack +
       '<script>(function(){' +
@@ -2878,37 +2876,72 @@
           menuName: menu.name,
           week: ver.week,
           weekKey: ver.weekKey,
-          hideDate: !!ver.hideDate
+          hideDate: !!ver.hideDate,
+          landscape: !!landscape
         }) + ';' +
-        'var pb=document.getElementById("printSheet");' +
-        'if(pb){pb.onclick=function(ev){ev.preventDefault();' +
-          'function go(){fitPages();setTimeout(function(){window.print();},80);}' +
-          'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);}else go();' +
-        '};}' +
-        // Stamp Roman + keep one history copy only when staff choose Save to menus.
+        // History / reopen sheets get a Print toolbar (preview itself is Save or Discard only).
+        'function bindPrintButton(){' +
+          'var pb=document.getElementById("printSheet");' +
+          'if(!pb)return;' +
+          'pb.onclick=function(ev){ev.preventDefault();' +
+            'function go(){fitPages();setTimeout(function(){window.print();},80);}' +
+            'if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go);}else go();' +
+          '};' +
+        '}' +
+        'function paperOptsHtml(){' +
+          'if(SAVE_META.landscape)return \'<span class="hint">Card menu — landscape A4 guillotine.</span>\';' +
+          'var a5=document.body.classList.contains("paper-a5");' +
+          'var a4c=a5?"":" checked";' +
+          'var a5c=a5?" checked":"";' +
+          'return \'<label class="paper-opt"><input type="radio" name="paper" value="a4"\'+a4c+' +
+            '\' onchange="document.body.className=\\\'paper-a4\\\'"> A4 (fill page)</label>\'+' +
+          '\'<label class="paper-opt"><input type="radio" name="paper" value="a5"\'+a5c+' +
+            '\' onchange="document.body.className=\\\'paper-a5\\\'"> 2×A5 on A4 (guillotine)</label>\';' +
+        '}' +
+        'function escHint(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}' +
+        'function switchToPrintToolbar(hintText){' +
+          'var tb=document.getElementById("previewToolbar")||document.querySelector(".toolbar");' +
+          'if(!tb)return;' +
+          'tb.innerHTML=\'<button type="button" id="printSheet">Print / save as PDF</button>\'+' +
+            'paperOptsHtml()+\'<span class="hint" id="printHint">\'+escHint(hintText)+\'</span>\';' +
+          'document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});' +
+          'bindPrintButton();' +
+        '}' +
+        'var db=document.getElementById("discardPreview");' +
+        'if(db){db.onclick=function(){window.close();};}' +
+        // Stamp Roman, save into Print history, return parent to history, close preview.
         'var sb=document.getElementById("saveToMenus");' +
         'if(sb){sb.onclick=function(){' +
           'if(!window.opener||!window.opener.EBMenuPrint||!window.opener.EBMenuPrint.commitPrintVersion){' +
-            'alert("Keep the Menus tab open, then click Save to menus again.");return;}' +
+            'alert("Keep the Menus tab open, then click Save again.");return;}' +
           'var api=window.opener.EBMenuPrint;' +
           'sb.disabled=true;sb.textContent="Saving…";' +
+          'var disc=document.getElementById("discardPreview");if(disc)disc.disabled=true;' +
           'var ver=api.commitPrintVersion(SAVE_META.menuId);' +
           'if(SAVE_META.hideDate)ver.hideDate=true;' +
           '[].forEach.call(document.querySelectorAll(".tracker .roman"),function(el){el.textContent=ver.roman;});' +
-          'var hint=document.getElementById("printHint");' +
-          'if(hint){hint.textContent=(SAVE_META.hideDate?("print "+ver.roman):(ver.week+" · print "+ver.roman))+' +
-            '" — saved to Print history.";}' +
+          'var hintText=(SAVE_META.hideDate?("print "+ver.roman):(ver.week+" · print "+ver.roman))+' +
+            '" — from Print history: print PDF or email.";' +
           'try{document.title=api.printSheetLabel?api.printSheetLabel(SAVE_META.menuName,ver):document.title;}catch(e1){}' +
+          'fitPages();' +
+          'switchToPrintToolbar(hintText);' +
           'fitPages();' +
           'var html="<!DOCTYPE html>"+document.documentElement.outerHTML;' +
           'api.savePrintHistory({' +
             'menuId:SAVE_META.menuId,menuName:SAVE_META.menuName,' +
             'roman:ver.roman,n:ver.n,week:ver.week||SAVE_META.week,weekKey:ver.weekKey||SAVE_META.weekKey,' +
             'hideDate:!!ver.hideDate,html:html' +
-          '}).then(function(){sb.textContent="Saved · "+ver.roman;})' +
-          '.catch(function(){sb.disabled=false;sb.textContent="Save to menus";' +
+          '}).then(function(saved){' +
+            'try{if(typeof window.opener.EBMenusOnPrintSaved==="function"){' +
+              'window.opener.EBMenusOnPrintSaved(saved||{menuId:SAVE_META.menuId,roman:ver.roman});' +
+            '}}catch(e2){}' +
+            'window.close();' +
+          '}).catch(function(){sb.disabled=false;sb.textContent="Save";' +
+            'if(disc)disc.disabled=false;' +
             'alert("Could not save this sheet. Try again.");});' +
         '};}' +
+        // Reopened history sheets already have Print — bind it.
+        'bindPrintButton();' +
       '})();<\/script>' +
       '</body></html>'
     );
@@ -3422,6 +3455,66 @@
     return true;
   }
 
+  /**
+   * Email a saved sheet: prefer native share (phone), else download the HTML
+   * and open mailto so staff can attach the file.
+   */
+  function emailPrintHtml(entry) {
+    if (!entry || !entry.html) return Promise.resolve(false);
+    var label = printSheetLabel(entry.menuName || entry.menuId || 'Menu', entry);
+    var name = printFileName(entry.menuName || entry.menuId || 'menu', {
+      roman: entry.roman,
+      week: entry.week,
+      hideDate: entry.hideDate
+    }, 'html');
+    var subject = label;
+    var body = 'Please find the Eight Bells menu attached (' + label + ').' +
+      '\n\nIf the file did not attach automatically, attach the downloaded HTML and open it in a browser to Print → Save as PDF.';
+    var blob = new Blob([entry.html], { type: 'text/html;charset=utf-8' });
+    var file = null;
+    try {
+      if (typeof File !== 'undefined') {
+        file = new File([blob], name, { type: 'text/html' });
+      }
+    } catch (e0) { file = null; }
+    if (file && typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+      try {
+        if (navigator.canShare({ files: [file] })) {
+          return navigator.share({
+            files: [file],
+            title: label,
+            text: body
+          }).then(function () { return true; }).catch(function () {
+            return emailPrintHtmlMailto_(name, subject, body, blob);
+          });
+        }
+      } catch (e1) {}
+    }
+    return Promise.resolve(emailPrintHtmlMailto_(name, subject, body, blob));
+  }
+
+  function emailPrintHtmlMailto_(name, subject, body, blob) {
+    try {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        try { URL.revokeObjectURL(url); } catch (e) {}
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 800);
+    } catch (e2) {}
+    var mail = 'mailto:?subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(body);
+    try { window.location.href = mail; } catch (e3) {
+      try { window.open(mail, '_blank'); } catch (e4) {}
+    }
+    return true;
+  }
+
   function partyCss() {
     return (
       '.party-page{text-align:center;padding-top:8mm;position:relative}' +
@@ -3486,6 +3579,7 @@
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
     downloadPrintHtml: downloadPrintHtml,
+    emailPrintHtml: emailPrintHtml,
     historyCloudUrl: historyCloudUrl,
     measureOppositeColumns: measureOppositeColumns,
     planPromoFill: planPromoFill
