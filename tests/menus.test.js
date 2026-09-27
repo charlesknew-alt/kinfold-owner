@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow113') !== -1, 'menus page cache-bust is flow113');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow113') !== -1, 'hub menus link cache-bust is flow113');
+assert(page.indexOf('flow114') !== -1, 'menus page cache-bust is flow114');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow114') !== -1, 'hub menus link cache-bust is flow114');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -975,6 +975,28 @@ assert(/cols-classics[\s\S]{0,2500}Sandwiches/i.test(sandColA4),
   'Blocks Column Sandwiches stay in a column when alone under Specials');
 assert(printJs.indexOf('sandLockedCol') !== -1,
   'print respects Sandwiches Column lock against orphan full-bleed');
+assert(printJs.indexOf('Lower-margin section') !== -1 &&
+  printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
+  'two-page planner prefers Sandwiches on page 2');
+assert(printJs.indexOf('mainsPairedInCol') !== -1 && printJs.indexOf('canSitInColumn') !== -1,
+  'Best-fit Mains can sit opposite Sandwiches instead of a quiz-only column');
+
+var sandMainsPairDishes = sandColAloneDishes.concat([
+  api.dish('Mains', 'Cheese & Bacon Burger', 'fries', '18.95', ''),
+  api.dish('Mains', 'Homemade Beef Lasagne', 'garlic bread', '15.95', ''),
+  api.dish('Mains', 'Ham, Egg & Chips', '', '18.95', 'gf')
+]);
+var sandMainsPairHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    Starters: { width: 'full', frame: false },
+    Sandwiches: { width: 'column', frame: false, tip: true, note: 'hours' },
+    Mains: { width: 'both', frame: false }
+  }),
+  promos: sandColAlonePromos
+});
+var sandMainsA4 = sandMainsPairHtml.split('mode-panel mode-a5')[0] || sandMainsPairHtml;
+assert(/cols-classics[\s\S]{0,4000}Cheese & Bacon Burger|mains-sand-row[\s\S]{0,4000}Cheese & Bacon Burger/.test(sandMainsA4),
+  'Best-fit Mains fill the column opposite Sandwiches');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
 var jammedSunday = [
@@ -1096,12 +1118,12 @@ assert(printJs.indexOf('sidesOnP1') !== -1 && printJs.indexOf('keep type size eq
   'planner can move Sides to page 1 so both pages stay the same size');
 assert(printJs.indexOf('spreadPage') !== -1 && printJs.indexOf('spread-even') !== -1,
   'after shared type, leftover vertical space is spread evenly down the page');
-assert(printJs.indexOf('free page 2 for larger type') !== -1,
-  'planner can move Sandwiches box to page 1 to raise shared type');
+assert(printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
+  'planner keeps Sandwiches on page 2 instead of pulling them forward');
 assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -1,
   'Gemini layout review can move Sides between pages for shared type');
-assert(aiGs.indexOf('tip/sell box') !== -1 || aiGs.indexOf('sell box') !== -1,
-  'Gemini prefers sandwich sell box on page 1 when page 2 is packed');
+assert(aiGs.indexOf('stay on page 2') !== -1 || aiGs.indexOf('sandwichesOn page2') !== -1,
+  'Gemini keeps sandwiches on page 2 in a column');
 assert(page.indexOf('advice.sidesOn') !== -1,
   'generate applies AI sidesOn to the print layout');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
@@ -1397,6 +1419,8 @@ var sharedTypeLayout = print.planFluidLayout(mainMenu, sharedTypeDishes, {
   sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
 });
 assert(sharedTypeLayout.pages === 2, 'packed mains+desserts+sandwiches use two pages (would clip at min type)');
+assert(sharedTypeLayout.p2 && sharedTypeLayout.p2.sandwiches === true && !sharedTypeLayout.p1.sandwiches,
+  'named sandwich fillings sit on page 2 (less prominent, column)');
 assert(/type range/i.test(sharedTypeLayout.summary) || /minimum type/i.test(sharedTypeLayout.summary),
   'layout summary states type range / min-type decision');
 assert(sharedTypeLayout.p1.sidesOnP1 === true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === false,
@@ -1439,8 +1463,8 @@ var tipPackedLayout = print.planFluidLayout(mainMenu, tipOnlyPacked, {
   })
 });
 assert(tipPackedLayout.pages === 2, 'nibbles+mains+desserts packed menu uses two pages');
-assert(tipPackedLayout.p1.sandwiches === true && !(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches),
-  'sandwich sell box sits on page 1 so both pages can open type toward the maximum');
+assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPackedLayout.p1.sandwiches,
+  'sandwich sell box sits on page 2 (quieter, lower-margin) in a column');
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
 assert(seedMainLayout.pages === 2, 'sample main menu uses two pages (too much for min type on one)');
 assert(seedMainLayout.typeRange && seedMainLayout.typeRange.name.max === 11.5,
