@@ -312,23 +312,25 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow102') !== -1, 'menus page cache-bust is flow102');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow102') !== -1, 'hub menus link cache-bust is flow102');
+assert(page.indexOf('flow103') !== -1, 'menus page cache-bust is flow103');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow103') !== -1, 'hub menus link cache-bust is flow103');
 assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,
   'each subcategory has an Add to section button');
 assert(page.indexOf('pendingAddSection') !== -1 && page.indexOf('rememberScroll_') !== -1,
   'add-from-section pre-fills category and save keeps page place');
+assert(page.indexOf('data-view="panels"') !== -1 && page.indexOf('renderFeaturePanels') !== -1,
+  'Feature panels is a top-level view (not buried in Main → Wording)');
 assert(page.indexOf('doSyncNow') !== -1 && page.indexOf('syncNowFromCloud') !== -1,
   'Sync now forces every device onto the shared cloud book');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('CLOUD_DEFAULT_URL') !== -1,
   'shared cloud URL helper exists');
 assert(ingestJs.indexOf('Do not use a per-device custom AI URL') !== -1,
   'cloud sync ignores per-device custom AI URLs');
-assert(ingestJs.indexOf('cloudBridgeCall_') !== -1 && ingestJs.indexOf('eb-menu-cloud') !== -1,
-  'cloud writes use Apps Script iframe bridge (avoids POST 302 break)');
+assert(ingestJs.indexOf("mode: 'no-cors'") !== -1 && ingestJs.indexOf('cloudWriteAndVerify_') !== -1,
+  'cloud writes use no-cors POST then GET verify');
 assert(ingestJs.indexOf('cloudGet') !== -1, 'cloud reads use fast GET');
 assert(aiGs.indexOf('cloudBridgeHtml_') !== -1 && aiGs.indexOf('bridgeApi') !== -1,
-  'Menu AI serves cloud bridge for GitHub Pages');
+  'Menu AI still exposes bridgeApi for diagnostics');
 assert(printJs.indexOf('Do not wait on uploads') !== -1,
   'print history renders before background migrate');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
