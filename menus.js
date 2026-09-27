@@ -1306,7 +1306,9 @@
         });
       });
     });
-    return list;
+    // Same order as PDF — group every section together (preview used to split
+    // Desserts / Mains when dishes were interleaved in the saved list).
+    return orderDishesForSell(list);
   }
 
   function sheetPlanFor(book, hostId, includes) {
