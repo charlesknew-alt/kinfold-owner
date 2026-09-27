@@ -739,7 +739,9 @@ function emailPrintHistory_(body) {
     from: fromUsed || null,
     replyTo: alias || null,
     subject: subject,
-    filename: attachedAs
+    filename: attachedAs,
+    sendMode: fromUsed ? 'alias-from' : 'primary-replyto',
+    build: 'sendas-fix-76b'
   };
 }
 
