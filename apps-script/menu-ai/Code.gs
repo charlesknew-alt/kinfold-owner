@@ -134,9 +134,13 @@ function doGet(e) {
   if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
   if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
   if (action === 'getMenusState') return json_(getMenusState_());
-  // Email by id — HTML is already in Script Properties (avoids broken browser POST).
+  // Email by id — HTML is in Drive / legacy props.
   if (action === 'emailPrintHistory') {
     return json_(emailPrintHistory_({ id: p.id, to: p.to }));
+  }
+  // Emergency: free Script Properties when print HTML blew the 500KB cap.
+  if (action === 'purgeHistory') {
+    return json_(purgeHistoryProps_());
   }
   return json_({
     ok: true,
@@ -489,16 +493,20 @@ function reviewLayoutWithGemini_(body) {
   };
 }
 
-/* ——— Shared staff data (Script Properties) ———
- * Survives across phones/PCs without Drive OAuth.
- *   MENUS_*   — live dishes / meta / promos / layout
- *   HISTIDX + HIST_{id}_* — generated print sheets (capped for quota)
+/* ——— Shared staff data ———
+ * MENUS_* in Script Properties (small JSON).
+ * Print HTML in Drive (Script Properties 500KB quota is too small for sheets).
  */
 
-var HISTORY_MAX_ = 40;
+var HISTORY_MAX_ = 12;
 /** Ids removed on any device — stop other PCs re-uploading them. */
-var HISTORY_DELETED_MAX_ = 200;
+var HISTORY_DELETED_MAX_ = 80;
 var PROP_CHUNK_ = 8500;
+
+function isQuotaError_(err) {
+  var msg = String(err && err.message ? err.message : err || '');
+  return /quota|exceeded the property storage/i.test(msg);
+}
 
 function propDeletePrefix_(props, prefix) {
   var oldN = parseInt(props.getProperty(prefix + '_n') || '0', 10) || 0;
@@ -507,6 +515,23 @@ function propDeletePrefix_(props, prefix) {
   keys.forEach(function (k) {
     try { props.deleteProperty(k); } catch (e) {}
   });
+}
+
+/**
+ * Delete every Script Property used for print HTML / index / tombstones.
+ * Call when quota is blown so Menus can open again.
+ */
+function purgeHistoryProps_() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties() || {};
+  var keys = Object.keys(all);
+  var removed = 0;
+  keys.forEach(function (k) {
+    if (/^HIST/i.test(k)) {
+      try { props.deleteProperty(k); removed++; } catch (e) {}
+    }
+  });
+  return { ok: true, removed: removed, keysBefore: keys.length };
 }
 
 function propWrite_(prefix, text) {
@@ -519,7 +544,14 @@ function propWrite_(prefix, text) {
   for (var i = 0; i < n; i++) {
     batch[prefix + '_' + i] = text.substring(i * PROP_CHUNK_, (i + 1) * PROP_CHUNK_);
   }
-  props.setProperties(batch, false);
+  try {
+    props.setProperties(batch, false);
+  } catch (err) {
+    if (!isQuotaError_(err)) throw err;
+    // Free space from old print HTML chunks, then retry once.
+    purgeHistoryProps_();
+    props.setProperties(batch, false);
+  }
 }
 
 function propRead_(prefix) {
@@ -560,10 +592,61 @@ function historyWriteIndex_(list) {
   propWrite_('HISTIDX', JSON.stringify(list || []));
 }
 
+/** Drive folder for print HTML (avoids Script Properties 500KB cap). */
+function historyHtmlFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = String(props.getProperty('HIST_FOLDER_ID') || '');
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (e) {}
+  }
+  var folder = DriveApp.createFolder('Eight Bells Menu Print History');
+  try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
+  return folder;
+}
+
+function historyWriteHtmlDrive_(id, html) {
+  var safe = historySafeId_(id);
+  if (!safe) return;
+  var folder = historyHtmlFolder_();
+  var name = safe + '.html';
+  var existing = folder.getFilesByName(name);
+  while (existing.hasNext()) {
+    try { existing.next().setTrashed(true); } catch (e) {}
+  }
+  folder.createFile(name, String(html || ''), MimeType.HTML);
+}
+
+function historyReadHtmlDrive_(id) {
+  var safe = historySafeId_(id);
+  if (!safe) return '';
+  try {
+    var folder = historyHtmlFolder_();
+    var files = folder.getFilesByName(safe + '.html');
+    if (!files.hasNext()) return '';
+    return files.next().getBlob().getDataAsString() || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function historyDeleteHtmlDrive_(id) {
+  var safe = historySafeId_(id);
+  if (!safe) return;
+  try {
+    var folder = historyHtmlFolder_();
+    var files = folder.getFilesByName(safe + '.html');
+    while (files.hasNext()) {
+      try { files.next().setTrashed(true); } catch (e) {}
+    }
+  } catch (e2) {}
+}
+
 function historyDeleteHtml_(id) {
   var safe = historySafeId_(id);
   if (!safe) return;
+  // Clear legacy Script Properties chunks + Drive file.
   propDelete_('HIST_' + safe);
+  historyDeleteHtmlDrive_(safe);
 }
 
 function historyPrune_(list) {
@@ -650,22 +733,30 @@ function savePrintHistory_(raw) {
   meta.id = safe;
   // Explicit save from a device re-adds the sheet (clears a prior delete tombstone).
   historyUnmarkDeleted_(safe);
+  // HTML lives in Drive — Script Properties only hold the small index.
+  // Drop legacy property chunks first so quota errors clear.
+  propDelete_('HIST_' + safe);
   try {
-    propWrite_('HIST_' + safe, String(raw.html));
+    historyWriteHtmlDrive_(safe, String(raw.html));
   } catch (e) {
-    // Quota — drop older sheets and retry once.
-    var slim = historyPrune_(historyReadIndex_()).slice(0, Math.max(3, HISTORY_MAX_ - 4));
-    historyReadIndex_().forEach(function (r) {
-      if (!slim.some(function (k) { return k.id === r.id; })) historyDeleteHtml_(r.id);
-    });
-    historyWriteIndex_(slim);
-    propWrite_('HIST_' + safe, String(raw.html));
+    // Drive scope may need a one-time re-auth after deploy — still keep index.
+    if (isQuotaError_(e)) purgeHistoryProps_();
+    try { historyWriteHtmlDrive_(safe, String(raw.html)); } catch (e2) {}
   }
   var list = historyReadIndex_().filter(function (r) { return r.id !== meta.id; });
   list.unshift(meta);
   list = historyPrune_(list);
-  historyWriteIndex_(list);
-  return { ok: true, source: 'props', entry: meta };
+  try {
+    historyWriteIndex_(list);
+  } catch (e2) {
+    if (isQuotaError_(e2)) {
+      purgeHistoryProps_();
+      historyWriteIndex_(list.slice(0, HISTORY_MAX_));
+    } else {
+      throw e2;
+    }
+  }
+  return { ok: true, source: 'drive', entry: meta };
 }
 
 function getPrintHistory_(id) {
@@ -679,7 +770,8 @@ function getPrintHistory_(id) {
       break;
     }
   }
-  var html = propRead_('HIST_' + id);
+  // Prefer Drive; fall back to legacy Script Properties chunks.
+  var html = historyReadHtmlDrive_(id) || propRead_('HIST_' + id);
   if (!html) {
     return { ok: false, error: 'Sheet not found in cloud history' };
   }
