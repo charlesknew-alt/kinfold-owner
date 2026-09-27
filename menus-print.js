@@ -3405,18 +3405,21 @@
       (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
         if (id) deleted[String(id)] = true;
       });
-      // Shared list = cloud. Upload any local-only sheet not tombstoned
-      // (Kate’s pub PC → everyone). Drop local copies of deletes.
-      return purgeLocalDeleted(deleted).then(function () {
-        return migrateLocalToCloud(known, deleted);
-      }).then(function () {
-        // Re-list after migrate so Sunday 11:16 appears on this device too.
-        return historyCloudPost({ action: 'listPrintHistory' }).then(function (data2) {
-          var items = Array.isArray(data2.items) ? data2.items : cloudItems;
-          return sortHistoryNewest(items.map(function (r) { return asRow(r, 'cloud'); }));
-        }).catch(function () {
-          return sortHistoryNewest(cloudItems.map(function (r) { return asRow(r, 'cloud'); }));
+      // Show immediately: cloud + any local-only sheets not deleted elsewhere.
+      // Do not wait on uploads (that made Print history feel broken/slow).
+      return localListOnly().then(function (localItems) {
+        var byId = {};
+        (localItems || []).forEach(function (r) {
+          if (r && r.id && !deleted[r.id]) byId[r.id] = asRow(r, 'local');
         });
+        cloudItems.forEach(function (r) {
+          if (r && r.id) byId[r.id] = asRow(r, 'cloud');
+        });
+        Promise.resolve()
+          .then(function () { return purgeLocalDeleted(deleted); })
+          .then(function () { return migrateLocalToCloud(known, deleted); })
+          .catch(function () {});
+        return sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
       });
     }).catch(function () {
       return localListOnly();
@@ -3425,18 +3428,19 @@
 
   function getPrintHistory(id) {
     if (!id) return Promise.resolve(null);
-    return historyCloudPost({
-      action: 'getPrintHistory',
-      id: id
-    }).then(function (data) {
-      var entry = data.entry || null;
-      if (entry && entry.html) {
-        // Refresh local cache so reopen still works offline later.
-        localSaveOnly(normalizeHistoryEntry(entry)).catch(function () {});
-      }
-      return entry;
-    }).catch(function () {
-      return localGetOnly(id);
+    // Local first (instant open), then cloud if this device does not have HTML.
+    return localGetOnly(id).then(function (local) {
+      if (local && local.html) return local;
+      return historyCloudPost({
+        action: 'getPrintHistory',
+        id: id
+      }).then(function (data) {
+        var entry = data.entry || null;
+        if (entry && entry.html) {
+          localSaveOnly(normalizeHistoryEntry(entry)).catch(function () {});
+        }
+        return entry;
+      }).catch(function () { return null; });
     });
   }
 
