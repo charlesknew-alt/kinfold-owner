@@ -683,17 +683,49 @@
     return out;
   }
 
+  /**
+   * Pick the right section when dropping a catalogue dish onto a target menu.
+   * Specials / Desserts / Sandwiches / Little Bells coerce to that menu’s category;
+   * Main / Sunday / Party keep (or guess) the catalogue section.
+   */
+  function sectionForTargetMenu(section, name, description, targetMenuId) {
+    var tid = String(targetMenuId || '').trim();
+    var s = String(section || '').trim();
+    var n = String(name || '').trim();
+    var d = String(description || '').trim();
+    if (tid === 'specials') return coerceSpecialsSection(s || 'Specials', n, d);
+    if (tid === 'desserts') return 'Desserts';
+    if (tid === 'sandwiches') return 'Sandwiches';
+    if (tid === 'little-bells') return 'Little Bells';
+    var guessed = guessSection(s, n, d, { menuId: tid });
+    if (guessed && SECTIONS.indexOf(guessed) !== -1) return guessed;
+    var norm = normalizeSectionName(s);
+    if (norm && SECTIONS.indexOf(norm) !== -1) return norm;
+    return tid === 'specials' ? 'Special Mains' : 'Mains';
+  }
+
   /** Clone a catalogue (or live menu) dish onto a target menu with a fresh id. */
   function dishFromCatalogueEntry(entry, opts) {
     opts = opts || {};
-    var section = opts.section || (entry && entry.section) || 'Mains';
+    var name = (entry && entry.name) || 'Dish';
+    var description = (entry && entry.description) || '';
+    var section = opts.section;
+    if (!section && opts.menuId) {
+      section = sectionForTargetMenu(
+        (entry && entry.section) || '',
+        name,
+        description,
+        opts.menuId
+      );
+    }
+    if (!section) section = (entry && entry.section) || 'Mains';
     var d = dish(
       section,
-      (entry && entry.name) || 'Dish',
-      (entry && entry.description) || '',
+      name,
+      description,
       (entry && entry.price) || '',
       (entry && entry.tags) || '',
-      false
+      !!opts.lunchClub
     );
     d.id = d.id + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     return tidyDishFields(d);
@@ -2003,6 +2035,7 @@
     searchDishCatalogue: searchDishCatalogue,
     filterDishCatalogue: filterDishCatalogue,
     dishCatalogueSections: dishCatalogueSections,
+    sectionForTargetMenu: sectionForTargetMenu,
     dishFromCatalogueEntry: dishFromCatalogueEntry,
     isoDateToday: isoDateToday
   };

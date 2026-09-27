@@ -307,8 +307,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow94') !== -1, 'menus page cache-bust is flow94');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow94') !== -1, 'hub menus link cache-bust is flow94');
+assert(page.indexOf('flow95') !== -1, 'menus page cache-bust is flow95');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow95') !== -1, 'hub menus link cache-bust is flow95');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('GmailApp.sendEmail') !== -1,
@@ -325,8 +325,14 @@ assert(page.indexOf('data-view="catalogue"') !== -1 && page.indexOf('renderCatal
   'All dishes view browses the shared catalogue');
 assert(page.indexOf('catalogueSearch') !== -1 && page.indexOf('catalogueSection') !== -1,
   'All dishes can search by name and filter by category');
+assert(page.indexOf('data-catalogue-add') !== -1 && page.indexOf('Add to menu') !== -1,
+  'All dishes can add a dish onto a chosen menu');
+assert(page.indexOf('addCatalogueDishToMenu') !== -1 && page.indexOf('data-catalogue-target') !== -1,
+  'All dishes has a menu dropdown per row');
 assert(typeof api.filterDishCatalogue === 'function' && typeof api.dishCatalogueSections === 'function',
   'catalogue filter helpers are exported');
+assert(typeof api.sectionForTargetMenu === 'function',
+  'sectionForTargetMenu maps catalogue dishes onto the right menu category');
 assert(page.indexOf('Sending…') !== -1, 'Email button shows sending state');
 assert(page.indexOf('data-dish-delete') !== -1 && page.indexOf('removeDishInstant') !== -1,
   'dish Delete melts away without reloading the list');
@@ -377,6 +383,12 @@ assert(api.dishCatalogueSections(catSmoke).indexOf('Mains') !== -1,
   'catalogue exposes distinct categories for the filter');
 assert(api.dishFromCatalogueEntry(sirloin).name === 'Sirloin of Beef',
   'catalogue entry can be cloned onto a menu');
+assert(api.sectionForTargetMenu('Mains', 'Sirloin of Beef', '', 'specials') === 'Special Mains',
+  'Add to Specials coerces Mains → Special Mains');
+assert(api.sectionForTargetMenu('Starters', 'Whitebait', '', 'desserts') === 'Desserts',
+  'Add to Desserts menu forces Desserts category');
+assert(api.dishFromCatalogueEntry(sirloin, { menuId: 'specials' }).section === 'Special Mains',
+  'catalogue clone onto Specials uses Special Mains');
 assert(printJs.indexOf('cols-little-solo') !== -1 && printJs.indexOf('levelOppositeColumns') !== -1,
   'opposite columns are leveled with food then feature panels');
 assert(printJs.indexOf('function noteUnits') !== -1,
