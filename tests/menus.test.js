@@ -312,8 +312,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow101') !== -1, 'menus page cache-bust is flow101');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow101') !== -1, 'hub menus link cache-bust is flow101');
+assert(page.indexOf('flow102') !== -1, 'menus page cache-bust is flow102');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow102') !== -1, 'hub menus link cache-bust is flow102');
+assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,
+  'each subcategory has an Add to section button');
+assert(page.indexOf('pendingAddSection') !== -1 && page.indexOf('rememberScroll_') !== -1,
+  'add-from-section pre-fills category and save keeps page place');
 assert(page.indexOf('doSyncNow') !== -1 && page.indexOf('syncNowFromCloud') !== -1,
   'Sync now forces every device onto the shared cloud book');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('CLOUD_DEFAULT_URL') !== -1,
@@ -752,7 +756,8 @@ assert(fs.existsSync(path.join(root, 'images/lunch-club-mark.png')), 'lunch club
 global.localStorage = {
   _d: {},
   getItem: function (k) { return this._d[k] == null ? null : this._d[k]; },
-  setItem: function (k, v) { this._d[k] = String(v); }
+  setItem: function (k, v) { this._d[k] = String(v); },
+  removeItem: function (k) { delete this._d[k]; }
 };
 require(path.join(root, 'menus-print.js'));
 var print = global.EBMenuPrint;
@@ -1431,8 +1436,9 @@ assert(fromPdf.length >= 2, 'cleaned PDF-like text parses dishes');
 assert(fromPdf[0].name === 'Bread and Salted Butter' && fromPdf[0].price === '5.95', 'price-only line joins previous name');
 assert(cleaned.indexOf('Please inform') === -1, 'allergy footer stripped from extract');
 
+// Unique id each run — cloud may keep a delete tombstone for a fixed test id.
 var histSample = {
-  id: 'test-hist-1',
+  id: 'test-hist-' + Date.now().toString(36),
   menuId: 'main',
   menuName: 'Main menu',
   roman: 'III',
@@ -1479,12 +1485,12 @@ ingest.readFiles([{ name: 'a.jpg' }, { name: 'b.jpg' }], function () {}).then(fu
 return print.savePrintHistory(histSample).then(function () {
   return print.listPrintHistory();
 }).then(function (rows) {
-  assert(rows.some(function (r) { return r.id === 'test-hist-1' && r.roman === 'III'; }),
+  assert(rows.some(function (r) { return r.id === histSample.id && r.roman === 'III'; }),
     'history lists saved sheet with Roman');
-  return print.getPrintHistory('test-hist-1');
+  return print.getPrintHistory(histSample.id);
 }).then(function (got) {
   assert(got && /sample main III/.test(got.html || ''), 'history returns stored HTML');
-  return print.deletePrintHistory('test-hist-1');
+  return print.deletePrintHistory(histSample.id);
 }).then(function () {
   if (failed) {
     console.error('\n' + failed + ' check(s) failed');

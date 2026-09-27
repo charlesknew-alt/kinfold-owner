@@ -105,6 +105,11 @@
     }
     .section-block-body { padding: 4px 14px 10px; }
     .section-block .dish-row:last-child { border-bottom: 0; }
+    .section-add-row {
+      display: flex; justify-content: flex-start; padding: 10px 0 4px; margin-top: 4px;
+      border-top: 1px dashed var(--line);
+    }
+    .section-add-row .soft { font-size: 13px; padding: 8px 12px; }
     .toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
     .history-day { margin: 0 0 18px; }
     .history-day h3 {
@@ -375,9 +380,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow101"></script>
-  <script src="menus-print.js?v=20260927-flow101"></script>
-  <script src="menus-ingest.js?v=20260927-flow101"></script>
+  <script src="menus.js?v=20260927-flow102"></script>
+  <script src="menus-print.js?v=20260927-flow102"></script>
+  <script src="menus-ingest.js?v=20260927-flow102"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -405,6 +410,8 @@
     var includes = loadIncludes();
     var pendingReview = null;
     var editingPromoId = '';
+    var pendingAddSection = ''; // Add from a subcategory → pre-fill Section
+    var pendingScroll = null;   // { y, section } — keep place after save / cancel
     var flowStep = 1; // staff: 1 dishes · 2 generate · owner: + blocks + wording
     var viewMode = 'edit'; // edit | catalogue | history
     var historyFilter = 'all';
@@ -1255,8 +1262,37 @@
         hint.innerHTML = '<strong>' + escapeAttr(planTitle(plan.fit)) + '</strong>' + escapeAttr(plan.text || '');
       }
       bindEditor();
-      var open = document.getElementById('step-' + FLOW_STEPS[flowStep - 1].key);
-      if (open && flowStep > 1) open.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (pendingScroll) {
+        var ps = pendingScroll;
+        pendingScroll = null;
+        requestAnimationFrame(function () {
+          var elSec = findSectionBlock_(ps.section);
+          if (elSec) {
+            elSec.scrollIntoView({ block: 'nearest' });
+            return;
+          }
+          if (typeof ps.y === 'number') window.scrollTo(0, ps.y);
+        });
+      } else {
+        var open = document.getElementById('step-' + FLOW_STEPS[flowStep - 1].key);
+        if (open && flowStep > 1) open.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    function findSectionBlock_(section) {
+      if (!section) return null;
+      var found = null;
+      document.querySelectorAll('.section-block[data-section]').forEach(function (n) {
+        if (!found && n.getAttribute('data-section') === section) found = n;
+      });
+      return found;
+    }
+
+    function rememberScroll_(section) {
+      pendingScroll = {
+        y: window.scrollY || window.pageYOffset || 0,
+        section: section || ''
+      };
     }
 
     function sectionCount(list) {
@@ -1853,6 +1889,12 @@
       return html;
     }
 
+    function sectionAddFooter_(sec) {
+      return '<div class="section-add-row no-print">' +
+        '<button type="button" class="soft" data-add-section="' + escapeAttr(sec) + '">' +
+        'Add to ' + escapeAttr(sec) + '</button></div>';
+    }
+
     function renderComplete() {
       var list = EBMenus.sortDishesBySection(dishes());
       if (!list.length) return '<p class="note">This menu is empty. Add a dish, or paste a list.</p>';
@@ -1864,12 +1906,15 @@
       var open = false;
       list.forEach(function (d, idx) {
         if (d.section !== section) {
-          if (open) html += '</div></div>';
+          if (open) {
+            html += sectionAddFooter_(section);
+            html += '</div></div>';
+          }
           section = d.section;
           var rule = menuRules[section] || defaults[section] || { width: 'full', frame: false };
           var widthLabel = (EBMenus.WIDTH_OPTIONS.filter(function (w) { return w.id === rule.width; })[0] || {}).label || rule.width;
           var count = list.filter(function (x) { return x.section === section; }).length;
-          html += '<div class="section-block">';
+          html += '<div class="section-block" data-section="' + escapeAttr(section) + '">';
           html += '<div class="section-block-head">';
           html += '<div class="title">' + escapeAttr(section) + '</div>';
           html += '<div class="meta"><span class="chip">' + count + '</span>';
@@ -1909,7 +1954,10 @@
         if (idx > 0) html += '<option value="merge-up">Merge ↑ into dish above</option>';
         html += '<option value="remove">Delete</option>';
         html += '</select></div></div>';
-        if (idx === list.length - 1 && open) html += '</div></div>';
+        if (idx === list.length - 1 && open) {
+          html += sectionAddFooter_(section);
+          html += '</div></div>';
+        }
       });
       return html;
     }
@@ -1926,10 +1974,32 @@
           render();
         };
       });
+      document.querySelectorAll('[data-add-section]').forEach(function (b) {
+        b.onclick = function () {
+          pendingAddSection = b.getAttribute('data-add-section') || '';
+          dishId = '';
+          mode = 'add';
+          flowStep = 1;
+          render();
+          var form = document.querySelector('.form-card');
+          if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+      });
       document.querySelectorAll('[data-mode]').forEach(function (b) {
         b.onclick = function () {
           var next = b.getAttribute('data-mode');
-          if (next === 'add') dishId = '';
+          if (next === 'add') {
+            dishId = '';
+            pendingAddSection = '';
+          }
+          if (next === 'complete') {
+            // Cancel from Add/Adjust — stay where you were on the list.
+            var keepSec = '';
+            if (mode === 'add' && pendingAddSection) keepSec = pendingAddSection;
+            else if (currentDish()) keepSec = currentDish().section || '';
+            rememberScroll_(keepSec);
+            pendingAddSection = '';
+          }
           mode = next;
           flowStep = 1;
           render();
@@ -1956,6 +2026,7 @@
               fromMenu: d.fromMenu
             };
           }));
+          rememberScroll_(next);
           save();
           render();
         };
@@ -1977,8 +2048,10 @@
               alert('Nothing above to merge into.');
               return;
             }
+            var staySec = sorted[idx - 1] && sorted[idx - 1].section;
             book[menuId] = EBMenus.mergeDishWithPrevious(sorted, idx);
             dishId = book[menuId][Math.max(0, idx - 1)].id;
+            rememberScroll_(staySec || '');
             save();
             mode = 'complete';
             render();
@@ -2449,7 +2522,9 @@
       return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
     function blank() {
-      return { section: dishes()[0] ? dishes()[0].section : 'Mains', name: '', description: '', price: '', tags: '', lunchClub: false };
+      var sec = pendingAddSection ||
+        (dishes()[0] ? dishes()[0].section : 'Mains');
+      return { section: sec, name: '', description: '', price: '', tags: '', lunchClub: false };
     }
 
     function applyCatalogueEntryToForm(entry) {
@@ -2706,6 +2781,7 @@
     function onSave() {
       var next = readForm();
       if (!next.name) return;
+      var staySection = next.section || pendingAddSection || '';
       if (mode === 'add') {
         next.id = EBMenus.dish(next.section, next.name).id + '-' + Date.now();
         next = EBMenus.tidyDishFields(next);
@@ -2719,8 +2795,11 @@
         next.fromMenu = item.fromMenu;
         next = EBMenus.tidyDishFields(next);
         Object.keys(next).forEach(function (k) { item[k] = next[k]; });
+        staySection = next.section || item.section || '';
         mode = 'complete';
       }
+      pendingAddSection = '';
+      rememberScroll_(staySection);
       save();
       render();
     }
