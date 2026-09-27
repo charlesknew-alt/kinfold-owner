@@ -381,9 +381,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow105"></script>
-  <script src="menus-print.js?v=20260927-flow105"></script>
-  <script src="menus-ingest.js?v=20260927-flow105"></script>
+  <script src="menus.js?v=20260927-flow106"></script>
+  <script src="menus-print.js?v=20260927-flow106"></script>
+  <script src="menus-ingest.js?v=20260927-flow106"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -919,7 +919,11 @@
           }).catch(function (err) {
             btn.disabled = false;
             btn.textContent = label || 'Email';
-            alert('Could not send email. ' + (err && err.message ? err.message : 'Try again in a moment.'));
+            var msg = (err && err.message) ? String(err.message) : '';
+            if (/missing.?html|Missing sheet HTML/i.test(msg)) {
+              msg = 'This device could not attach the sheet. Open the sheet once (Print PDF), then try Email again.';
+            }
+            alert('Could not send email. ' + (msg || 'Try again in a moment.'));
           });
         };
       });

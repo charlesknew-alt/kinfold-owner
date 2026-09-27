@@ -46,9 +46,64 @@
   }
 
   /**
+   * Form POST into a hidden iframe — Apps Script reads e.parameter.payload.
+   * More reliable than no-cors fetch for large print HTML (email).
+   */
+  function cloudFormWrite_(body) {
+    return new Promise(function (resolve, reject) {
+      if (typeof document === 'undefined' || !document.body) {
+        reject(new Error('no_document'));
+        return;
+      }
+      var url = getCloudUrl();
+      if (!url) {
+        reject(new Error('no_cloud'));
+        return;
+      }
+      var name = 'ebCloud' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+      var iframe = document.createElement('iframe');
+      iframe.setAttribute('name', name);
+      iframe.setAttribute('title', 'Menu cloud write');
+      iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;clip:rect(0,0,0,0)';
+      var form = document.createElement('form');
+      form.method = 'POST';
+      form.action = url;
+      form.target = name;
+      form.acceptCharset = 'UTF-8';
+      form.style.display = 'none';
+      var input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'payload';
+      input.value = JSON.stringify(body || {});
+      form.appendChild(input);
+      var settled = false;
+      var finish = function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { if (form.parentNode) form.parentNode.removeChild(form); } catch (e1) {}
+        try { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e2) {}
+        resolve(true);
+      };
+      var timer = setTimeout(finish, 22000);
+      iframe.onload = finish;
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+      try {
+        form.submit();
+      } catch (err) {
+        settled = true;
+        clearTimeout(timer);
+        try { if (form.parentNode) form.parentNode.removeChild(form); } catch (e3) {}
+        try { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (e4) {}
+        reject(err);
+      }
+    });
+  }
+
+  /**
    * Writes: browser fetch POST with redirect:follow dies on Google’s 302.
-   * In the browser, mode: 'no-cors' still delivers the POST body (Apps Script
-   * runs doPost on the first hop). Response is opaque — verify with GET.
+   * Prefer form POST for large bodies; no-cors fetch as fallback.
    * Outside the browser (Node tests), follow Location manually.
    */
   function cloudWrite_(body) {
@@ -61,23 +116,26 @@
     var inBrowser = typeof document !== 'undefined';
 
     if (inBrowser) {
-      var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timer = setTimeout(function () {
-        try { if (ctrl) ctrl.abort(); } catch (e0) {}
-      }, 15000);
-      return fetch(url, {
-        method: 'POST',
-        mode: 'no-cors',
-        credentials: 'omit',
-        headers: headers,
-        body: payload,
-        signal: ctrl ? ctrl.signal : undefined
-      }).then(function () {
-        clearTimeout(timer);
-        return true;
-      }).catch(function (err) {
-        clearTimeout(timer);
-        throw err;
+      // Form POST first — delivers email HTML even when cloud history is empty.
+      return cloudFormWrite_(body).catch(function () {
+        var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = setTimeout(function () {
+          try { if (ctrl) ctrl.abort(); } catch (e0) {}
+        }, 15000);
+        return fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          credentials: 'omit',
+          headers: headers,
+          body: payload,
+          signal: ctrl ? ctrl.signal : undefined
+        }).then(function () {
+          clearTimeout(timer);
+          return true;
+        }).catch(function (err) {
+          clearTimeout(timer);
+          throw err;
+        });
       });
     }
 
@@ -137,8 +195,9 @@
   }
 
   /**
-   * Shared cloud call. Reads use GET. Email POSTs the HTML (no-cors) so we
-   * never race a separate upload. Other writes use no-cors + GET verify.
+   * Shared cloud call. Reads use GET. Email always POSTs the sheet HTML
+   * (form iframe) — never GET-by-id (cloud history is often empty →
+   * "Missing sheet HTML to email"). Other writes use form/no-cors + verify.
    */
   function cloudPost(body) {
     body = body || {};
@@ -151,20 +210,13 @@
       return cloudGet(action, body);
     }
     if (action === 'emailPrintHistory') {
-      // Must include HTML in the POST — GET-by-id races the cloud upload and
-      // returns "Missing sheet HTML to email" for local-only sheets.
-      if (body.entry && body.entry.html) {
-        return cloudWrite_(body).then(function () {
-          return { ok: true, to: body.to || '', via: 'no-cors' };
-        });
+      if (!(body.entry && body.entry.html)) {
+        return Promise.reject(new Error('missing_html'));
       }
-      if (body.id || (body.entry && body.entry.id)) {
-        return cloudGet('emailPrintHistory', {
-          id: body.id || (body.entry && body.entry.id),
-          to: body.to
-        });
-      }
-      return Promise.reject(new Error('missing_html'));
+      // Never GET-by-id — that path returns Missing sheet HTML when cloud is empty.
+      return cloudWrite_(body).then(function () {
+        return { ok: true, to: body.to || '', via: 'form' };
+      });
     }
     return cloudWriteAndVerify_(body);
   }
