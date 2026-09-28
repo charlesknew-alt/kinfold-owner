@@ -50,17 +50,11 @@
    * More reliable than no-cors fetch for large print HTML (email).
    */
   function cloudFormWrite_(body) {
-    // Menus often runs inside manager.eightbells… iframe. A form POST there
-    // cannot reliably target a hidden sibling iframe — Google’s 302 response
-    // navigates the whole Menus frame to raw JSON (script.googleusercontent.com).
-    // Use no-cors fetch whenever we are embedded.
-    var embedded = false;
-    try {
-      embedded = typeof window !== 'undefined' && window.top && window.top !== window;
-    } catch (eEmb) {
-      embedded = true; // cross-origin top → treat as embedded
-    }
-    if (embedded) {
+    // Never form-POST from the browser. In manager.eightbells… (and often even
+    // top-level), Google’s 302 echo response navigates the Menus frame to raw
+    // JSON — Email/Save then look “broken” even when the mail was sent.
+    // no-cors fetch delivers the body without navigating.
+    if (typeof document !== 'undefined') {
       return cloudWrite_(body);
     }
     return new Promise(function (resolve, reject) {
@@ -231,21 +225,22 @@
         return Promise.reject(new Error('missing_html'));
       }
       // Never GET-by-id — that path returns Missing sheet HTML when cloud is empty.
-      return cloudFormWrite_(body).then(function () {
-        return { ok: true, to: body.to || '', via: 'form' };
+      // Always no-cors in the browser so Email does not navigate to raw JSON.
+      return cloudWrite_(body).then(function () {
+        return { ok: true, to: body.to || '', via: 'no-cors' };
       });
     }
-    // Print HTML is large — form POST is more reliable than no-cors fetch.
+    // Print HTML — no-cors in browser (form POST navigates Menus to JSON).
     if (action === 'savePrintHistory') {
       if (!(body.entry && body.entry.html)) {
         return Promise.reject(new Error('missing_html'));
       }
       var histId = body.entry.id;
-      return cloudFormWrite_(body).then(function () {
+      return cloudWrite_(body).then(function () {
         function verifyHtml_(attempt) {
           return cloudGet('getPrintHistory', { id: histId }).then(function (data) {
             if (data && data.entry && data.entry.html) {
-              return { ok: true, via: 'form', id: histId };
+              return { ok: true, via: 'no-cors', id: histId };
             }
             if (attempt < 4) {
               return new Promise(function (resolve) {
