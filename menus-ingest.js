@@ -50,6 +50,19 @@
    * More reliable than no-cors fetch for large print HTML (email).
    */
   function cloudFormWrite_(body) {
+    // Menus often runs inside manager.eightbells… iframe. A form POST there
+    // cannot reliably target a hidden sibling iframe — Google’s 302 response
+    // navigates the whole Menus frame to raw JSON (script.googleusercontent.com).
+    // Use no-cors fetch whenever we are embedded.
+    var embedded = false;
+    try {
+      embedded = typeof window !== 'undefined' && window.top && window.top !== window;
+    } catch (eEmb) {
+      embedded = true; // cross-origin top → treat as embedded
+    }
+    if (embedded) {
+      return cloudWrite_(body);
+    }
     return new Promise(function (resolve, reject) {
       if (typeof document === 'undefined' || !document.body) {
         reject(new Error('no_document'));
@@ -62,6 +75,8 @@
       }
       var name = 'ebCloud' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
       var iframe = document.createElement('iframe');
+      // Both property + attribute — some browsers only honour .name for targeting.
+      iframe.name = name;
       iframe.setAttribute('name', name);
       iframe.setAttribute('title', 'Menu cloud write');
       iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;clip:rect(0,0,0,0)';

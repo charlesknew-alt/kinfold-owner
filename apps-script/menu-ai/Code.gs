@@ -21,7 +21,38 @@
  * From alias is OFF by default — Gmail “Send mail as” via Outlook SMTP was
  * bouncing with “Authentication unsuccessful”. Set Script Property
  * MENU_EMAIL_USE_FROM=1 after fixing Gmail → Accounts → Send mail as.
+ *
+ * DRIVE (Print history HTML archive for phone ↔ PC):
+ * Run AUTHORIZE_DRIVE_PRINT_HISTORY once → Allow Google Drive.
+ * Without this, sheets fall back to Script Properties (small quota).
  */
+
+/**
+ * ★ ONE-TIME: select this in the function dropdown (top toolbar) → Run → Allow.
+ * Grants Drive so print HTML lands in “Eight Bells Menu Print History”
+ * instead of Script Properties (fixes phone download + quota wipes).
+ */
+function AUTHORIZE_DRIVE_PRINT_HISTORY() {
+  var folder = historyHtmlFolder_();
+  if (!folder) {
+    throw new Error('Drive still not authorised — click Allow on the permission prompt, then Run again');
+  }
+  var probeName = '_varlo_drive_probe.txt';
+  var existing = folder.getFilesByName(probeName);
+  while (existing.hasNext()) {
+    try { existing.next().setTrashed(true); } catch (e0) {}
+  }
+  var file = folder.createFile(probeName, 'ok ' + new Date().toISOString(), MimeType.PLAIN_TEXT);
+  var id = file.getId();
+  try { file.setTrashed(true); } catch (e1) {}
+  Logger.log('Drive authorised. Folder: ' + folder.getName() + ' (' + folder.getId() + ')');
+  return {
+    ok: true,
+    folderId: folder.getId(),
+    folderName: folder.getName(),
+    probeFileId: id
+  };
+}
 
 /**
  * ★ ONE-TIME: select this in the function dropdown (top toolbar) → Run → Allow.
