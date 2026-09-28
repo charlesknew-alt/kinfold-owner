@@ -387,9 +387,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260927-flow116"></script>
-  <script src="menus-print.js?v=20260927-flow116"></script>
-  <script src="menus-ingest.js?v=20260927-flow116"></script>
+  <script src="menus.js?v=20260928-flow117"></script>
+  <script src="menus-print.js?v=20260928-flow117"></script>
+  <script src="menus-ingest.js?v=20260928-flow117"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -864,7 +864,7 @@
         });
         html += '</select></div>';
         if (!filtered.length) {
-          html += '<p class="note">Nothing on this device yet. If your phone has Sunday sheets, open Menus on the <strong>phone</strong>, tap <strong>Sync now</strong>, then Sync now here. Or generate and <strong>Save</strong> a preview.</p>';
+          html += '<p class="note">No saved sheets in the shared history yet. Tap <strong>Sync now</strong> (pulls from the cloud), or generate a menu and click <strong>Save</strong> on the preview.</p>';
           el.innerHTML = html;
           bindHistory();
           // Still try a cloud pull+push in case sheets just landed.
