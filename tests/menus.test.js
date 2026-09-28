@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow117') !== -1, 'menus page cache-bust is flow117');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow117') !== -1, 'hub menus link cache-bust is flow117');
+assert(page.indexOf('flow118') !== -1, 'menus page cache-bust is flow118');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow118') !== -1, 'hub menus link cache-bust is flow118');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -343,6 +343,10 @@ assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHt
   'print HTML moves to Drive; purge frees Script Properties quota');
 assert(ingestJs.indexOf('form POST navigates') !== -1 || ingestJs.indexOf('no-cors fetch only') !== -1,
   'cloud writes avoid form POST that navigates phones to JSON');
+assert(ingestJs.indexOf('window.top') !== -1 && ingestJs.indexOf('cloudWrite_(body)') !== -1,
+  'embedded Menus (manager iframe) uses no-cors so Save does not show raw JSON');
+assert(aiGs.indexOf('AUTHORIZE_DRIVE_PRINT_HISTORY') !== -1,
+  'Apps Script has one-click Drive authorise for print HTML');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf('entry: meta') !== -1,
   'email POSTs sheet HTML with the mail request');
 assert(ingestJs.indexOf('cloudFormWrite_') !== -1 && ingestJs.indexOf('Never GET-by-id') !== -1,
