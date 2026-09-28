@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow116') !== -1, 'menus page cache-bust is flow116');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow116') !== -1, 'hub menus link cache-bust is flow116');
+assert(page.indexOf('flow117') !== -1, 'menus page cache-bust is flow117');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow117') !== -1, 'hub menus link cache-bust is flow117');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -335,6 +335,10 @@ assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),
 assert(aiGs.indexOf('Could not store sheet HTML') !== -1 &&
   aiGs.indexOf('historyPrunePropsHtml_') !== -1,
   'save falls back to Script Properties HTML when Drive is unauthorised');
+assert(aiGs.indexOf('freeHistoryHtmlBlobs_') !== -1 && aiGs.indexOf('historyRebuildIndexIfEmpty_') !== -1,
+  'quota free keeps HISTIDX; empty index rebuilds from stored HTML');
+assert(page.indexOf('No saved sheets in the shared history') !== -1,
+  'empty print history points at Sync now / Save, not phone-only');
 assert(aiGs.indexOf('purgeHistoryProps_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
   'print HTML moves to Drive; purge frees Script Properties quota');
 assert(ingestJs.indexOf('form POST navigates') !== -1 || ingestJs.indexOf('no-cors fetch only') !== -1,

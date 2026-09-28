@@ -142,6 +142,10 @@ function doGet(e) {
   if (action === 'purgeHistory') {
     return json_(purgeHistoryProps_());
   }
+  // Rebuild HISTIDX from remaining HTML blobs / Drive files (no re-upload).
+  if (action === 'rebuildPrintHistoryIndex') {
+    return json_(rebuildPrintHistoryIndex_());
+  }
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
@@ -520,7 +524,7 @@ function propDeletePrefix_(props, prefix) {
 
 /**
  * Delete every Script Property used for print HTML / index / tombstones.
- * Call when quota is blown so Menus can open again.
+ * Emergency only (?action=purgeHistory) — do not call from normal saves.
  */
 function purgeHistoryProps_() {
   var props = PropertiesService.getScriptProperties();
@@ -533,6 +537,24 @@ function purgeHistoryProps_() {
     }
   });
   return { ok: true, removed: removed, keysBefore: keys.length };
+}
+
+/**
+ * Free Script Properties space without wiping the shared index / tombstones.
+ * (Older code called purgeHistoryProps_ on quota → empty Print history on PC.)
+ */
+function freeHistoryHtmlBlobs_() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties() || {};
+  var removed = 0;
+  Object.keys(all).forEach(function (k) {
+    if (k === 'HIST_FOLDER_ID') return;
+    if (k.indexOf('HISTIDX') === 0 || k.indexOf('HISTDEL') === 0) return;
+    if (/^HIST_/i.test(k)) {
+      try { props.deleteProperty(k); removed++; } catch (e) {}
+    }
+  });
+  return removed;
 }
 
 function propWrite_(prefix, text) {
@@ -549,8 +571,8 @@ function propWrite_(prefix, text) {
     props.setProperties(batch, false);
   } catch (err) {
     if (!isQuotaError_(err)) throw err;
-    // Free space from old print HTML chunks, then retry once.
-    purgeHistoryProps_();
+    // Drop HTML blobs only — keep HISTIDX / HISTDEL so devices still list sheets.
+    freeHistoryHtmlBlobs_();
     props.setProperties(batch, false);
   }
 }
@@ -632,13 +654,102 @@ function historyWriteHtmlDrive_(id, html) {
 }
 
 /** Keep only the newest N Script-Properties HTML blobs (quota is ~500KB). */
-var HISTORY_PROPS_HTML_MAX_ = 8;
+var HISTORY_PROPS_HTML_MAX_ = 3;
 
 function historyPrunePropsHtml_(list) {
   var sorted = historySortNewest_(list || []);
   sorted.slice(HISTORY_PROPS_HTML_MAX_).forEach(function (drop) {
     if (drop && drop.id) propDelete_('HIST_' + historySafeId_(drop.id));
   });
+}
+
+/** Ids that still have HIST_<id>_n HTML chunks in Script Properties. */
+function historyDiscoverStoredIds_() {
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties() || {};
+  var ids = {};
+  Object.keys(all).forEach(function (k) {
+    var m = String(k).match(/^HIST_([a-zA-Z0-9_-]+)_n$/);
+    if (m && m[1]) ids[m[1]] = true;
+  });
+  // Also pick up HTML files already in the Drive print-history folder.
+  try {
+    var folder = historyHtmlFolder_();
+    if (folder) {
+      var files = folder.getFiles();
+      while (files.hasNext()) {
+        var f = files.next();
+        var name = String(f.getName() || '');
+        var dm = name.match(/^([a-zA-Z0-9_-]+)\.html$/i);
+        if (dm && dm[1]) ids[dm[1]] = true;
+      }
+    }
+  } catch (eDrive) {}
+  return Object.keys(ids);
+}
+
+function historyMetaFromHtmlTitle_(id, html) {
+  var title = '';
+  var m = String(html || '').match(/<title>([^<]*)<\/title>/i);
+  if (m) title = String(m[1] || '').trim();
+  var roman = '';
+  var rm = title.match(/—\s*([IVXLCDM]+)\s*$/);
+  if (rm) roman = rm[1];
+  var menuId = 'main';
+  var menuName = 'Menu';
+  if (/sunday/i.test(title)) {
+    menuId = 'sunday';
+    menuName = 'Sunday';
+  } else if (/dessert/i.test(title)) {
+    menuId = 'desserts';
+    menuName = 'Desserts';
+  } else if (/main/i.test(title)) {
+    menuId = 'main';
+    menuName = 'Main menu';
+  } else if (/special/i.test(title)) {
+    menuId = 'specials';
+    menuName = 'Specials';
+  } else if (title) {
+    menuName = title.replace(/\s+—\s*[IVXLCDM]+\s*$/, '').replace(/\s+Wk\b.*$/i, '').trim() || menuName;
+  }
+  var week = '';
+  var wm = title.match(/\b((?:Sunday|Week of)\s+[^—]+)/i);
+  if (wm) week = wm[1].replace(/\s+/g, ' ').trim();
+  return {
+    id: id,
+    menuId: menuId,
+    menuName: menuName,
+    roman: roman,
+    n: 0,
+    week: week,
+    weekKey: '',
+    hideDate: false,
+    generatedAt: Date.now(),
+    dayKey: ''
+  };
+}
+
+/**
+ * If HISTIDX was wiped by an old quota purge but HTML blobs remain, rebuild
+ * the list so PC/phone Print history is not empty.
+ */
+function historyRebuildIndexIfEmpty_() {
+  var list = historyReadIndex_();
+  if (list && list.length) return list;
+  var deleted = {};
+  historyReadDeleted_().forEach(function (id) { deleted[String(id)] = true; });
+  var rebuilt = [];
+  historyDiscoverStoredIds_().forEach(function (id) {
+    if (deleted[id]) return;
+    var html = propRead_('HIST_' + id) || historyReadHtmlDrive_(id);
+    if (!html) return;
+    rebuilt.push(historyMetaFromHtmlTitle_(id, html));
+  });
+  if (rebuilt.length) {
+    rebuilt = historySortNewest_(rebuilt);
+    try { historyWriteIndex_(rebuilt); } catch (e) {}
+  }
+  return rebuilt;
 }
 
 function historyReadHtmlDrive_(id) {
@@ -739,9 +850,44 @@ function historyUnmarkDeleted_(id) {
   historyWriteDeleted_(historyReadDeleted_().filter(function (x) { return x !== id; }));
 }
 
+function rebuildPrintHistoryIndex_() {
+  // Force a rebuild even when HISTIDX is a non-empty stale list.
+  try { propDelete_('HISTIDX'); } catch (e0) {}
+  var deleted = {};
+  historyReadDeleted_().forEach(function (id) { deleted[String(id)] = true; });
+  var candidates = historyDiscoverStoredIds_();
+  // Last-known shared sheets (in case getProperties() omits chunk keys).
+  ['pmujuzoge', 'pmujpewru', 'pmuizsmvo'].forEach(function (id) {
+    if (candidates.indexOf(id) === -1) candidates.push(id);
+  });
+  var rebuilt = [];
+  candidates.forEach(function (id) {
+    if (!id || deleted[id]) return;
+    var html = '';
+    try { html = historyReadHtmlDrive_(id) || ''; } catch (e1) { html = ''; }
+    if (!html) {
+      try { html = propRead_('HIST_' + id) || ''; } catch (e2) { html = ''; }
+    }
+    if (!html) return;
+    rebuilt.push(historyMetaFromHtmlTitle_(id, html));
+  });
+  rebuilt = historySortNewest_(rebuilt);
+  if (rebuilt.length) {
+    try { historyWriteIndex_(rebuilt); } catch (e3) {}
+  }
+  return {
+    ok: true,
+    source: 'props',
+    rebuilt: rebuilt.length,
+    items: rebuilt,
+    deletedIds: historyReadDeleted_()
+  };
+}
+
 function listPrintHistory_() {
-  var list = historyPrune_(historyReadIndex_());
-  historyWriteIndex_(list);
+  var list = historyRebuildIndexIfEmpty_();
+  list = historyPrune_(list);
+  try { historyWriteIndex_(list); } catch (e) {}
   return { ok: true, source: 'props', items: list, deletedIds: historyReadDeleted_() };
 }
 
@@ -802,8 +948,8 @@ function savePrintHistory_(raw) {
     historyWriteIndex_(list);
   } catch (e2) {
     if (isQuotaError_(e2)) {
-      purgeHistoryProps_();
-      historyWriteIndex_(list.slice(0, HISTORY_MAX_));
+      freeHistoryHtmlBlobs_();
+      historyWriteIndex_(list.slice(0, Math.min(HISTORY_MAX_, HISTORY_PROPS_HTML_MAX_)));
     } else {
       throw e2;
     }
