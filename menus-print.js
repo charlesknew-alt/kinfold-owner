@@ -265,7 +265,7 @@
   }
 
   /** Group sandwich fillings by price for A5 card faces. */
-  function cardSandwichesInner(dishes) {
+  function cardSandwichesInner(dishes, plan) {
     var groups = {};
     var order = [];
     (dishes || []).forEach(function (d) {
@@ -283,9 +283,17 @@
       });
       if (p) html += '<div class="lb-price">£' + esc(p) + '</div>';
     });
-    html +=
-      '<div class="desc card-spiel">Served on either Ciabatta vg, Farmhouse White or Granary<br>' +
-      'All served with Fries and Salad</div>';
+    // Text under the fillings — editable in Blocks → Text outside dishes.
+    var spiel = '';
+    if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+      spiel = String(root.EBMenus.sectionLayoutFor('Sandwiches', plan && plan.sectionLayout).note || '').trim();
+    } else if (plan && plan.sectionLayout && plan.sectionLayout.Sandwiches) {
+      spiel = String(plan.sectionLayout.Sandwiches.note || '').trim();
+    }
+    if (!spiel) {
+      spiel = 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad';
+    }
+    html += '<div class="desc card-spiel">' + esc(spiel).replace(/\n/g, '<br>') + '</div>';
     return scallop(html);
   }
 
@@ -2235,16 +2243,41 @@
             );
           }).join('');
       } else if (menu.id === 'little-bells') {
+        var lbRule = { note: '', sell: '' };
+        if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+          lbRule = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout) || lbRule;
+        } else if (plan && plan.sectionLayout && plan.sectionLayout['Little Bells']) {
+          lbRule = plan.sectionLayout['Little Bells'];
+        }
+        var iceLines = String(lbRule.sell || '').trim().split(/\n+/).map(function (l) {
+          return l.trim();
+        }).filter(Boolean);
+        if (!iceLines.length) {
+          iceLines = [
+            'Two Scoops of Ice-Cream',
+            'Salted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip',
+            '£9.50'
+          ];
+        }
+        var sundayNote = String(lbRule.note || '').trim() ||
+          'Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options';
+        var iceTitle = iceLines[0] || 'Two Scoops of Ice-Cream';
+        var icePrice = '';
+        var iceDesc = [];
+        iceLines.slice(1).forEach(function (line) {
+          if (/^£?\d/.test(line) && !icePrice) icePrice = line.replace(/^£/, '');
+          else iceDesc.push(line);
+        });
         inner =
           scallop(dishes.map(function (d) { return dishCentered(d, { hidePrice: true, hideLunch: true }); }).join('')) +
           '<div class="lb-foot">' +
-            '<div class="lb-ice">Two Scoops of Ice-Cream</div>' +
-            '<div class="desc">Salted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip</div>' +
-            '<div class="lb-price">£9.50</div>' +
-            '<div class="desc">Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options</div>' +
+            '<div class="lb-ice">' + esc(iceTitle) + '</div>' +
+            (iceDesc.length ? '<div class="desc">' + esc(iceDesc.join(' ')).replace(/\n/g, '<br>') + '</div>' : '') +
+            (icePrice ? '<div class="lb-price">£' + esc(icePrice) + '</div>' : '') +
+            '<div class="desc">' + esc(sundayNote).replace(/\n/g, '<br>') + '</div>' +
           '</div>';
       } else if (menu.id === 'sandwiches') {
-        inner = cardSandwichesInner(dishes);
+        inner = cardSandwichesInner(dishes, plan);
       } else if (menu.id === 'specials') {
         // Board note from Blocks → Specials section “Extra info” (default in layout; editable)
         var specialsNote = '';

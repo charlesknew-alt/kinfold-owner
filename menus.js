@@ -1872,11 +1872,19 @@
       note: 'All served with roast potatoes, Yorkshire pudding, seasonal vegetables and gravy'
     },
     Mains: { width: 'full', frame: false, note: '' },
-    'Little Bells': { width: 'full', frame: true, note: '' },
+    'Little Bells': {
+      width: 'full',
+      frame: true,
+      // Sheet Extra info; card menus override sell (ice cream) in defaultSectionLayoutBook.
+      note: 'Little Bells on Sunday in addition have a choice of roasts at half price of the adults.\n\nAll below £9.50 to include a choice of one scoop of ice cream or sorbet.',
+      tip: false,
+      sell: 'Two Scoops of Ice-Cream\nSalted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip\n£9.50'
+    },
     Sandwiches: {
       width: 'column',
       frame: true,
-      note: '(12 – 2.45 pm Mon to Fri; 12 – 4.30 pm Sat)\nAll served with fries and salad.',
+      // Main/Sunday under-title (hours). Card menu overrides note to the filling spiel.
+      note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with nachos & salad. FRIES UPGRADE +£2.',
       // Tip = include a selling box on Main/Sunday even with 0 fillings listed
       tip: true,
       sell: 'A selection of sandwiches is available — ask the team.'
@@ -1953,6 +1961,19 @@
     MENUS.forEach(function (m) {
       out[m.id] = defaultSectionLayout();
     });
+    // Card menus keep their own outside-dish wording (separate from Main/Sunday Blocks).
+    if (out.sandwiches && out.sandwiches.Sandwiches) {
+      out.sandwiches.Sandwiches = Object.assign({}, out.sandwiches.Sandwiches, {
+        note: 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad',
+        sell: 'A selection of sandwiches is available — ask the team.'
+      });
+    }
+    if (out['little-bells'] && out['little-bells']['Little Bells']) {
+      out['little-bells']['Little Bells'] = Object.assign({}, out['little-bells']['Little Bells'], {
+        note: 'Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options',
+        sell: 'Two Scoops of Ice-Cream\nSalted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip\n£9.50'
+      });
+    }
     return out;
   }
 

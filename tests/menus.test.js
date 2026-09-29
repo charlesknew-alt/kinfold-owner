@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow119') !== -1, 'menus page cache-bust is flow119');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow119') !== -1, 'hub menus link cache-bust is flow119');
+assert(page.indexOf('flow120') !== -1, 'menus page cache-bust is flow120');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow120') !== -1, 'hub menus link cache-bust is flow120');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -705,9 +705,34 @@ assert(page.indexOf('data-layout-note') !== -1,
   'Blocks step has extra-info field per category');
 assert(page.indexOf('data-layout-tip') !== -1 && page.indexOf('data-layout-sell') !== -1,
   'Blocks step has tip toggle and selling content for Sandwiches');
+assert(page.indexOf('Text outside dishes') !== -1 && page.indexOf('renderOutsideTextEditors') !== -1,
+  'UI has Text outside dishes editors for card spiel / ice cream / notes');
+assert(page.indexOf('Layout & text outside dishes') !== -1,
+  'Blocks step title mentions text outside dishes');
+assert(page.indexOf('outside-text-box') !== -1,
+  'outside-text editors use a highlighted box');
+assert(page.indexOf('data-view="blocks"') !== -1 && page.indexOf('renderBlocksHub') !== -1,
+  'top-level Blocks & text view like Feature panels (manager + owner)');
+assert(page.indexOf('id="viewBlocks"') !== -1,
+  'Blocks & text toggle button is always in the menus chrome');
+assert(!/staff-mode[\s\S]{0,200}#viewBlocks\s*\{[^}]*display:\s*none/.test(page) &&
+  page.indexOf('viewBlocks') !== -1 && page.indexOf('mode=staff') !== -1,
+  'Blocks & text is not hidden in staff/manager mode');
+assert(page.indexOf("viewMode === 'blocks'") !== -1 &&
+  page.indexOf('isStaffMode') !== -1 &&
+  /lede\.textContent = isStaffMode/.test(page),
+  'Blocks hub has manager and owner copy');
 assert(api.sectionLayoutFor('Sandwiches').tip === true, 'Sandwiches tip box defaults on');
 assert(/selection of sandwiches/i.test(api.sectionLayoutFor('Sandwiches').sell || ''),
   'Sandwiches default sell wording mentions selection');
+assert(/12\s*[–-]\s*2\.45/i.test(api.sectionLayoutFor('Sandwiches').note || ''),
+  'Main/Sunday Sandwiches default note keeps lunch hours');
+assert(/Ciabatta/i.test(api.sectionLayoutForMenu('sandwiches').Sandwiches.note || ''),
+  'Sandwiches card default note is the under-fillings spiel');
+assert(/Two Scoops of Ice-Cream/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].sell || ''),
+  'Little Bells card default sell is the ice cream block');
+assert(/half price of the adults/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].note || ''),
+  'Little Bells card default note is the Sunday foot line');
 assert(api.normalizeSectionLayout({ Sandwiches: { width: 'column', frame: true, tip: false, sell: 'Ask at the bar' } }).Sandwiches.tip === false,
   'normalize keeps tip off when explicitly false');
 assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') !== -1,
@@ -715,6 +740,10 @@ assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') 
 assert(printJs.indexOf('Tip box') !== -1 || printJs.indexOf('sandRule.tip') !== -1 ||
   printJs.indexOf('wantSandwiches') !== -1,
   'print honours tip when deciding sandwiches box');
+assert(/cardSandwichesInner\(dishes,\s*plan\)/.test(printJs),
+  'sandwich card spiel reads plan sectionLayout note');
+assert(printJs.indexOf('lbRule.sell') !== -1 && printJs.indexOf('sundayNote') !== -1,
+  'Little Bells card foot reads sell (ice cream) and note (Sunday)');
 assert(printJs.indexOf('startersInTop') !== -1 && printJs.indexOf('top-band-logo') !== -1,
   'starters sit beside logo spanning the top band');
 assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
@@ -1403,6 +1432,44 @@ var tipHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: 
 });
 assert(/Selection at the bar/.test(tipHtml), 'empty tip box prints sell wording');
 assert(/lunch hours/.test(tipHtml), 'empty tip box still shows note/hours');
+
+// Card menus: text outside dishes comes from sectionLayout note/sell (not hard-coded only).
+var sandCardDishes = [
+  api.dish('Sandwiches', 'Crayfish Marie Rose & Salad', '', '10.95', ''),
+  api.dish('Sandwiches', 'Falafel & Guacamole', 'flatbread', '8.95', 'vg')
+];
+var sandCardHtml = print.build(api.menuById('sandwiches'), sandCardDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    Sandwiches: {
+      note: 'EDITABLE CARD SPIEL\nAll served with Fries',
+      sell: 'Ask the team',
+      tip: true,
+      frame: true,
+      width: 'column'
+    }
+  })
+});
+assert(/EDITABLE CARD SPIEL/.test(sandCardHtml), 'sandwiches card prints editable note under fillings');
+assert(/All served with Fries/.test(sandCardHtml), 'sandwiches card note keeps line breaks as spiel');
+var kidsCardDishes = [
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Little Bells', 'Kids Mac & Cheese', '', '', '')
+];
+var kidsCardHtml = print.build(api.menuById('little-bells'), kidsCardDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      note: 'CUSTOM SUNDAY NOTE for Little Bells',
+      sell: 'Two Scoops of Ice-Cream\nVanilla only\n£8.00',
+      frame: true,
+      width: 'full'
+    }
+  })
+});
+assert(/CUSTOM SUNDAY NOTE for Little Bells/.test(kidsCardHtml),
+  'Little Bells card prints editable Sunday/foot note');
+assert(/Two Scoops of Ice-Cream/.test(kidsCardHtml) && /Vanilla only/.test(kidsCardHtml),
+  'Little Bells card prints editable ice cream sell lines');
+assert(/£8\.00/.test(kidsCardHtml), 'Little Bells card prints editable ice cream price');
 
 // Promo must not force over
 var crowdedDishes = aloneDishes.concat(api.composeDishes(book, 'main', { desserts: true, sandwiches: true, 'little-bells': true }).filter(function (d) {
