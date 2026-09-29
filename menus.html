@@ -1752,14 +1752,8 @@
           ? 'Width / frilly box rules for each section are below.'
           : 'Card menus use the wording fields below — layout is fixed on the A5 face.') +
         '</p></div>';
-      if (menu.kind === 'long') {
-        // Reuse Blocks step body (width/frame + notes) without the flow nav chrome.
-        var body = renderBlocksStep(menu, list);
-        html += String(body || '').replace(/<div class="flow-nav[\s\S]*?<\/div>/g, '');
-      } else {
-        html += renderOutsideTextEditors(menu, list);
-        html += '<p class="note no-print" style="margin:12px 0 0"><button type="button" class="soft" data-view-jump="edit">← Back to Edit &amp; generate</button></p>';
-      }
+      html += renderBlocksStep(menu, list, { noNav: true });
+      html += '<p class="note no-print" style="margin:12px 0 0"><button type="button" class="soft" data-view-jump="edit">← Back to Edit &amp; generate</button></p>';
       el.innerHTML = html;
       bindEditor();
     }
