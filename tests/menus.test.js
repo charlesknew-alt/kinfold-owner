@@ -715,6 +715,13 @@ assert(page.indexOf('data-view="blocks"') !== -1 && page.indexOf('renderBlocksHu
   'top-level Blocks & text view like Feature panels (manager + owner)');
 assert(page.indexOf('id="viewBlocks"') !== -1,
   'Blocks & text toggle button is always in the menus chrome');
+assert(!/staff-mode[\s\S]{0,200}#viewBlocks\s*\{[^}]*display:\s*none/.test(page) &&
+  page.indexOf('viewBlocks') !== -1 && page.indexOf('mode=staff') !== -1,
+  'Blocks & text is not hidden in staff/manager mode');
+assert(page.indexOf("viewMode === 'blocks'") !== -1 &&
+  page.indexOf('isStaffMode') !== -1 &&
+  /lede\.textContent = isStaffMode/.test(page),
+  'Blocks hub has manager and owner copy');
 assert(api.sectionLayoutFor('Sandwiches').tip === true, 'Sandwiches tip box defaults on');
 assert(/selection of sandwiches/i.test(api.sectionLayoutFor('Sandwiches').sell || ''),
   'Sandwiches default sell wording mentions selection');
