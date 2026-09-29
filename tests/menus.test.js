@@ -312,8 +312,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow120') !== -1, 'menus page cache-bust is flow120');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow120') !== -1, 'hub menus link cache-bust is flow120');
+assert(page.indexOf('flow121') !== -1, 'menus page cache-bust is flow121');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow121') !== -1, 'hub menus link cache-bust is flow121');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
@@ -1432,6 +1432,29 @@ var tipHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: 
 });
 assert(/Selection at the bar/.test(tipHtml), 'empty tip box prints sell wording');
 assert(/lunch hours/.test(tipHtml), 'empty tip box still shows note/hours');
+
+// Spin me a different layout — soft chrome variants on the preview toolbar
+assert(printJs.indexOf('spinLayout') !== -1 && printJs.indexOf('Spin me a different layout') !== -1,
+  'preview toolbar has Spin me a different layout');
+assert(printJs.indexOf('applySpinLayout_') !== -1 && printJs.indexOf('opts.spin') !== -1,
+  'planner accepts a spin seed for alternate chrome placement');
+assert(page.indexOf('EBMenusSpinLayout') !== -1,
+  'Menus host exposes EBMenusSpinLayout for the preview window');
+var spinBase = print.planFluidLayout(mainMenu, aloneDishes, { spin: 0 });
+var spinOne = print.planFluidLayout(mainMenu, aloneDishes, { spin: 1 });
+var spinTwo = print.planFluidLayout(mainMenu, aloneDishes, { spin: 2 });
+assert(spinOne.spin === 1 && spinOne.spinLabel, 'spin 1 tags the layout with a label');
+assert(spinTwo.spin === 2 && spinTwo.spinLabel, 'spin 2 tags a further variant');
+assert(
+  JSON.stringify(spinBase.p1) !== JSON.stringify(spinOne.p1) ||
+  JSON.stringify(spinBase.p2 || null) !== JSON.stringify(spinOne.p2 || null) ||
+  spinBase.forceFillClass !== spinOne.forceFillClass ||
+  (spinOne.fillers || []).some(function (f) { return /Spin/i.test(f); }),
+  'spin changes soft placement or density vs the default plan'
+);
+var spunHtml = print.build(mainMenu, aloneDishes, { spin: 1, sectionLayout: api.defaultSectionLayout() });
+assert(/Spin me a different layout/.test(spunHtml) && /id="spinLayout"/.test(spunHtml),
+  'built preview HTML includes the spin button');
 
 // Card menus: text outside dishes comes from sectionLayout note/sell (not hard-coded only).
 var sandCardDishes = [

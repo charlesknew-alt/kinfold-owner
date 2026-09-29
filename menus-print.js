@@ -1423,6 +1423,15 @@
       layout.fit = 'one';
     }
 
+    // Optional “Spin me a different layout” — flip soft placement choices that still fit.
+    applySpinLayout_(layout, bag, {
+      spin: opts.spin,
+      wantSandwiches: wantSandwiches,
+      sandDishCount: sandDishCount,
+      wantPromoBox: wantPromoBox,
+      promoLabel: promoLabel
+    });
+
     var bits = layout.fillers.length
       ? ' Auto-adds where they fit: ' + layout.fillers.join('; ') + '.'
       : ' Sheet is full — no room for extra selling boxes.';
@@ -1437,10 +1446,135 @@
       typeNote +
       ' Columns start and finish level (food first, then feature panels).' +
       (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
-      ' Layout from ' + bag.count + ' dishes.' + bits;
+      ' Layout from ' + bag.count + ' dishes.' + bits +
+      (layout.spinLabel ? ' Spin: ' + layout.spinLabel + '.' : '');
 
     layout.typeRange = TYPE_RANGE;
     layout.orderedDishes = dishes;
+    return layout;
+  }
+
+  /**
+   * Fun alternate layouts for the preview “Spin me a different layout” button.
+   * Only flips soft chrome (Sides / Sandwiches / promos / logo / roasts) — never
+   * drops food or forces an over-capacity sheet.
+   */
+  function applySpinLayout_(layout, bag, opts) {
+    opts = opts || {};
+    var spin = parseInt(opts.spin, 10) || 0;
+    if (!spin || !layout || layout.fit === 'over') return layout;
+    var moves = [];
+    var p1 = layout.p1 || {};
+    var p2 = layout.p2;
+
+    if (layout.pages === 2 && p2 && bag.sides) {
+      moves.push({
+        label: 'Sides on the other page',
+        run: function () {
+          if (p1.sidesOnP1 && !p2.sidesOnP2) {
+            p1.sidesOnP1 = false;
+            p2.sidesOnP2 = true;
+          } else if (!p1.sidesOnP1 && p2.sidesOnP2) {
+            p1.sidesOnP1 = true;
+            p2.sidesOnP2 = false;
+          } else {
+            p1.sidesOnP1 = !p1.sidesOnP1;
+            p2.sidesOnP2 = !p1.sidesOnP1;
+          }
+        }
+      });
+    }
+    if (layout.pages === 2 && p2 && opts.wantSandwiches) {
+      moves.push({
+        label: 'Sandwiches on the other page',
+        run: function () {
+          if (p1.sandwiches && !p2.sandwiches) {
+            p1.sandwiches = false;
+            p2.sandwiches = true;
+          } else if (!p1.sandwiches && p2.sandwiches) {
+            p1.sandwiches = true;
+            p2.sandwiches = false;
+          } else if (!p1.sandwiches && !p2.sandwiches) {
+            p2.sandwiches = true;
+          } else {
+            // Both somehow on — keep quieter page-2 preference
+            p1.sandwiches = false;
+            p2.sandwiches = true;
+          }
+        }
+      });
+    }
+    if (opts.wantPromoBox) {
+      moves.push({
+        label: 'Feature panels on the other page',
+        run: function () {
+          if (layout.pages === 2 && p2) {
+            if (p1.rooms && !p2.rooms) {
+              p1.rooms = false;
+              p2.rooms = true;
+            } else if (!p1.rooms && p2.rooms) {
+              p1.rooms = true;
+              p2.rooms = false;
+            } else if (!p1.rooms && !p2.rooms) {
+              p1.rooms = true;
+            } else {
+              p1.rooms = !p1.rooms;
+              p2.rooms = !p1.rooms;
+            }
+          } else {
+            p1.rooms = !p1.rooms;
+          }
+        }
+      });
+    }
+    if (layout.pages === 2 && p2) {
+      moves.push({
+        label: p2.footLogo ? 'Drop page-2 logo' : 'Add page-2 logo',
+        run: function () { p2.footLogo = !p2.footLogo; }
+      });
+      moves.push({
+        label: p1.footPromos ? 'Quieter page-1 foot' : 'Busier page-1 foot',
+        run: function () {
+          p1.footPromos = !p1.footPromos;
+          p2.footPromos = !p2.footPromos;
+        }
+      });
+    } else {
+      moves.push({
+        label: p1.footLogo ? 'Drop foot logo' : 'Add foot logo',
+        run: function () { p1.footLogo = !p1.footLogo; }
+      });
+    }
+    if (bag.sundayRoasts && layout.pages === 2 && p2) {
+      moves.push({
+        label: p1.sundayRoasts ? 'Roasts on page 2' : 'Roasts on page 1',
+        run: function () { p1.sundayRoasts = !p1.sundayRoasts; }
+      });
+    }
+    // Density nudge — preview fitPages still tightens if needed.
+    var dens = ['airy', 'roomy', 'normal', 'tight'];
+    moves.push({
+      label: 'Type density ' + dens[spin % dens.length],
+      run: function () {
+        layout.forceFillClass = 'fill-' + dens[spin % dens.length];
+      }
+    });
+
+    if (!moves.length) {
+      layout.spinLabel = 'no alternate chrome to flip';
+      layout.spin = spin;
+      return layout;
+    }
+    var pick = moves[(spin - 1) % moves.length];
+    // Also apply a second move for larger spins so consecutive clicks feel fresh.
+    var pick2 = moves[spin % moves.length];
+    try { pick.run(); } catch (e0) {}
+    if (spin > 1 && pick2 && pick2 !== pick) {
+      try { pick2.run(); } catch (e1) {}
+    }
+    layout.spin = spin;
+    layout.spinLabel = pick.label + (spin > 1 && pick2 && pick2 !== pick ? ' + ' + pick2.label : '');
+    layout.fillers = (layout.fillers || []).concat(['Spin · ' + layout.spinLabel]);
     return layout;
   }
 
@@ -2345,6 +2479,8 @@
       '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
+      '.toolbar button.spin{background:#DFC2AF;color:#1c1610}' +
+      '.toolbar button.spin:disabled{opacity:.55;cursor:wait}' +
       '.toolbar label.paper-opt{display:inline-flex;align-items:center;gap:6px;background:#3a342c;color:#f4eae3}' +
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
@@ -2704,18 +2840,26 @@
     else if (plan.defaultPaper === 'a5') defaultPaper = 'a5';
     var bodyClass = 'paper-' + defaultPaper;
     var layout = null;
+    var spinN = parseInt(plan.spin, 10) || 0;
     if (menu.kind === 'long') {
       layout = planFluidLayout(menu, dishes, {
         promos: plan.promos || [],
-        sectionLayout: plan.sectionLayout
+        sectionLayout: plan.sectionLayout,
+        spin: spinN
       });
       plan.layout = layout;
       plan.fit = layout.fit;
       plan.text = layout.summary;
+      if (layout.forceFillClass) plan.forceFillClass = layout.forceFillClass;
       if (!plan.promos) plan.promos = layout.promos || [];
       if (!plan.sectionLayout && root.EBMenus && root.EBMenus.defaultSectionLayout) {
         plan.sectionLayout = root.EBMenus.defaultSectionLayout();
       }
+    } else if (spinN > 0) {
+      // Card / party: spin nudges starting type density (fitPages still tightens if needed).
+      var densCard = ['airy', 'roomy', 'normal', 'tight'];
+      plan.forceFillClass = 'fill-' + densCard[spinN % densCard.length];
+      plan.spinLabel = 'type density ' + densCard[spinN % densCard.length];
     }
     var body;
     if (landscape) {
@@ -2749,6 +2893,7 @@
       '<div class="toolbar" id="previewToolbar">' +
         '<button type="button" id="saveToMenus">Save</button>' +
         '<button type="button" id="discardPreview">Discard</button>' +
+        '<button type="button" class="spin" id="spinLayout" title="Try another arrangement of sides, sandwiches, panels and logo">Spin me a different layout</button>' +
         (landscape ? '<span class="hint">Card menu — two identical copies on landscape A4 for the guillotine.</span>' :
           '<label class="paper-opt"><input type="radio" name="paper" value="a4"' +
             (defaultPaper === 'a4' ? ' checked' : '') +
@@ -2757,7 +2902,11 @@
             (defaultPaper === 'a5' ? ' checked' : '') +
             ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint" id="printHint">' + esc(dateHint) +
-        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.</span>' +
+        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.' +
+        (plan && ((plan.layout && plan.layout.spinLabel) || plan.spinLabel)
+          ? ' · Spin: ' + esc((plan.layout && plan.layout.spinLabel) || plan.spinLabel)
+          : '') +
+        '</span>' +
       '</div>' +
       a4Stack + a5Stack +
       '<script>(function(){' +
@@ -2978,6 +3127,19 @@
         '}' +
         'var db=document.getElementById("discardPreview");' +
         'if(db){db.onclick=function(){window.close();};}' +
+        // Fun alternate arrangement — parent Menus tab re-plans and rewrites this preview.
+        'var spinBtn=document.getElementById("spinLayout");' +
+        'if(spinBtn){spinBtn.onclick=function(){' +
+          'if(!window.opener||typeof window.opener.EBMenusSpinLayout!=="function"){' +
+            'alert("Keep the Menus tab open, then try Spin again.");return;}' +
+          'spinBtn.disabled=true;spinBtn.textContent="Spinning…";' +
+          'try{' +
+            'var ok=window.opener.EBMenusSpinLayout(window);' +
+            'if(!ok){spinBtn.disabled=false;spinBtn.textContent="Spin me a different layout";' +
+              'alert("Could not spin this layout. Generate the menu again from Menus.");}' +
+          '}catch(spinErr){spinBtn.disabled=false;spinBtn.textContent="Spin me a different layout";' +
+            'alert("Could not spin this layout. Try Generate again.");}' +
+        '};}' +
         // Stamp Roman, save into Print history, return parent to history, close preview.
         'var sb=document.getElementById("saveToMenus");' +
         'if(sb){sb.onclick=function(){' +
@@ -2986,6 +3148,7 @@
           'var api=window.opener.EBMenuPrint;' +
           'sb.disabled=true;sb.textContent="Saving…";' +
           'var disc=document.getElementById("discardPreview");if(disc)disc.disabled=true;' +
+          'var spinOff=document.getElementById("spinLayout");if(spinOff)spinOff.disabled=true;' +
           'var ver=api.commitPrintVersion(SAVE_META.menuId);' +
           'if(SAVE_META.hideDate)ver.hideDate=true;' +
           '[].forEach.call(document.querySelectorAll(".tracker .roman"),function(el){el.textContent=ver.roman;});' +

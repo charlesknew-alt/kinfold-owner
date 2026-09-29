@@ -393,9 +393,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow120"></script>
-  <script src="menus-print.js?v=20260928-flow120"></script>
-  <script src="menus-ingest.js?v=20260928-flow120"></script>
+  <script src="menus.js?v=20260928-flow121"></script>
+  <script src="menus-print.js?v=20260928-flow121"></script>
+  <script src="menus-ingest.js?v=20260928-flow121"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -439,6 +439,73 @@
     var cloudPushTimer = null;
     var cloudSyncNote = '';
     var cloudPullDone = false;
+
+    // Last Generate preview — Spin me a different layout rewrites that window.
+    var lastPreviewCtx = null;
+
+    /**
+     * Preview toolbar “Spin me a different layout” — re-plan soft chrome
+     * (Sides / Sandwiches / panels / logo) and rebuild the open preview sheet.
+     */
+    window.EBMenusSpinLayout = function (previewWin) {
+      if (!lastPreviewCtx || !previewWin || previewWin.closed) return false;
+      if (!window.EBMenuPrint || typeof EBMenuPrint.build !== 'function') return false;
+      var ctx = lastPreviewCtx;
+      ctx.spin = (ctx.spin || 0) + 1;
+      var plan = {};
+      Object.keys(ctx.plan || {}).forEach(function (k) { plan[k] = ctx.plan[k]; });
+      plan.spin = ctx.spin;
+      // Drop a prior forced layout so planFluidLayout can apply the new spin.
+      delete plan.layout;
+      if (ctx.menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
+        var spun = EBMenuPrint.planFluidLayout(ctx.menu, ctx.dishes, {
+          promos: plan.promos || [],
+          sectionLayout: plan.sectionLayout,
+          spin: ctx.spin
+        });
+        if (spun && spun.fit === 'over') {
+          // Skip illegal spins — try the next variant once.
+          ctx.spin += 1;
+          plan.spin = ctx.spin;
+          spun = EBMenuPrint.planFluidLayout(ctx.menu, ctx.dishes, {
+            promos: plan.promos || [],
+            sectionLayout: plan.sectionLayout,
+            spin: ctx.spin
+          });
+        }
+        if (!spun || spun.fit === 'over') return false;
+        plan.layout = spun;
+        plan.fit = spun.fit;
+        plan.text = spun.summary;
+        if (spun.forceFillClass) plan.forceFillClass = spun.forceFillClass;
+        // Light local column fill so spun sheets still balance without waiting on Gemini.
+        if (EBMenuPrint.measureOppositeColumns) {
+          var cols = EBMenuPrint.measureOppositeColumns(ctx.menu, ctx.dishes, {
+            layout: spun,
+            sectionLayout: plan.sectionLayout,
+            promos: plan.promos || []
+          });
+          function pageFill(p) {
+            if (!p || p.shorter === 'even') return { shorter: 'even', panels: 0 };
+            return { shorter: p.shorter, panels: Math.abs(p.gap || 0) > 9 ? 2 : 1 };
+          }
+          plan.forceColumnFill = {
+            page1: pageFill(cols.page1),
+            page2: pageFill(cols.page2)
+          };
+        }
+      }
+      ctx.plan = plan;
+      var html = EBMenuPrint.build(ctx.menu, ctx.dishes, plan);
+      try {
+        previewWin.document.open();
+        previewWin.document.write(html);
+        previewWin.document.close();
+      } catch (e) {
+        return false;
+      }
+      return true;
+    };
 
     // Preview Save → stamp history, then jump here so staff can Print PDF / Email.
     window.EBMenusOnPrintSaved = function () {
@@ -1799,9 +1866,9 @@
     function renderGenerateStep(menu) {
       var html = '';
       if (isStaffMode) {
-        html += '<p class="step-lede">Check the plan, then generate. On the preview: <strong>Save</strong> stamps Print history (then opens it), or <strong>Discard</strong> to keep editing. Print PDF and Email from history.</p>';
+        html += '<p class="step-lede">Check the plan, then generate. On the preview: <strong>Save</strong> stamps Print history, <strong>Spin me a different layout</strong> tries another arrangement, or <strong>Discard</strong> to keep editing. Print PDF and Email from history.</p>';
       } else {
-        html += '<p class="step-lede">Check the plan, then generate. Preview is Save or Discard only — Save stamps the week / Roman into <strong>Print history</strong> and takes you there to Print PDF or Email. Discard closes the preview so you can edit.</p>';
+        html += '<p class="step-lede">Check the plan, then generate. Preview: <strong>Save</strong> stamps Print history, <strong>Spin me a different layout</strong> tries another arrangement, or <strong>Discard</strong> to edit. Print PDF and Email from history.</p>';
       }
       html += '<div id="preview">' + renderPlanHtml() + '</div>';
       html += '<div class="generate-bar no-print" style="position:static;margin:12px 0 0;border-radius:12px;border:1px solid var(--line)"><div class="bar-inner">';
@@ -3421,11 +3488,17 @@
           result.plan.meta.coursePrices = result.plan.meta.coursePrices || '2 courses £32.95 · 3 courses £39.95';
         }
         if (result.plan.meta.paper === 'a5') result.plan.defaultPaper = 'a5';
+        lastPreviewCtx = {
+          menu: menu,
+          dishes: result.dishes,
+          plan: result.plan,
+          spin: 0
+        };
         w.document.open();
         var html = EBMenuPrint.build(menu, result.dishes, result.plan);
         w.document.write(html);
         w.document.close();
-        // Preview is Save or Discard only. Save stamps history and returns here.
+        // Preview: Save, Discard, or Spin me a different layout.
       }
 
       var i = 0;
