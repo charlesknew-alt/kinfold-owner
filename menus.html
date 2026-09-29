@@ -263,6 +263,11 @@
     #preview .plan-empty { padding: 16px 14px; color: var(--ink-soft); font-size: 13px; }
     .include-box { background: var(--paint-wash); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
     .include-box h3 { font-family: var(--serif); font-weight: 500; font-size: 17px; margin-bottom: 6px; }
+    .outside-text-box {
+      border: 1px solid var(--paint-deep);
+      background: linear-gradient(180deg, #fff 0%, var(--paint-wash) 100%);
+    }
+    .outside-text-box > h3 { font-size: 20px; margin-bottom: 8px; }
     .include-row { display: flex; flex-wrap: wrap; gap: 10px 14px; }
     .include-row label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
     .complete-head {
@@ -378,6 +383,7 @@
     </script>
     <div class="view-toggle no-print" id="viewToggle" role="tablist" aria-label="Menus view">
       <button type="button" class="soft on" data-view="edit" id="viewEdit">Edit &amp; generate</button>
+      <button type="button" class="soft" data-view="blocks" id="viewBlocks">Blocks &amp; text</button>
       <button type="button" class="soft" data-view="panels" id="viewPanels">Feature panels</button>
       <button type="button" class="soft" data-view="catalogue" id="viewCatalogue">All dishes</button>
       <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
@@ -387,9 +393,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow119"></script>
-  <script src="menus-print.js?v=20260928-flow119"></script>
-  <script src="menus-ingest.js?v=20260928-flow119"></script>
+  <script src="menus.js?v=20260928-flow120"></script>
+  <script src="menus-print.js?v=20260928-flow120"></script>
+  <script src="menus-ingest.js?v=20260928-flow120"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -736,6 +742,7 @@
       if (viewMode === 'history') renderHistory();
       else if (viewMode === 'catalogue') renderCatalogue();
       else if (viewMode === 'panels') renderFeaturePanels();
+      else if (viewMode === 'blocks') renderBlocksHub();
       else render();
     }
 
@@ -744,7 +751,7 @@
       cloudSyncNote = 'Syncing shared menus…';
       cloudPullDone = false;
       var ed = document.getElementById('editor');
-      if (ed && (viewMode === 'edit' || viewMode === 'panels' || viewMode === 'history')) {
+      if (ed && (viewMode === 'edit' || viewMode === 'blocks' || viewMode === 'panels' || viewMode === 'history')) {
         ed.innerHTML = '<p class="note">Syncing shared menus and print history…</p>';
       }
       return pullMenusFromCloud().then(function (pulled) {
@@ -803,6 +810,17 @@
       document.querySelectorAll('#viewToggle [data-view]').forEach(function (b) {
         b.classList.toggle('on', b.getAttribute('data-view') === viewMode);
       });
+      if (viewMode === 'blocks') {
+        if (lede) {
+          lede.textContent = isStaffMode
+            ? 'Hours, “served with…”, ice cream and other wording around the dishes — same editors for the floor and the owner page. Pick a menu below.'
+            : 'Layout rules and text outside dishes for the selected menu — hours, ice cream, sandwich spiel, Specials board notes. Same place for owner and manager.';
+        }
+        if (picker) picker.style.display = '';
+        renderPicker();
+        renderBlocksHub();
+        return;
+      }
       if (viewMode === 'panels') {
         if (lede) {
           lede.textContent = 'Shared feature panels for every menu — Stay a While, pub quizzes, events. Edit once here; tick which lines print on each menu under Wording.';
@@ -1317,7 +1335,7 @@
 
       if (!isStaffMode) {
         // —— 2. Blocks (section layout) ——
-        html += flowStepShell(2, 'Blocks', 'How sections sit on the sheet',
+        html += flowStepShell(2, 'Blocks', 'Layout & text outside dishes',
           blockSummary(menu),
           renderBlocksStep(menu, list));
 
@@ -1379,7 +1397,7 @@
     }
 
     function blockSummary(menu) {
-      if (menu.kind !== 'long') return 'Card menus use a fixed card layout';
+      if (menu.kind !== 'long') return 'Card wording — text under / around the dishes';
       var custom = 0;
       var defaults = EBMenus.defaultSectionLayout();
       var rules = layoutFor(menu.id || menuId);
@@ -1453,24 +1471,6 @@
       return flowNav(prev, next, nextLabel, 'top') + (innerHtml || '') + flowNav(prev, next, nextLabel, 'bottom');
     }
 
-    function renderStaffSpecialsNote(list) {
-      var defaultsSp = EBMenus.defaultSectionLayout();
-      var noteSecs = EBMenus.SPECIALS_SECTIONS || ['Special Starters', 'Special Mains', 'Special Desserts'];
-      var specialsRules = layoutFor('specials');
-      var html = '<div class="include-box" style="margin-bottom:14px"><h3>Specials board note</h3>';
-      html += '<p class="note" style="margin:0 0 10px">Line under the Specials title in the frilly box. Clear for none. Same wording when Specials are ticked onto Main / Sunday.</p>';
-      noteSecs.forEach(function (sec) {
-        var ruleSp = specialsRules[sec] || defaultsSp[sec] || { note: '' };
-        var nIn = (list || []).filter(function (d) { return d.section === sec; }).length;
-        html += '<label class="field">' + escapeAttr(sec) +
-          (nIn ? ' · ' + nIn + ' dish' + (nIn === 1 ? '' : 'es') : '') + '</label>';
-        html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
-          escapeAttr(ruleSp.note || '') + '</textarea>';
-      });
-      html += '</div>';
-      return html;
-    }
-
     function renderDishesStep(menu, list) {
       var html = '';
       if (isStaffMode) {
@@ -1493,8 +1493,13 @@
         html += '</div></div>';
       }
 
-      if (isStaffMode && menu.id === 'specials') {
-        html += renderStaffSpecialsNote(list);
+      // Card menus + staff (no Blocks step): edit spiel / ice cream / notes here.
+      // Staff Specials board notes live in the same “Text outside dishes” box.
+      if (menu.kind !== 'long' || isStaffMode) {
+        html += renderOutsideTextEditors(menu, list, { compact: menu.kind === 'long' });
+      } else {
+        html += '<p class="note no-print" style="margin:0 0 12px">Hours, ice cream, “served with…” and other <strong>text outside dishes</strong> → ' +
+          '<button type="button" class="link" data-view-jump="blocks">Blocks &amp; text</button> (top) or next step <strong>Blocks</strong>.</p>';
       }
 
       if (mode === 'paste') {
@@ -1523,32 +1528,112 @@
       return withFlowNav(html, null, 2, 'Next · Blocks');
     }
 
-    function renderBlocksStep(menu, list) {
+    /**
+     * Editors for wording that prints outside the dish list (card spiel,
+     * Little Bells ice cream / Sunday note, Specials board line, section notes).
+     */
+    function renderOutsideTextEditors(menu, list, opts) {
+      opts = opts || {};
+      var defaults = EBMenus.defaultSectionLayout();
+      var menuRules = layoutFor(menuId);
+      var html = '';
+      html += '<div class="include-box outside-text-box" style="margin-bottom:14px">';
+      html += '<h3>Text outside dishes</h3>';
+      html += '<p class="note" style="margin:0 0 12px">Hours, “served with…”, ice cream, Sunday notes — anything that prints around the dishes, not as a dish row.</p>';
+
+      if (menu.id === 'specials') {
+        var noteSecs = EBMenus.SPECIALS_SECTIONS || ['Special Starters', 'Special Mains', 'Special Desserts'];
+        noteSecs.forEach(function (sec) {
+          var ruleSp = menuRules[sec] || defaults[sec] || { note: '' };
+          html += '<label class="field">' + escapeAttr(sec) + ' — under the title</label>';
+          html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
+            escapeAttr(ruleSp.note || '') + '</textarea>';
+        });
+        html += '<p class="note" style="margin:8px 0 0">Shows in the Specials frilly box. Same note when Specials are ticked onto Main / Sunday.</p>';
+        html += '</div>';
+        return html;
+      }
+
+      if (menu.id === 'sandwiches') {
+        var sand = menuRules.Sandwiches || defaults.Sandwiches || { note: '', sell: '', tip: true };
+        html += '<label class="field">Under the fillings (card)</label>';
+        html += '<textarea data-layout-note="Sandwiches" rows="3" placeholder="Served on either Ciabatta…">' +
+          escapeAttr(sand.note || '') + '</textarea>';
+        html += '<p class="note" style="margin:6px 0 10px">Prints under the sandwich list on the Sandwiches card.</p>';
+        html += '<label class="field">Tip / selling box (Main &amp; Sunday when empty)</label>';
+        html += '<textarea data-layout-sell="Sandwiches" rows="3" placeholder="A selection of sandwiches is available…">' +
+          escapeAttr(sand.sell || '') + '</textarea>';
+        html += '<p class="note" style="margin:6px 0 0">Used when Tip box is on and there are no fillings listed on Main / Sunday.</p>';
+        html += '</div>';
+        return html;
+      }
+
+      if (menu.id === 'little-bells') {
+        var lb = menuRules['Little Bells'] || defaults['Little Bells'] || { note: '', sell: '' };
+        html += '<label class="field">Ice cream / extras under the dishes</label>';
+        html += '<textarea data-layout-sell="Little Bells" rows="3" placeholder="Two Scoops of Ice-Cream&#10;Flavours…&#10;£9.50">' +
+          escapeAttr(lb.sell || '') + '</textarea>';
+        html += '<p class="note" style="margin:6px 0 10px">First line = title, middle = flavours, last line starting with £ = price.</p>';
+        html += '<label class="field">Sunday / foot note</label>';
+        html += '<textarea data-layout-note="Little Bells" rows="3" placeholder="Little Bells on Sunday…">' +
+          escapeAttr(lb.note || '') + '</textarea>';
+        html += '<p class="note" style="margin:6px 0 0">Prints under the ice cream block on the Little Bells card (and as Extra info when Little Bells is on Main / Sunday).</p>';
+        html += '</div>';
+        return html;
+      }
+
+      if (menu.id === 'desserts' || menu.id === 'lunch-club') {
+        var secName = menu.id === 'desserts' ? 'Desserts' : 'Mains';
+        var rule = menuRules[secName] || defaults[secName] || { note: '' };
+        html += '<label class="field">Note under the title</label>';
+        html += '<textarea data-layout-note="' + escapeAttr(secName) + '" rows="2" placeholder="Optional line above the dishes">' +
+          escapeAttr(rule.note || '') + '</textarea>';
+        html += '<p class="note" style="margin:6px 0 0">Optional. Leave blank for no extra line on the card.</p>';
+        html += '</div>';
+        return html;
+      }
+
+      // Main / Sunday — call out Sandwiches + Little Bells wording specifically.
+      ['Sandwiches', 'Little Bells'].forEach(function (sec) {
+        var rule = menuRules[sec] || defaults[sec] || { note: '', sell: '', tip: false };
+        var nIn = (list || []).filter(function (d) {
+          return (d.section || '') === sec || (sec === 'Sandwiches' && /sandwich/i.test(d.section || ''));
+        }).length;
+        html += '<div class="section-block" style="margin-bottom:12px">';
+        html += '<div class="section-block-head"><div class="title">' + escapeAttr(sec) + '</div>';
+        html += '<div class="meta"><span class="chip">' + nIn + ' on this sheet</span></div></div>';
+        html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
+        if (sec === 'Little Bells') {
+          html += '<label class="field">Ice cream / extras (card + sheet)</label>';
+          html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="3">' +
+            escapeAttr(rule.sell || '') + '</textarea>';
+          html += '<label class="field" style="margin-top:10px">Sunday / foot note</label>';
+        } else {
+          html += '<label class="field">Under title / card spiel</label>';
+        }
+        html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="3">' +
+          escapeAttr(rule.note || '') + '</textarea>';
+        if (sec === 'Sandwiches') {
+          html += '<label class="field" style="margin-top:10px">Tip box selling words</label>';
+          html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2">' +
+            escapeAttr(rule.sell || '') + '</textarea>';
+        }
+        html += '</div></div>';
+      });
+      if (opts.compact) {
+        html += '<p class="note" style="margin:0">More section notes (Starters, Roasts…) are in <strong>Blocks</strong>.</p>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderBlocksStep(menu, list, opts) {
+      opts = opts || {};
       var html = '';
       if (menu.kind !== 'long') {
-        // Specials card: edit the board note here (prints in the frilly box; also used on Main).
-        if (menu.id === 'specials') {
-          html += '<p class="step-lede">Wording under the <strong>Specials</strong> title in the frilly box. Clear it if you want no line. Same note is used when Specials are ticked onto Main / Sunday.</p>';
-          var defaultsSp = EBMenus.defaultSectionLayout();
-          var noteSecs = EBMenus.SPECIALS_SECTIONS || ['Special Starters', 'Special Mains', 'Special Desserts'];
-          html += '<div class="block-cards">';
-          noteSecs.forEach(function (sec) {
-            var ruleSp = layoutFor(menuId)[sec] || defaultsSp[sec] || { note: '', frame: true };
-            var nIn = (list || []).filter(function (d) { return d.section === sec; }).length;
-            html += '<div class="section-block">';
-            html += '<div class="section-block-head"><div class="title">' + escapeAttr(sec) + '</div>';
-            html += '<div class="meta"><span class="chip">' + nIn + ' dish' + (nIn === 1 ? '' : 'es') + '</span></div></div>';
-            html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
-            html += '<label class="field">Extra info under the title</label>';
-            html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
-              escapeAttr(ruleSp.note || '') + '</textarea>';
-            html += '<p class="note" style="margin:6px 0 0">Shows in the Specials frilly box above the dishes. Leave blank for no line.</p>';
-            html += '</div></div>';
-          });
-          html += '</div>';
-          return withFlowNav(html, 1, 3, 'Next · Wording');
-        }
-        html += '<p class="step-lede">Sandwich / dessert / card menus print on a fixed card. Layout rules apply to Main and Sunday sheets.</p>';
+        html += '<p class="step-lede">Edit the wording that prints <strong>outside the dish list</strong> on this card.</p>';
+        html += renderOutsideTextEditors(menu, list);
+        if (opts.noNav) return html;
         return withFlowNav(html, 1, 3, 'Next · Wording');
       }
       html += '<p class="step-lede">Rules for <strong>this menu only</strong> — Main, Sunday and the others each keep their own. <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit for this page (AI chooses)</strong> lets layout pick. Frilly box = scalloped frame.</p>';
@@ -1597,9 +1682,14 @@
           html += '<option value="yes"' + (rule.frame ? ' selected' : '') + '>Yes</option>';
           html += '<option value="no"' + (!rule.frame ? ' selected' : '') + '>No</option>';
           html += '</select></div></div>';
-          html += '<label class="field">Extra info under the title</label>';
+          html += '<label class="field">Text outside dishes (under the title)</label>';
           html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="Hours, “all served with…”, etc. Shows above the dishes in the box.">' +
             escapeAttr(rule.note || '') + '</textarea>';
+          if (sec === 'Little Bells') {
+            html += '<label class="field" style="margin-top:10px">Ice cream / extras (Little Bells card)</label>';
+            html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="3" placeholder="Two Scoops of Ice-Cream…">' +
+              escapeAttr(rule.sell || '') + '</textarea>';
+          }
           if (sec === 'Sandwiches') {
             html += '<div class="layout-row" style="grid-template-columns:1fr 1fr;border:0;padding:10px 0 0;margin-top:8px">';
             html += '<div><label class="field" style="margin-top:0">Tip box (no fillings)</label>';
@@ -1607,7 +1697,7 @@
             html += '<option value="yes"' + (rule.tip ? ' selected' : '') + '>Yes — show selling words</option>';
             html += '<option value="no"' + (!rule.tip ? ' selected' : '') + '>No — omit when empty</option>';
             html += '</select></div>';
-            html += '<div><label class="field" style="margin-top:0">Selling content</label>';
+            html += '<div><label class="field" style="margin-top:0">Tip box selling words</label>';
             html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2" placeholder="A selection of sandwiches is available…">' +
               escapeAttr(rule.sell || '') + '</textarea></div></div>';
             html += '<p class="note" style="margin:6px 0 0">When Sandwiches has 0 dishes, Tip puts a selling box on Main / Sunday so guests still see sandwiches are available.</p>';
@@ -1618,6 +1708,7 @@
       });
       html += '</div>';
       html += '<div class="toolbar-row"><button type="button" class="link" id="doResetLayout">Reset this menu’s blocks to defaults</button></div>';
+      if (opts.noNav) return html;
       return withFlowNav(html, 1, 3, 'Next · Wording');
     }
 
@@ -1640,6 +1731,35 @@
         'On each menu’s <strong>Wording</strong> step, tick which lines print on that sheet.</p>';
       html += '</div>';
       html += renderWordingBank();
+      el.innerHTML = html;
+      bindEditor();
+    }
+
+    /**
+     * Top-level hub (like Feature panels) so manager + owner can always find
+     * text outside dishes / Blocks without digging through the Generate flow.
+     */
+    function renderBlocksHub() {
+      var el = document.getElementById('editor');
+      var menu = EBMenus.menuById(menuId);
+      var list = dishes();
+      var html = '';
+      html += '<div class="include-box" style="margin-bottom:14px">';
+      html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px">Blocks &amp; text outside dishes</h3>';
+      html += '<p class="note" style="margin:0">Editing <strong>' + escapeAttr(menu.name) + '</strong>. ' +
+        'Change hours, “served with…”, ice cream, sandwich spiel and Specials board notes here. ' +
+        (menu.kind === 'long'
+          ? 'Width / frilly box rules for each section are below.'
+          : 'Card menus use the wording fields below — layout is fixed on the A5 face.') +
+        '</p></div>';
+      if (menu.kind === 'long') {
+        // Reuse Blocks step body (width/frame + notes) without the flow nav chrome.
+        var body = renderBlocksStep(menu, list);
+        html += String(body || '').replace(/<div class="flow-nav[\s\S]*?<\/div>/g, '');
+      } else {
+        html += renderOutsideTextEditors(menu, list);
+        html += '<p class="note no-print" style="margin:12px 0 0"><button type="button" class="soft" data-view-jump="edit">← Back to Edit &amp; generate</button></p>';
+      }
       el.innerHTML = html;
       bindEditor();
     }
@@ -2235,11 +2355,12 @@
         };
       });
       function persistLayoutFromDom() {
-        // Staff Specials note editor only shows Special* textareas — merge onto that menu.
+        // Note/sell editors bind to the open menu. Specials board notes stay on Specials
+        // even when only textareas are shown (no width/frame controls).
         var targetId = menuId;
         var onlyNotes = !document.querySelector('[data-layout-width]') &&
           !!document.querySelector('[data-layout-note]');
-        if (onlyNotes && (menuId === 'specials' || isStaffMode)) targetId = 'specials';
+        if (onlyNotes && menuId === 'specials') targetId = 'specials';
         var next = EBMenus.normalizeSectionLayout(layoutFor(targetId));
         EBMenus.SECTIONS.forEach(function (sec) {
           var w = document.querySelector('[data-layout-width="' + sec + '"]');
