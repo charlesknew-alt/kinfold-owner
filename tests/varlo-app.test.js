@@ -21,12 +21,13 @@ function extract(name) {
   return m ? m[1] : '';
 }
 
-var ebHub = extract('eightbells');
-var wmHub = extract('windmill');
+var ebHub = extract('hub-eightbells');
+var wmHub = extract('hub-windmill');
 var ebPaper = extract('paperwork-eightbells');
 var wmPaper = extract('paperwork-windmill');
 var card = extract('cardtakings-eightbells');
 var cardWm = extract('cardtakings-windmill');
+var gift = extract('giftcards-eightbells');
 
 assert(ebHub.indexOf('/exec') !== -1 && ebHub.indexOf('page=') === -1, 'EB manager hub has no page=');
 assert(wmHub.indexOf('/exec') !== -1 && wmHub.indexOf('page=') === -1, 'WM manager hub has no page=');
@@ -57,10 +58,23 @@ assert(html.indexOf('function withOwnerShell') !== -1, 'owner iframe helper kept
 assert(html.indexOf('function stripOwnerShell') !== -1, 'manager iframe strips shell=owner');
 assert(html.indexOf('function withStaffMenus') !== -1 && html.indexOf('mode=staff') !== -1,
   'Eight Bells manager Menus get mode=staff');
-assert(html.indexOf("menusFab") !== -1 && html.indexOf("openApp('menus-eightbells'") !== -1,
-  'Eight Bells manager has Menus FAB');
+assert(html.indexOf('id="managerHomeEb"') !== -1 && html.indexOf('id="managerHomeWm"') !== -1,
+  'manager home tile menus exist for both pubs');
+assert(html.indexOf("openApp('hub-eightbells'") !== -1 && html.indexOf("openApp('menus-eightbells'") !== -1,
+  'Eight Bells manager home opens paperwork hub and Menus');
+assert(html.indexOf("openApp('giftcards-eightbells'") !== -1, 'Eight Bells manager home has Gift cards tile');
+assert(gift.indexOf('eightbellsbolney.com/staff/vouchers') !== -1,
+  'Gift cards opens the pub-site staff vouchers login');
+assert(html.indexOf('VOUCHER_STAFF_PASSWORD') !== -1 && html.indexOf('not in git') !== -1,
+  'Gift cards notes password stays in Vercel, not git');
+assert(!/VOUCHER_STAFF_PASSWORD\s*[:=]\s*['"][^'"]+['"]/.test(html),
+  'Gift cards password value is not stored in the page');
+assert(html.indexOf('MANAGER_APPS') !== -1, 'manager apps are allowlisted');
+assert(html.indexOf('menusFab') === -1 && html.indexOf('roomsFab') === -1,
+  'manager FABs removed in favour of home tiles');
 assert(html.indexOf('openOwnerReview') === -1, 'does not touch openOwnerReview');
-assert(!/Owner tools|owner paperwork|page=owner/.test(html.match(/id="managerView"[\s\S]*id="roomsFab"/)[0]), 'manager chrome has no owner-paperwork link');
+assert(html.indexOf('id="managerView"') !== -1 && html.indexOf('Gift cards') !== -1,
+  'manager chrome includes Gift cards on the landing');
 
 assert(html.indexOf('#1c1610') !== -1 && html.indexOf('#f6f0e6') !== -1, 'Varlo ink + cream tokens');
 assert(html.indexOf('#b68a3a') !== -1 && html.indexOf('#24362c') !== -1, 'Varlo brass + forest tokens');
@@ -78,6 +92,13 @@ assert(auth.indexOf('function doGet') !== -1 && auth.indexOf('function doPost') 
 assert(auth.indexOf('callback') !== -1, 'auth supports JSONP');
 assert(auth.indexOf('HASH_EIGHTBELLS') !== -1 && auth.indexOf('HASH_WINDMILL') !== -1, 'auth has manager hash keys');
 assert(auth.indexOf('routePage') === -1, 'auth script does not implement the venue page router');
+
+var portal = fs.readFileSync(path.join(__dirname, '..', 'manager-portals/eightbells/index.html'), 'utf8');
+assert(portal.indexOf('giftcards') !== -1 && portal.indexOf('/staff/vouchers') !== -1,
+  'deploy copy for manager.eightbellsbolney.com includes Gift cards tile');
+assert(portal.indexOf('VOUCHER_STAFF_PASSWORD') !== -1, 'deploy copy documents Vercel password key');
+assert(!/VOUCHER_STAFF_PASSWORD\s*[:=]\s*['"][^'"]+['"]/.test(portal),
+  'deploy copy does not embed the gift-card password');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');

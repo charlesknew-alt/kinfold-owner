@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#24362c">
+  <title>Manager – The Eight Bells</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔔</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --ink: #1c1610;
+      --ink-soft: #3d3429;
+      --cream: #f6f0e6;
+      --paper: #fbf7f0;
+      --rule: #d8cfc0;
+      --brass: #b68a3a;
+      --brass-deep: #8d6824;
+      --forest: #24362c;
+      --forest-mid: #2f4a3b;
+      --eightbells: #6b2d5b;
+      --text-dim: #6f6574;
+      --rust: #8a3d28;
+    }
+    html, body {
+      min-height: 100%;
+      font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+    }
+    ::selection { color: var(--ink); background: #e6d3a4; }
+
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: var(--forest);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity .5s;
+    }
+    .login-overlay.hidden { opacity: 0; pointer-events: none; }
+    .login-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      opacity: .3;
+      background:
+        radial-gradient(circle at 80% 10%, #b68a3a, transparent 35%),
+        radial-gradient(circle at 10% 90%, #2f4a3b, transparent 40%);
+      pointer-events: none;
+    }
+    .login-card {
+      position: relative;
+      background: var(--paper);
+      border: 1px solid rgba(246, 240, 230, 0.18);
+      border-radius: 24px;
+      padding: 40px 32px;
+      width: 90%;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 24px 60px rgba(12, 16, 12, 0.35);
+    }
+    .login-mark { font-size: 40px; line-height: 1; margin-bottom: 10px; }
+    .login-card h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 34px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .login-card h2 {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--brass-deep);
+      margin-bottom: 22px;
+    }
+    .login-card input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--rule);
+      background: #fff;
+      color: var(--ink);
+      font-size: 16px;
+      text-align: center;
+      letter-spacing: 4px;
+      outline: none;
+      font-family: inherit;
+    }
+    .login-card input:focus { border-color: var(--brass); }
+    .login-card input::placeholder { letter-spacing: 1px; color: #8a8074; }
+    .login-btn {
+      width: 100%;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 999px;
+      background: var(--forest);
+      color: var(--cream);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+      font-family: inherit;
+    }
+    .login-btn:hover { background: var(--forest-mid); }
+    .error { color: var(--rust); font-size: 13px; margin-top: 12px; display: none; }
+    .error.show { display: block; }
+
+    .landing {
+      min-height: 100vh;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      position: relative;
+      background: var(--cream);
+    }
+    .landing.show { display: flex; }
+    .landing::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(900px 420px at 100% 0%, #b68a3a24, transparent 55%),
+        radial-gradient(700px 380px at 0% 80%, #24362c14, transparent 50%);
+      pointer-events: none;
+    }
+    .brand { text-align: center; margin-bottom: 28px; position: relative; }
+    .brand .mark { font-size: 42px; line-height: 1; margin-bottom: 8px; }
+    .brand h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 44px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .brand p {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--brass-deep);
+    }
+
+    .pub-card {
+      position: relative;
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 16px;
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 22px 48px rgba(28, 22, 16, 0.06);
+    }
+    .pub-icon { font-size: 36px; margin-bottom: 12px; }
+    .pub-name {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .pub-location {
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .pub-links { display: flex; flex-direction: column; gap: 10px; }
+    .pub-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 600;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+    }
+    .pub-link:hover { background: #fff; border-color: var(--brass); }
+    .link-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .pub-link.paperwork .link-icon { background: rgba(245, 158, 11, 0.15); }
+    .pub-link.menus .link-icon { background: rgba(107, 45, 91, 0.12); }
+    .pub-link.cardtakings .link-icon { background: rgba(223, 194, 175, 0.45); }
+    .pub-link.pricing .link-icon { background: rgba(45, 90, 61, 0.12); }
+    .pub-link.giftcards .link-icon { background: rgba(182, 138, 58, 0.18); }
+    .link-label { flex: 1; }
+    .link-label small {
+      display: block;
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .link-arrow { color: var(--text-dim); font-size: 18px; }
+
+    .footer {
+      position: relative;
+      text-align: center;
+      padding: 28px 16px 8px;
+      font-size: 12px;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .sign-out {
+      background: none;
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      padding: 8px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+    }
+    .sign-out:hover { border-color: var(--brass); }
+
+    .app-view {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: var(--cream);
+      flex-direction: column;
+    }
+    .app-view.active { display: flex; }
+    .app-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: rgba(246, 240, 230, 0.92);
+      border-bottom: 1px solid var(--rule);
+      flex-shrink: 0;
+      backdrop-filter: blur(12px);
+    }
+    .app-bar-back {
+      background: none;
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      padding: 8px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+    }
+    .app-bar-back:hover { border-color: var(--brass); }
+    .app-bar-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .app-bar-pub { font-size: 12px; color: var(--ink-soft); margin-left: auto; }
+    .app-frame {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: #fff;
+    }
+    .app-loader {
+      position: absolute;
+      inset: 0;
+      top: 49px;
+      background: var(--cream);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      transition: opacity .4s;
+    }
+    .app-loader.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      border: 3px solid var(--rule);
+      border-top: 3px solid var(--forest);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: sp .8s linear infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    .app-loader p { color: var(--ink-soft); font-size: 13px; }
+
+    @media (max-width: 640px) {
+      .brand h1 { font-size: 36px; }
+      .pub-card { padding: 24px 20px; }
+      .landing { justify-content: flex-start; padding-top: 48px; }
+      .login-card h1 { font-size: 30px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-overlay" id="login">
+    <form class="login-card" onsubmit="checkPw(event)">
+      <div class="login-mark" aria-hidden="true">🔔</div>
+      <h1>The Eight Bells</h1>
+      <h2>Manager</h2>
+      <input type="password" id="pw" placeholder="Enter PIN" maxlength="6" inputmode="numeric" autocomplete="off" aria-label="PIN">
+      <button class="login-btn" type="submit">Sign In</button>
+      <div class="error" id="err">Incorrect PIN</div>
+    </form>
+  </div>
+
+  <div class="landing" id="landing">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">🔔</div>
+      <h1>The Eight Bells</h1>
+      <p>Manager</p>
+    </div>
+    <div class="pub-card eightbells">
+      <div class="pub-icon" aria-hidden="true">🔔</div>
+      <div class="pub-name">The Eight Bells</div>
+      <div class="pub-location">Bolney</div>
+      <div class="pub-links">
+        <button type="button" class="pub-link paperwork" onclick="openDept('paperwork')">
+          <span class="link-icon" aria-hidden="true">📋</span>
+          <span class="link-label">Paperwork<small>Weekly data, cash &amp; expenses</small></span>
+          <span class="link-arrow" aria-hidden="true">›</span>
+        </button>
+        <button type="button" class="pub-link menus" onclick="openDept('menus')">
+          <span class="link-icon" aria-hidden="true">🍽️</span>
+          <span class="link-label">Menus<small>Change a dish, paste a list, lunch club tick</small></span>
+          <span class="link-arrow" aria-hidden="true">›</span>
+        </button>
+        <button type="button" class="pub-link cardtakings" onclick="openDept('cards')">
+          <span class="link-icon" aria-hidden="true">💳</span>
+          <span class="link-label">Card Takings<small>First &amp; last sale, by machine</small></span>
+          <span class="link-arrow" aria-hidden="true">›</span>
+        </button>
+        <button type="button" class="pub-link pricing" onclick="openDept('pricing')">
+          <span class="link-icon" aria-hidden="true">🍺</span>
+          <span class="link-label">Drink Pricing<small>Bar sell prices</small></span>
+          <span class="link-arrow" aria-hidden="true">›</span>
+        </button>
+        <button type="button" class="pub-link giftcards" onclick="openDept('giftcards')">
+          <span class="link-icon" aria-hidden="true">🎁</span>
+          <span class="link-label">Gift cards<small>Staff login — issue &amp; redeem vouchers</small></span>
+          <span class="link-arrow" aria-hidden="true">›</span>
+        </button>
+      </div>
+    </div>
+    <div class="footer">
+      <button type="button" class="sign-out" onclick="signOut()">Sign out</button>
+      <div>The Eight Bells · Bolney</div>
+    </div>
+  </div>
+
+  <div class="app-view" id="appView">
+    <div class="app-bar">
+      <button type="button" class="app-bar-back" onclick="closeApp()">← Back</button>
+      <span class="app-bar-title" id="appTitle">—</span>
+      <span class="app-bar-pub">Eight Bells</span>
+    </div>
+    <div class="app-loader" id="appLoader">
+      <div class="spinner"></div>
+      <p>Loading…</p>
+    </div>
+    <iframe class="app-frame" id="appFrame" title="Department" src="about:blank" allow="clipboard-write"></iframe>
+  </div>
+
+  <script>
+    var PIN = '1106';
+    var HUB = 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec';
+    var DEPTS = {
+      paperwork: {
+        title: 'Paperwork',
+        url: HUB
+      },
+      menus: {
+        title: 'Menus',
+        url: 'https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20260928-flow120'
+      },
+      cards: {
+        title: 'Card Takings',
+        url: HUB + '?page=cardday&shell=owner'
+      },
+      pricing: {
+        title: 'Drink Pricing',
+        url: HUB + '?page=kegcosting'
+      },
+      // Staff gift-card portal on the pub site. Password is VOUCHER_STAFF_PASSWORD
+      // in Vercel — never store it in this repo.
+      giftcards: {
+        title: 'Gift cards',
+        url: 'https://www.eightbellsbolney.com/staff/vouchers'
+      }
+    };
+
+    var currentDept = null;
+
+    function showLogin() {
+      document.getElementById('login').classList.remove('hidden');
+      document.getElementById('landing').classList.remove('show');
+      document.getElementById('appView').classList.remove('active');
+      document.getElementById('pw').focus();
+    }
+
+    function showHome() {
+      currentDept = null;
+      document.getElementById('login').classList.add('hidden');
+      document.getElementById('appView').classList.remove('active');
+      document.getElementById('appFrame').src = 'about:blank';
+      document.getElementById('landing').classList.add('show');
+    }
+
+    function checkPw(event) {
+      if (event) event.preventDefault();
+      var input = document.getElementById('pw');
+      if (input.value.trim() === PIN) {
+        sessionStorage.setItem('eightbells_auth', 'yes');
+        input.value = '';
+        document.getElementById('err').classList.remove('show');
+        showHome();
+      } else {
+        document.getElementById('err').classList.add('show');
+        input.value = '';
+        input.focus();
+      }
+    }
+
+    function signOut() {
+      sessionStorage.removeItem('eightbells_auth');
+      currentDept = null;
+      document.getElementById('appFrame').src = 'about:blank';
+      document.getElementById('err').classList.remove('show');
+      showLogin();
+    }
+
+    function hubScript(url) {
+      return url && url.indexOf('AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww') !== -1;
+    }
+
+    function stripOwnerShell(url) {
+      if (!url) return url;
+      return url
+        .replace(/([?&])shell=owner(&)?/g, function(_, sep, more) { return more ? sep : ''; })
+        .replace(/[?&]$/, '');
+    }
+
+    function withOwnerShell(url) {
+      if (!url || /[?&]shell=owner(?:&|$|#)/.test(url)) return url;
+      var hash = '';
+      var hashAt = url.indexOf('#');
+      if (hashAt !== -1) {
+        hash = url.slice(hashAt);
+        url = url.slice(0, hashAt);
+      }
+      return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'shell=owner' + hash;
+    }
+
+    function prepareNavUrl(url) {
+      if (!hubScript(url)) return url;
+      if (currentDept === 'cards' && /[?&]page=cardday(?:&|$|#)/.test(url)) return withOwnerShell(url);
+      return stripOwnerShell(url);
+    }
+
+    function loadFrame(url) {
+      var loader = document.getElementById('appLoader');
+      var frame = document.getElementById('appFrame');
+      loader.classList.remove('hidden');
+      frame.src = url;
+      frame.onload = function() {
+        setTimeout(function() { loader.classList.add('hidden'); }, 600);
+      };
+      setTimeout(function() { loader.classList.add('hidden'); }, 15000);
+    }
+
+    function openDept(id) {
+      var dept = DEPTS[id];
+      if (!dept) return;
+      currentDept = id;
+      document.getElementById('appTitle').textContent = dept.title;
+      document.getElementById('landing').classList.remove('show');
+      document.getElementById('appView').classList.add('active');
+      loadFrame(dept.url);
+    }
+
+    function closeApp() {
+      showHome();
+    }
+
+    window.addEventListener('message', function(e) {
+      if (!e.data || e.data.type !== 'navigate' || !e.data.url) return;
+      if (!document.getElementById('appView').classList.contains('active')) return;
+      loadFrame(prepareNavUrl(e.data.url));
+    });
+
+    if (sessionStorage.getItem('eightbells_auth') === 'yes') showHome();
+    else showLogin();
+  </script>
+</body>
+</html>
