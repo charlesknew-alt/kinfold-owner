@@ -1194,10 +1194,12 @@
     } else if (opts.sectionLayout && opts.sectionLayout.Sandwiches) {
       sandRule = opts.sectionLayout.Sandwiches;
     }
+    var isLongHost = menu.id === 'main' || menu.id === 'main-next' || menu.id === 'sunday' ||
+      (root.EBMenus && root.EBMenus.isMainSheet && root.EBMenus.isMainSheet(menu.id));
     var wantSandwiches;
     if (sandDishCount > 0) {
-      wantSandwiches = menu.id === 'main' || menu.id === 'sunday' || !!bag.sandwiches;
-    } else if (menu.id === 'main' || menu.id === 'sunday') {
+      wantSandwiches = isLongHost || !!bag.sandwiches;
+    } else if (isLongHost) {
       wantSandwiches = sandRule.tip !== false && sandRule.tip !== 'no' && sandRule.tip !== 0;
     } else {
       wantSandwiches = !!bag.sandwiches;
