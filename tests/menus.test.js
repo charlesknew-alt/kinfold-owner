@@ -212,6 +212,20 @@ assert(api.includableMenus('sunday').some(function (m) { return m.id === 'little
   'Little Bells (kids) can be ticked onto Sunday');
 assert(api.includableMenus('main').some(function (m) { return m.id === 'little-bells'; }),
   'Little Bells (kids) can be ticked onto Main');
+assert(api.MENUS.some(function (m) { return m.id === 'main-next' && m.kind === 'long'; }),
+  'Main (upcoming) is a long menu tab');
+assert(api.isMainSheet('main') && api.isMainSheet('main-next') && !api.isMainSheet('sunday'),
+  'isMainSheet covers live Main and upcoming only');
+assert(api.includableMenus('main-next').some(function (m) { return m.id === 'specials'; }),
+  'Specials can be ticked onto Main (upcoming)');
+assert(!api.includableMenus('main').some(function (m) { return m.id === 'main-next'; }),
+  'upcoming Main is not pulled onto live Main as an include');
+assert(Array.isArray(api.seed()['main-next']) && api.seed()['main-next'].length === 0,
+  'seed leaves Main (upcoming) empty');
+assert(page.indexOf('main-next') !== -1 && page.indexOf('Swap Main') !== -1,
+  'UI offers Main (upcoming) with swap/copy controls');
+assert(page.indexOf("'main-next'") !== -1 && /main-next/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
+  'staff menu list includes Main (upcoming)');
 assert(page.indexOf("'little-bells'") !== -1 && page.indexOf('Little Bells (kids)') !== -1,
   'staff Menus offer Little Bells kids include checkbox');
 assert(page.indexOf("STAFF_MENU_IDS") !== -1 && /little-bells/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
@@ -312,8 +326,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow120') !== -1, 'menus page cache-bust is flow120');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow120') !== -1, 'hub menus link cache-bust is flow120');
+assert(page.indexOf('flow121') !== -1, 'menus page cache-bust is flow121');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow121') !== -1, 'hub menus link cache-bust is flow121');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,

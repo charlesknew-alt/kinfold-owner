@@ -6,6 +6,8 @@
 
   var MENUS = [
     { id: 'main', name: 'Main menu', kind: 'long' },
+    // Parallel long sheet so staff can build the next Main without wiping the live one.
+    { id: 'main-next', name: 'Main (upcoming)', kind: 'long' },
     { id: 'sunday', name: 'Sunday', kind: 'long' },
     { id: 'party', name: 'Party / Christmas', kind: 'party' },
     { id: 'sandwiches', name: 'Sandwiches', kind: 'card', comfortable: 10 },
@@ -14,6 +16,11 @@
     { id: 'little-bells', name: 'Little Bells', kind: 'card', comfortable: 6 },
     { id: 'lunch-club', name: 'Lunch club', kind: 'card', comfortable: 12 }
   ];
+
+  /** Live Main + upcoming Main — same long-sheet rules / includes. */
+  function isMainSheet(id) {
+    return id === 'main' || id === 'main-next';
+  }
 
   /** Canonical sections staff pick from — print layout keys off these. */
   var SECTIONS = [
@@ -787,6 +794,8 @@
 
   function seed() {
     return {
+      // Empty by default — staff copy from Main when they start the next one.
+      'main-next': [],
       main: [
         dish('Nibbles', 'Bread and Salted Butter', '', '5.95', ''),
         dish('Nibbles', 'Marinated Olives', '', '6.95', 'vg'),
@@ -1307,11 +1316,11 @@
     };
   }
 
-  /** Menus that can be pulled onto a long sheet (main / Sunday). */
+  /** Menus that can be pulled onto a long sheet (Main / Main upcoming / Sunday). */
   function includableMenus(hostId) {
-    if (hostId !== 'main' && hostId !== 'sunday') return [];
+    if (!isMainSheet(hostId) && hostId !== 'sunday') return [];
     return MENUS.filter(function (m) {
-      return m.id !== hostId && m.id !== 'lunch-club' && m.kind === 'card';
+      return m.id !== hostId && m.id !== 'lunch-club' && m.id !== 'main-next' && m.kind === 'card';
     });
   }
 
@@ -2035,6 +2044,7 @@
     MENUS: MENUS,
     SECTIONS: SECTIONS,
     WIDTH_OPTIONS: WIDTH_OPTIONS,
+    isMainSheet: isMainSheet,
     seed: seed,
     menuById: menuById,
     parsePaste: parsePaste,

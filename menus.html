@@ -393,9 +393,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow120"></script>
-  <script src="menus-print.js?v=20260928-flow120"></script>
-  <script src="menus-ingest.js?v=20260928-flow120"></script>
+  <script src="menus.js?v=20260928-flow121"></script>
+  <script src="menus-print.js?v=20260928-flow121"></script>
+  <script src="menus-ingest.js?v=20260928-flow121"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -449,7 +449,7 @@
 
     // Manager: day-to-day printables (owner keeps Party / Lunch club).
     // Little Bells is included so Sunday/Main can tick the kids menu onto the sheet.
-    var STAFF_MENU_IDS = ['specials', 'main', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
+    var STAFF_MENU_IDS = ['specials', 'main', 'main-next', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
 
     var FLOW_STEPS = isStaffMode
       ? [
@@ -1479,6 +1479,10 @@
         html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
       }
 
+      if (EBMenus.isMainSheet && EBMenus.isMainSheet(menu.id)) {
+        html += renderMainPairBox(menu, list);
+      }
+
       var extras = EBMenus.includableMenus(menuId);
       if (extras.length) {
         html += '<div class="include-box"><h3>Also put on this sheet</h3>';
@@ -1526,6 +1530,72 @@
       html += '</div>';
       if (isStaffMode) return withFlowNav(html, null, 2, 'Next · Generate');
       return withFlowNav(html, null, 2, 'Next · Blocks');
+    }
+
+    /**
+     * Live Main + Main (upcoming) — copy / swap without wiping the printed menu.
+     */
+    function renderMainPairBox(menu, list) {
+      var otherId = menu.id === 'main' ? 'main-next' : 'main';
+      var other = EBMenus.menuById(otherId);
+      var otherCount = (book[otherId] || []).length;
+      var html = '<div class="include-box outside-text-box" style="margin-bottom:14px">';
+      html += '<h3>' + (menu.id === 'main-next' ? 'Upcoming Main' : 'Live Main') + '</h3>';
+      if (menu.id === 'main-next') {
+        html += '<p class="note" style="margin:0 0 10px">Build the <strong>next</strong> Main here. The live <strong>Main menu</strong> stays as-is until you swap.</p>';
+      } else {
+        html += '<p class="note" style="margin:0 0 10px">This is the live Main guests get today. Use <strong>Main (upcoming)</strong> to prepare a replacement without deleting this one.</p>';
+      }
+      html += '<div class="toolbar-row" style="margin:0;flex-wrap:wrap;gap:8px">';
+      html += '<button type="button" class="soft" id="doCopyMainFrom">' +
+        (menu.id === 'main-next' ? 'Copy live Main into upcoming' : 'Copy upcoming into live Main') +
+        '</button>';
+      html += '<button type="button" class="go" id="doSwapMains">Swap Main ↔ Upcoming</button>';
+      html += '</div>';
+      html += '<p class="note" style="margin:8px 0 0">' + escapeAttr(other.name) + ' has ' +
+        otherCount + ' dish' + (otherCount === 1 ? '' : 'es') +
+        (list && list.length ? ' · this sheet has ' + list.length : '') + '.</p>';
+      html += '</div>';
+      return html;
+    }
+
+    function cloneDishesForMenu_(srcList) {
+      return (srcList || []).map(function (d) {
+        var copy = {
+          id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+          section: d.section || '',
+          name: d.name || '',
+          description: d.description || '',
+          price: d.price || '',
+          tags: d.tags || '',
+          lunchClub: !!d.lunchClub
+        };
+        return EBMenus.tidyDishFields ? EBMenus.tidyDishFields(copy) : copy;
+      });
+    }
+
+    function swapMainPair_() {
+      var a = book.main || [];
+      var b = book['main-next'] || [];
+      book.main = b;
+      book['main-next'] = a;
+      var la = layoutBook.main;
+      var lb = layoutBook['main-next'];
+      layoutBook.main = lb || (EBMenus.defaultSectionLayout ? EBMenus.defaultSectionLayout() : {});
+      layoutBook['main-next'] = la || (EBMenus.defaultSectionLayout ? EBMenus.defaultSectionLayout() : {});
+      var ia = includes.main;
+      var ib = includes['main-next'];
+      includes.main = ib || {};
+      includes['main-next'] = ia || {};
+      var pa = promoTicks.main;
+      var pb = promoTicks['main-next'];
+      promoTicks.main = pb || {};
+      promoTicks['main-next'] = pa || {};
+      var ma = metaBook.main;
+      var mb = metaBook['main-next'];
+      metaBook.main = mb || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {});
+      metaBook['main-next'] = ma || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {});
+      save();
     }
 
     /**
@@ -2492,6 +2562,37 @@
       bindDishSuggest();
       var doFromWeek = document.getElementById('doFromWeek');
       if (doFromWeek) doFromWeek.onclick = openWeekPickForSunday;
+      var doCopyMain = document.getElementById('doCopyMainFrom');
+      if (doCopyMain) {
+        doCopyMain.onclick = function () {
+          var srcId = menuId === 'main' ? 'main-next' : 'main';
+          var srcName = EBMenus.menuById(srcId).name;
+          var dstName = EBMenus.menuById(menuId).name;
+          var n = (book[srcId] || []).length;
+          if (!n) {
+            alert(srcName + ' is empty — nothing to copy.');
+            return;
+          }
+          if (!confirm('Replace all dishes on ' + dstName + ' with a copy of ' + srcName + ' (' + n + ' dishes)?')) return;
+          book[menuId] = cloneDishesForMenu_(book[srcId]);
+          dishId = (book[menuId][0] && book[menuId][0].id) || '';
+          save();
+          mode = 'complete';
+          render();
+        };
+      }
+      var doSwapMains = document.getElementById('doSwapMains');
+      if (doSwapMains) {
+        doSwapMains.onclick = function () {
+          var liveN = (book.main || []).length;
+          var nextN = (book['main-next'] || []).length;
+          if (!confirm('Swap live Main (' + liveN + ' dishes) with Main (upcoming) (' + nextN + ' dishes)?\n\nBlocks, includes and wording ticks swap too.')) return;
+          swapMainPair_();
+          dishId = (dishes()[0] && dishes()[0].id) || '';
+          mode = 'complete';
+          render();
+        };
+      }
       var doClear = document.getElementById('doClear');
       if (doClear) doClear.onclick = function () {
         if (!confirm('Clear every dish on ' + EBMenus.menuById(menuId).name + ' and start again?')) return;
