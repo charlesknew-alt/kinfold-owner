@@ -1,6 +1,11 @@
-# Manager portal Menus URL (manager.eightbellsbolney.com)
-# Still pointed at flow96 in the eightbells-manager repo — Cursor cannot push there.
-# Update the Menus tile URL to:
-https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20260927-flow107
+# Manager portal (manager.eightbellsbolney.com)
+# Source of truth: github.com/charlesknew-alt/eightbells-manager
+#
+# Menus tile URL (update there when bumping cache-bust):
+https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20260928-flow121
+#
+# Gift cards tile:
+https://www.eightbellsbolney.com/staff/vouchers
+# Password: VOUCHER_STAFF_PASSWORD in Vercel (not in git)
 #
 # Windmill menus: PENDING — must be an entirely separate system (items, fonts, layouts).
