@@ -311,10 +311,29 @@
     return '<div class="' + (cls || 'card-outside') + '">' + esc(raw).replace(/\n/g, '<br>') + '</div>';
   }
 
+  /** Pull “All below £9.50 to include…” into a big price line + quieter sub line. */
+  function splitOfferHtml(raw) {
+    var text = String(raw || '').replace(/\s+/g, ' ').trim();
+    var m = text.match(/^(.*?)(£\s*\d+(?:\.\d{1,2})?)(.*)$/);
+    if (!m) return '';
+    var before = String(m[1] || '').trim();
+    var price = String(m[2] || '').replace(/\s+/g, '');
+    var after = String(m[3] || '').trim().replace(/^[,.:;–-]+\s*/, '');
+    var priceLine = (before ? before + ' ' : '') + price;
+    var inner = '<div class="lb-price-line">' + esc(priceLine) + '</div>';
+    if (after) inner += '<div class="lb-offer-sub">' + esc(after) + '</div>';
+    return inner;
+  }
+
   function blurbInnerHtml(text, kind) {
     var raw = String(text || '').trim();
     if (!raw) return '';
     kind = String(kind || 'paragraph').toLowerCase();
+    var offerish = kind === 'title' || kind === 'heading' || /^all\b/i.test(raw);
+    if (offerish && /£\s*\d/.test(raw)) {
+      var split = splitOfferHtml(raw);
+      if (split) return split;
+    }
     var lines = raw.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
     if ((kind === 'title' || kind === 'heading') && lines.length && /^all\s*£|^£\s*\d/i.test(lines[0])) {
       var inner = '<div class="lb-price-line">' + esc(lines[0]) + '</div>';
@@ -2664,7 +2683,7 @@
       '.sheet-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),calc(var(--desc) + 0.6pt),var(--desc-max));line-height:1.4}' +
       '.sheet-blurb-text{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.4;color:#3a342c}' +
       '.sheet-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 3px;text-transform:none}' +
-      '.sheet-offer .lb-price-line{font-size:1.15em}' +
+      '.sheet-offer .lb-price-line{font-size:clamp(16pt,calc(var(--name) + 7pt),22pt);font-weight:700;letter-spacing:.04em}' +
       '.sheet-offer .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:clamp(10.5pt,calc(var(--desc) + 1pt),12pt);line-height:1.35;text-transform:none}' +
       '.sheet-blurb .lb-offer-sub{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.35;text-transform:none}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
@@ -3841,16 +3860,31 @@
 
   function openPrintHtml(html) {
     if (!html) return false;
+    // Phone Chrome in the Varlo iframe blocks blob: tabs, so they land on
+    // about:blank. Open a same-origin page and hand it the HTML instead.
+    try {
+      window.__EB_PRINT_PREVIEW_HTML = html;
+      sessionStorage.setItem('EB_PRINT_PREVIEW_HTML', html);
+    } catch (e) {}
+    var previewUrl;
+    try {
+      previewUrl = new URL('print-preview.html', window.location.href).href;
+      previewUrl += (previewUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+    } catch (e2) {
+      previewUrl = 'print-preview.html?t=' + Date.now();
+    }
+    var w = window.open(previewUrl, '_blank');
+    if (w) return true;
     var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     var url = URL.createObjectURL(blob);
-    var w = window.open(url, '_blank');
+    w = window.open(url, '_blank');
     if (w) {
       setTimeout(function () {
-        try { URL.revokeObjectURL(url); } catch (e) {}
+        try { URL.revokeObjectURL(url); } catch (e3) {}
       }, 120000);
       return true;
     }
-    try { URL.revokeObjectURL(url); } catch (e2) {}
+    try { URL.revokeObjectURL(url); } catch (e4) {}
     w = window.open('', '_blank');
     if (!w) return false;
     w.document.open();

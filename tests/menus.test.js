@@ -148,7 +148,9 @@ assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') 
   'dish lines use flex leaders that start after the name');
 assert(printJs.indexOf('.dish-line{display:flex') !== -1, 'dish-line flex rule present in source');
 assert(!/\*\/\s*\+/.test(printJs), 'print CSS has no comment-plus that becomes NaN');
-assert(printJs.indexOf('createObjectURL') !== -1, 'print preview opens as a blob URL not about:blank');
+assert(printJs.indexOf('createObjectURL') !== -1, 'print preview falls back to a blob URL');
+assert(printJs.indexOf('print-preview.html') !== -1, 'print preview opens a real same-origin page not about:blank');
+assert(fs.existsSync(path.join(root, 'print-preview.html')), 'print-preview.html exists for GitHub Pages');
 assert(printJs.indexOf('fitPreviewToScreen') !== -1, 'preview scales A4 to the phone viewport');
 assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport tag');
 assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
@@ -426,8 +428,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow130') !== -1, 'menus page cache-bust is flow130');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow130') !== -1, 'hub menus link cache-bust is flow130');
+assert(page.indexOf('flow131') !== -1, 'menus page cache-bust is flow131');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow131') !== -1, 'hub menus link cache-bust is flow131');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1723,6 +1725,31 @@ var embedKidsWithRooms = print.build(api.menuById('sunday'), [
 var embedKidsWithRoomsRow = (embedKidsWithRooms.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(embedKidsWithRoomsRow && !/Stay a While|Gatherings/i.test(embedKidsWithRoomsRow),
   'explicit rooms panels still stay out of the kids|desserts pair');
+var liveWordingHtml = print.build(api.menuById('sunday'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
+  api.dish('Desserts', 'Half-Baked Cookie Dough', 'salted caramel', '8.25', ''),
+  api.dish('Desserts', 'Sticky Toffee Pudding', 'toffee sauce', '8.25', '')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      above: 'All below £9.50 to include a choice of one scoop of ice cream or sorbet.',
+      aboveKind: 'heading',
+      below: 'Little Bells on Sunday in addition have a choice of roasts at half price of the adults.',
+      belowKind: 'text',
+      frame: false,
+      width: 'column'
+    },
+    Desserts: { width: 'column', frame: true }
+  }),
+  promos: []
+});
+assert(/sheet-offer/.test(liveWordingHtml) && /lb-price-line/.test(liveWordingHtml),
+  'All below £9.50 is a sheet offer, not one meek Cinzel paragraph');
+assert(/All below £9\.50/.test(liveWordingHtml) && /lb-offer-sub/.test(liveWordingHtml) &&
+  /one scoop of ice cream or sorbet/i.test(liveWordingHtml),
+  '£9.50 sits on the price line; scoop line is the quieter sub');
 var embedSandHtml = print.build(api.menuById('main'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Sandwiches', 'BLT', 'fries', '10.95', ''),
