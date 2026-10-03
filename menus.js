@@ -2775,6 +2775,16 @@
         belowKind: lbDef.belowKind || 'text'
       });
     }
+    // Main does not inherit the Sunday roast line — that copy is Sunday’s.
+    ['main', 'main-next'].forEach(function (id) {
+      if (!out[id] || !out[id]['Little Bells']) return;
+      var hostLb = out[id]['Little Bells'];
+      out[id]['Little Bells'] = Object.assign({}, hostLb, {
+        below: '',
+        belowKind: 'text',
+        note: String(hostLb.above || '')
+      });
+    });
     return out;
   }
 

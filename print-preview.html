@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menu preview</title>
+</head>
+<body>
+<script>
+(function () {
+  var html = '';
+  if (window.opener) {
+    try { html = window.opener.__EB_PRINT_PREVIEW_HTML || ''; } catch (e) {}
+  }
+  if (!html) {
+    try { html = sessionStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e2) {}
+  }
+  if (html) {
+    document.open();
+    document.write(html);
+    document.close();
+    return;
+  }
+  document.body.style.fontFamily = 'system-ui,sans-serif';
+  document.body.style.padding = '24px';
+  document.body.textContent = 'Preview missing. Keep the Menus tab open and Generate again.';
+})();
+</script>
+</body>
+</html>
