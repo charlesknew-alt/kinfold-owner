@@ -2562,7 +2562,7 @@
   var OUTSIDE_KINDS = [
     { id: 'title', label: 'Title (large heading)' },
     { id: 'heading', label: 'Heading (between title & paragraph)' },
-    { id: 'paragraph', label: 'Paragraph (centred body)' },
+    { id: 'paragraph', label: 'Paragraph (body)' },
     { id: 'text', label: 'Text (smaller plain line)' }
   ];
 

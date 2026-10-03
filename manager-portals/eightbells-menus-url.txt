@@ -2,7 +2,7 @@
 # Source of truth: github.com/charlesknew-alt/eightbells-manager
 #
 # Menus tile URL (update there when bumping cache-bust):
-https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20261003-flow132
+https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20261003-flow134
 #
 # Gift cards tile:
 https://www.eightbellsbolney.com/staff/vouchers

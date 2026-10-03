@@ -275,6 +275,13 @@ assert(api.includableMenus('sunday').some(function (m) { return m.id === 'little
   'Little Bells (kids) can be ticked onto Sunday');
 assert(api.includableMenus('main').some(function (m) { return m.id === 'little-bells'; }),
   'Little Bells (kids) can be ticked onto Main');
+['main', 'sunday', 'main-next'].forEach(function (host) {
+  var ids = api.includableMenus(host).map(function (m) { return m.id; });
+  ['sandwiches', 'desserts', 'specials', 'little-bells'].forEach(function (id) {
+    assert(ids.indexOf(id) !== -1, id + ' can be ticked onto ' + host);
+  });
+  assert(ids.indexOf('lunch-club') === -1, 'Lunch club is not a drop-in on ' + host);
+});
 assert(api.MENUS.some(function (m) { return m.id === 'main-next' && m.kind === 'long'; }),
   'Main (upcoming) is a long menu tab');
 assert(api.isMainSheet('main') && api.isMainSheet('main-next') && !api.isMainSheet('sunday'),
@@ -428,8 +435,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow132') !== -1, 'menus page cache-bust is flow132');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow132') !== -1, 'hub menus link cache-bust is flow132');
+assert(page.indexOf('flow134') !== -1, 'menus page cache-bust is flow134');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow134') !== -1, 'hub menus link cache-bust is flow134');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -605,8 +612,9 @@ assert(typeof api.normalizeSectionLayoutBook === 'function' && typeof api.sectio
   'Blocks rules are stored per menu');
 assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout') !== -1,
   'menus UI keeps a Blocks book per menu');
-assert(page.indexOf('this menu only') !== -1 && page.indexOf('drop onto this sheet') !== -1,
-  'Blocks step says drop-ins stay in this menu’s Column or Full width');
+assert(page.indexOf('this menu only') !== -1 && page.indexOf('drops onto this sheet') !== -1 &&
+  page.indexOf('Specials') !== -1 && page.indexOf('not centred like the card') !== -1,
+  'Blocks step says every drop-in menu follows this sheet, not the card');
 var flatLegacy = api.normalizeSectionLayout({
   Desserts: { width: 'column', frame: true, note: 'legacy' },
   'Little Bells': { width: 'column', frame: false, note: '' }
@@ -734,8 +742,13 @@ assert(printJs.indexOf('specials-beside') !== -1,
   'Specials beside-course blocks are marked specials-beside');
 assert(printJs.indexOf('specials-beside-title') !== -1,
   'Main-sheet Specials box uses compact specials-beside-title');
-assert(/\.specials-beside[^{]*specials-beside-title\{[^}]*text-align:\s*center/.test(printJs),
-  'Specials beside-course title is centred');
+assert(/\.specials-beside[^{]*specials-beside-title\{[^}]*text-align:\s*left/.test(printJs),
+  'Specials beside-course title is left like the parent sheet');
+assert(/\.specials-beside \.sec-note\{text-align:left/.test(printJs),
+  'Specials beside-course note is left like the parent sheet');
+assert(/\.specials-course\{[^}]*text-align:center/.test(printJs) &&
+  /style="text-align:center"/.test(printJs),
+  'Specials card still centres course heads and board notes');
 assert(/\.specials-beside\{[^}]*width:\s*100%/.test(printJs) &&
   /\.specials-beside[^}]*\.scallop\{[^}]*width:\s*100%/.test(printJs),
   'Specials beside-course box is full width like the course above');
@@ -869,6 +882,8 @@ assert(page.indexOf('data-layout-above-kind') !== -1 && page.indexOf('Type size'
   'each outside-text box has a type-size picker');
 assert(page.indexOf('this sheet') !== -1 && page.indexOf('card keeps its own') !== -1,
   'UI says host type sizes are independent of the card');
+assert(page.indexOf('not centred like the card') !== -1,
+  'host Blocks copy says drop-in wording is left like the sheet');
 assert(page.indexOf("base['Little Bells'] = Object.assign") === -1,
   'host menus do not copy Little Bells card wording or type sizes');
 assert(page.indexOf("layoutBook[mid]['Little Bells']") === -1,
@@ -1713,6 +1728,12 @@ assert(embedKidsHtml.indexOf('class="card-blurb') === -1,
   'embedded Little Bells does not use card Title/Heading sizes');
 assert(/sheet-blurb-title/.test(embedKidsHtml) && /sheet-blurb-heading/.test(embedKidsHtml),
   'embedded Little Bells uses this sheet’s type-size pickers');
+assert(/\.sheet-blurb\{text-align:left/.test(embedKidsHtml),
+  'embedded Little Bells wording is left-aligned like the parent sheet');
+assert(/\.card-blurb\{[^}]*text-align:center/.test(printJs),
+  'Little Bells card wording stays centred');
+assert(printJs.indexOf('.sheet-blurb{text-align:center') === -1,
+  'sheet drop-in blurbs are not card-centred');
 var embedKidsRow = (embedKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(/col-little[\s\S]*sheet-blurb-below[\s\S]*col-desserts/.test(embedKidsRow),
   'Sunday roast line stays in the Little Bells column');
@@ -1798,6 +1819,8 @@ assert(/Lunch only/.test(embedSandHtml) && /12\s*[–-]\s*2\.45/.test(embedSandH
   'embedded sandwiches print this sheet’s above/below wording');
 assert(embedSandHtml.indexOf('class="card-blurb') === -1 && /sheet-blurb-heading/.test(embedSandHtml),
   'embedded sandwiches use this sheet’s type sizes, not the card’s');
+assert(/\.sheet-blurb\{text-align:left/.test(embedSandHtml) && /sheet-blurb-heading/.test(embedSandHtml),
+  'embedded sandwiches wording is left-aligned like the parent sheet');
 var embedDessHtml = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Desserts', 'Sticky Toffee', 'custard', '7.95', 'v')
@@ -1817,6 +1840,30 @@ assert(/Save room for pudding/.test(embedDessHtml) && /sheet-blurb-paragraph/.te
   'embedded desserts use this sheet’s type sizes');
 assert(/Ice cream \+1\.50/.test(embedDessHtml) && /sheet-blurb-text/.test(embedDessHtml),
   'embedded desserts below line uses this sheet’s text size');
+assert(/\.sheet-blurb\{text-align:left/.test(embedDessHtml) && embedDessHtml.indexOf('class="card-blurb') === -1,
+  'embedded desserts wording is left-aligned like the parent sheet');
+var embedSpecHtml = print.build(api.menuById('main'), [
+  api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+  api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Special Starters': { width: 'full', frame: true, note: 'When it’s gone, it’s gone' }
+  })
+});
+var embedSpecA4 = embedSpecHtml.split('mode-panel mode-a5')[0] || embedSpecHtml;
+assert(/specials-beside/.test(embedSpecA4) && /When it’s gone/.test(embedSpecA4),
+  'ticked Specials print on Main under the parent course');
+assert(/\.specials-beside \.sec-note\{text-align:left/.test(embedSpecHtml),
+  'Specials note on Main is left-aligned like the parent sheet');
+var specialsCardHtml = print.build(api.menuById('specials'), [
+  api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Special Starters': { width: 'full', frame: true, note: 'When it’s gone, it’s gone' }
+  })
+});
+assert(/card-face/.test(specialsCardHtml) && /text-align:center/.test(specialsCardHtml),
+  'Specials card keeps centred board notes');
 
 // Promo must not force over
 var crowdedDishes = aloneDishes.concat(api.composeDishes(book, 'main', { desserts: true, sandwiches: true, 'little-bells': true }).filter(function (d) {

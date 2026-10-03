@@ -425,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261003-flow132"></script>
-  <script src="menus-print.js?v=20261003-flow132"></script>
-  <script src="menus-ingest.js?v=20261003-flow132"></script>
+  <script src="menus.js?v=20261003-flow134"></script>
+  <script src="menus-print.js?v=20261003-flow134"></script>
+  <script src="menus-ingest.js?v=20261003-flow134"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1747,7 +1747,7 @@
       var kinds = (EBMenus.OUTSIDE_KINDS) || [
         { id: 'title', label: 'Title (large heading)' },
         { id: 'heading', label: 'Heading (between title & paragraph)' },
-        { id: 'paragraph', label: 'Paragraph (centred body)' },
+        { id: 'paragraph', label: 'Paragraph (body)' },
         { id: 'text', label: 'Text (smaller plain line)' }
       ];
       var html = '<select data-layout-' + place + '-kind="' + escapeAttr(sec) + '">';
@@ -1786,10 +1786,11 @@
       html += '<textarea data-layout-below="' + escapeAttr(sec) + '" rows="' + (opts.belowRows || 3) + '" placeholder="' +
         escapeAttr(opts.belowPlaceholder || 'Optional — prints under the dishes') + '">' +
         escapeAttr(slots.below) + '</textarea>';
-      var hostSheet = (menuId === 'main' || menuId === 'sunday' || menuId === 'main-next');
+      var hostMenu = EBMenus.menuById ? EBMenus.menuById(menuId) : null;
+      var hostSheet = !!(hostMenu && hostMenu.kind === 'long');
       html += '<p class="note" style="margin:6px 0 0">' + (hostSheet
-        ? 'Type size is for <strong>this sheet</strong> when ' + escapeAttr(sec) + ' is ticked on. The ' + escapeAttr(sec) + ' card keeps its own wording and sizes.'
-        : 'Type size is for this <strong>card</strong>. Main and Sunday keep their own wording and sizes when this menu is ticked on.') + '</p>';
+        ? 'Type size is for <strong>this sheet</strong> when ' + escapeAttr(sec) + ' is ticked on. Wording lines up with the dishes (not centred like the card). The ' + escapeAttr(sec) + ' card keeps its own wording and sizes.'
+        : 'Type size is for this <strong>card</strong> (centred). Main, Sunday and other long sheets keep their own wording, sizes and left alignment when this menu is ticked on.') + '</p>';
       return html;
     }
 
@@ -1814,7 +1815,7 @@
           html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
             escapeAttr(ruleSp.note || '') + '</textarea>';
         });
-        html += '<p class="note" style="margin:8px 0 0">Shows in the Specials frilly box. Same note when Specials are ticked onto Main / Sunday.</p>';
+        html += '<p class="note" style="margin:8px 0 0">Shows in the Specials frilly box. When Specials are ticked onto Main / Sunday the note lines up with that sheet (not centred like this card).</p>';
         html += '</div>';
         return html;
       }
@@ -1898,7 +1899,7 @@
         if (opts.noNav) return html;
         return withFlowNav(html, 1, 3, 'Next · Wording');
       }
-      html += '<p class="step-lede">Rules for <strong>this menu only</strong>. Little Bells, Sandwiches and Desserts <strong>drop onto this sheet</strong> when ticked — they keep the Column or Full width you set here and stay in that area (not the card’s rules, and not mixed with another section). <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit for this page (AI chooses)</strong> lets layout pick. Frilly box = scalloped frame.</p>';
+      html += '<p class="step-lede">Rules for <strong>this menu only</strong>. Any menu with its own page — Little Bells, Sandwiches, Desserts, Specials, and extras — <strong>drops onto this sheet</strong> when ticked. Each keeps the Column or Full width you set here, stays in that area, and its wording lines up with this sheet (not centred like the card). <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit for this page (AI chooses)</strong> lets layout pick. Frilly box = scalloped frame.</p>';
 
       // Quick cards for sections that have dishes
       var bySec = {};
