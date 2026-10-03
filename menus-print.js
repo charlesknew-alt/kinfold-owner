@@ -804,6 +804,12 @@
     var sell = (opts.sell != null && String(opts.sell).trim())
       ? String(opts.sell).trim()
       : String(rule.sell || '').trim();
+    var sandSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
+      ? root.EBMenus.cardOutsideSlots(rule)
+      : { above: String(rule.above || '').trim(), below: String(rule.below || '').trim() };
+    // Long sheet: extra above/below lines stay at parent sec-note size, never card headings.
+    var extraAbove = sandSlots.above && sandSlots.above !== note ? sandSlots.above : '';
+    var extraBelow = sandSlots.below && sandSlots.below !== note ? sandSlots.below : '';
     if (!dishes.length) {
       // Tip box: selling words first, then hours / “all served with…” under the title
       var spielParts = [];
@@ -834,11 +840,20 @@
     var noteHtml = note
       ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
       : '';
+    if (extraAbove) {
+      noteHtml = '<div class="sec-note">' + esc(extraAbove).replace(/\n/g, '<br>') + '</div>' + noteHtml;
+    }
     var body = noteHtml + listDishes(dishes);
     var titled = sectionTitle('Sandwiches') + body;
+    var afterHtml = extraBelow
+      ? '<div class="sec-note sec-note-after">' + esc(extraBelow).replace(/\n/g, '<br>') + '</div>'
+      : '';
+    function withAfter(block) {
+      return afterHtml ? ('<div class="sec-stack">' + block + afterHtml + '</div>') : block;
+    }
     if (opts.alignTitle) {
       var inner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
-      return (
+      return withAfter(
         '<div class="sandwich-aligned">' +
           '<div class="promo-head pair-head">' +
             '<span class="sec-title soft-left">Sandwiches</span>' +
@@ -847,8 +862,8 @@
         '</div>'
       );
     }
-    if (!wantFrame) return '<div class="sec-plain">' + titled + '</div>';
-    return scallop(titled, frameKind);
+    if (!wantFrame) return withAfter('<div class="sec-plain">' + titled + '</div>');
+    return withAfter(scallop(titled, frameKind));
   }
 
   /** Prefer shared tidy from menus.js when available (priced desc orphans too). */
@@ -1547,7 +1562,13 @@
     var noteHtml = note
       ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
       : '';
-    return framedBlock(head + noteHtml + body, rule, kind || 'wide');
+    var after = opts.afterNote != null ? String(opts.afterNote).trim() : '';
+    var afterHtml = after
+      ? '<div class="sec-note sec-note-after">' + esc(after).replace(/\n/g, '<br>') + '</div>'
+      : '';
+    var block = framedBlock(head + noteHtml + body, rule, kind || 'wide');
+    if (!afterHtml) return block;
+    return '<div class="sec-stack">' + block + afterHtml + '</div>';
   }
 
   /**
@@ -1684,14 +1705,22 @@
     }
     var col = wantsColumn(littleRule);
     var frameKind = col ? 'box' : 'wide';
+    // On Main / Sunday the outside lines must use the parent sheet type
+    // (--desc / sec-note), not the A5 card Title/Heading sizes.
+    var slots = { above: '', below: '' };
+    if (root.EBMenus && root.EBMenus.cardOutsideSlots) {
+      slots = root.EBMenus.cardOutsideSlots(littleRule || {});
+    } else if (littleRule) {
+      slots.above = String(littleRule.above || '').trim();
+      slots.below = String(littleRule.below || '').trim();
+    }
     var kidsInner = sectionBlock(
       bag.littleBells.name,
       bag.littleBells.dishes,
       littleRule,
       frameKind,
-      { note: '' }
+      { note: slots.above, afterNote: slots.below }
     );
-    kidsInner = cardOutsideWrap(kidsInner, littleRule);
     if (!col) {
       return {
         html: '<section class="sec">' + kidsInner + '</section>',
@@ -2575,7 +2604,9 @@
       '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px}' +
       '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:0 0 auto}' +
       '.cols-balanced .col-feature > .scallop .scallop-pad,.cols-balanced .col-fill > .scallop .scallop-pad{flex:0 0 auto}' +
-      '.sec-note{font-family:var(--sans);font-size:var(--desc);color:#3a342c;line-height:1.35;margin:0 0 8px;font-weight:400}' +
+      '.sec-note{font-family:var(--sans);font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));color:#3a342c;line-height:1.35;margin:0 0 8px;font-weight:400;text-transform:none;letter-spacing:normal}' +
+      '.sec-note-after{margin-top:8px}' +
+      '.sec-stack{margin:0}' +
       '.scallop .sec-note{margin-top:0}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
