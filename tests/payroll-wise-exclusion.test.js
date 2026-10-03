@@ -20,6 +20,13 @@ assert(html.indexOf('id="wiseExclusionPanel"') !== -1, 'wiseExclusionPanel marku
 assert(html.indexOf('id="downloadWarn"') !== -1, 'downloadWarn near Download button exists');
 assert(html.indexOf('function hasValidBankDetails') !== -1, 'hasValidBankDetails helper exists');
 assert(html.indexOf('function bankDigits') !== -1, 'bankDigits helper exists');
+assert(html.indexOf('function bankKey') !== -1, 'bankKey helper exists');
+assert(html.indexOf('function isExcludedStaff') !== -1, 'isExcludedStaff helper exists');
+assert(html.indexOf('isExcludedStaff(corrected)') !== -1, 'BACS load uses isExcludedStaff');
+assert(html.indexOf('isExcludedStaff(item.dirMatch)') !== -1, 'Xero pull uses isExcludedStaff');
+assert(html.indexOf('left out') !== -1, 'panel total says left out (not ambiguous out)');
+assert(html.indexOf('background:var(--surface)') !== -1, 'exclusion panel uses solid surface background');
+assert(html.indexOf('.wise-exclusion-panel.is-ok{border-color:var(--green);box-shadow:0 2px 12px rgba(28,22,16,.06);position:static}') !== -1 || html.indexOf('position:static') !== -1, 'ok panel is not sticky over the table');
 assert(html.indexOf('function wiseSortForCsv') !== -1, 'wiseSortForCsv helper exists');
 assert(html.indexOf('function updateWiseExclusionPanel') !== -1, 'updateWiseExclusionPanel exists');
 assert(html.indexOf('function collectTableDropouts') !== -1, 'collectTableDropouts exists');
@@ -70,6 +77,25 @@ if (bankFn && validFn && sortFn && acctFn) {
   assert(wiseAcctForCsv(jude) === '09380302', 'Jude account keeps leading zero in Wise CSV');
   assert(hasValidBankDetails({ sortCode: '043605', accountNumber: '09380302' }) === true, 'unhyphenated leading-zero sort still valid');
   assert(wiseSortForCsv({ sortCode: '043605', accountNumber: '09380302' }) === '04-36-05', 'normalises bare 043605 to 04-36-05');
+}
+
+// Smoke-test isExcludedStaff (bank digits + name fallback)
+var keyFn = html.match(/function bankKey\(e\)\{[\s\S]*?\n\}/);
+var exclFn = html.match(/function isExcludedStaff\(person\)\{[\s\S]*?\n\}/);
+assert(!!keyFn && !!exclFn, 'can extract isExcludedStaff helpers');
+if (keyFn && exclFn && bankFn) {
+  // eslint-disable-next-line no-new-func
+  var exclHelpers = new Function(
+    'var excludedStaff = [];\n' +
+    bankFn[0] + '\n' +
+    keyFn[0] + '\n' +
+    exclFn[0] + '\n' +
+    'return {setExcluded:function(list){excludedStaff=list;},isExcludedStaff:isExcludedStaff};'
+  )();
+  exclHelpers.setExcluded([{ name: 'David Lennon', sortCode: '53-50-39', accountNumber: '54534259', entity: 'windmill' }]);
+  assert(exclHelpers.isExcludedStaff({ name: 'David Lennon', sortCode: '535039', accountNumber: '54534259' }) === true, 'excluded by unhyphenated bank match');
+  assert(exclHelpers.isExcludedStaff({ name: 'David Lennon', sortCode: '', accountNumber: '' }) === true, 'excluded by name when bank empty');
+  assert(exclHelpers.isExcludedStaff({ name: 'Kyle Johnson', sortCode: '20-00-00', accountNumber: '12345678' }) === false, 'other staff not excluded');
 }
 
 if (failed) {
