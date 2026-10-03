@@ -1583,7 +1583,7 @@
     if (typeof root.EBMenuPrint !== 'undefined' && root.EBMenuPrint.planFluidLayout) {
       var menu = menuById(hostId);
       if (menu.kind === 'long') {
-        var layout = root.EBMenuPrint.planFluidLayout(menu, list);
+        var layout = root.EBMenuPrint.planFluidLayout(menu, list, { includes: includes });
         plan.fit = layout.fit;
         plan.text = layout.summary;
         if (extras.length) plan.text += ' Includes ' + extras.join(', ') + '.';
@@ -2529,17 +2529,18 @@
     'Little Bells': {
       width: 'full',
       frame: true,
-      // Sheet Extra info; card menus override sell (ice cream) in defaultSectionLayoutBook.
-      note: 'Little Bells on Sunday in addition have a choice of roasts at half price of the adults.\n\nAll below £9.50 to include a choice of one scoop of ice cream or sorbet.',
+      // One outside-text block for the kids card AND when Little Bells is on Main / Sunday.
+      // Blank line: offer (price / ice cream) above the dish box; rest below.
+      note: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.\n\nLittle Bells on Sunday have a choice of roasts at half the price of the adults.',
       tip: false,
-      sell: 'Two Scoops of Ice-Cream\nSalted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip\n£9.50'
+      sell: ''
     },
     Sandwiches: {
       width: 'column',
       frame: true,
       // Main/Sunday under-title (hours). Card menu overrides note to the filling spiel.
       note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with nachos & salad. FRIES UPGRADE +£2.',
-      // Tip = include a selling box on Main/Sunday even with 0 fillings listed
+      // Tip = selling box on Main/Sunday when Sandwiches is ticked and has 0 fillings
       tip: true,
       sell: 'A selection of sandwiches is available — ask the team.'
     },
@@ -2569,6 +2570,45 @@
     return out;
   }
 
+  function foldLittleBellsOutside_(rule) {
+    rule = rule || {};
+    var note = String(rule.note || '').replace(/\r\n/g, '\n').trim();
+    var sell = String(rule.sell || '').replace(/\r\n/g, '\n').trim();
+    // Old “Two Scoops £9.50” dessert block fought the included-scoop offer — drop it.
+    if (/two\s*scoops/i.test(sell)) sell = '';
+    if (sell && note.toLowerCase().indexOf(sell.toLowerCase()) === -1) {
+      note = [sell, note].filter(Boolean).join('\n\n');
+    }
+    return note;
+  }
+
+  /** Offer (price / ice cream) above the dish box; Sunday / hours below. Blank line splits. */
+  function splitCardOutsideText(raw) {
+    var text = String(raw || '').replace(/\r\n/g, '\n').trim();
+    if (!text) return { above: '', below: '' };
+    var parts = text.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean);
+    function isOffer(p) {
+      return /£\s*\d|one scoop|ice cream or sorbet|all below|all £/i.test(p);
+    }
+    if (parts.length === 1) {
+      return isOffer(parts[0]) ? { above: parts[0], below: '' } : { above: '', below: parts[0] };
+    }
+    var above = [];
+    var below = [];
+    parts.forEach(function (p) {
+      if (isOffer(p) && !below.length) above.push(p);
+      else below.push(p);
+    });
+    if (!above.length) {
+      return { above: parts[0], below: parts.slice(1).join('\n\n') };
+    }
+    return { above: above.join('\n\n'), below: below.join('\n\n') };
+  }
+
+  function littleBellsOutsideText(rule) {
+    return foldLittleBellsOutside_(rule);
+  }
+
   function normalizeSectionLayout(raw) {
     var base = defaultSectionLayout();
     if (!raw || typeof raw !== 'object') return base;
@@ -2591,6 +2631,10 @@
         sell: String(sell || '').replace(/\r\n/g, '\n').trim()
       };
     });
+    if (base['Little Bells']) {
+      base['Little Bells'].note = foldLittleBellsOutside_(base['Little Bells']);
+      base['Little Bells'].sell = '';
+    }
     return base;
   }
 
@@ -2624,8 +2668,8 @@
     }
     if (out['little-bells'] && out['little-bells']['Little Bells']) {
       out['little-bells']['Little Bells'] = Object.assign({}, out['little-bells']['Little Bells'], {
-        note: 'Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options',
-        sell: 'Two Scoops of Ice-Cream\nSalted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip\n£9.50'
+        note: String((DEFAULT_SECTION_LAYOUT['Little Bells'] || {}).note || ''),
+        sell: ''
       });
     }
     return out;
@@ -2755,6 +2799,8 @@
     normalizeSectionLayoutBook: normalizeSectionLayoutBook,
     sectionLayoutForMenu: sectionLayoutForMenu,
     sectionLayoutFor: sectionLayoutFor,
+    littleBellsOutsideText: littleBellsOutsideText,
+    splitCardOutsideText: splitCardOutsideText,
     isColumnWidth: isColumnWidth,
     isFullWidth: isFullWidth,
     isLockedColumnWidth: isLockedColumnWidth,

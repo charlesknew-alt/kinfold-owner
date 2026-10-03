@@ -264,7 +264,7 @@
     return html;
   }
 
-  /** Group sandwich fillings by price for A5 card faces. */
+  /** Group sandwich fillings by price for A5 card faces. Spiel prints outside the box. */
   function cardSandwichesInner(dishes, plan) {
     var groups = {};
     var order = [];
@@ -283,18 +283,40 @@
       });
       if (p) html += '<div class="lb-price">£' + esc(p) + '</div>';
     });
-    // Text under the fillings — editable in Blocks → Text outside dishes.
+    return scallop(html);
+  }
+
+  function cardSandwichesSpiel(plan) {
     var spiel = '';
     if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
       spiel = String(root.EBMenus.sectionLayoutFor('Sandwiches', plan && plan.sectionLayout).note || '').trim();
     } else if (plan && plan.sectionLayout && plan.sectionLayout.Sandwiches) {
       spiel = String(plan.sectionLayout.Sandwiches.note || '').trim();
     }
-    if (!spiel) {
-      spiel = 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad';
+    return spiel || 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad';
+  }
+
+  function cardOutsideHtml(text, cls) {
+    var raw = String(text || '').trim();
+    if (!raw) return '';
+    return '<div class="' + (cls || 'card-outside') + '">' + esc(raw).replace(/\n/g, '<br>') + '</div>';
+  }
+
+  function cardOfferHtml(text) {
+    var raw = String(text || '').trim();
+    if (!raw) return '';
+    var lines = raw.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var html = '<div class="card-offer">';
+    if (lines.length && /^all\s*£|^£\d/i.test(lines[0])) {
+      html += '<div class="lb-price-line">' + esc(lines[0]) + '</div>';
+      if (lines.length > 1) {
+        html += '<div class="lb-offer-sub">' + esc(lines.slice(1).join('\n')).replace(/\n/g, '<br>') + '</div>';
+      }
+    } else {
+      html += esc(raw).replace(/\n/g, '<br>');
     }
-    html += '<div class="desc card-spiel">' + esc(spiel).replace(/\n/g, '<br>') + '</div>';
-    return scallop(html);
+    html += '</div>';
+    return html;
   }
 
   function groupBySection(dishes) {
@@ -1115,8 +1137,9 @@
   }
 
   /**
-   * Decide page split + which optional selling boxes fit.
-   * Promo never forces an extra page.
+   * Decide page split + which optional chrome (logo / feature panels) fits.
+   * Sandwiches follow the Dishes include tick (or named fillings already on the
+   * sheet) — they are never dropped because of space. Promo never forces an extra page.
    */
   function planFluidLayout(menu, dishes, opts) {
     opts = opts || {};
@@ -1186,7 +1209,8 @@
         back = backWithoutRoasts;
       }
     }
-    // Named fillings always print on Main/Sunday; 0 dishes → Tip box only when tip is on
+    // Named fillings on the composed sheet always print. Empty tip box only when
+    // staff ticked Sandwiches on this host AND Tip is on — never “if it fits”.
     var sandDishCount = sandwichDishesOf(bag).length;
     var sandRule = { tip: true, sell: '', note: '', frame: true };
     if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
@@ -1196,11 +1220,15 @@
     }
     var isLongHost = menu.kind === 'long' || menu.id === 'main' || menu.id === 'main-next' || menu.id === 'sunday' ||
       (root.EBMenus && root.EBMenus.isMainSheet && root.EBMenus.isMainSheet(menu.id));
+    var includeSandwiches = opts.includes && typeof opts.includes === 'object'
+      ? !!opts.includes.sandwiches
+      : null;
+    var tipOn = sandRule.tip !== false && sandRule.tip !== 'no' && sandRule.tip !== 0;
     var wantSandwiches;
     if (sandDishCount > 0) {
       wantSandwiches = isLongHost || !!bag.sandwiches;
     } else if (isLongHost) {
-      wantSandwiches = sandRule.tip !== false && sandRule.tip !== 'no' && sandRule.tip !== 0;
+      wantSandwiches = includeSandwiches === true && tipOn;
     } else {
       wantSandwiches = !!bag.sandwiches;
     }
@@ -1226,7 +1254,8 @@
       p2: null,
       leftover: { p1: 0, p2: 0 },
       summary: '',
-      fillers: []
+      fillers: [],
+      sandwichesLocked: !!wantSandwiches
     };
     if (roastsOnP1) layout.fillers.push('Sunday Roasts (page 1 — balance)');
     if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
@@ -1241,8 +1270,8 @@
     if (bag.specialDesserts) oneNeed += sectionUnits(bag.specialDesserts, true);
     if (bag.sides) oneNeed += sectionUnits(bag.sides, false);
     if (bag.sauces) oneNeed += sectionUnits(bag.sauces, false);
-    // Named sandwich fillings count as food; empty tip box is optional chrome.
-    var foodNeed = oneNeed + (sandDishCount > 0 ? sandCost : 0);
+    // Named fillings and a ticked empty tip box both count as food (not optional chrome).
+    var foodNeed = oneNeed + (wantSandwiches ? sandCost : 0);
     var roastN = bag.sundayRoasts && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0;
     var mainsN = bag.mains && bag.mains.dishes ? bag.mains.dishes.length : 0;
     var dessertN = bag.desserts && bag.desserts.dishes ? bag.desserts.dishes.length : 0;
@@ -1271,17 +1300,8 @@
         }
       }
       if (wantSandwiches) {
-        if (sandDishCount > 0) {
-          layout.p1.sandwiches = true;
-          layout.fillers.push('Sandwiches (page 1)');
-        } else {
-          add = tryAdd(left1, sandCost + 4);
-          if (add.ok) {
-            layout.p1.sandwiches = true;
-            left1 = add.left;
-            layout.fillers.push('Sandwiches box (page 1)');
-          }
-        }
+        layout.p1.sandwiches = true;
+        layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches box (page 1)');
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
       add = tryAdd(left1, COST.footLogo + 6);
@@ -1320,8 +1340,9 @@
       // Desserts + a full mains list leave little room — be stricter about fillers
       var tightBack = !!(bag.desserts && bag.mains && bag.mains.dishes.length >= 6);
       if (wantSandwiches) {
-        // Lower-margin section — keep it quieter on page 2, in a column.
-        // Only fall back to page 1 if page 2 cannot take the pack.
+        // Lower-margin section — quieter on page 2, in a column.
+        // Fall back to page 1 if page 2 is jammed.
+        // Never drop — staff ticked Sandwiches (or listed fillings).
         var p2SandCost = tightBack ? sandCost + 2 : sandCost;
         var addSx = tryAdd(p2left, p2SandCost);
         if (addSx.ok) {
@@ -1335,19 +1356,25 @@
             p1left = addSandP1.left;
             layout.leftover.p1 = p1left;
             layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches box (page 1)');
-          } else if (bag.sides || sandDishCount) {
+          } else if (bag.sides) {
             var addS = tryAdd(p1left, sandCost);
             if (addS.ok) {
               layout.p1.sandwiches = true;
               p1left = addS.left;
-              if (bag.sides) {
-                layout.p1.sidesOnP1 = true;
-                layout.p2.sidesOnP2 = false;
-                p2left += sectionUnits(bag.sides, false);
-              }
+              layout.p1.sidesOnP1 = true;
+              layout.p2.sidesOnP2 = false;
+              p2left += sectionUnits(bag.sides, false);
               layout.leftover.p1 = p1left;
               layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches + sides (page 1)');
+            } else {
+              layout.p2.sandwiches = true;
+              p2left = Math.max(0, p2left - sandCost);
+              layout.fillers.push(sandDishCount ? 'Sandwiches (page 2 — kept)' : 'Sandwiches box (page 2 — kept)');
             }
+          } else {
+            layout.p2.sandwiches = true;
+            p2left = Math.max(0, p2left - sandCost);
+            layout.fillers.push(sandDishCount ? 'Sandwiches (page 2 — kept)' : 'Sandwiches box (page 2 — kept)');
           }
         }
       }
@@ -1426,8 +1453,8 @@
     }
 
     var bits = layout.fillers.length
-      ? ' Auto-adds where they fit: ' + layout.fillers.join('; ') + '.'
-      : ' Sheet is full — no room for extra selling boxes.';
+      ? ' Layout: ' + layout.fillers.join('; ') + '.'
+      : ' Sheet is full — logo / extra feature panels skipped.';
     var typeNote = ' Type range: names ' + TYPE_RANGE.name.min + '–' + TYPE_RANGE.name.max +
       'pt, descriptions ' + TYPE_RANGE.desc.min + '–' + TYPE_RANGE.desc.max +
       'pt, section titles ' + TYPE_RANGE.title.min + '–' + TYPE_RANGE.title.max +
@@ -1711,7 +1738,8 @@
   function buildLong(menu, dishes, plan, ver) {
     var layout = (plan && plan.layout) || planFluidLayout(menu, dishes, {
       promos: (plan && plan.promos) || [],
-      sectionLayout: plan && plan.sectionLayout
+      sectionLayout: plan && plan.sectionLayout,
+      includes: plan && plan.includes
     });
     dishes = layout.orderedDishes || orderDishesForPrint(dishes);
     var bag = layout.bag || pickSections(dishes);
@@ -2231,6 +2259,8 @@
   function buildCard(menu, dishes, plan, ver) {
     function face() {
       var title = menu.name.replace(/ menu$/i, '');
+      var offerAbove = '';
+      var outsideBelow = '';
       var inner;
       if (menu.id === 'lunch-club') {
         var secs = groupBySection(dishes);
@@ -2251,35 +2281,18 @@
         } else if (plan && plan.sectionLayout && plan.sectionLayout['Little Bells']) {
           lbRule = plan.sectionLayout['Little Bells'];
         }
-        var iceLines = String(lbRule.sell || '').trim().split(/\n+/).map(function (l) {
-          return l.trim();
-        }).filter(Boolean);
-        if (!iceLines.length) {
-          iceLines = [
-            'Two Scoops of Ice-Cream',
-            'Salted Caramel, Chocolate, Strawberry, Vanilla or Mint Choc Chip',
-            '£9.50'
-          ];
-        }
-        var sundayNote = String(lbRule.note || '').trim() ||
-          'Little Bells on Sunday have a choice of roasts at half price of the adults in addition to above options';
-        var iceTitle = iceLines[0] || 'Two Scoops of Ice-Cream';
-        var icePrice = '';
-        var iceDesc = [];
-        iceLines.slice(1).forEach(function (line) {
-          if (/^£?\d/.test(line) && !icePrice) icePrice = line.replace(/^£/, '');
-          else iceDesc.push(line);
-        });
-        inner =
-          scallop(dishes.map(function (d) { return dishCentered(d, { hidePrice: true, hideLunch: true }); }).join('')) +
-          '<div class="lb-foot">' +
-            '<div class="lb-ice">' + esc(iceTitle) + '</div>' +
-            (iceDesc.length ? '<div class="desc">' + esc(iceDesc.join(' ')).replace(/\n/g, '<br>') + '</div>' : '') +
-            (icePrice ? '<div class="lb-price">£' + esc(icePrice) + '</div>' : '') +
-            '<div class="desc">' + esc(sundayNote).replace(/\n/g, '<br>') + '</div>' +
-          '</div>';
+        var lbOutside = (root.EBMenus && root.EBMenus.littleBellsOutsideText)
+          ? root.EBMenus.littleBellsOutsideText(lbRule)
+          : String((lbRule && lbRule.note) || '').trim();
+        var lbSplit = (root.EBMenus && root.EBMenus.splitCardOutsideText)
+          ? root.EBMenus.splitCardOutsideText(lbOutside)
+          : { above: '', below: lbOutside };
+        offerAbove = cardOfferHtml(lbSplit.above);
+        outsideBelow = cardOutsideHtml(lbSplit.below);
+        inner = scallop(dishes.map(function (d) { return dishCentered(d, { hidePrice: true, hideLunch: true }); }).join(''));
       } else if (menu.id === 'sandwiches') {
         inner = cardSandwichesInner(dishes, plan);
+        outsideBelow = cardOutsideHtml(cardSandwichesSpiel(plan));
       } else if (menu.id === 'specials') {
         // Board note from Blocks → Specials section “Extra info” (default in layout; editable)
         var specialsNote = '';
@@ -2316,7 +2329,10 @@
         // desserts etc
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
       }
-      var faceCls = 'card-face fill-page fill-airy' + (menu.id === 'specials' ? ' specials-face' : '');
+      var faceCls = 'card-face fill-page fill-airy' +
+        (menu.id === 'specials' ? ' specials-face' : '') +
+        (menu.id === 'little-bells' ? ' kids-face' : '') +
+        (menu.id === 'sandwiches' ? ' sandwiches-face' : '');
       return (
         '<article class="' + faceCls + '">' +
           '<div class="card-top">' +
@@ -2324,7 +2340,9 @@
             '<img class="logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="">' +
             (menu.id === 'lunch-club' ? '' : '<h1>' + esc(title) + '</h1>') +
           '</div>' +
+          offerAbove +
           '<div class="card-mid">' + inner + '</div>' +
+          outsideBelow +
           allergy() +
         '</article>'
       );
@@ -2374,6 +2392,8 @@
       '.card-mid{flex:1 1 auto;display:flex;flex-direction:column;justify-content:stretch;min-height:0;gap:8px}' +
       '.card-face .allergy{flex:0 0 auto;margin-top:4px}' +
       '.card-face.fill-airy{--dish-gap:20px;--sec-gap:20px;--name:14pt;--desc:11.5pt;--title:22pt}' +
+      '.card-face.kids-face.fill-airy,.card-face.kids-face.fill-roomy{--dish-gap:12px;--name:12pt;--desc:10pt;--title:20pt}' +
+      '.card-face.sandwiches-face.fill-airy{--dish-gap:12px;--name:12.5pt;--desc:10.5pt;--title:20pt}' +
       '.card-face.fill-roomy{--dish-gap:16px;--sec-gap:16px;--name:13pt;--desc:11pt;--title:20pt}' +
       '.card-face.fill-normal{--dish-gap:12px;--sec-gap:13px;--name:12pt;--desc:10.5pt;--title:18pt}' +
       '.card-face.fill-tight{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:9.75pt;--title:16pt}' +
@@ -2385,6 +2405,10 @@
       '.card-face.fill-tight .scallop-pad,.card-face.fill-compact .scallop-pad,.card-face.fill-dense .scallop-pad{justify-content:flex-start}' +
       '.card-face .lb-foot{flex:0 0 auto;text-align:center}' +
       '.card-face .lb-price{text-align:center;margin:6px 0 10px}' +
+      '.card-offer{flex:0 0 auto;text-align:center;margin:0 0 8px;font-family:var(--serif);color:var(--ink);line-height:1.3}' +
+      '.card-offer .lb-price-line{font-family:var(--serif);font-weight:700;font-size:16pt;letter-spacing:.04em;margin:0 0 4px}' +
+      '.card-offer .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:11pt;line-height:1.35}' +
+      '.card-outside{flex:0 0 auto;text-align:center;margin:8px 4px 0;font-family:var(--sans);font-weight:600;font-size:10.5pt;line-height:1.4;color:#1c1610}' +
       '.card-face .card-spiel{margin-top:8px}' +
       '.card-face .logo{width:86px;margin:0 auto 8px}' +
       '.card-face h1{margin:2px 0 10px;font-size:min(var(--title),22pt)}' +
@@ -2709,7 +2733,8 @@
     if (menu.kind === 'long') {
       layout = planFluidLayout(menu, dishes, {
         promos: plan.promos || [],
-        sectionLayout: plan.sectionLayout
+        sectionLayout: plan.sectionLayout,
+        includes: plan.includes
       });
       plan.layout = layout;
       plan.fit = layout.fit;
