@@ -418,8 +418,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow127') !== -1, 'menus page cache-bust is flow127');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow127') !== -1, 'hub menus link cache-bust is flow127');
+assert(page.indexOf('flow128') !== -1, 'menus page cache-bust is flow128');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow128') !== -1, 'hub menus link cache-bust is flow128');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -857,6 +857,8 @@ assert(page.indexOf('data-layout-above') !== -1 && page.indexOf('data-layout-bel
   'card menus have above/below text boxes');
 assert(page.indexOf('data-layout-above-kind') !== -1 && page.indexOf('Type size') !== -1,
   'each outside-text box has a type-size picker');
+assert(page.indexOf('parent menu type') !== -1,
+  'UI says card type sizes do not apply when ticked onto Main / Sunday');
 var lbDef = api.sectionLayoutForMenu('little-bells')['Little Bells'];
 assert(/All £9\.50/.test(lbDef.above || '') && /one scoop/i.test(lbDef.above || ''),
   'Little Bells default above box is the £9.50 / ice cream offer');
@@ -1646,6 +1648,52 @@ assert(/card-blurb-text/.test(kidsCardHtml) && /card-blurb-below/.test(kidsCardH
 assert(kidsCardHtml.indexOf('CUSTOM SUNDAY NOTE') > kidsCardHtml.indexOf('All £8.00'),
   'offer stays above the Sunday line');
 assert(/kids-face/.test(kidsCardHtml), 'Little Bells card uses calmer kids type');
+
+var embedKidsHtml = print.build(api.menuById('sunday'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Little Bells', 'Kids Mac & Cheese', '', '', ''),
+  api.dish('Desserts', 'Sticky Toffee', 'custard', '7.95', 'v')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      above: 'All £9.50\nto include a scoop.',
+      aboveKind: 'title',
+      below: 'Sunday roasts at half adult price.',
+      belowKind: 'heading',
+      frame: false,
+      width: 'column'
+    },
+    Desserts: { width: 'column', frame: true }
+  })
+});
+assert(/All £9\.50/.test(embedKidsHtml) && /Sunday roasts at half adult price/.test(embedKidsHtml),
+  'embedded Little Bells still prints above and below wording');
+assert(embedKidsHtml.indexOf('class="card-blurb') === -1,
+  'embedded Little Bells does not use card Title/Heading sizes');
+assert(/sec-note/.test(embedKidsHtml) && /sec-note-after/.test(embedKidsHtml),
+  'embedded outside text uses parent section-note type');
+var embedSandHtml = print.build(api.menuById('main'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Sandwiches', 'BLT', 'fries', '10.95', ''),
+  api.dish('Sandwiches', 'Fish Finger', 'tartare', '11.95', '')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    Sandwiches: {
+      note: '(12 – 2.45 pm)',
+      above: 'CARD HEADING SHOULD NOT DOMINATE',
+      aboveKind: 'title',
+      below: '',
+      belowKind: 'heading',
+      frame: true,
+      width: 'column',
+      tip: true
+    }
+  })
+});
+assert(/12\s*[–-]\s*2\.45/.test(embedSandHtml), 'embedded sandwiches keep hours as section note');
+assert(embedSandHtml.indexOf('class="card-blurb') === -1,
+  'embedded sandwiches do not use card Title size');
 
 // Promo must not force over
 var crowdedDishes = aloneDishes.concat(api.composeDishes(book, 'main', { desserts: true, sandwiches: true, 'little-bells': true }).filter(function (d) {

@@ -425,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow127"></script>
-  <script src="menus-print.js?v=20260928-flow127"></script>
-  <script src="menus-ingest.js?v=20260928-flow127"></script>
+  <script src="menus.js?v=20260928-flow128"></script>
+  <script src="menus-print.js?v=20260928-flow128"></script>
+  <script src="menus-ingest.js?v=20260928-flow128"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1801,7 +1801,7 @@
       html += '<textarea data-layout-below="' + escapeAttr(sec) + '" rows="' + (opts.belowRows || 3) + '" placeholder="' +
         escapeAttr(opts.belowPlaceholder || 'Optional — prints under the dishes') + '">' +
         escapeAttr(slots.below) + '</textarea>';
-      html += '<p class="note" style="margin:6px 0 0">Same idea as party top/bottom blurbs: pick Title / Heading / Paragraph / Text for each box. Never inside the frilly frame.</p>';
+      html += '<p class="note" style="margin:6px 0 0">Type size is for this <strong>card</strong> (Title / Heading / Paragraph / Text). When Little Bells or Sandwiches are ticked onto Main or Sunday, the same wording uses the parent menu type — not these card sizes.</p>';
       return html;
     }
 
