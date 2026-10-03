@@ -1742,7 +1742,7 @@
     return { html: html, usedTitles: fill.usedTitles || [] };
   }
 
-  /** Blocks Column section with no food partner — pair with feature panels so columns finish level. */
+  /** Blocks Column section with no food partner — stay a half-column, never full-bleed. */
   function columnSoloSection(title, dishes, rule, opts) {
     opts = opts || {};
     if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
@@ -1751,6 +1751,7 @@
     var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
+      skipPromos: true,
       secClass: 'column-solo-row',
       colsClass: 'column-solo-cols',
       leftClass: '',
@@ -1759,11 +1760,24 @@
     return { html: leveled.html, usedPromoTitles: leveled.usedTitles };
   }
 
+  /** Drop-in / leftover section stays in its Blocks area: Column lock stays a column. */
+  function renderUnpairedSection(title, dishes, rule, opts) {
+    opts = opts || {};
+    if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
+    if (lockedColumnWidth(rule)) {
+      return columnSoloSection(title, dishes, rule, opts);
+    }
+    return {
+      html: '<section class="sec">' + sectionBlock(title, dishes, rule) + '</section>',
+      usedPromoTitles: []
+    };
+  }
+
   /**
-   * Little Bells respects Blocks width.
-   * GOLDEN RULE: Column pairs with food first (Desserts if Column/Best fit, else Sides),
-   * then feature panels under the shorter column so both finish level.
-   * Locked Full partners are never forced into the pair.
+   * Little Bells respects this host menu’s Blocks width.
+   * Column stays a column; Full width stays full-bleed. Drop-in wording
+   * (offer / Sunday line) stays in the Little Bells area — never across Desserts
+   * and never with Stay a While jammed under the plates.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
     opts = opts || {};
@@ -1779,7 +1793,7 @@
       bag.littleBells.dishes,
       littleRule,
       frameKind,
-      { noteHtml: extras.aboveHtml, skipBelow: !!col, afterHtml: col ? '' : extras.belowHtml }
+      { noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
     );
     if (!col) {
       return {
@@ -1790,8 +1804,7 @@
       };
     }
     var kidsU = sectionUnits(bag.littleBells, !!(littleRule && littleRule.frame)) +
-      noteUnits(extras.slots.above);
-    var pairFooter = extras.belowHtml;
+      noteUnits(extras.slots.above) + noteUnits(extras.slots.below);
     // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
@@ -1805,8 +1818,7 @@
         secClass: 'little-desserts-row',
         colsClass: 'cols-little-desserts',
         leftClass: 'col-little',
-        rightClass: 'col-desserts',
-        footer: pairFooter
+        rightClass: 'col-desserts'
       });
       return {
         html: dessPair.html,
@@ -1815,7 +1827,7 @@
         usedPromoTitles: dessPair.usedTitles
       };
     }
-    // Food first: Sides when Blocks allows Column / Best fit — then level with panels.
+    // Food first: Sides when Blocks allows Column / Best fit.
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide');
@@ -1824,11 +1836,11 @@
       var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
+        skipPromos: true,
         secClass: 'little-sides-row',
         colsClass: 'cols-little-sides',
         leftClass: 'col-little',
-        rightClass: 'col-sides',
-        footer: pairFooter
+        rightClass: 'col-sides'
       });
       return {
         html: sidePair.html,
@@ -1837,15 +1849,15 @@
         usedPromoTitles: sidePair.usedTitles
       };
     }
-    // No food partner — feature panels on the short side (never a blank half).
+    // No food partner — stay a half-column. Do not fill the other half with rooms copy.
     var solo = levelOppositeColumns(kidsInner, kidsU, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
+      skipPromos: true,
       secClass: 'little-solo-row',
       colsClass: 'cols-little-solo',
       leftClass: 'col-little',
-      rightClass: 'col-promo',
-      footer: pairFooter
+      rightClass: 'col-promo'
     });
     return {
       html: solo.html,
@@ -2231,7 +2243,11 @@
       usedPromoTitles = usedPromoTitles.concat(littleP1.usedPromoTitles || []);
       p1 += littleP1.html;
       if (bag.desserts && !littleP1.usedDesserts) {
-        p1 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
+        var dessSolo1 = renderUnpairedSection(bag.desserts.name, bag.desserts.dishes, dessRule, {
+          promos: promos, excludeTitles: usedPromoTitles
+        });
+        usedPromoTitles = usedPromoTitles.concat(dessSolo1.usedPromoTitles || []);
+        p1 += dessSolo1.html;
       }
       if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
         p1 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
@@ -2279,6 +2295,7 @@
         {
           promos: promos,
           excludeTitles: usedPromoTitles,
+          skipPromos: true,
           secClass: 'mains-sand-row',
           leftClass: '',
           rightClass: 'col-food'
@@ -2301,7 +2318,11 @@
     usedPromoTitles = usedPromoTitles.concat(littleP2.usedPromoTitles || []);
     p2 += littleP2.html;
     if (bag.desserts && !littleP2.usedDesserts) {
-      p2 += '<section class="sec">' + sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule) + '</section>';
+      var dessSolo2 = renderUnpairedSection(bag.desserts.name, bag.desserts.dishes, dessRule, {
+        promos: promos, excludeTitles: usedPromoTitles
+      });
+      usedPromoTitles = usedPromoTitles.concat(dessSolo2.usedPromoTitles || []);
+      p2 += dessSolo2.html;
     }
     if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
       p2 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
@@ -2678,10 +2699,10 @@
       '.sheet-blurb{text-align:center;text-transform:none;letter-spacing:normal;color:var(--ink);max-width:36em;margin-left:auto;margin-right:auto}' +
       '.sheet-blurb-above{margin:0 0 8px}' +
       '.sheet-blurb-below{margin:10px 4px 0}' +
-      '.sheet-blurb-title{font-family:var(--serif);font-weight:700;font-size:clamp(14pt,calc(var(--title) - 4pt),20pt);line-height:1.25}' +
-      '.sheet-blurb-heading{font-family:var(--serif);font-weight:600;font-size:clamp(12.5pt,calc(var(--name) + 3pt),16pt);line-height:1.3}' +
-      '.sheet-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),calc(var(--desc) + 0.6pt),var(--desc-max));line-height:1.4}' +
-      '.sheet-blurb-text{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.4;color:#3a342c}' +
+      '.sheet-blurb-title{font-family:var(--serif);font-weight:700;font-size:clamp(16pt,var(--title),22pt);line-height:1.2}' +
+      '.sheet-blurb-heading{font-family:var(--serif);font-weight:600;font-size:clamp(13.5pt,calc(var(--name) + 4pt),17pt);line-height:1.3}' +
+      '.sheet-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:clamp(11pt,var(--name),12pt);line-height:1.4}' +
+      '.sheet-blurb-text{font-family:var(--sans);font-weight:400;font-size:clamp(9.5pt,var(--desc),10.5pt);line-height:1.4;color:#3a342c}' +
       '.sheet-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 3px;text-transform:none}' +
       '.sheet-offer .lb-price-line{font-size:clamp(16pt,calc(var(--name) + 7pt),22pt);font-weight:700;letter-spacing:.04em}' +
       '.sheet-offer .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:clamp(10.5pt,calc(var(--desc) + 1pt),12pt);line-height:1.35;text-transform:none}' +
