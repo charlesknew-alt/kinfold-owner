@@ -345,8 +345,10 @@
     kind = String(kind || 'paragraph').toLowerCase();
     if (['title', 'heading', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
     place = place === 'above' ? 'above' : 'below';
-    return '<div class="sheet-blurb sheet-blurb-' + kind + ' sheet-blurb-' + place + '">' +
-      blurbInnerHtml(raw, kind) + '</div>';
+    var inner = blurbInnerHtml(raw, kind);
+    var offer = (place === 'above' && /lb-price-line/.test(inner)) ? ' sheet-offer' : '';
+    return '<div class="sheet-blurb sheet-blurb-' + kind + ' sheet-blurb-' + place + offer + '">' +
+      inner + '</div>';
   }
 
   function sheetOutsideParts(rule) {
@@ -1687,22 +1689,25 @@
    */
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
     opts = opts || {};
-    var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
-    var fillOpts = {
-      leftFrame: opts.leftFrame || 'box',
-      rightFrame: opts.rightFrame || 'wide',
-      excludeTitles: opts.excludeTitles || []
-    };
-    var fill = planPromoFill(leftU || 0, rightU || 0, remaining, fillOpts);
-    // If one side is still clearly short and planPromoFill returned nothing usable, force panels.
-    var gap = (rightU || 0) - (leftU || 0);
-    if (!fill.left && !fill.right && remaining.length && Math.abs(gap) > 2.5) {
-      fill = planPromoFill(leftU || 0, rightU || 0, remaining, {
-        leftFrame: fillOpts.leftFrame,
-        rightFrame: fillOpts.rightFrame,
-        excludeTitles: fillOpts.excludeTitles,
-        force: { shorter: gap > 0 ? 'left' : 'right', panels: Math.abs(gap) > 9 ? 2 : 1 }
-      });
+    var fill = { left: '', right: '', usedTitles: [] };
+    if (!opts.skipPromos) {
+      var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
+      var fillOpts = {
+        leftFrame: opts.leftFrame || 'box',
+        rightFrame: opts.rightFrame || 'wide',
+        excludeTitles: opts.excludeTitles || []
+      };
+      fill = planPromoFill(leftU || 0, rightU || 0, remaining, fillOpts);
+      // If one side is still clearly short and planPromoFill returned nothing usable, force panels.
+      var gap = (rightU || 0) - (leftU || 0);
+      if (!fill.left && !fill.right && remaining.length && Math.abs(gap) > 2.5) {
+        fill = planPromoFill(leftU || 0, rightU || 0, remaining, {
+          leftFrame: fillOpts.leftFrame,
+          rightFrame: fillOpts.rightFrame,
+          excludeTitles: fillOpts.excludeTitles,
+          force: { shorter: gap > 0 ? 'left' : 'right', panels: Math.abs(gap) > 9 ? 2 : 1 }
+        });
+      }
     }
     var leftFeat = fill.left ? '<div class="col-feature">' + fill.left + '</div>' : '';
     var rightFeat = fill.right ? '<div class="col-feature">' + fill.right + '</div>' : '';
@@ -1777,6 +1782,7 @@
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
+        skipPromos: true,
         secClass: 'little-desserts-row',
         colsClass: 'cols-little-desserts',
         leftClass: 'col-little',
@@ -2500,8 +2506,8 @@
         '--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
         '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
         '--dish-gap-min:8px;--dish-gap-max:14px}' +
-      '*{box-sizing:border-box} body{margin:0;background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
-      '.toolbar{position:sticky;top:0;z-index:5;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}' +
+      '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
+      '.toolbar{position:sticky;top:0;z-index:50;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
       '.toolbar label.paper-opt{display:inline-flex;align-items:center;gap:6px;background:#3a342c;color:#f4eae3}' +
       '.toolbar label.paper-opt input{margin:0}' +
@@ -2636,6 +2642,8 @@
          CONTENT-SIZED (little promotions) — never grow into a tall empty frame.
          Food (Sides / sandwich sell) balances the short column instead. */
       '.cols-balanced{align-items:stretch}' +
+      '.preview-clip{width:100%;overflow:hidden}' +
+      '.cols-balanced .col{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}' +
       '.cols-balanced .col-events,.cols-balanced .col-food{min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column}' +
       '.cols-balanced .col-body{flex:0 0 auto;min-width:0}' +
       '.cols-balanced .col-logo{flex:0 0 auto;display:flex;justify-content:flex-end;margin:0 0 8px}' +
@@ -2651,11 +2659,13 @@
       '.sheet-blurb{text-align:center;text-transform:none;letter-spacing:normal;color:var(--ink);max-width:36em;margin-left:auto;margin-right:auto}' +
       '.sheet-blurb-above{margin:0 0 8px}' +
       '.sheet-blurb-below{margin:10px 4px 0}' +
-      '.sheet-blurb-title{font-family:var(--serif);font-weight:700;font-size:clamp(var(--name-min),calc(var(--name) + 2.5pt),var(--title-max));line-height:1.25}' +
-      '.sheet-blurb-heading{font-family:var(--serif);font-weight:600;font-size:clamp(var(--name-min),calc(var(--name) + 0.4pt),var(--name-max));line-height:1.3}' +
+      '.sheet-blurb-title{font-family:var(--serif);font-weight:700;font-size:clamp(14pt,calc(var(--title) - 4pt),20pt);line-height:1.25}' +
+      '.sheet-blurb-heading{font-family:var(--serif);font-weight:600;font-size:clamp(12.5pt,calc(var(--name) + 3pt),16pt);line-height:1.3}' +
       '.sheet-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),calc(var(--desc) + 0.6pt),var(--desc-max));line-height:1.4}' +
       '.sheet-blurb-text{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.4;color:#3a342c}' +
       '.sheet-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 3px;text-transform:none}' +
+      '.sheet-offer .lb-price-line{font-size:1.15em}' +
+      '.sheet-offer .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:clamp(10.5pt,calc(var(--desc) + 1pt),12pt);line-height:1.35;text-transform:none}' +
       '.sheet-blurb .lb-offer-sub{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.35;text-transform:none}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
@@ -2736,8 +2746,9 @@
       '.a5-face.party-page{text-align:center}' +
       '.a5-face .party-dish .desc{text-align:center}' +
       '.a5-face .party-promos{text-align:center;margin-top:auto;padding-top:6px}' +
-      '@media print{body{background:#fff}.toolbar{display:none}' +
-      '.page,.sheet,.cut-sheet{margin:0;box-shadow:none}' +
+      '@media print{body{background:#fff;overflow:visible}.toolbar{display:none}' +
+      '.preview-clip{overflow:visible}.sheet-stack{transform:none!important;margin-bottom:0!important}' +
+      '.page,.sheet,.cut-sheet{margin:0;box-shadow:none;transform:none!important}' +
       (guillotine
         ? '@page{size:A4 landscape;margin:0}.cut-sheet{page-break-after:always}.cut-sheet:last-child{page-break-after:auto}'
         : (landscape ? '@page{size:A4 landscape;margin:0}' : '@page{size:A4 portrait;margin:0}') +
@@ -2913,7 +2924,7 @@
       body = buildLong(menu, dishes, plan, ver);
     }
 
-    var a4Stack = landscape ? body : '<div class="sheet-stack mode-panel mode-a4">' + body + '</div>';
+    var a4Stack = '<div class="sheet-stack mode-panel mode-a4">' + body + '</div>';
     var a5Stack = '';
     if (!landscape) {
       a5Stack = '<div class="sheet-stack mode-panel mode-a5">' + wrapGuillotine(body) + '</div>';
@@ -2925,7 +2936,9 @@
       : (menu.kind === 'party' ? ' Standardised party layout.' : '');
 
     var html = (
-      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(printSheetLabel(menu.name, ver)) + '</title>' +
+      '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>' + esc(printSheetLabel(menu.name, ver)) + '</title>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
@@ -2946,7 +2959,7 @@
         '<span class="hint" id="printHint">' + esc(dateHint) +
         ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.</span>' +
       '</div>' +
-      a4Stack + a5Stack +
+      '<div class="preview-clip">' + a4Stack + a5Stack + '</div>' +
       '<script>(function(){' +
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact","fill-dense"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
@@ -3115,6 +3128,24 @@
           'balanceOppositeColumns();' +
           'a4.forEach(spreadPage);' +
           'a5.forEach(spreadPage);' +
+          'fitPreviewToScreen();' +
+        '}' +
+        'function fitPreviewToScreen(){' +
+          'var stacks=document.querySelectorAll(".sheet-stack");' +
+          '[].forEach.call(stacks,function(el){el.style.transform="";el.style.marginBottom="";});' +
+          'if(document.body.classList.contains("is-printing"))return;' +
+          'if(window.matchMedia&&window.matchMedia("print").matches)return;' +
+          'var vw=Math.max(280,(document.documentElement.clientWidth||window.innerWidth||800)-8);' +
+          '[].forEach.call(stacks,function(stack){' +
+            'var cs=window.getComputedStyle(stack);' +
+            'if(cs.display==="none"||!stack.offsetWidth)return;' +
+            'var page=stack.querySelector(".page,.sheet,.cut-sheet")||stack;' +
+            'var w=page.offsetWidth;if(!w)return;' +
+            'var s=Math.min(1,vw/w);if(s>=0.995)return;' +
+            'stack.style.transformOrigin="top left";' +
+            'stack.style.transform="scale("+s+")";' +
+            'stack.style.marginBottom=((s-1)*stack.scrollHeight)+"px";' +
+          '});' +
         '}' +
         'function sync(){var a5=document.body.classList.contains("paper-a5");' +
         'var s=document.createElement("style");s.id="paperPrint";var old=document.getElementById("paperPrint");' +
@@ -3126,7 +3157,9 @@
         '}' +
         'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();' +
         'setTimeout(fitPages,80);setTimeout(fitPages,400);setTimeout(fitPages,1200);' +
-        'window.addEventListener("beforeprint",fitPages);' +
+        'window.addEventListener("beforeprint",function(){document.body.classList.add("is-printing");fitPages();});' +
+        'window.addEventListener("afterprint",function(){document.body.classList.remove("is-printing");fitPages();});' +
+        'window.addEventListener("resize",fitPreviewToScreen);' +
         'var SAVE_META=' + JSON.stringify({
           menuId: menu.id,
           menuName: menu.name,
@@ -3808,7 +3841,17 @@
 
   function openPrintHtml(html) {
     if (!html) return false;
-    var w = window.open('', '_blank');
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var w = window.open(url, '_blank');
+    if (w) {
+      setTimeout(function () {
+        try { URL.revokeObjectURL(url); } catch (e) {}
+      }, 120000);
+      return true;
+    }
+    try { URL.revokeObjectURL(url); } catch (e2) {}
+    w = window.open('', '_blank');
     if (!w) return false;
     w.document.open();
     w.document.write(html);
