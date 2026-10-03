@@ -414,9 +414,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow122"></script>
-  <script src="menus-print.js?v=20260928-flow122"></script>
-  <script src="menus-ingest.js?v=20260928-flow122"></script>
+  <script src="menus.js?v=20260928-flow123"></script>
+  <script src="menus-print.js?v=20260928-flow123"></script>
+  <script src="menus-ingest.js?v=20260928-flow123"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -3598,7 +3598,10 @@
       } else {
         html += '<p>No lunch club ticks — lunch club stays a separate menu.</p>';
       }
-        html += '<p><strong>Print order in each category</strong> — dearest dish first, then mixed high/low so the sheet sells. Not the order you typed.</p>';
+      html += '<p><strong>Print order in each category</strong> — dearest dish first, then mixed high/low so the sheet sells. Not the order you typed.</p>';
+      html += '</div>';
+
+      if (!list.length) {
         html += '<div class="plan-sheet"><div class="plan-empty">No dishes on this sheet yet.</div></div>';
         return html;
       }
