@@ -548,6 +548,35 @@
     }).catch(function () { return null; });
   }
 
+  /** Proof-read the live dish list (names + descriptions) before Generate. */
+  function reviewSpelling(dishes, onProgress) {
+    var url = getCloudUrl();
+    if (!url) return Promise.resolve(null);
+    if (onProgress) onProgress('Checking spelling…');
+    var slim = (dishes || []).slice(0, 80).map(function (d) {
+      return {
+        id: d && d.id,
+        name: d && d.name,
+        description: d && d.description
+      };
+    });
+    return fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'reviewSpelling',
+        dishes: slim
+      })
+    }, 12000).then(function (res) {
+      return res.text().then(function (t) {
+        var data;
+        try { data = JSON.parse(t); } catch (e) { return null; }
+        if (!data || !data.ok) return null;
+        return data;
+      });
+    }).catch(function () { return null; });
+  }
+
   function dishesFromText(text) {
     if (!root.EBMenus) return [];
     return root.EBMenus.parsePaste(text).filter(function (d) {
@@ -747,6 +776,7 @@
     getCloudUrl: getCloudUrl,
     cloudPost: cloudPost,
     reviewLayout: reviewLayout,
+    reviewSpelling: reviewSpelling,
     AI_URL_KEY: AI_URL_KEY,
     CLOUD_DEFAULT_URL: CLOUD_DEFAULT_URL
   };

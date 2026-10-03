@@ -63,6 +63,22 @@ var aiPack = api.dishesFromAiMenu({
 });
 assert(aiPack.dishes.length === 1 && aiPack.dishes[0].name === 'Soup', 'AI pack drops junk names');
 assert(aiPack.spellingFixes.length === 1 && aiPack.spellingFixes[0].to === 'Soup', 'spellingFixes normalised');
+assert(typeof api.autoCorrectSpelling === 'function' && typeof api.scanMenuSpelling === 'function',
+  'live spelling helpers exported');
+assert(api.autoCorrectSpelling('Seperate tomatos with mayonaise').text === 'Separate tomatoes with mayonnaise',
+  'common food typos auto-correct on save');
+assert(api.scanMenuSpelling([{ id: 'd1', name: 'Calimari', description: 'bruscetta, mozarella' }]).length >= 2,
+  'menu scan finds spelling mistakes before generate');
+assert(api.applySpellingFixesToDishes(
+  [{ id: 'd1', name: 'Calimari', description: 'with mayonaise' }],
+  [{ from: 'Calimari', to: 'Calamari', where: 'name', dishId: 'd1' }]
+)[0].name === 'Calamari', 'apply spelling fixes rewrites the dish');
+assert(page.indexOf('spellCheckThenGenerate_') !== -1 && page.indexOf('spellHintsName') !== -1,
+  'spelling suggests as you type and gates Generate');
+assert(page.indexOf('dearest dish first') !== -1,
+  'generate plan explains selling mix inside each category');
+assert(ingestJs.indexOf('reviewSpelling') !== -1 && aiGs.indexOf('reviewSpellingWithGemini_') !== -1,
+  'Menu AI can proof-read the live sheet before print');
 assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
@@ -226,6 +242,45 @@ assert(page.indexOf('main-next') !== -1 && page.indexOf('Swap Main') !== -1,
   'UI offers Main (upcoming) with swap/copy controls');
 assert(page.indexOf("'main-next'") !== -1 && /main-next/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
   'staff menu list includes Main (upcoming)');
+assert(page.indexOf('doAddExtraMenu') !== -1 && page.indexOf('doAddExtraSection') !== -1,
+  'owner can add extra menus and categories');
+assert(page.indexOf('renderOwnerExtrasBox') !== -1 && page.indexOf('if (!isStaffMode) html += renderOwnerExtrasBox()') !== -1,
+  'extra menus/categories UI is owner-only');
+assert(typeof api.addCustomSection === 'function' && typeof api.addCustomMenu === 'function',
+  'custom section/menu helpers exported');
+api.resetExtras();
+var addedSec = api.addCustomSection('sharing boards');
+assert(addedSec.ok && addedSec.section === 'Sharing Boards' && api.SECTIONS.indexOf('Sharing Boards') !== -1,
+  'owner can add a new category');
+assert(api.sectionOptions('main').indexOf('Sharing Boards') !== -1,
+  'new category appears in the Section dropdown');
+assert(api.isHeading('Sharing Boards') === 'Sharing Boards',
+  'paste headings recognise the new category');
+assert(api.guessSection('Sharing Boards', 'Charcuterie', '') === 'Sharing Boards',
+  'dishes stay in the custom category');
+assert(api.defaultSectionLayout()['Sharing Boards'] && api.defaultSectionLayout()['Sharing Boards'].width === 'full',
+  'new category gets a default Blocks rule');
+assert(!api.addCustomSection('Mains').ok, 'built-in category names are rejected');
+assert(!api.addCustomSection('sharing boards').ok, 'duplicate category is rejected');
+var addedMenu = api.addCustomMenu({ name: 'Brunch', kind: 'long' });
+assert(addedMenu.ok && addedMenu.menu.id === 'brunch' && api.menuById('brunch').kind === 'long',
+  'owner can add a long extra menu');
+assert(api.includableMenus('brunch').some(function (m) { return m.id === 'specials'; }),
+  'extra long menus can tick Specials onto the sheet');
+var addedCard = api.addCustomMenu({ name: 'Bar snacks', kind: 'card' });
+assert(addedCard.ok && api.menuById('bar-snacks').kind === 'card',
+  'owner can add a card extra menu');
+assert(api.includableMenus('main').some(function (m) { return m.id === 'bar-snacks'; }),
+  'extra card menus can be ticked onto Main');
+assert(!api.addCustomMenu({ name: 'Main menu', kind: 'long' }).ok,
+  'built-in menu names are rejected');
+assert(api.removeCustomSection('Sharing Boards').ok && api.SECTIONS.indexOf('Sharing Boards') === -1,
+  'owner can remove a custom category');
+assert(api.removeCustomMenu('brunch').ok && api.menuById('brunch').id === 'main',
+  'owner can remove a custom menu');
+api.resetExtras();
+assert(api.SECTIONS.indexOf('Sharing Boards') === -1 && !api.MENUS.some(function (m) { return m.id === 'bar-snacks'; }),
+  'resetExtras restores built-in menus and categories');
 assert(page.indexOf("'little-bells'") !== -1 && page.indexOf('Little Bells (kids)') !== -1,
   'staff Menus offer Little Bells kids include checkbox');
 assert(page.indexOf("STAFF_MENU_IDS") !== -1 && /little-bells/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
@@ -326,8 +381,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow121') !== -1, 'menus page cache-bust is flow121');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow121') !== -1, 'hub menus link cache-bust is flow121');
+assert(page.indexOf('flow122') !== -1, 'menus page cache-bust is flow122');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow122') !== -1, 'hub menus link cache-bust is flow122');
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,

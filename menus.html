@@ -131,6 +131,27 @@
       .catalogue-filters { grid-template-columns: minmax(0, 1.4fr) minmax(140px, 220px); align-items: end; }
     }
     .catalogue-filters .field { margin-top: 0; }
+    .owner-extras-grid {
+      display: grid; gap: 10px; margin: 10px 0 0;
+    }
+    @media (min-width: 640px) {
+      .owner-extras-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .owner-extras-grid .field { margin-top: 0; }
+    .owner-extras-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+    .owner-extras-row input, .owner-extras-row select { flex: 1 1 140px; min-width: 0; }
+    .owner-extras-list { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+    .owner-extras-list li {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      padding: 4px 0;
+    }
+    .spell-hints {
+      margin: 4px 0 8px; padding: 8px 10px; background: #fff8e8; border: 1px solid #e4d9cc;
+      border-radius: 10px; font-size: 13px;
+    }
+    .spell-hints[hidden] { display: none !important; }
+    .spell-hints strong { font-weight: 700; }
+    .spell-hints button.link { margin-left: 8px; }
     .catalogue-row {
       padding: 12px 0; border-bottom: 1px solid var(--line);
     }
@@ -393,9 +414,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow121"></script>
-  <script src="menus-print.js?v=20260928-flow121"></script>
-  <script src="menus-ingest.js?v=20260928-flow121"></script>
+  <script src="menus.js?v=20260928-flow122"></script>
+  <script src="menus-print.js?v=20260928-flow122"></script>
+  <script src="menus-ingest.js?v=20260928-flow122"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -410,7 +431,9 @@
     var LAYOUT_STORAGE = 'eb-menu-section-layout-v2';
     var LAYOUT_STORAGE_LEGACY = 'eb-menu-section-layout-v1';
     var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1';
+    var EXTRAS_STORAGE = 'eb-menus-extras-v1';
     var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at';
+    applyExtrasFromStorage();
     var book = load();
     var metaBook = loadMeta();
     var promoBank = loadPromoBank();
@@ -421,6 +444,7 @@
     var mode = 'complete';
     var dishId = '';
     var includes = loadIncludes();
+    ensureExtraMenuStores();
     var pendingReview = null;
     var editingPromoId = '';
     var pendingAddSection = ''; // Add from a subcategory → pre-fill Section
@@ -464,9 +488,51 @@
         ];
 
     function visibleMenus() {
-      if (!isStaffMode) return EBMenus.MENUS;
       return EBMenus.MENUS.filter(function (m) {
-        return STAFF_MENU_IDS.indexOf(m.id) !== -1;
+        if (!isStaffMode) return true;
+        if (STAFF_MENU_IDS.indexOf(m.id) !== -1) return true;
+        return !!(m.custom && m.kind !== 'party' && m.staff !== false);
+      });
+    }
+
+    function staffCanSeeMenu(m) {
+      if (!m) return false;
+      if (STAFF_MENU_IDS.indexOf(m.id) !== -1) return true;
+      return !!(m.custom && m.kind !== 'party' && m.staff !== false);
+    }
+
+    function extrasFromStorage() {
+      try {
+        var raw = JSON.parse(localStorage.getItem(EXTRAS_STORAGE) || 'null');
+        if (raw && typeof raw === 'object') return raw;
+      } catch (e) {}
+      return { sections: [], menus: [] };
+    }
+
+    function applyExtrasFromStorage() {
+      if (!window.EBMenus || typeof EBMenus.applyExtras !== 'function') return;
+      var raw = extrasFromStorage();
+      EBMenus.applyExtras({
+        sections: raw.sections || [],
+        menus: raw.menus || []
+      });
+    }
+
+    function currentExtrasState() {
+      if (EBMenus.extrasState) return EBMenus.extrasState();
+      return extrasFromStorage();
+    }
+
+    function ensureExtraMenuStores() {
+      var extras = currentExtrasState();
+      (extras.menus || []).forEach(function (m) {
+        if (!book[m.id]) book[m.id] = [];
+        if (!layoutBook[m.id] && EBMenus.defaultSectionLayout) {
+          layoutBook[m.id] = EBMenus.defaultSectionLayout();
+        }
+        if (m.kind === 'party' && !metaBook[m.id] && EBMenus.emptyMeta) {
+          metaBook[m.id] = EBMenus.emptyMeta();
+        }
       });
     }
 
@@ -604,6 +670,9 @@
       try {
         localStorage.setItem(CATALOGUE_STORAGE, JSON.stringify(dishCatalogue || []));
       } catch (eCat) {}
+      try {
+        localStorage.setItem(EXTRAS_STORAGE, JSON.stringify(currentExtrasState()));
+      } catch (eEx) {}
       try { localStorage.setItem(CLOUD_AT_KEY, String(cloudUpdatedAt || 0)); } catch (e) {}
     }
     function save() {
@@ -627,7 +696,9 @@
         promoTicks: promoTicks,
         // Per-menu Blocks book (main / sunday / …). Legacy flat maps migrate on load.
         sectionLayout: layoutBook,
-        dishCatalogue: dishCatalogue || []
+        dishCatalogue: dishCatalogue || [],
+        extraMenus: (currentExtrasState().menus) || [],
+        extraSections: (currentExtrasState().sections) || []
       };
     }
     function applyCloudState(state) {
@@ -637,6 +708,12 @@
         if (Array.isArray(state.book[k]) && state.book[k].length) hasDish = true;
       });
       if (!hasDish) return false;
+      if (EBMenus.applyExtras && (Array.isArray(state.extraMenus) || Array.isArray(state.extraSections))) {
+        EBMenus.applyExtras({
+          sections: state.extraSections,
+          menus: state.extraMenus
+        });
+      }
       book = EBMenus.tidyBook ? EBMenus.tidyBook(state.book) : state.book;
       if (!book.main) {
         var seeded = EBMenus.seed();
@@ -662,6 +739,7 @@
         dishCatalogue = state.dishCatalogue;
       }
       cloudUpdatedAt = Number(state.updatedAt) || Date.now();
+      ensureExtraMenuStores();
       saveLocalOnly();
       if (!book[menuId] || !book[menuId].length) {
         menuId = 'main';
@@ -1479,6 +1557,8 @@
         html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
       }
 
+      if (!isStaffMode) html += renderOwnerExtrasBox();
+
       if (EBMenus.isMainSheet && EBMenus.isMainSheet(menu.id)) {
         html += renderMainPairBox(menu, list);
       }
@@ -1489,7 +1569,7 @@
         html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print.</p><div class="include-row">';
         extras.forEach(function (m) {
           // Staff: same menus they can open as tabs (incl. Little Bells kids on Main/Sunday)
-          if (isStaffMode && STAFF_MENU_IDS.indexOf(m.id) === -1) return;
+          if (isStaffMode && !staffCanSeeMenu(m)) return;
           var on = !!(includes[menuId] && includes[menuId][m.id]);
           var label = m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
           html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(label) + '</label>';
@@ -1530,6 +1610,59 @@
       html += '</div>';
       if (isStaffMode) return withFlowNav(html, null, 2, 'Next · Generate');
       return withFlowNav(html, null, 2, 'Next · Blocks');
+    }
+
+    /**
+     * Owner: extra menus (tabs) and extra categories (section dropdowns).
+     * Staff see extra menus on the picker once saved; they cannot add/remove.
+     */
+    function renderOwnerExtrasBox() {
+      var extras = currentExtrasState();
+      var html = '<div class="include-box outside-text-box" id="ownerExtrasBox" style="margin-bottom:14px">';
+      html += '<h3>Add menus &amp; categories</h3>';
+      html += '<p class="note" style="margin:0 0 10px">Owner only. New menus appear as tabs (staff see them too, except Party). New categories appear in the Section dropdown on every menu.</p>';
+      html += '<div class="owner-extras-grid">';
+
+      html += '<div>';
+      html += '<label class="field">New menu</label>';
+      html += '<div class="owner-extras-row">';
+      html += '<input type="text" id="extraMenuName" placeholder="e.g. Brunch" maxlength="48" autocomplete="off">';
+      html += '<select id="extraMenuKind" aria-label="Menu type">';
+      html += '<option value="long">Long sheet (like Main)</option>';
+      html += '<option value="card">Card (like Specials)</option>';
+      html += '<option value="party">Party / occasion</option>';
+      html += '</select>';
+      html += '<button type="button" class="go" id="doAddExtraMenu">Add menu</button>';
+      html += '</div>';
+      if (extras.menus && extras.menus.length) {
+        html += '<ul class="owner-extras-list">';
+        extras.menus.forEach(function (m) {
+          var kindLabel = m.kind === 'card' ? 'card' : (m.kind === 'party' ? 'party' : 'long');
+          html += '<li><span>' + escapeAttr(m.name) + ' <span class="note">(' + kindLabel + ')</span></span>';
+          html += '<button type="button" class="link" data-remove-extra-menu="' + escapeAttr(m.id) + '">Remove</button></li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div>';
+
+      html += '<div>';
+      html += '<label class="field">New category</label>';
+      html += '<div class="owner-extras-row">';
+      html += '<input type="text" id="extraSectionName" placeholder="e.g. Sharing boards" maxlength="48" autocomplete="off">';
+      html += '<button type="button" class="go" id="doAddExtraSection">Add category</button>';
+      html += '</div>';
+      if (extras.sections && extras.sections.length) {
+        html += '<ul class="owner-extras-list">';
+        extras.sections.forEach(function (s) {
+          html += '<li><span>' + escapeAttr(s) + '</span>';
+          html += '<button type="button" class="link" data-remove-extra-section="' + escapeAttr(s) + '">Remove</button></li>';
+        });
+        html += '</ul>';
+      }
+      html += '</div>';
+
+      html += '</div></div>';
+      return html;
     }
 
     /**
@@ -1869,7 +2002,7 @@
     function renderGenerateStep(menu) {
       var html = '';
       if (isStaffMode) {
-        html += '<p class="step-lede">Check the plan, then generate. On the preview: <strong>Save</strong> stamps Print history (then opens it), or <strong>Discard</strong> to keep editing. Print PDF and Email from history.</p>';
+        html += '<p class="step-lede">Check the plan, then generate. Print order inside each category is a selling mix (dearest first, not a price ladder). Spelling is checked before the preview opens. On the preview: <strong>Save</strong> stamps Print history (then opens it), or <strong>Discard</strong> to keep editing. Print PDF and Email from history.</p>';
       } else {
         html += '<p class="step-lede">Check the plan, then generate. Preview is Save or Discard only — Save stamps the week / Roman into <strong>Print history</strong> and takes you there to Print PDF or Email. Discard closes the preview so you can edit.</p>';
       }
@@ -1928,6 +2061,7 @@
       html += '<div class="dish-form-layout"><div class="dish-form-fields">';
       html += '<label class="field">Section</label>' + sectionSelectHtml(formItem.section || 'Mains', 'id="section"');
       html += field('Name', 'name', formItem.name);
+      html += '<div class="spell-hints" id="spellHintsName" hidden></div>';
       // Suggest sits under the name on phone/tablet/desktop so it is easy to tap.
       html += '<aside class="dish-suggest" id="dishSuggest" aria-live="polite">';
       if (mode === 'replace') {
@@ -1942,6 +2076,7 @@
       html += '<div class="dish-suggest-list" id="dishSuggestList"></div>';
       html += '</aside>';
       html += field('Description', 'description', formItem.description);
+      html += '<div class="spell-hints" id="spellHintsDesc" hidden></div>';
       html += field('Price', 'price', formItem.price);
       html += marksEditor(mode === 'replace' ? formItem : item, 'form');
       var saveLabel = mode === 'add' ? 'Add dish' : (mode === 'replace' ? 'Replace dish' : 'Save changes');
@@ -2277,8 +2412,112 @@
       return html;
     }
 
+    function retargetSection_(fromName, toName) {
+      var from = String(fromName || '');
+      var to = String(toName || 'Mains');
+      Object.keys(book || {}).forEach(function (mid) {
+        if (!Array.isArray(book[mid])) return;
+        book[mid] = book[mid].map(function (d) {
+          if ((d.section || '') !== from) return d;
+          var copy = {};
+          Object.keys(d).forEach(function (k) { copy[k] = d[k]; });
+          copy.section = to;
+          return copy;
+        });
+      });
+    }
+
+    function bindOwnerExtras_() {
+      var addMenu = document.getElementById('doAddExtraMenu');
+      if (addMenu) {
+        addMenu.onclick = function () {
+          var nameEl = document.getElementById('extraMenuName');
+          var kindEl = document.getElementById('extraMenuKind');
+          var res = EBMenus.addCustomMenu({
+            name: nameEl ? nameEl.value : '',
+            kind: kindEl ? kindEl.value : 'long'
+          });
+          if (!res.ok) {
+            alert(res.error || 'Could not add menu.');
+            return;
+          }
+          ensureExtraMenuStores();
+          menuId = res.menu.id;
+          dishId = '';
+          mode = 'complete';
+          flowStep = 1;
+          save();
+          render();
+        };
+      }
+      var addSec = document.getElementById('doAddExtraSection');
+      if (addSec) {
+        addSec.onclick = function () {
+          var nameEl = document.getElementById('extraSectionName');
+          var res = EBMenus.addCustomSection(nameEl ? nameEl.value : '');
+          if (!res.ok) {
+            alert(res.error || 'Could not add category.');
+            return;
+          }
+          save();
+          render();
+        };
+      }
+      document.querySelectorAll('[data-remove-extra-menu]').forEach(function (b) {
+        b.onclick = function () {
+          var id = b.getAttribute('data-remove-extra-menu');
+          var menu = EBMenus.menuById(id);
+          var n = (book[id] || []).length;
+          var label = (menu && menu.name) || id;
+          if (!confirm('Delete ' + label + (n ? ' and its ' + n + ' dish' + (n === 1 ? '' : 'es') : '') + '? This cannot be undone.')) return;
+          EBMenus.removeCustomMenu(id);
+          delete book[id];
+          delete layoutBook[id];
+          delete metaBook[id];
+          delete includes[id];
+          Object.keys(includes).forEach(function (host) {
+            if (includes[host]) delete includes[host][id];
+          });
+          if (promoTicks[id]) delete promoTicks[id];
+          if (menuId === id) menuId = 'main';
+          ensureExtraMenuStores();
+          save();
+          render();
+        };
+      });
+      document.querySelectorAll('[data-remove-extra-section]').forEach(function (b) {
+        b.onclick = function () {
+          var name = b.getAttribute('data-remove-extra-section');
+          var used = 0;
+          Object.keys(book || {}).forEach(function (mid) {
+            (book[mid] || []).forEach(function (d) {
+              if ((d.section || '') === name) used += 1;
+            });
+          });
+          var msg = 'Remove category ' + name + '?';
+          if (used) msg += ' ' + used + ' dish' + (used === 1 ? '' : 'es') + ' will move to Mains.';
+          if (!confirm(msg)) return;
+          if (used) retargetSection_(name, 'Mains');
+          EBMenus.removeCustomSection(name);
+          save();
+          render();
+        };
+      });
+      ['extraMenuName', 'extraSectionName'].forEach(function (fid) {
+        var el = document.getElementById(fid);
+        if (!el) return;
+        el.onkeydown = function (ev) {
+          if (ev.key !== 'Enter') return;
+          ev.preventDefault();
+          if (fid === 'extraMenuName' && addMenu) addMenu.click();
+          if (fid === 'extraSectionName' && addSec) addSec.click();
+        };
+      });
+    }
+
     function bindEditor() {
       bindDateField();
+      bindOwnerExtras_();
       document.querySelectorAll('[data-view-jump]').forEach(function (b) {
         b.onclick = function () {
           var next = b.getAttribute('data-view-jump');
@@ -2673,7 +2912,7 @@
       html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 8px" id="reviewCount">' +
         (pendingReview.dishes || []).length + ' dishes · fix sections · merge / split / delete · then save</p>';
       html += '<div id="reviewList" style="max-height:58vh;overflow:auto;border:1px solid #e4d9cc;border-radius:10px;padding:10px 12px;background:#fff;font-family:system-ui,sans-serif;font-size:13px"></div>';
-      if (result.kind === 'party' && menuId !== 'party') {
+      if (result.kind === 'party' && EBMenus.menuById(menuId).kind !== 'party') {
         html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:12px 0 0;color:#5a2a2a">AI thinks this is a <strong>party / Christmas</strong> set menu. Use the <strong>Party / Christmas</strong> tab for the standardised centred layout.</p>';
       }
       html += '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px">';
@@ -2971,7 +3210,62 @@
       });
     }
 
+    function paintSpellHints_(fieldId, boxId, where) {
+      var el = document.getElementById(fieldId);
+      var box = document.getElementById(boxId);
+      if (!el || !box || !EBMenus.suggestSpellingForText) return;
+      var extra = catalogueSpellExtra_();
+      extra.push(el.value || '');
+      var hits = EBMenus.suggestSpellingForText(el.value || '', {
+        extra: extra,
+        where: where
+      });
+      if (!hits.length) {
+        box.hidden = true;
+        box.innerHTML = '';
+        return;
+      }
+      box.hidden = false;
+      var html = '';
+      hits.forEach(function (f, i) {
+        html += '<div><span style="text-decoration:line-through;opacity:.75">' + escapeAttr(f.from) +
+          '</span> → <strong>' + escapeAttr(f.to) + '</strong>';
+        html += '<button type="button" class="link" data-spell-i="' + i + '">Use this</button></div>';
+      });
+      box.innerHTML = html;
+      box.querySelectorAll('[data-spell-i]').forEach(function (btn) {
+        btn.onclick = function () {
+          var i = parseInt(btn.getAttribute('data-spell-i'), 10);
+          var f = hits[i];
+          if (!f) return;
+          el.value = EBMenus.autoCorrectSpelling
+            ? spellReplaceLive_(el.value, f.from, f.to)
+            : el.value;
+          paintSpellHints_(fieldId, boxId, where);
+        };
+      });
+    }
+
+    function spellReplaceLive_(text, from, to) {
+      var re = new RegExp('\\b' + String(from).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+      return String(text || '').replace(re, to);
+    }
+
+    function bindSpellHints() {
+      ['name', 'description'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var boxId = id === 'name' ? 'spellHintsName' : 'spellHintsDesc';
+        var where = id === 'name' ? 'name' : 'description';
+        paintSpellHints_(id, boxId, where);
+        el.addEventListener('input', function () {
+          paintSpellHints_(id, boxId, where);
+        });
+      });
+    }
+
     function bindDishSuggest() {
+      bindSpellHints();
       var nameEl = document.getElementById('name');
       var listEl = document.getElementById('dishSuggestList');
       var secEl = document.getElementById('section');
@@ -3137,7 +3431,11 @@
     function onSave() {
       var next = readForm();
       if (!next.name) return;
-      // Keep exactly what staff typed in Name (e.g. Vegan Katsu Curry).
+      if (EBMenus.autoCorrectSpelling) {
+        next.name = EBMenus.autoCorrectSpelling(next.name).text;
+        next.description = EBMenus.autoCorrectSpelling(next.description).text;
+      }
+      // Keep exactly what staff typed in Name (e.g. Vegan Katsu Curry), after typo fix.
       // tidyDishFields still lifts tags / cleans description, but must not
       // rewrite the printed title on Adjust / Add / Replace.
       var typedName = next.name;
@@ -3300,9 +3598,7 @@
       } else {
         html += '<p>No lunch club ticks — lunch club stays a separate menu.</p>';
       }
-      html += '</div>';
-
-      if (!list.length) {
+        html += '<p><strong>Print order in each category</strong> — dearest dish first, then mixed high/low so the sheet sells. Not the order you typed.</p>';
         html += '<div class="plan-sheet"><div class="plan-empty">No dishes on this sheet yet.</div></div>';
         return html;
       }
@@ -3347,6 +3643,102 @@
     }
 
     function generateMenu() {
+      spellCheckThenGenerate_(function () {
+        generateMenuAfterSpell_();
+      });
+    }
+
+    function catalogueSpellExtra_() {
+      return (dishCatalogue || []).map(function (e) { return e && e.name; }).filter(Boolean);
+    }
+
+    function mergeSpellingFixes_(a, b) {
+      return (EBMenus.normalizeSpellingFixes || function (x) { return x || []; })
+        ([].concat(a || [], b || []));
+    }
+
+    function spellCheckThenGenerate_(done) {
+      var list = dishes();
+      if (!list.length || !EBMenus.scanMenuSpelling) {
+        done();
+        return;
+      }
+      var local = EBMenus.scanMenuSpelling(list, { extra: catalogueSpellExtra_() });
+      var aiFn = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewSpelling)
+        ? EBMenuIngest.reviewSpelling
+        : null;
+      var btn = document.getElementById('doGenerate');
+      if (btn) { btn.disabled = true; btn.textContent = 'Checking spelling…'; }
+      var aiP = aiFn ? aiFn(list) : Promise.resolve(null);
+      aiP.then(function (ai) {
+        var aiFixes = (ai && ai.spellingFixes) ? ai.spellingFixes : [];
+        var fixes = mergeSpellingFixes_(local, aiFixes);
+        if (!fixes.length) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+          done();
+          return;
+        }
+        showSpellingGate_(fixes, done);
+      }, function () {
+        if (!local.length) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+          done();
+          return;
+        }
+        showSpellingGate_(local, done);
+      });
+    }
+
+    function showSpellingGate_(fixes, done) {
+      var btn = document.getElementById('doGenerate');
+      var existing = document.getElementById('spellGateOverlay');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      var overlay = document.createElement('div');
+      overlay.id = 'spellGateOverlay';
+      overlay.setAttribute('style',
+        'position:fixed;inset:0;z-index:45;background:rgba(28,22,16,.55);display:flex;align-items:center;justify-content:center;padding:24px');
+      var card = document.createElement('div');
+      card.setAttribute('style',
+        'background:#fffaf4;color:#1c1610;max-width:480px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);max-height:80vh;overflow:auto');
+      var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
+      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Spelling check</div>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Suggested changes on this sheet. Apply them, or keep what you typed.</p>';
+      html += '<ul style="margin:0 0 16px;padding-left:18px;font-family:system-ui,sans-serif;font-size:14px;line-height:1.45">';
+      fixes.forEach(function (f) {
+        html += '<li style="margin:0 0 6px"><span style="text-decoration:line-through;opacity:.75">' +
+          escapeAttr(f.from) + '</span> → <strong>' + escapeAttr(f.to) + '</strong>';
+        if (f.dishName) html += ' <span style="opacity:.65;font-size:12px">(' + escapeAttr(f.dishName) +
+          (f.where ? ' · ' + escapeAttr(f.where) : '') + ')</span>';
+        html += '</li>';
+      });
+      html += '</ul>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+      html += '<button type="button" id="spellApplyAll" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Apply all &amp; generate</button>';
+      html += '<button type="button" id="spellKeepTyped" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Keep as typed</button>';
+      html += '</div>';
+      card.innerHTML = html;
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      function closeGate() {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+      }
+      document.getElementById('spellApplyAll').onclick = function () {
+        if (EBMenus.applySpellingFixesToDishes) {
+          book[menuId] = EBMenus.applySpellingFixesToDishes(dishes(), fixes);
+          if (EBMenus.sortDishesBySection) book[menuId] = EBMenus.sortDishesBySection(book[menuId]);
+          save();
+        }
+        closeGate();
+        done();
+      };
+      document.getElementById('spellKeepTyped').onclick = function () {
+        closeGate();
+        done();
+      };
+    }
+
+    function generateMenuAfterSpell_() {
       var result = composed();
       if (result.plan.fit === 'over') {
         alert('Too much information for two readable pages.\n\nRemove some sections, or put Desserts / Little Bells / Sandwiches on their own menus, then try again.\n\nWe will not shrink the type below a size customers can read.');
@@ -3392,6 +3784,7 @@
       card.setAttribute('style',
         'background:#fffaf4;color:#1c1610;max-width:420px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);font-family:Georgia,serif');
       var steps = [
+        'Sell order inside each category (dearest first, mixed high/low — not a price ladder)',
         'Ordering sections (Nibbles → Starters → Sharing → Item Boost → Classics → Mains…)',
         'Choosing one or two pages and columns',
         'Placing wording / sandwiches / logo only if they fit',

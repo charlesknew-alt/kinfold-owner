@@ -42,6 +42,13 @@
     'Desserts'
   ];
 
+  /** Built-in tabs/categories — extras from the owner page are appended at runtime. */
+  var CORE_MENUS = MENUS.slice();
+  var CORE_SECTIONS = SECTIONS.slice();
+  var extraMenus = [];
+  var extraSections = [];
+  var extraLookupKeys = [];
+
   var SPECIALS_SECTIONS = ['Special Starters', 'Special Mains', 'Special Desserts'];
   var SPECIALS_GONE_NOTE = "When it's gone, it's gone";
 
@@ -900,6 +907,203 @@
     return MENUS[0];
   }
 
+  function titleCaseLabel_(s) {
+    return String(s || '').replace(/\s+/g, ' ').trim().replace(/\b\w/g, function (c) {
+      return c.toUpperCase();
+    });
+  }
+
+  function clearExtraLookups_() {
+    extraLookupKeys.forEach(function (k) {
+      delete SECTION_NAMES[k];
+      delete HEADING_ALIASES[k];
+    });
+    extraLookupKeys = [];
+  }
+
+  function addExtraLookup_(name) {
+    var k = String(name || '').toLowerCase();
+    if (!k) return;
+    SECTION_NAMES[k] = name;
+    HEADING_ALIASES[k] = name;
+    extraLookupKeys.push(k);
+  }
+
+  function rebuildMenusAndSections_() {
+    MENUS.length = 0;
+    CORE_MENUS.forEach(function (m) { MENUS.push(m); });
+    extraMenus.forEach(function (m) {
+      MENUS.push({
+        id: m.id,
+        name: m.name,
+        kind: m.kind,
+        comfortable: m.kind === 'card' ? (m.comfortable || 10) : m.comfortable,
+        custom: true,
+        staff: m.staff !== false
+      });
+    });
+    SECTIONS.length = 0;
+    CORE_SECTIONS.forEach(function (s) { SECTIONS.push(s); });
+    extraSections.forEach(function (s) {
+      if (SECTIONS.indexOf(s) === -1) SECTIONS.push(s);
+    });
+    clearExtraLookups_();
+    extraSections.forEach(addExtraLookup_);
+  }
+
+  function normalizeExtraSections(raw) {
+    var seen = {};
+    var out = [];
+    (Array.isArray(raw) ? raw : []).forEach(function (s) {
+      var n = titleCaseLabel_(s);
+      if (!n || n.length > 48) return;
+      var k = n.toLowerCase();
+      if (seen[k]) return;
+      if (CORE_SECTIONS.some(function (c) { return c.toLowerCase() === k; })) return;
+      if (SPECIALS_SECTIONS.some(function (c) { return c.toLowerCase() === k; })) return;
+      seen[k] = true;
+      out.push(n);
+    });
+    return out;
+  }
+
+  function normalizeExtraMenus(raw) {
+    var seen = {};
+    CORE_MENUS.forEach(function (m) { seen[m.id] = true; });
+    var out = [];
+    (Array.isArray(raw) ? raw : []).forEach(function (m) {
+      if (!m || typeof m !== 'object') return;
+      var name = String(m.name || '').replace(/\s+/g, ' ').trim();
+      if (!name || name.length > 48) return;
+      var kind = String(m.kind || 'long').toLowerCase();
+      if (kind !== 'long' && kind !== 'card' && kind !== 'party') kind = 'long';
+      var id = slug(String(m.id || name)) || 'extra-menu';
+      if (id === 'menu') id = 'extra-menu';
+      var n = 2;
+      var base = id;
+      while (seen[id]) {
+        id = base + '-' + n;
+        n += 1;
+      }
+      if (CORE_MENUS.some(function (c) { return c.name.toLowerCase() === name.toLowerCase(); })) return;
+      if (out.some(function (c) { return c.name.toLowerCase() === name.toLowerCase(); })) return;
+      seen[id] = true;
+      var row = { id: id, name: name, kind: kind, custom: true, staff: m.staff !== false };
+      if (kind === 'card') {
+        var cap = parseInt(m.comfortable, 10);
+        row.comfortable = cap > 0 ? cap : 10;
+      }
+      out.push(row);
+    });
+    return out;
+  }
+
+  function applyExtras(opts) {
+    opts = opts || {};
+    extraSections = normalizeExtraSections(opts.sections);
+    extraMenus = normalizeExtraMenus(opts.menus);
+    rebuildMenusAndSections_();
+    return extrasState();
+  }
+
+  function extrasState() {
+    return {
+      sections: extraSections.slice(),
+      menus: extraMenus.map(function (m) {
+        return {
+          id: m.id,
+          name: m.name,
+          kind: m.kind,
+          comfortable: m.comfortable,
+          staff: m.staff !== false
+        };
+      })
+    };
+  }
+
+  function uniqueMenuId_(name) {
+    var reserved = {};
+    MENUS.forEach(function (m) { reserved[m.id] = true; });
+    extraMenus.forEach(function (m) { reserved[m.id] = true; });
+    ['custom', 'extra', 'new', 'owner', 'menu'].forEach(function (k) { reserved[k] = true; });
+    var base = slug(name) || 'extra-menu';
+    var id = base;
+    var n = 2;
+    while (reserved[id]) {
+      id = base + '-' + n;
+      n += 1;
+    }
+    return id;
+  }
+
+  function addCustomSection(name) {
+    var n = titleCaseLabel_(name);
+    if (!n) return { ok: false, error: 'Type a category name.' };
+    if (n.length > 48) return { ok: false, error: 'Keep the category name short.' };
+    if (SECTIONS.some(function (s) { return s.toLowerCase() === n.toLowerCase(); })) {
+      return { ok: false, error: n + ' is already a category.' };
+    }
+    extraSections.push(n);
+    rebuildMenusAndSections_();
+    return { ok: true, section: n };
+  }
+
+  function addCustomMenu(opts) {
+    opts = opts || {};
+    var name = String(opts.name || '').replace(/\s+/g, ' ').trim();
+    if (!name) return { ok: false, error: 'Type a menu name.' };
+    if (name.length > 48) return { ok: false, error: 'Keep the menu name short.' };
+    if (MENUS.some(function (m) { return m.name.toLowerCase() === name.toLowerCase(); })) {
+      return { ok: false, error: name + ' is already a menu.' };
+    }
+    var kind = String(opts.kind || 'long').toLowerCase();
+    if (kind !== 'long' && kind !== 'card' && kind !== 'party') kind = 'long';
+    var row = {
+      id: uniqueMenuId_(name),
+      name: name,
+      kind: kind,
+      custom: true,
+      staff: opts.staff !== false
+    };
+    if (kind === 'card') {
+      var cap = parseInt(opts.comfortable, 10);
+      row.comfortable = cap > 0 ? cap : 10;
+    }
+    extraMenus.push(row);
+    rebuildMenusAndSections_();
+    return { ok: true, menu: extrasState().menus.filter(function (m) { return m.id === row.id; })[0] };
+  }
+
+  function removeCustomSection(name) {
+    var k = String(name || '').toLowerCase();
+    var next = extraSections.filter(function (s) { return s.toLowerCase() !== k; });
+    if (next.length === extraSections.length) return { ok: false, error: 'That category is built-in.' };
+    extraSections = next;
+    rebuildMenusAndSections_();
+    return { ok: true };
+  }
+
+  function removeCustomMenu(id) {
+    var next = extraMenus.filter(function (m) { return m.id !== id; });
+    if (next.length === extraMenus.length) return { ok: false, error: 'That menu is built-in.' };
+    extraMenus = next;
+    rebuildMenusAndSections_();
+    return { ok: true };
+  }
+
+  function isCustomMenu(id) {
+    return extraMenus.some(function (m) { return m.id === id; });
+  }
+
+  function isCustomSection(name) {
+    var k = String(name || '').toLowerCase();
+    return extraSections.some(function (s) { return s.toLowerCase() === k; });
+  }
+
+  function resetExtras() {
+    return applyExtras({ sections: [], menus: [] });
+  }
+
   function isHeading(line) {
     var bare = String(line || '')
       .replace(/^[\s·•|–—\-]+|[\s·•|–—\-:]+$/g, '')
@@ -1316,9 +1520,10 @@
     };
   }
 
-  /** Menus that can be pulled onto a long sheet (Main / Main upcoming / Sunday). */
+  /** Menus that can be pulled onto a long sheet (Main / upcoming / Sunday / extra longs). */
   function includableMenus(hostId) {
-    if (!isMainSheet(hostId) && hostId !== 'sunday') return [];
+    var host = menuById(hostId);
+    if (!host || host.kind !== 'long') return [];
     return MENUS.filter(function (m) {
       return m.id !== hostId && m.id !== 'lunch-club' && m.id !== 'main-next' && m.kind === 'card';
     });
@@ -1461,6 +1666,368 @@
     return parts.join(', ');
   }
 
+  /**
+   * Common pub-food typos (British). Exact token match only — never restyles
+   * a correctly spelled dish. Used on type/save and before Generate.
+   */
+  var SPELL_TYPOS = {
+    seperate: 'separate',
+    seperated: 'separated',
+    availible: 'available',
+    recieve: 'receive',
+    recieved: 'received',
+    tomatos: 'tomatoes',
+    tomatoe: 'tomato',
+    potatos: 'potatoes',
+    potatoe: 'potato',
+    mushrom: 'mushroom',
+    mashroom: 'mushroom',
+    mushroon: 'mushroom',
+    mushrooom: 'mushroom',
+    brocolli: 'broccoli',
+    brocoli: 'broccoli',
+    asparagas: 'asparagus',
+    aspargus: 'asparagus',
+    mayonaise: 'mayonnaise',
+    mayoonaise: 'mayonnaise',
+    vinagrette: 'vinaigrette',
+    vinegarette: 'vinaigrette',
+    ciabata: 'ciabatta',
+    ciabatta: 'ciabatta',
+    bruscetta: 'bruschetta',
+    bruchetta: 'bruschetta',
+    bruschetta: 'bruschetta',
+    proscuitto: 'prosciutto',
+    parmesean: 'parmesan',
+    mozarella: 'mozzarella',
+    mozerella: 'mozzarella',
+    mozzarela: 'mozzarella',
+    gorgonzolla: 'gorgonzola',
+    sandwhich: 'sandwich',
+    sandwhiches: 'sandwiches',
+    sandwiche: 'sandwich',
+    calimari: 'calamari',
+    calarmari: 'calamari',
+    gnochi: 'gnocchi',
+    nocchi: 'gnocchi',
+    risoto: 'risotto',
+    risotoo: 'risotto',
+    beatroot: 'beetroot',
+    coriandar: 'coriander',
+    corainder: 'coriander',
+    chilly: 'chilli',
+    chille: 'chilli',
+    chili: 'chilli',
+    aoli: 'aioli',
+    aloli: 'aioli',
+    colslaw: 'coleslaw',
+    colseslaw: 'coleslaw',
+    garlick: 'garlic',
+    pepercorn: 'peppercorn',
+    peppercorne: 'peppercorn',
+    stroganof: 'stroganoff',
+    stroganoffe: 'stroganoff',
+    schnitzle: 'schnitzel',
+    snitzel: 'schnitzel',
+    linguini: 'linguine',
+    tagliateli: 'tagliatelle',
+    arrancini: 'arancini',
+    arancinni: 'arancini',
+    terine: 'terrine',
+    camenbert: 'camembert',
+    camembert: 'camembert',
+    gerkin: 'gherkin',
+    gerkins: 'gherkins',
+    sourdow: 'sourdough',
+    bagget: 'baguette',
+    bagett: 'baguette',
+    natchos: 'nachos',
+    harisa: 'harissa',
+    siracha: 'sriracha',
+    sriracha: 'sriracha',
+    hadock: 'haddock',
+    haddok: 'haddock',
+    veneson: 'venison',
+    cassarole: 'casserole',
+    cassarolle: 'casserole',
+    sirlon: 'sirloin',
+    surloin: 'sirloin',
+    truffel: 'truffle',
+    choclate: 'chocolate',
+    caramell: 'caramel',
+    caramal: 'caramel',
+    vanila: 'vanilla',
+    strawbery: 'strawberry',
+    rasberry: 'raspberry',
+    rasbery: 'raspberry',
+    bluebery: 'blueberry',
+    avacado: 'avocado',
+    avacadoe: 'avocado',
+    falafal: 'falafel',
+    felafel: 'falafel',
+    tahinni: 'tahini',
+    mancheego: 'manchego',
+    briosh: 'brioche',
+    briochee: 'brioche',
+    stilten: 'stilton',
+    waguy: 'wagyu',
+    scampy: 'scampi',
+    crackeling: 'crackling',
+    puding: 'pudding',
+    custerd: 'custard',
+    cheescake: 'cheesecake',
+    toffy: 'toffee',
+    sorbett: 'sorbet',
+    vegtables: 'vegetables',
+    vegatables: 'vegetables',
+    seasional: 'seasonal',
+    seosonal: 'seasonal',
+    gravey: 'gravy',
+    sause: 'sauce',
+    sauses: 'sauces',
+    balsmaic: 'balsamic',
+    musels: 'mussels',
+    lemmon: 'lemon',
+    filet: 'fillet',
+    resturant: 'restaurant',
+    resteraunt: 'restaurant',
+    restaraunt: 'restaurant',
+    deserts: 'desserts',
+    desert: 'dessert',
+    ocassion: 'occasion',
+    occassion: 'occasion',
+    definately: 'definitely',
+    reccomended: 'recommended',
+    reccommended: 'recommended',
+    accomodation: 'accommodation',
+    independant: 'independent',
+    untill: 'until',
+    begining: 'beginning',
+    enviroment: 'environment',
+    goverment: 'government',
+    occured: 'occurred',
+    occurence: 'occurrence',
+    sucession: 'succession',
+    succesful: 'successful',
+    neccessary: 'necessary',
+    neccesary: 'necessary',
+    privelege: 'privilege',
+    seige: 'siege',
+    wierd: 'weird',
+    acheive: 'achieve',
+    beleive: 'believe',
+    reciept: 'receipt',
+    peice: 'piece',
+    teh: 'the',
+    adn: 'and',
+    ot: 'to',
+    fo: 'of',
+    wiht: 'with',
+    witth: 'with',
+    servedd: 'served',
+    buterr: 'butter',
+    buter: 'butter',
+    creme: 'crème',
+    fricasee: 'fricassee',
+    pangratato: 'pangrattato',
+    yorksire: 'yorkshire',
+    dumplin: 'dumpling',
+    musturd: 'mustard',
+    streakey: 'streaky',
+    smokey: 'smoky',
+    icecream: 'ice cream'
+  };
+
+  var SPELL_SKIP = {
+    the: 1, and: 1, for: 1, with: 1, from: 1, this: 1, that: 1, onto: 1,
+    gf: 1, vg: 1, df: 1, mp: 1, uk: 1, oz: 1, ml: 1, kg: 1
+  };
+
+  function spellTokenize_(text) {
+    return String(text || '').match(/[A-Za-zÀ-ÿ']+/g) || [];
+  }
+
+  function spellMatchCase_(sample, to) {
+    var s = String(sample || '');
+    var t = String(to || '');
+    if (!s || !t) return t;
+    if (s.toUpperCase() === s && s.length > 1) return t.toUpperCase();
+    if (s.charAt(0) === s.charAt(0).toUpperCase()) {
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+    return t;
+  }
+
+  function spellReplaceToken_(text, from, to) {
+    var re = new RegExp('\\b' + String(from).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    return String(text || '').replace(re, function (m) {
+      return spellMatchCase_(m, to);
+    });
+  }
+
+  function levenshtein_(a, b) {
+    a = String(a || '');
+    b = String(b || '');
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    if (Math.abs(a.length - b.length) > 2) return 99;
+    var prev = [];
+    var i;
+    for (i = 0; i <= b.length; i++) prev[i] = i;
+    for (i = 1; i <= a.length; i++) {
+      var cur = [i];
+      var j;
+      for (j = 1; j <= b.length; j++) {
+        var cost = a.charAt(i - 1).toLowerCase() === b.charAt(j - 1).toLowerCase() ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  function knownSpellWords_(extra) {
+    var seen = {};
+    var out = [];
+    function add(word) {
+      var w = String(word || '').toLowerCase();
+      if (!w || w.length < 4 || seen[w] || SPELL_SKIP[w]) return;
+      seen[w] = true;
+      out.push(w);
+    }
+    Object.keys(SPELL_TYPOS).forEach(function (k) { add(SPELL_TYPOS[k]); });
+    SECTIONS.forEach(function (s) {
+      spellTokenize_(s).forEach(add);
+    });
+    try {
+      var seeded = seed();
+      Object.keys(seeded).forEach(function (mid) {
+        (seeded[mid] || []).forEach(function (d) {
+          spellTokenize_(d.name).forEach(add);
+          spellTokenize_(d.description).forEach(add);
+        });
+      });
+    } catch (eSeed) {}
+    (extra || []).forEach(function (t) {
+      spellTokenize_(t).forEach(add);
+    });
+    return out;
+  }
+
+  function suggestSpellingForText(text, opts) {
+    opts = opts || {};
+    var raw = String(text || '');
+    if (!raw.trim()) return [];
+    var known = opts.known || knownSpellWords_(opts.extra);
+    var knownSet = {};
+    known.forEach(function (w) { knownSet[w] = true; });
+    var seen = {};
+    var out = [];
+    spellTokenize_(raw).forEach(function (tok) {
+      var lower = tok.toLowerCase();
+      if (SPELL_SKIP[lower] || lower.length < 3) return;
+      if (/^vegan$|^vegetarian$|^gluten$|^dairy$/.test(lower)) return;
+      var mapped = SPELL_TYPOS[lower];
+      if (mapped && mapped !== lower) {
+        var key = lower + '>' + mapped;
+        if (!seen[key]) {
+          seen[key] = true;
+          out.push({ from: tok, to: spellMatchCase_(tok, mapped), where: opts.where || '' });
+        }
+        return;
+      }
+      if (knownSet[lower]) return;
+      if (opts.typosOnly) return;
+      if (lower.length < 5) return;
+      var best = '';
+      var bestD = 3;
+      var i;
+      for (i = 0; i < known.length; i++) {
+        var w = known[i];
+        if (Math.abs(w.length - lower.length) > 1) continue;
+        var d = levenshtein_(lower, w);
+        if (d === 1 && d < bestD) {
+          bestD = d;
+          best = w;
+          break;
+        }
+      }
+      if (best) {
+        var key2 = lower + '>' + best;
+        if (!seen[key2]) {
+          seen[key2] = true;
+          out.push({ from: tok, to: spellMatchCase_(tok, best), where: opts.where || '', fuzzy: true });
+        }
+      }
+    });
+    return out;
+  }
+
+  function autoCorrectSpelling(text) {
+    var raw = String(text || '');
+    var fixes = suggestSpellingForText(raw, { typosOnly: true });
+    var next = raw;
+    fixes.forEach(function (f) {
+      next = spellReplaceToken_(next, f.from, f.to);
+    });
+    return { text: next, changed: next !== raw, fixes: fixes };
+  }
+
+  function scanMenuSpelling(dishes, opts) {
+    opts = opts || {};
+    var extra = opts.extra || [];
+    var known = knownSpellWords_(extra);
+    var raw = [];
+    (dishes || []).forEach(function (d) {
+      if (!d) return;
+      suggestSpellingForText(d.name, { known: known, where: 'name' }).forEach(function (f) {
+        raw.push({
+          from: f.from,
+          to: f.to,
+          where: 'name',
+          dishId: d.id || '',
+          dishName: d.name || '',
+          fuzzy: !!f.fuzzy
+        });
+      });
+      suggestSpellingForText(d.description, { known: known, where: 'description' }).forEach(function (f) {
+        raw.push({
+          from: f.from,
+          to: f.to,
+          where: 'description',
+          dishId: d.id || '',
+          dishName: d.name || '',
+          fuzzy: !!f.fuzzy
+        });
+      });
+    });
+    return normalizeSpellingFixes(raw);
+  }
+
+  function applySpellingFixesToDishes(dishes, fixes) {
+    var list = (dishes || []).slice();
+    (fixes || []).forEach(function (fix) {
+      if (!fix || !fix.from || !fix.to) return;
+      list = list.map(function (d) {
+        if (fix.dishId && d.id !== fix.dishId) return d;
+        var copy = {};
+        Object.keys(d || {}).forEach(function (k) { copy[k] = d[k]; });
+        var field = String(fix.where || fix.field || '').toLowerCase();
+        if (field === 'description' || field === 'desc') {
+          copy.description = spellReplaceToken_(copy.description, fix.from, fix.to);
+        } else {
+          copy.name = spellReplaceToken_(copy.name, fix.from, fix.to);
+          if (field !== 'name') {
+            copy.description = spellReplaceToken_(copy.description, fix.from, fix.to);
+          }
+        }
+        return copy;
+      });
+    });
+    return list;
+  }
+
   /** Normalise Gemini spellingFixes for the review gate. */
   function normalizeSpellingFixes(raw) {
     if (!Array.isArray(raw)) return [];
@@ -1471,13 +2038,18 @@
       var from = String(fix.from != null ? fix.from : (fix.original != null ? fix.original : '')).trim();
       var to = String(fix.to != null ? fix.to : (fix.corrected != null ? fix.corrected : '')).trim();
       if (!from || !to || from === to) return;
-      var key = from.toLowerCase() + '\0' + to.toLowerCase();
+      var where = String(fix.where || fix.field || '').trim();
+      var dishId = String(fix.dishId || '').trim();
+      var key = from.toLowerCase() + '\0' + to.toLowerCase() + '\0' + dishId;
       if (seen[key]) return;
       seen[key] = true;
       out.push({
         from: from,
         to: to,
-        where: String(fix.where || fix.field || '').trim()
+        where: where,
+        dishId: dishId,
+        dishName: String(fix.dishName || '').trim(),
+        fuzzy: !!fix.fuzzy
       });
     });
     return out;
@@ -2047,6 +2619,17 @@
     isMainSheet: isMainSheet,
     seed: seed,
     menuById: menuById,
+    applyExtras: applyExtras,
+    extrasState: extrasState,
+    addCustomSection: addCustomSection,
+    addCustomMenu: addCustomMenu,
+    removeCustomSection: removeCustomSection,
+    removeCustomMenu: removeCustomMenu,
+    isCustomMenu: isCustomMenu,
+    isCustomSection: isCustomSection,
+    resetExtras: resetExtras,
+    normalizeExtraSections: normalizeExtraSections,
+    normalizeExtraMenus: normalizeExtraMenus,
     parsePaste: parsePaste,
     sheetPlan: sheetPlan,
     sheetPlanFor: sheetPlanFor,
@@ -2062,6 +2645,10 @@
     formatMarks: formatMarks,
     dishesFromAiMenu: dishesFromAiMenu,
     normalizeSpellingFixes: normalizeSpellingFixes,
+    suggestSpellingForText: suggestSpellingForText,
+    autoCorrectSpelling: autoCorrectSpelling,
+    scanMenuSpelling: scanMenuSpelling,
+    applySpellingFixesToDishes: applySpellingFixesToDishes,
     isJunkDishName: isJunkDishName,
     promoItem: promoItem,
     seedPromoBank: seedPromoBank,

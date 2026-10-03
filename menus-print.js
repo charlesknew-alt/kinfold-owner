@@ -1194,7 +1194,7 @@
     } else if (opts.sectionLayout && opts.sectionLayout.Sandwiches) {
       sandRule = opts.sectionLayout.Sandwiches;
     }
-    var isLongHost = menu.id === 'main' || menu.id === 'main-next' || menu.id === 'sunday' ||
+    var isLongHost = menu.kind === 'long' || menu.id === 'main' || menu.id === 'main-next' || menu.id === 'sunday' ||
       (root.EBMenus && root.EBMenus.isMainSheet && root.EBMenus.isMainSheet(menu.id));
     var wantSandwiches;
     if (sandDishCount > 0) {
