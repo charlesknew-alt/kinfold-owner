@@ -69,6 +69,30 @@ assert(api.autoCorrectSpelling('Seperate tomatos with mayonaise').text === 'Sepa
   'common food typos auto-correct on save');
 assert(api.scanMenuSpelling([{ id: 'd1', name: 'Calimari', description: 'bruscetta, mozarella' }]).length >= 2,
   'menu scan finds spelling mistakes before generate');
+assert(api.scanMenuSpelling([{
+  id: 'd2',
+  name: 'Korean Chicken Balls',
+  description: 'noodles, caramelised onions, malted bread'
+}]).length === 0, 'does not flag onions, noodles or malted bread');
+assert(api.isBenignSpellingPair('onions', 'onion') && api.isBenignSpellingPair('noodles', 'noodle'),
+  'plurals are left as typed');
+assert(api.enrichSpellingFixes(
+    [{ id: 'x', name: 'Falafel', description: 'malted bread' }],
+    [{ from: 'malted', to: 'salted', where: 'description', dishId: 'x' }]
+  ).length === 0, 'malted bread is kept even if AI suggests salted');
+assert(api.enrichSpellingFixes(
+  [{ id: 'x', name: 'Prawns', description: 'smokey paprika' }],
+  [{ from: 'smokey', to: 'smoky', where: 'description', dishId: 'x' }]
+)[0].snippet.indexOf('smokey paprika') !== -1, 'spelling fixes carry the full description');
+assert(api.splitSpellSnippet('toasted malted bread', 'malted').hit.toLowerCase() === 'malted',
+  'snippet splitter marks the word in the full line');
+assert(page.indexOf('data-spell-act="change"') !== -1 && page.indexOf('data-spell-act="keep"') !== -1,
+  'spelling gate has Change and Correct tick boxes');
+assert(page.indexOf('As written') !== -1 && page.indexOf('If changed') !== -1,
+  'spelling gate shows the whole dish line, not just the word');
+assert(aiGs.indexOf('Read each NAME and DESCRIPTION as a whole sentence') !== -1 &&
+  aiGs.indexOf('malted bread') !== -1,
+  'Menu AI proof-reads the full sentence and keeps malted bread');
 assert(api.applySpellingFixesToDishes(
   [{ id: 'd1', name: 'Calimari', description: 'with mayonaise' }],
   [{ from: 'Calimari', to: 'Calamari', where: 'name', dishId: 'd1' }]
@@ -387,8 +411,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow123') !== -1, 'menus page cache-bust is flow123');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow123') !== -1, 'hub menus link cache-bust is flow123');
+assert(page.indexOf('flow124') !== -1, 'menus page cache-bust is flow124');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow124') !== -1, 'hub menus link cache-bust is flow124');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
