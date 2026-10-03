@@ -288,10 +288,19 @@
 
   function cardSandwichesSpiel(plan) {
     var spiel = '';
+    var rule = null;
     if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
-      spiel = String(root.EBMenus.sectionLayoutFor('Sandwiches', plan && plan.sectionLayout).note || '').trim();
+      rule = root.EBMenus.sectionLayoutFor('Sandwiches', plan && plan.sectionLayout);
     } else if (plan && plan.sectionLayout && plan.sectionLayout.Sandwiches) {
-      spiel = String(plan.sectionLayout.Sandwiches.note || '').trim();
+      rule = plan.sectionLayout.Sandwiches;
+    }
+    if (rule) {
+      var slots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
+        ? root.EBMenus.cardOutsideSlots(rule)
+        : null;
+      if (slots && slots.below) spiel = slots.below;
+      else if (rule.below) spiel = String(rule.below).trim();
+      if (!spiel) spiel = String(rule.note || '').trim();
     }
     return spiel || 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad';
   }
@@ -300,6 +309,43 @@
     var raw = String(text || '').trim();
     if (!raw) return '';
     return '<div class="' + (cls || 'card-outside') + '">' + esc(raw).replace(/\n/g, '<br>') + '</div>';
+  }
+
+  function cardBlurbHtml(text, kind, place) {
+    var raw = String(text || '').trim();
+    if (!raw) return '';
+    kind = String(kind || 'paragraph').toLowerCase();
+    if (['title', 'heading', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
+    place = place === 'above' ? 'above' : 'below';
+    var lines = raw.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var inner;
+    if ((kind === 'title' || kind === 'heading') && lines.length && /^all\s*£|^£\s*\d/i.test(lines[0])) {
+      inner = '<div class="lb-price-line">' + esc(lines[0]) + '</div>';
+      if (lines.length > 1) {
+        inner += '<div class="lb-offer-sub">' + esc(lines.slice(1).join('\n')).replace(/\n/g, '<br>') + '</div>';
+      }
+    } else {
+      inner = esc(raw).replace(/\n/g, '<br>');
+    }
+    return '<div class="card-blurb card-blurb-' + kind + ' card-blurb-' + place +
+      (place === 'above' && (kind === 'title' || kind === 'heading') ? ' card-offer' : '') +
+      (place === 'below' ? ' card-outside' : '') +
+      '">' + inner + '</div>';
+  }
+
+  function cardOutsideWrap(inner, rule) {
+    var slots = { above: '', aboveKind: 'heading', below: '', belowKind: 'text' };
+    if (root.EBMenus && root.EBMenus.cardOutsideSlots) {
+      slots = root.EBMenus.cardOutsideSlots(rule || {});
+    } else if (rule) {
+      slots.above = String(rule.above || '').trim();
+      slots.below = String(rule.below || '').trim();
+      slots.aboveKind = rule.aboveKind || slots.aboveKind;
+      slots.belowKind = rule.belowKind || slots.belowKind;
+    }
+    return cardBlurbHtml(slots.above, slots.aboveKind, 'above') +
+      (inner || '') +
+      cardBlurbHtml(slots.below, slots.belowKind, 'below');
   }
 
   function cardOfferHtml(text) {
@@ -1642,8 +1688,10 @@
       bag.littleBells.name,
       bag.littleBells.dishes,
       littleRule,
-      frameKind
+      frameKind,
+      { note: '' }
     );
+    kidsInner = cardOutsideWrap(kidsInner, littleRule);
     if (!col) {
       return {
         html: '<section class="sec">' + kidsInner + '</section>',
@@ -2275,24 +2323,32 @@
             );
           }).join('');
       } else if (menu.id === 'little-bells') {
-        var lbRule = { note: '', sell: '' };
+        var lbRule = { note: '', sell: '', above: '', below: '' };
         if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
           lbRule = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout) || lbRule;
         } else if (plan && plan.sectionLayout && plan.sectionLayout['Little Bells']) {
           lbRule = plan.sectionLayout['Little Bells'];
         }
-        var lbOutside = (root.EBMenus && root.EBMenus.littleBellsOutsideText)
-          ? root.EBMenus.littleBellsOutsideText(lbRule)
-          : String((lbRule && lbRule.note) || '').trim();
-        var lbSplit = (root.EBMenus && root.EBMenus.splitCardOutsideText)
-          ? root.EBMenus.splitCardOutsideText(lbOutside)
-          : { above: '', below: lbOutside };
-        offerAbove = cardOfferHtml(lbSplit.above);
-        outsideBelow = cardOutsideHtml(lbSplit.below);
+        var lbSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
+          ? root.EBMenus.cardOutsideSlots(lbRule)
+          : { above: lbRule.above || '', aboveKind: lbRule.aboveKind || 'heading',
+              below: lbRule.below || '', belowKind: lbRule.belowKind || 'text' };
+        offerAbove = cardBlurbHtml(lbSlots.above, lbSlots.aboveKind, 'above');
+        outsideBelow = cardBlurbHtml(lbSlots.below, lbSlots.belowKind, 'below');
         inner = scallop(dishes.map(function (d) { return dishCentered(d, { hidePrice: true, hideLunch: true }); }).join(''));
       } else if (menu.id === 'sandwiches') {
+        var sandRule = {};
+        if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+          sandRule = root.EBMenus.sectionLayoutFor('Sandwiches', plan && plan.sectionLayout) || {};
+        }
+        var sandSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
+          ? root.EBMenus.cardOutsideSlots(sandRule)
+          : { above: sandRule.above || '', aboveKind: sandRule.aboveKind || 'paragraph',
+              below: '', belowKind: sandRule.belowKind || 'paragraph' };
+        offerAbove = cardBlurbHtml(sandSlots.above, sandSlots.aboveKind, 'above');
         inner = cardSandwichesInner(dishes, plan);
-        outsideBelow = cardOutsideHtml(cardSandwichesSpiel(plan));
+        outsideBelow = cardBlurbHtml(sandSlots.below || cardSandwichesSpiel(plan), sandSlots.belowKind, 'below') ||
+          cardOutsideHtml(cardSandwichesSpiel(plan));
       } else if (menu.id === 'specials') {
         // Board note from Blocks → Specials section “Extra info” (default in layout; editable)
         var specialsNote = '';
@@ -2326,7 +2382,20 @@
           }).join('')
         );
       } else {
-        // desserts etc
+        // desserts etc — optional above/below boxes with a type size
+        var dessertRule = {};
+        if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+          dessertRule = root.EBMenus.sectionLayoutFor(
+            (dishes[0] && dishes[0].section) || 'Desserts',
+            plan && plan.sectionLayout
+          ) || {};
+        }
+        var dessertSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
+          ? root.EBMenus.cardOutsideSlots(dessertRule)
+          : { above: dessertRule.above || '', aboveKind: 'paragraph',
+              below: dessertRule.below || '', belowKind: 'paragraph' };
+        offerAbove = cardBlurbHtml(dessertSlots.above, dessertSlots.aboveKind, 'above');
+        outsideBelow = cardBlurbHtml(dessertSlots.below, dessertSlots.belowKind, 'below');
         inner = scallop(dishes.map(function (d) { return dishCentered(d); }).join(''));
       }
       var faceCls = 'card-face fill-page fill-airy' +
@@ -2405,10 +2474,21 @@
       '.card-face.fill-tight .scallop-pad,.card-face.fill-compact .scallop-pad,.card-face.fill-dense .scallop-pad{justify-content:flex-start}' +
       '.card-face .lb-foot{flex:0 0 auto;text-align:center}' +
       '.card-face .lb-price{text-align:center;margin:6px 0 10px}' +
-      '.card-offer{flex:0 0 auto;text-align:center;margin:0 0 8px;font-family:var(--serif);color:var(--ink);line-height:1.3}' +
-      '.card-offer .lb-price-line{font-family:var(--serif);font-weight:700;font-size:16pt;letter-spacing:.04em;margin:0 0 4px}' +
-      '.card-offer .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:11pt;line-height:1.35}' +
-      '.card-outside{flex:0 0 auto;text-align:center;margin:8px 4px 0;font-family:var(--sans);font-weight:600;font-size:10.5pt;line-height:1.4;color:#1c1610}' +
+      '.card-offer{flex:0 0 auto;text-align:center;margin:0 0 8px;font-family:var(--serif);color:var(--ink);line-height:1.3;text-transform:none}' +
+      '.card-offer .lb-price-line{font-family:var(--serif);font-weight:700;font-size:16pt;letter-spacing:.04em;margin:0 0 4px;text-transform:none}' +
+      '.card-offer .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:11pt;line-height:1.35;text-transform:none}' +
+      '.card-outside{flex:0 0 auto;text-align:center;margin:8px 4px 0;font-family:var(--sans);font-weight:600;font-size:10.5pt;line-height:1.4;color:#1c1610;text-transform:none}' +
+      '.card-blurb{flex:0 0 auto;text-align:center;text-transform:none;letter-spacing:normal;color:var(--ink)}' +
+      '.card-blurb-above{margin:0 4px 8px}' +
+      '.card-blurb-below{margin:8px 4px 0}' +
+      '.card-blurb-title{font-family:var(--serif);font-weight:700;font-size:16pt;line-height:1.25}' +
+      '.card-blurb-heading{font-family:var(--serif);font-weight:600;font-size:13pt;line-height:1.35}' +
+      '.card-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:11pt;line-height:1.4}' +
+      '.card-blurb-text{font-family:var(--sans);font-weight:400;font-size:10pt;line-height:1.4;color:#3a342c}' +
+      '.card-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 4px;text-transform:none}' +
+      '.card-blurb-title .lb-price-line{font-size:18pt}' +
+      '.card-blurb-heading .lb-price-line{font-size:15pt}' +
+      '.card-blurb .lb-offer-sub{font-family:var(--sans);font-weight:600;font-size:11pt;line-height:1.35;text-transform:none}' +
       '.card-face .card-spiel{margin-top:8px}' +
       '.card-face .logo{width:86px;margin:0 auto 8px}' +
       '.card-face h1{margin:2px 0 10px;font-size:min(var(--title),22pt)}' +

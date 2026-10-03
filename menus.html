@@ -425,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow126"></script>
-  <script src="menus-print.js?v=20260928-flow126"></script>
-  <script src="menus-ingest.js?v=20260928-flow126"></script>
+  <script src="menus.js?v=20260928-flow127"></script>
+  <script src="menus-print.js?v=20260928-flow127"></script>
+  <script src="menus-ingest.js?v=20260928-flow127"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -595,12 +595,20 @@
       }
       var kidsLay = layoutBook['little-bells'];
       if (kidsLay && kidsLay['Little Bells'] && key !== 'little-bells') {
-        var kidsNote = EBMenus.littleBellsOutsideText
-          ? EBMenus.littleBellsOutsideText(kidsLay['Little Bells'])
-          : (kidsLay['Little Bells'].note || '');
+        var kidsRule = kidsLay['Little Bells'];
+        var kidsSlots = EBMenus.cardOutsideSlots ? EBMenus.cardOutsideSlots(kidsRule) : {
+          above: kidsRule.above || '',
+          aboveKind: kidsRule.aboveKind || 'heading',
+          below: kidsRule.below || '',
+          belowKind: kidsRule.belowKind || 'text'
+        };
         base['Little Bells'] = Object.assign({}, base['Little Bells'] || {}, {
-          note: kidsNote,
-          sell: ''
+          note: [kidsSlots.above, kidsSlots.below].filter(Boolean).join('\n\n'),
+          sell: '',
+          above: kidsSlots.above,
+          aboveKind: kidsSlots.aboveKind,
+          below: kidsSlots.below,
+          belowKind: kidsSlots.belowKind
         });
       }
       return base;
@@ -1753,6 +1761,50 @@
       save();
     }
 
+    function outsideKindSelect(sec, place, value) {
+      var kinds = (EBMenus.OUTSIDE_KINDS) || [
+        { id: 'title', label: 'Title (large heading)' },
+        { id: 'heading', label: 'Heading (between title & paragraph)' },
+        { id: 'paragraph', label: 'Paragraph (centred body)' },
+        { id: 'text', label: 'Text (smaller plain line)' }
+      ];
+      var html = '<select data-layout-' + place + '-kind="' + escapeAttr(sec) + '">';
+      kinds.forEach(function (k) {
+        html += '<option value="' + k.id + '"' + (value === k.id ? ' selected' : '') + '>' + escapeAttr(k.label) + '</option>';
+      });
+      html += '</select>';
+      return html;
+    }
+
+    function renderCardOutsideBoxes(sec, rule, opts) {
+      opts = opts || {};
+      var slots = (EBMenus.cardOutsideSlots)
+        ? EBMenus.cardOutsideSlots(rule || {})
+        : {
+          above: (rule && rule.above) || '',
+          aboveKind: (rule && rule.aboveKind) || 'heading',
+          below: (rule && rule.below) || '',
+          belowKind: (rule && rule.belowKind) || 'text'
+        };
+      var html = '';
+      html += '<label class="field" style="margin-top:0">Above the dish box</label>';
+      html += '<div class="layout-row" style="grid-template-columns:1fr;border:0;padding:0;margin:0 0 6px">';
+      html += '<label class="field" style="margin:0">Type size</label>' + outsideKindSelect(sec, 'above', slots.aboveKind);
+      html += '</div>';
+      html += '<textarea data-layout-above="' + escapeAttr(sec) + '" rows="' + (opts.aboveRows || 3) + '" placeholder="' +
+        escapeAttr(opts.abovePlaceholder || 'Optional — prints above the dishes') + '">' +
+        escapeAttr(slots.above) + '</textarea>';
+      html += '<label class="field">Below the dish box</label>';
+      html += '<div class="layout-row" style="grid-template-columns:1fr;border:0;padding:0;margin:0 0 6px">';
+      html += '<label class="field" style="margin:0">Type size</label>' + outsideKindSelect(sec, 'below', slots.belowKind);
+      html += '</div>';
+      html += '<textarea data-layout-below="' + escapeAttr(sec) + '" rows="' + (opts.belowRows || 3) + '" placeholder="' +
+        escapeAttr(opts.belowPlaceholder || 'Optional — prints under the dishes') + '">' +
+        escapeAttr(slots.below) + '</textarea>';
+      html += '<p class="note" style="margin:6px 0 0">Same idea as party top/bottom blurbs: pick Title / Heading / Paragraph / Text for each box. Never inside the frilly frame.</p>';
+      return html;
+    }
+
     /**
      * Editors for wording that prints outside the dish list (card spiel,
      * Little Bells ice cream / Sunday note, Specials board line, section notes).
@@ -1781,11 +1833,11 @@
 
       if (menu.id === 'sandwiches') {
         var sand = menuRules.Sandwiches || defaults.Sandwiches || { note: '', sell: '', tip: true };
-        html += '<label class="field">Under the fillings (card)</label>';
-        html += '<textarea data-layout-note="Sandwiches" rows="3" placeholder="Served on either Ciabatta…">' +
-          escapeAttr(sand.note || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 10px">Prints <strong>under the dish box</strong> on the Sandwiches card — not inside the frilly frame.</p>';
-        html += '<label class="field">Tip / selling box (Main &amp; Sunday when empty)</label>';
+        html += renderCardOutsideBoxes('Sandwiches', sand, {
+          abovePlaceholder: 'Optional line above the fillings',
+          belowPlaceholder: 'Served on either Ciabatta…'
+        });
+        html += '<label class="field" style="margin-top:12px">Tip / selling box (Main &amp; Sunday when empty)</label>';
         html += '<textarea data-layout-sell="Sandwiches" rows="3" placeholder="A selection of sandwiches is available…">' +
           escapeAttr(sand.sell || '') + '</textarea>';
         html += '<p class="note" style="margin:6px 0 0">Used when you tick Sandwiches on Main / Sunday and that menu has 0 fillings. Unticked Sandwiches stay off the sheet.</p>';
@@ -1794,12 +1846,11 @@
       }
 
       if (menu.id === 'little-bells') {
-        var lb = menuRules['Little Bells'] || defaults['Little Bells'] || { note: '' };
-        var lbNote = EBMenus.littleBellsOutsideText ? EBMenus.littleBellsOutsideText(lb) : (lb.note || '');
-        html += '<label class="field">Text outside the dish box</label>';
-        html += '<textarea data-layout-note="Little Bells" rows="6" placeholder="All £9.50&#10;to include a choice of one scoop of ice cream or sorbet.&#10;&#10;Little Bells on Sunday have a choice of roasts at half the price of the adults.">' +
-          escapeAttr(lbNote) + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 0">Same wording on the kids card, Sunday and Main. Blank line: price / ice cream prints <strong>above</strong> the dish box; the rest (Sunday roast) prints <strong>below</strong> — never inside the frilly frame.</p>';
+        var lb = menuRules['Little Bells'] || defaults['Little Bells'] || {};
+        html += renderCardOutsideBoxes('Little Bells', lb, {
+          abovePlaceholder: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.',
+          belowPlaceholder: 'Little Bells on Sunday have a choice of roasts at half the price of the adults.'
+        });
         html += '</div>';
         return html;
       }
@@ -1807,10 +1858,17 @@
       if (menu.id === 'desserts' || menu.id === 'lunch-club') {
         var secName = menu.id === 'desserts' ? 'Desserts' : 'Mains';
         var rule = menuRules[secName] || defaults[secName] || { note: '' };
-        html += '<label class="field">Note under the title</label>';
-        html += '<textarea data-layout-note="' + escapeAttr(secName) + '" rows="2" placeholder="Optional line above the dishes">' +
-          escapeAttr(rule.note || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 0">Optional. Leave blank for no extra line on the card.</p>';
+        if (menu.id === 'desserts') {
+          html += renderCardOutsideBoxes('Desserts', rule, {
+            abovePlaceholder: 'Optional line above the puddings',
+            belowPlaceholder: 'Optional line under the dish box'
+          });
+        } else {
+          html += '<label class="field">Note under the title</label>';
+          html += '<textarea data-layout-note="' + escapeAttr(secName) + '" rows="2" placeholder="Optional line above the dishes">' +
+            escapeAttr(rule.note || '') + '</textarea>';
+          html += '<p class="note" style="margin:6px 0 0">Optional. Leave blank for no extra line on the card.</p>';
+        }
         html += '</div>';
         return html;
       }
@@ -1826,16 +1884,14 @@
         html += '<div class="meta"><span class="chip">' + nIn + ' on this sheet</span></div></div>';
         html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
         if (sec === 'Little Bells') {
-          html += '<label class="field">Text outside the dish box (card + Sunday + Main)</label>';
+          html += renderCardOutsideBoxes(sec, rule, {
+            abovePlaceholder: 'All £9.50\nto include a choice of one scoop…',
+            belowPlaceholder: 'Little Bells on Sunday…'
+          });
         } else {
           html += '<label class="field">Under title / card spiel</label>';
-        }
-        html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="4">' +
-          escapeAttr(sec === 'Little Bells' && EBMenus.littleBellsOutsideText
-            ? EBMenus.littleBellsOutsideText(rule)
-            : (rule.note || '')) + '</textarea>';
-        if (sec === 'Little Bells') {
-          html += '<p class="note" style="margin:6px 0 0">Blank line splits offer above the box (£9.50 / ice cream) from Sunday note below. Same text everywhere Little Bells prints.</p>';
+          html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="4">' +
+            escapeAttr(rule.note || '') + '</textarea>';
         }
         if (sec === 'Sandwiches') {
           html += '<label class="field" style="margin-top:10px">Tip box selling words</label>';
@@ -1906,9 +1962,16 @@
           html += '<option value="yes"' + (rule.frame ? ' selected' : '') + '>Yes</option>';
           html += '<option value="no"' + (!rule.frame ? ' selected' : '') + '>No</option>';
           html += '</select></div></div>';
-          html += '<label class="field">Text outside dishes (under the title)</label>';
-          html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="Hours, “all served with…”, etc. Shows above the dishes in the box.">' +
-            escapeAttr(rule.note || '') + '</textarea>';
+          if (sec === 'Little Bells') {
+            html += renderCardOutsideBoxes(sec, rule, {
+              abovePlaceholder: 'All £9.50\nto include a choice of one scoop…',
+              belowPlaceholder: 'Little Bells on Sunday…'
+            });
+          } else {
+            html += '<label class="field">Text outside dishes (under the title)</label>';
+            html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="Hours, “all served with…”, etc. Shows above the dishes in the box.">' +
+              escapeAttr(rule.note || '') + '</textarea>';
+          }
           if (sec === 'Sandwiches') {
             html += '<div class="layout-row" style="grid-template-columns:1fr 1fr;border:0;padding:10px 0 0;margin-top:8px">';
             html += '<div><label class="field" style="margin-top:0">Tip box (no fillings)</label>';
@@ -2678,7 +2741,7 @@
         // even when only textareas are shown (no width/frame controls).
         var targetId = menuId;
         var onlyNotes = !document.querySelector('[data-layout-width]') &&
-          !!document.querySelector('[data-layout-note]');
+          (!!document.querySelector('[data-layout-note]') || !!document.querySelector('[data-layout-above]'));
         if (onlyNotes && menuId === 'specials') targetId = 'specials';
         var next = EBMenus.normalizeSectionLayout(layoutFor(targetId));
         EBMenus.SECTIONS.forEach(function (sec) {
@@ -2687,35 +2750,53 @@
           var n = document.querySelector('[data-layout-note="' + sec + '"]');
           var t = document.querySelector('[data-layout-tip="' + sec + '"]');
           var s = document.querySelector('[data-layout-sell="' + sec + '"]');
-          if (!w && !f && !n && !t && !s) return;
+          var ab = document.querySelector('[data-layout-above="' + sec + '"]');
+          var bl = document.querySelector('[data-layout-below="' + sec + '"]');
+          var abk = document.querySelector('[data-layout-above-kind="' + sec + '"]');
+          var blk = document.querySelector('[data-layout-below-kind="' + sec + '"]');
+          if (!w && !f && !n && !t && !s && !ab && !bl) return;
+          var above = ab ? ab.value : (next[sec].above || '');
+          var below = bl ? bl.value : (next[sec].below || '');
           next[sec] = {
             width: (w && w.value) || next[sec].width,
             frame: f ? f.value === 'yes' : !!next[sec].frame,
-            note: n ? n.value : (next[sec].note || ''),
+            note: n ? n.value : ((ab || bl)
+              ? [String(above || '').trim(), String(below || '').trim()].filter(Boolean).join('\n\n')
+              : (next[sec].note || '')),
             tip: t ? t.value === 'yes' : !!next[sec].tip,
-            sell: s ? s.value : (next[sec].sell || '')
+            sell: s ? s.value : (next[sec].sell || ''),
+            above: above,
+            aboveKind: abk ? abk.value : (next[sec].aboveKind || 'heading'),
+            below: below,
+            belowKind: blk ? blk.value : (next[sec].belowKind || 'text')
           };
         });
         layoutBook[targetId] = EBMenus.normalizeSectionLayout(next);
         if (next['Little Bells']) {
-          var sharedLb = EBMenus.littleBellsOutsideText
-            ? EBMenus.littleBellsOutsideText(next['Little Bells'])
-            : String(next['Little Bells'].note || '');
+          var lbNorm = EBMenus.normalizeSectionLayout
+            ? EBMenus.normalizeSectionLayout({ 'Little Bells': next['Little Bells'] })['Little Bells']
+            : next['Little Bells'];
           Object.keys(layoutBook).forEach(function (mid) {
             if (!layoutBook[mid] || !layoutBook[mid]['Little Bells']) return;
-            layoutBook[mid]['Little Bells'].note = sharedLb;
-            layoutBook[mid]['Little Bells'].sell = '';
+            layoutBook[mid]['Little Bells'] = Object.assign({}, layoutBook[mid]['Little Bells'], {
+              note: lbNorm.note || '',
+              sell: '',
+              above: lbNorm.above || '',
+              aboveKind: lbNorm.aboveKind || 'heading',
+              below: lbNorm.below || '',
+              belowKind: lbNorm.belowKind || 'text'
+            });
           });
         }
         saveSectionLayout();
       }
-      document.querySelectorAll('[data-layout-width],[data-layout-frame],[data-layout-tip]').forEach(function (sel) {
+      document.querySelectorAll('[data-layout-width],[data-layout-frame],[data-layout-tip],[data-layout-above-kind],[data-layout-below-kind]').forEach(function (sel) {
         sel.onchange = function () {
           persistLayoutFromDom();
           render();
         };
       });
-      document.querySelectorAll('[data-layout-note],[data-layout-sell]').forEach(function (ta) {
+      document.querySelectorAll('[data-layout-note],[data-layout-sell],[data-layout-above],[data-layout-below]').forEach(function (ta) {
         ta.onchange = function () {
           persistLayoutFromDom();
         };

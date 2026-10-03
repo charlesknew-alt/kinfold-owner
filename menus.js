@@ -2529,8 +2529,11 @@
     'Little Bells': {
       width: 'full',
       frame: true,
-      // One outside-text block for the kids card AND when Little Bells is on Main / Sunday.
-      // Blank line: offer (price / ice cream) above the dish box; rest below.
+      // Two outside-text boxes (same idea as party top/bottom blurbs), each with a type size.
+      above: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.',
+      aboveKind: 'heading',
+      below: 'Little Bells on Sunday have a choice of roasts at half the price of the adults.',
+      belowKind: 'text',
       note: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.\n\nLittle Bells on Sunday have a choice of roasts at half the price of the adults.',
       tip: false,
       sell: ''
@@ -2555,16 +2558,38 @@
     { id: 'both', label: 'Best fit for this page (AI chooses)' }
   ];
 
+  /** Type size for text outside the dish box — same four steps as party blurbs. */
+  var OUTSIDE_KINDS = [
+    { id: 'title', label: 'Title (large heading)' },
+    { id: 'heading', label: 'Heading (between title & paragraph)' },
+    { id: 'paragraph', label: 'Paragraph (centred body)' },
+    { id: 'text', label: 'Text (smaller plain line)' }
+  ];
+
+  function normalizeOutsideKind(kind, fallback) {
+    var k = String(kind || fallback || 'paragraph').toLowerCase();
+    if (['title', 'heading', 'paragraph', 'text'].indexOf(k) === -1) {
+      return fallback || 'paragraph';
+    }
+    return k;
+  }
+
   function defaultSectionLayout() {
     var out = {};
     SECTIONS.forEach(function (s) {
       var d = DEFAULT_SECTION_LAYOUT[s] || { width: 'full', frame: false, note: '' };
+      var aboveKindDef = s === 'Little Bells' ? 'heading' : 'paragraph';
+      var belowKindDef = s === 'Little Bells' ? 'text' : 'paragraph';
       out[s] = {
         width: d.width,
         frame: !!d.frame,
         note: String(d.note || ''),
         tip: !!d.tip,
-        sell: String(d.sell || '')
+        sell: String(d.sell || ''),
+        above: String(d.above || ''),
+        aboveKind: normalizeOutsideKind(d.aboveKind, aboveKindDef),
+        below: String(d.below || ''),
+        belowKind: normalizeOutsideKind(d.belowKind, belowKindDef)
       };
     });
     return out;
@@ -2600,13 +2625,48 @@
       else below.push(p);
     });
     if (!above.length) {
+      // Prefer offer detection over “first paragraph is above” — Sunday-first
+      // saves used to dump the roast line into the large heading slot.
+      var offerIdx = -1;
+      parts.forEach(function (p, i) {
+        if (offerIdx === -1 && isOffer(p)) offerIdx = i;
+      });
+      if (offerIdx !== -1) {
+        return {
+          above: parts[offerIdx],
+          below: parts.filter(function (_p, i) { return i !== offerIdx; }).join('\n\n')
+        };
+      }
       return { above: parts[0], below: parts.slice(1).join('\n\n') };
     }
     return { above: above.join('\n\n'), below: below.join('\n\n') };
   }
 
   function littleBellsOutsideText(rule) {
-    return foldLittleBellsOutside_(rule);
+    var slots = cardOutsideSlots(rule);
+    return [slots.above, slots.below].filter(Boolean).join('\n\n');
+  }
+
+  /** Named above/below boxes + type size. Migrates old single-note Little Bells saves. */
+  function cardOutsideSlots(rule) {
+    rule = rule || {};
+    var aboveKindDef = 'heading';
+    var belowKindDef = 'text';
+    if (rule.above != null || rule.below != null) {
+      return {
+        above: String(rule.above || '').replace(/\r\n/g, '\n').trim(),
+        aboveKind: normalizeOutsideKind(rule.aboveKind, aboveKindDef),
+        below: String(rule.below || '').replace(/\r\n/g, '\n').trim(),
+        belowKind: normalizeOutsideKind(rule.belowKind, belowKindDef)
+      };
+    }
+    var split = splitCardOutsideText(foldLittleBellsOutside_(rule));
+    return {
+      above: split.above,
+      aboveKind: normalizeOutsideKind(rule.aboveKind, aboveKindDef),
+      below: split.below,
+      belowKind: normalizeOutsideKind(rule.belowKind, belowKindDef)
+    };
   }
 
   function normalizeSectionLayout(raw) {
@@ -2623,16 +2683,47 @@
       if (row.tip == null) tip = s === 'Sandwiches' ? true : !!base[s].tip;
       else tip = row.tip === true || row.tip === 'yes' || row.tip === 1;
       var sell = row.sell != null ? String(row.sell) : base[s].sell;
+      var aboveKindDef = s === 'Little Bells' ? 'heading' : (base[s].aboveKind || 'paragraph');
+      var belowKindDef = s === 'Little Bells' ? 'text' : (base[s].belowKind || 'paragraph');
+      var slots;
+      if (row.above != null || row.below != null) {
+        slots = {
+          above: String(row.above || '').replace(/\r\n/g, '\n').trim(),
+          aboveKind: normalizeOutsideKind(row.aboveKind, aboveKindDef),
+          below: String(row.below || '').replace(/\r\n/g, '\n').trim(),
+          belowKind: normalizeOutsideKind(row.belowKind, belowKindDef)
+        };
+      } else if (s === 'Little Bells') {
+        slots = cardOutsideSlots({
+          note: note,
+          sell: sell,
+          aboveKind: row.aboveKind,
+          belowKind: row.belowKind
+        });
+      } else {
+        slots = {
+          above: String(base[s].above || ''),
+          aboveKind: normalizeOutsideKind(row.aboveKind, aboveKindDef),
+          below: String(base[s].below || ''),
+          belowKind: normalizeOutsideKind(row.belowKind, belowKindDef)
+        };
+      }
+      var joined = [slots.above, slots.below].filter(Boolean).join('\n\n');
       base[s] = {
         width: width,
         frame: row.frame === true || row.frame === 'yes' || row.frame === 1,
-        note: String(note || '').replace(/\r\n/g, '\n').trim(),
+        note: s === 'Little Bells'
+          ? (joined || String(note || '').replace(/\r\n/g, '\n').trim())
+          : String(note || '').replace(/\r\n/g, '\n').trim(),
         tip: !!tip,
-        sell: String(sell || '').replace(/\r\n/g, '\n').trim()
+        sell: String(sell || '').replace(/\r\n/g, '\n').trim(),
+        above: slots.above,
+        aboveKind: slots.aboveKind,
+        below: slots.below,
+        belowKind: slots.belowKind
       };
     });
     if (base['Little Bells']) {
-      base['Little Bells'].note = foldLittleBellsOutside_(base['Little Bells']);
       base['Little Bells'].sell = '';
     }
     return base;
@@ -2643,7 +2734,10 @@
     var map = normalizeSectionLayout(layouts);
     if (map[canon]) return map[canon];
     // Unknown sections: full, no frame, no note, no tip
-    return { width: 'full', frame: false, note: '', tip: false, sell: '' };
+    return {
+      width: 'full', frame: false, note: '', tip: false, sell: '',
+      above: '', aboveKind: 'paragraph', below: '', belowKind: 'paragraph'
+    };
   }
 
   /** True when raw is the old flat map (section name → rule), not a per-menu book. */
@@ -2663,13 +2757,22 @@
     if (out.sandwiches && out.sandwiches.Sandwiches) {
       out.sandwiches.Sandwiches = Object.assign({}, out.sandwiches.Sandwiches, {
         note: 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad',
-        sell: 'A selection of sandwiches is available — ask the team.'
+        sell: 'A selection of sandwiches is available — ask the team.',
+        above: '',
+        aboveKind: 'paragraph',
+        below: 'Served on either Ciabatta vg, Farmhouse White or Granary\nAll served with Fries and Salad',
+        belowKind: 'paragraph'
       });
     }
     if (out['little-bells'] && out['little-bells']['Little Bells']) {
+      var lbDef = DEFAULT_SECTION_LAYOUT['Little Bells'] || {};
       out['little-bells']['Little Bells'] = Object.assign({}, out['little-bells']['Little Bells'], {
-        note: String((DEFAULT_SECTION_LAYOUT['Little Bells'] || {}).note || ''),
-        sell: ''
+        note: String(lbDef.note || ''),
+        sell: '',
+        above: String(lbDef.above || ''),
+        aboveKind: lbDef.aboveKind || 'heading',
+        below: String(lbDef.below || ''),
+        belowKind: lbDef.belowKind || 'text'
       });
     }
     return out;
@@ -2733,6 +2836,8 @@
     MENUS: MENUS,
     SECTIONS: SECTIONS,
     WIDTH_OPTIONS: WIDTH_OPTIONS,
+    OUTSIDE_KINDS: OUTSIDE_KINDS,
+    normalizeOutsideKind: normalizeOutsideKind,
     isMainSheet: isMainSheet,
     seed: seed,
     menuById: menuById,
@@ -2801,6 +2906,7 @@
     sectionLayoutFor: sectionLayoutFor,
     littleBellsOutsideText: littleBellsOutsideText,
     splitCardOutsideText: splitCardOutsideText,
+    cardOutsideSlots: cardOutsideSlots,
     isColumnWidth: isColumnWidth,
     isFullWidth: isFullWidth,
     isLockedColumnWidth: isLockedColumnWidth,
