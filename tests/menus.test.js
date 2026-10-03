@@ -428,8 +428,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow132') !== -1, 'menus page cache-bust is flow132');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow132') !== -1, 'hub menus link cache-bust is flow132');
+assert(page.indexOf('flow133') !== -1, 'menus page cache-bust is flow133');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow133') !== -1, 'hub menus link cache-bust is flow133');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -869,6 +869,8 @@ assert(page.indexOf('data-layout-above-kind') !== -1 && page.indexOf('Type size'
   'each outside-text box has a type-size picker');
 assert(page.indexOf('this sheet') !== -1 && page.indexOf('card keeps its own') !== -1,
   'UI says host type sizes are independent of the card');
+assert(page.indexOf('not centred like the card') !== -1,
+  'host Blocks copy says drop-in wording is left like the sheet');
 assert(page.indexOf("base['Little Bells'] = Object.assign") === -1,
   'host menus do not copy Little Bells card wording or type sizes');
 assert(page.indexOf("layoutBook[mid]['Little Bells']") === -1,
@@ -1713,6 +1715,12 @@ assert(embedKidsHtml.indexOf('class="card-blurb') === -1,
   'embedded Little Bells does not use card Title/Heading sizes');
 assert(/sheet-blurb-title/.test(embedKidsHtml) && /sheet-blurb-heading/.test(embedKidsHtml),
   'embedded Little Bells uses this sheet’s type-size pickers');
+assert(/\.sheet-blurb\{text-align:left/.test(embedKidsHtml),
+  'embedded Little Bells wording is left-aligned like the parent sheet');
+assert(/\.card-blurb\{[^}]*text-align:center/.test(printJs),
+  'Little Bells card wording stays centred');
+assert(printJs.indexOf('.sheet-blurb{text-align:center') === -1,
+  'sheet drop-in blurbs are not card-centred');
 var embedKidsRow = (embedKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(/col-little[\s\S]*sheet-blurb-below[\s\S]*col-desserts/.test(embedKidsRow),
   'Sunday roast line stays in the Little Bells column');
