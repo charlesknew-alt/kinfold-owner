@@ -551,13 +551,16 @@ function reviewSpellingWithGemini_(body) {
   });
   var prompt =
     'Proof-read this Eight Bells (Bolney) pub menu. British English.\n' +
+    'Read each NAME and DESCRIPTION as a whole sentence, not isolated words.\n' +
     'Return ONLY valid JSON:\n' +
-    '{ "spellingFixes": [ { "from": "typo as written", "to": "correction", "where": "name|description", "dishId": "id" } ] }\n' +
+    '{ "spellingFixes": [ { "from": "typo as written", "to": "correction", "where": "name|description", "dishId": "id", "snippet": "the full name or description" } ] }\n' +
     'Rules:\n' +
-    '- Only real spelling / OCR mistakes. Do not restyle, rename, or rewrite dishes.\n' +
+    '- Only real spelling / OCR mistakes in that sentence. Do not restyle, rename, or rewrite dishes.\n' +
+    '- Do not change plurals (onions, noodles, tomatoes) to singular, or the other way around.\n' +
+    '- Do not change real food words: malted bread, smoked, salted, pickled, toasted, chilli, fillet.\n' +
     '- Prefer British spelling (chilli, fillet, colour) only when the written form is wrong.\n' +
     '- Keep intentional names (Wagyu, Nduja, Padron, MP).\n' +
-    '- If nothing is wrong, return {"spellingFixes":[]}.\n' +
+    '- If a word is correct in context, omit it. If nothing is wrong, return {"spellingFixes":[]}.\n' +
     'Dishes:\n' + JSON.stringify(slim).slice(0, 9000);
 
   var called = callGemini_(key, [{ text: prompt }], {
@@ -588,7 +591,13 @@ function reviewSpellingWithGemini_(body) {
     if (!f) return;
     var from = String(f.from || '').trim();
     var to = String(f.to || '').trim();
-    if (!from || !to || from === to) return;
+    if (!from || !to || from.toLowerCase() === to.toLowerCase()) return;
+    var keepWord = {
+      malted: 1, smoked: 1, onions: 1, onion: 1, noodles: 1, noodle: 1,
+      salted: 1, pickled: 1, toasted: 1, roasted: 1
+    };
+    if (keepWord[from.toLowerCase()]) return;
+    if (from.toLowerCase() + 's' === to.toLowerCase() || to.toLowerCase() + 's' === from.toLowerCase()) return;
     var keyFix = from.toLowerCase() + '>' + to.toLowerCase() + '>' + String(f.dishId || '');
     if (seen[keyFix]) return;
     seen[keyFix] = true;
@@ -596,7 +605,8 @@ function reviewSpellingWithGemini_(body) {
       from: from.slice(0, 80),
       to: to.slice(0, 80),
       where: String(f.where || 'name').slice(0, 20),
-      dishId: String(f.dishId || '')
+      dishId: String(f.dishId || ''),
+      snippet: String(f.snippet || '').slice(0, 240)
     });
   });
   return {

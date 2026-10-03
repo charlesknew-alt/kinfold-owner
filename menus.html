@@ -152,6 +152,17 @@
     .spell-hints[hidden] { display: none !important; }
     .spell-hints strong { font-weight: 700; }
     .spell-hints button.link { margin-left: 8px; }
+    .spell-gate-list { list-style: none; margin: 0 0 16px; padding: 0; }
+    .spell-gate-item {
+      border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; background: #fff;
+    }
+    .spell-gate-item .dish { font-weight: 700; font-size: 14px; margin: 0 0 8px; }
+    .spell-gate-item .line { font-size: 13.5px; line-height: 1.45; margin: 0 0 4px; }
+    .spell-gate-item .line .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin-right: 6px; }
+    .spell-gate-item mark { background: #f4d8c8; color: inherit; padding: 0 2px; border-radius: 3px; }
+    .spell-gate-item .picks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 13.5px; }
+    .spell-gate-item .picks label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .spell-gate-note { font-size: 13px; color: #8a3b2b; margin: 0 0 10px; min-height: 1.2em; }
     .catalogue-row {
       padding: 12px 0; border-bottom: 1px solid var(--line);
     }
@@ -414,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow123"></script>
-  <script src="menus-print.js?v=20260928-flow123"></script>
-  <script src="menus-ingest.js?v=20260928-flow123"></script>
+  <script src="menus.js?v=20260928-flow124"></script>
+  <script src="menus-print.js?v=20260928-flow124"></script>
+  <script src="menus-ingest.js?v=20260928-flow124"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -3675,7 +3686,9 @@
       var aiP = aiFn ? aiFn(list) : Promise.resolve(null);
       aiP.then(function (ai) {
         var aiFixes = (ai && ai.spellingFixes) ? ai.spellingFixes : [];
-        var fixes = mergeSpellingFixes_(local, aiFixes);
+        var fixes = EBMenus.enrichSpellingFixes
+          ? EBMenus.enrichSpellingFixes(list, mergeSpellingFixes_(local, aiFixes))
+          : mergeSpellingFixes_(local, aiFixes);
         if (!fixes.length) {
           if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
           done();
@@ -3694,6 +3707,8 @@
 
     function showSpellingGate_(fixes, done) {
       var btn = document.getElementById('doGenerate');
+      var list = dishes();
+      if (EBMenus.enrichSpellingFixes) fixes = EBMenus.enrichSpellingFixes(list, fixes);
       var existing = document.getElementById('spellGateOverlay');
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
       var overlay = document.createElement('div');
@@ -3702,22 +3717,37 @@
         'position:fixed;inset:0;z-index:45;background:rgba(28,22,16,.55);display:flex;align-items:center;justify-content:center;padding:24px');
       var card = document.createElement('div');
       card.setAttribute('style',
-        'background:#fffaf4;color:#1c1610;max-width:480px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);max-height:80vh;overflow:auto');
+        'background:#fffaf4;color:#1c1610;max-width:560px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);max-height:80vh;overflow:auto');
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
       html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Spelling check</div>';
-      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Suggested changes on this sheet. Apply them, or keep what you typed.</p>';
-      html += '<ul style="margin:0 0 16px;padding-left:18px;font-family:system-ui,sans-serif;font-size:14px;line-height:1.45">';
-      fixes.forEach(function (f) {
-        html += '<li style="margin:0 0 6px"><span style="text-decoration:line-through;opacity:.75">' +
-          escapeAttr(f.from) + '</span> → <strong>' + escapeAttr(f.to) + '</strong>';
-        if (f.dishName) html += ' <span style="opacity:.65;font-size:12px">(' + escapeAttr(f.dishName) +
-          (f.where ? ' · ' + escapeAttr(f.where) : '') + ')</span>';
-        html += '</li>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">AI has read each dish line. Tick <strong>Change</strong> or <strong>Correct as typed</strong> on every suggestion, then generate.</p>';
+      html += '<ul class="spell-gate-list">';
+      fixes.forEach(function (f, i) {
+        var snippet = f.snippet || f.dishName || '';
+        var parts = EBMenus.splitSpellSnippet
+          ? EBMenus.splitSpellSnippet(snippet, f.from)
+          : { before: snippet, hit: '', after: '' };
+        var preview = f.preview || snippet;
+        html += '<li class="spell-gate-item">';
+        html += '<div class="dish">' + escapeAttr(f.dishName || 'Dish') +
+          (f.where ? ' <span class="lbl" style="font-weight:400;font-size:12px;color:#5a534a">· ' +
+            escapeAttr(f.where) + '</span>' : '') + '</div>';
+        html += '<p class="line"><span class="lbl">As written</span>';
+        html += escapeAttr(parts.before);
+        if (parts.hit) html += '<mark>' + escapeAttr(parts.hit) + '</mark>';
+        html += escapeAttr(parts.after) + '</p>';
+        html += '<p class="line"><span class="lbl">If changed</span>' + escapeAttr(preview) + '</p>';
+        html += '<div class="picks">';
+        html += '<label><input type="checkbox" data-spell-i="' + i + '" data-spell-act="change"> Change to “' +
+          escapeAttr(f.to) + '”</label>';
+        html += '<label><input type="checkbox" data-spell-act="keep" data-spell-i="' + i + '"> Correct as typed</label>';
+        html += '</div></li>';
       });
       html += '</ul>';
+      html += '<p class="spell-gate-note" id="spellGateNote"></p>';
       html += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
-      html += '<button type="button" id="spellApplyAll" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Apply all &amp; generate</button>';
-      html += '<button type="button" id="spellKeepTyped" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Keep as typed</button>';
+      html += '<button type="button" id="spellGenerateChosen" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Generate</button>';
+      html += '<button type="button" id="spellKeepTyped" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Keep all as typed</button>';
       html += '</div>';
       card.innerHTML = html;
       overlay.appendChild(card);
@@ -3726,9 +3756,34 @@
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
       }
-      document.getElementById('spellApplyAll').onclick = function () {
-        if (EBMenus.applySpellingFixesToDishes) {
-          book[menuId] = EBMenus.applySpellingFixesToDishes(dishes(), fixes);
+      overlay.querySelectorAll('input[data-spell-i]').forEach(function (box) {
+        box.addEventListener('change', function () {
+          if (!box.checked) return;
+          var i = box.getAttribute('data-spell-i');
+          var act = box.getAttribute('data-spell-act');
+          overlay.querySelectorAll('input[data-spell-i="' + i + '"]').forEach(function (other) {
+            if (other.getAttribute('data-spell-act') !== act) other.checked = false;
+          });
+        });
+      });
+      document.getElementById('spellGenerateChosen').onclick = function () {
+        var chosen = [];
+        var missing = 0;
+        fixes.forEach(function (f, i) {
+          var change = overlay.querySelector('input[data-spell-i="' + i + '"][data-spell-act="change"]');
+          var keep = overlay.querySelector('input[data-spell-i="' + i + '"][data-spell-act="keep"]');
+          var didChange = change && change.checked;
+          var didKeep = keep && keep.checked;
+          if (!didChange && !didKeep) missing += 1;
+          else if (didChange) chosen.push(f);
+        });
+        var note = document.getElementById('spellGateNote');
+        if (missing) {
+          if (note) note.textContent = 'Tick Change or Correct on each line (' + missing + ' still open).';
+          return;
+        }
+        if (chosen.length && EBMenus.applySpellingFixesToDishes) {
+          book[menuId] = EBMenus.applySpellingFixesToDishes(dishes(), chosen);
           if (EBMenus.sortDishesBySection) book[menuId] = EBMenus.sortDishesBySection(book[menuId]);
           save();
         }

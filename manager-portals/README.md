@@ -18,4 +18,4 @@ Cursor cannot push to that repo from this environment — paste/push from your P
 
 Update the Menus URL cache-bust when Menus ships a new flow:
 
-`https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20260928-flow123`
+`https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20260928-flow124`

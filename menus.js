@@ -1843,6 +1843,39 @@
     gf: 1, vg: 1, df: 1, mp: 1, uk: 1, oz: 1, ml: 1, kg: 1
   };
 
+  /** Real food words — never “correct” these, even if a similar word exists. */
+  var SPELL_KEEP = {
+    malted: 1, smoked: 1, onions: 1, onion: 1, noodles: 1, noodle: 1,
+    salted: 1, pickled: 1, toasted: 1, roasted: 1, braised: 1, glazed: 1,
+    crushed: 1, melted: 1, whipped: 1, dressed: 1, mixed: 1, leaves: 1,
+    chips: 1, fries: 1, peas: 1, beans: 1, herbs: 1, spices: 1, crumbs: 1,
+    prawns: 1, mussels: 1, shallots: 1, capers: 1, gherkins: 1, tomatoes: 1,
+    potatoes: 1, mushrooms: 1, peppers: 1, olives: 1, almonds: 1, walnuts: 1
+  };
+
+  function isBenignSpellingPair(from, to) {
+    var a = String(from || '').toLowerCase();
+    var b = String(to || '').toLowerCase();
+    if (!a || !b || a === b) return true;
+    if (SPELL_KEEP[a]) return true;
+    if (a + 's' === b || b + 's' === a) return true;
+    if (a + 'es' === b || b + 'es' === a) return true;
+    if (a.length > 2 && a.slice(-1) === 'y' && a.slice(0, -1) + 'ies' === b) return true;
+    if (b.length > 2 && b.slice(-1) === 'y' && b.slice(0, -1) + 'ies' === a) return true;
+    return false;
+  }
+
+  function splitSpellSnippet(text, word) {
+    var raw = String(text || '');
+    var needle = String(word || '');
+    if (!raw || !needle) return { before: raw, hit: '', after: '' };
+    var re = new RegExp('\\b' + needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+    var m = raw.match(re);
+    if (!m) return { before: raw, hit: '', after: '' };
+    var i = m.index;
+    return { before: raw.slice(0, i), hit: m[0], after: raw.slice(i + m[0].length) };
+  }
+
   function spellTokenize_(text) {
     return String(text || '').match(/[A-Za-zÀ-ÿ']+/g) || [];
   }
@@ -1926,10 +1959,10 @@
     var out = [];
     spellTokenize_(raw).forEach(function (tok) {
       var lower = tok.toLowerCase();
-      if (SPELL_SKIP[lower] || lower.length < 3) return;
+      if (SPELL_SKIP[lower] || SPELL_KEEP[lower] || lower.length < 3) return;
       if (/^vegan$|^vegetarian$|^gluten$|^dairy$/.test(lower)) return;
       var mapped = SPELL_TYPOS[lower];
-      if (mapped && mapped !== lower) {
+      if (mapped && mapped !== lower && !isBenignSpellingPair(lower, mapped)) {
         var key = lower + '>' + mapped;
         if (!seen[key]) {
           seen[key] = true;
@@ -1938,7 +1971,7 @@
         return;
       }
       if (knownSet[lower]) return;
-      if (opts.typosOnly) return;
+      if (opts.typosOnly || !opts.fuzzy) return;
       if (lower.length < 5) return;
       var best = '';
       var bestD = 3;
@@ -1953,7 +1986,7 @@
           break;
         }
       }
-      if (best) {
+      if (best && !isBenignSpellingPair(lower, best)) {
         var key2 = lower + '>' + best;
         if (!seen[key2]) {
           seen[key2] = true;
@@ -1981,28 +2014,66 @@
     var raw = [];
     (dishes || []).forEach(function (d) {
       if (!d) return;
-      suggestSpellingForText(d.name, { known: known, where: 'name' }).forEach(function (f) {
+      // Exact typo map only — fuzzy word swaps (onions→onion, malted→salted)
+      // need the full sentence, which Gemini does on Generate.
+      suggestSpellingForText(d.name, { known: known, where: 'name', typosOnly: true }).forEach(function (f) {
         raw.push({
           from: f.from,
           to: f.to,
           where: 'name',
           dishId: d.id || '',
           dishName: d.name || '',
+          snippet: d.name || '',
           fuzzy: !!f.fuzzy
         });
       });
-      suggestSpellingForText(d.description, { known: known, where: 'description' }).forEach(function (f) {
+      suggestSpellingForText(d.description, { known: known, where: 'description', typosOnly: true }).forEach(function (f) {
         raw.push({
           from: f.from,
           to: f.to,
           where: 'description',
           dishId: d.id || '',
           dishName: d.name || '',
+          snippet: d.description || '',
           fuzzy: !!f.fuzzy
         });
       });
     });
-    return normalizeSpellingFixes(raw);
+    return enrichSpellingFixes(dishes, raw);
+  }
+
+  function fieldTextForFix_(dish, fix) {
+    var where = String((fix && fix.where) || (fix && fix.field) || '').toLowerCase();
+    var from = String((fix && fix.from) || '').toLowerCase();
+    var name = String((dish && dish.name) || '');
+    var desc = String((dish && dish.description) || '');
+    if (where === 'description' || where === 'desc') return desc;
+    if (where === 'name') return name;
+    if (from && desc.toLowerCase().indexOf(from) !== -1) return desc;
+    return name;
+  }
+
+  function enrichSpellingFixes(dishes, fixes) {
+    var byId = {};
+    (dishes || []).forEach(function (d) {
+      if (d && d.id) byId[d.id] = d;
+    });
+    return normalizeSpellingFixes(fixes).filter(function (f) {
+      return !isBenignSpellingPair(f.from, f.to);
+    }).map(function (f) {
+      var d = (f.dishId && byId[f.dishId]) || {};
+      var snippet = String(f.snippet || fieldTextForFix_(d, f) || '').trim();
+      return {
+        from: f.from,
+        to: f.to,
+        where: f.where,
+        dishId: f.dishId,
+        dishName: f.dishName || d.name || '',
+        snippet: snippet,
+        preview: spellReplaceToken_(snippet, f.from, f.to),
+        fuzzy: !!f.fuzzy
+      };
+    });
   }
 
   function applySpellingFixesToDishes(dishes, fixes) {
@@ -2049,6 +2120,8 @@
         where: where,
         dishId: dishId,
         dishName: String(fix.dishName || '').trim(),
+        snippet: String(fix.snippet || '').trim(),
+        preview: String(fix.preview || '').trim(),
         fuzzy: !!fix.fuzzy
       });
     });
@@ -2645,6 +2718,9 @@
     formatMarks: formatMarks,
     dishesFromAiMenu: dishesFromAiMenu,
     normalizeSpellingFixes: normalizeSpellingFixes,
+    enrichSpellingFixes: enrichSpellingFixes,
+    isBenignSpellingPair: isBenignSpellingPair,
+    splitSpellSnippet: splitSpellSnippet,
     suggestSpellingForText: suggestSpellingForText,
     autoCorrectSpelling: autoCorrectSpelling,
     scanMenuSpelling: scanMenuSpelling,
