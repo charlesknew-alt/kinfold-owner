@@ -150,7 +150,11 @@ assert(printJs.indexOf('.dish-line{display:flex') !== -1, 'dish-line flex rule p
 assert(!/\*\/\s*\+/.test(printJs), 'print CSS has no comment-plus that becomes NaN');
 assert(printJs.indexOf('createObjectURL') !== -1, 'print preview falls back to a blob URL');
 assert(printJs.indexOf('print-preview.html') !== -1, 'print preview opens a real same-origin page not about:blank');
+assert(printJs.indexOf('localStorage.setItem(key') !== -1 && printJs.indexOf('searchParams.set(\'k\'') !== -1,
+  'print preview stores HTML under a key so iframe tabs are not stuck on about:blank');
 assert(fs.existsSync(path.join(root, 'print-preview.html')), 'print-preview.html exists for GitHub Pages');
+assert(fs.readFileSync(path.join(root, 'print-preview.html'), 'utf8').indexOf('localStorage.getItem(key') !== -1,
+  'print-preview.html reads the keyed HTML from localStorage');
 assert(printJs.indexOf('fitPreviewToScreen') !== -1, 'preview scales A4 to the phone viewport');
 assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport tag');
 assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
@@ -435,8 +439,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow134') !== -1, 'menus page cache-bust is flow134');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow134') !== -1, 'hub menus link cache-bust is flow134');
+assert(page.indexOf('flow135') !== -1, 'menus page cache-bust is flow135');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow135') !== -1, 'hub menus link cache-bust is flow135');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1793,10 +1797,34 @@ var liveWordingHtml = print.build(api.menuById('sunday'), [
   promos: []
 });
 assert(/sheet-offer/.test(liveWordingHtml) && /lb-price-line/.test(liveWordingHtml),
-  'All below £9.50 is a sheet offer, not one meek Cinzel paragraph');
+  'Heading type: All below £9.50 is a sheet offer');
 assert(/All below £9\.50/.test(liveWordingHtml) && /lb-offer-sub/.test(liveWordingHtml) &&
   /one scoop of ice cream or sorbet/i.test(liveWordingHtml),
-  '£9.50 sits on the price line; scoop line is the quieter sub');
+  'Heading type: £9.50 sits on the price line; scoop line is the quieter sub');
+var paraOfferHtml = print.build(api.menuById('sunday'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Desserts', 'Sticky Toffee Pudding', 'toffee sauce', '8.25', '')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      above: 'All below £9.50 to include a choice of one scoop of ice cream or sorbet.',
+      aboveKind: 'paragraph',
+      below: 'Little Bells on Sunday in addition have a choice of roasts at half price of the adults.',
+      belowKind: 'paragraph',
+      frame: false,
+      width: 'column'
+    },
+    Desserts: { width: 'column', frame: true }
+  }),
+  promos: []
+});
+var paraOfferBody = paraOfferHtml.split('</style>')[1] || paraOfferHtml;
+assert(/sheet-blurb-paragraph/.test(paraOfferBody) && !/lb-price-line/.test(paraOfferBody) &&
+  !/sheet-offer/.test(paraOfferBody),
+  'Paragraph type: All below £9.50 stays paragraph — does not force the big offer style');
+assert(/All below £9\.50 to include a choice of one scoop/i.test(paraOfferBody),
+  'Paragraph type: full offer line prints as one paragraph');
 var embedSandHtml = print.build(api.menuById('main'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Sandwiches', 'BLT', 'fries', '10.95', ''),

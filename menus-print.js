@@ -329,18 +329,11 @@
     var raw = String(text || '').trim();
     if (!raw) return '';
     kind = String(kind || 'paragraph').toLowerCase();
-    var offerish = kind === 'title' || kind === 'heading' || /^all\b/i.test(raw);
-    if (offerish && /£\s*\d/.test(raw)) {
+    // Offer split only when Blocks type is Title/Heading — Paragraph/Text must
+    // honour the picker (staff pick Paragraph, print stays paragraph size).
+    if ((kind === 'title' || kind === 'heading') && /£\s*\d/.test(raw)) {
       var split = splitOfferHtml(raw);
       if (split) return split;
-    }
-    var lines = raw.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
-    if ((kind === 'title' || kind === 'heading') && lines.length && /^all\s*£|^£\s*\d/i.test(lines[0])) {
-      var inner = '<div class="lb-price-line">' + esc(lines[0]) + '</div>';
-      if (lines.length > 1) {
-        inner += '<div class="lb-offer-sub">' + esc(lines.slice(1).join('\n')).replace(/\n/g, '<br>') + '</div>';
-      }
-      return inner;
     }
     return esc(raw).replace(/\n/g, '<br>');
   }
@@ -3882,31 +3875,57 @@
 
   function openPrintHtml(html) {
     if (!html) return false;
-    // Phone Chrome in the Varlo iframe blocks blob: tabs, so they land on
-    // about:blank. Open a same-origin page and hand it the HTML instead.
+    // Phone Chrome in the Varlo iframe often opens a tab that stays about:blank
+    // (blob: and opener/sessionStorage both fail). Store HTML under a key and
+    // open same-origin print-preview.html?k=… so the new tab can read it.
+    var key = 'EB_PRINT_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     try {
       window.__EB_PRINT_PREVIEW_HTML = html;
       sessionStorage.setItem('EB_PRINT_PREVIEW_HTML', html);
+      localStorage.setItem(key, html);
+      localStorage.setItem('EB_PRINT_PREVIEW_HTML', html);
+      localStorage.setItem('EB_PRINT_PREVIEW_KEY', key);
     } catch (e) {}
     var previewUrl;
     try {
-      previewUrl = new URL('print-preview.html', window.location.href).href;
-      previewUrl += (previewUrl.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+      var u = new URL('print-preview.html', window.location.href);
+      u.searchParams.set('t', String(Date.now()));
+      u.searchParams.set('k', key);
+      previewUrl = u.href;
     } catch (e2) {
-      previewUrl = 'print-preview.html?t=' + Date.now();
+      previewUrl = 'print-preview.html?t=' + Date.now() + '&k=' + encodeURIComponent(key);
     }
-    var w = window.open(previewUrl, '_blank');
-    if (w) return true;
+    // <a target=_blank> is more reliable from iframes than window.open alone.
+    try {
+      var a = document.createElement('a');
+      a.href = previewUrl;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      if (a.parentNode) a.parentNode.removeChild(a);
+    } catch (e3) {}
+    var w = null;
+    try { w = window.open(previewUrl, '_blank'); } catch (e4) {}
+    if (w) {
+      try {
+        // Some Android builds return a window stuck on about:blank — nudge it.
+        if (!w.location || String(w.location.href || '') === 'about:blank') {
+          w.location.href = previewUrl;
+        }
+      } catch (e5) {}
+      return true;
+    }
     var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     w = window.open(url, '_blank');
     if (w) {
       setTimeout(function () {
-        try { URL.revokeObjectURL(url); } catch (e3) {}
+        try { URL.revokeObjectURL(url); } catch (e6) {}
       }, 120000);
       return true;
     }
-    try { URL.revokeObjectURL(url); } catch (e4) {}
+    try { URL.revokeObjectURL(url); } catch (e7) {}
     w = window.open('', '_blank');
     if (!w) return false;
     w.document.open();
