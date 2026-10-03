@@ -437,6 +437,8 @@ function reviewLayoutWithGemini_(body) {
     'OFF the packed page onto the roomier page so both can enlarge together.\n' +
     '- Sandwiches (fillings or tip/sell box) stay on page 2 in a column — quieter, lower-margin. ' +
     'Do not pull them onto page 1 to even leftover. Only use sandwichesOn page1 if page 2 cannot fit them.\n' +
+    '- If layout.sandwichesLocked is true, sandwichesOn must be page1 or page2 — NEVER omit. Staff ticked Sandwiches; you only choose which page.\n' +
+    '- If sandwichesLocked is false, sandwichesOn should be omit (they were not ticked on Dishes).\n' +
     '- Prefer fewer feature panels on the packed page over shrinking type. One panel is enough when two ' +
     'would force smaller shared type.\n' +
     '- Feature panels are LITTLE promotions — never a tall empty frame. Balance columns with food ' +
@@ -463,6 +465,7 @@ function reviewLayoutWithGemini_(body) {
     '5. PAGE 1: LEFT often Sharing/events; RIGHT = Burgers then Pub Classics. Sandwiches prefer page 2 column.\n' +
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
     '7. Prefer sandwichesOn page2 (fillings or sell box), always as a column. ' +
+    'Never omit sandwiches when sandwichesLocked is true. ' +
     'Move sidesOn to page1 when that raises the shared density.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
     '9. SECTION WIDTH “both” / best-fit: choose column OR full for balance on THIS sheet.\n' +
@@ -493,6 +496,13 @@ function reviewLayoutWithGemini_(body) {
   if (['airy', 'roomy', 'normal', 'tight', 'compact'].indexOf(density) === -1) density = 'normal';
   var sandwichesOn = String(advice.sandwichesOn || 'page2').toLowerCase();
   if (['page1', 'page2', 'omit'].indexOf(sandwichesOn) === -1) sandwichesOn = 'page2';
+  if (layout.sandwichesLocked && sandwichesOn === 'omit') {
+    sandwichesOn = (layout.p2 && layout.p2.sandwiches) ? 'page2' : 'page1';
+  }
+  if (layout.sandwichesLocked === false && sandwichesOn !== 'omit' &&
+      !(layout.p1 && layout.p1.sandwiches) && !(layout.p2 && layout.p2.sandwiches)) {
+    sandwichesOn = 'omit';
+  }
   var sidesOn = String(advice.sidesOn || '').toLowerCase();
   if (['page1', 'page2'].indexOf(sidesOn) === -1) sidesOn = '';
 

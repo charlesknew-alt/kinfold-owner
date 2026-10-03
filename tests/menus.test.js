@@ -24,6 +24,13 @@ assert(html.indexOf("openApp('menus-eightbells'") !== -1, 'owner tile opens menu
 assert(html.indexOf("'menus-eightbells': 'menus.html") !== -1, 'menus url is menus.html');
 assert(page.indexOf('Arranging your menu') !== -1, 'generate shows arranging step');
 assert(page.indexOf('Ordering sections') !== -1, 'arrange explains section order');
+assert(page.indexOf('Keeping Sandwiches, Little Bells and Desserts if you ticked them') !== -1 &&
+  page.indexOf('Placing wording / sandwiches') === -1,
+  'arrange keeps ticked sandwiches; does not treat them as optional-if-they-fit');
+assert(page.indexOf('Putting the logo on only if') !== -1,
+  'logo is still optional chrome if there is room');
+assert(page.indexOf('does not drop Sandwiches') !== -1,
+  'include ticks explain sandwiches are not optional-if-they-fit');
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
 assert(page.indexOf("getElementById('doGenerate').onclick") === -1, 'do not bind Generate before step renders');
 assert(/try\s*\{/.test(page) && page.indexOf('pullMenusFromCloud()') !== -1,
@@ -411,8 +418,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow124') !== -1, 'menus page cache-bust is flow124');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow124') !== -1, 'hub menus link cache-bust is flow124');
+assert(page.indexOf('flow126') !== -1, 'menus page cache-bust is flow126');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow126') !== -1, 'hub menus link cache-bust is flow126');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -842,10 +849,14 @@ assert(/12\s*[–-]\s*2\.45/i.test(api.sectionLayoutFor('Sandwiches').note || ''
   'Main/Sunday Sandwiches default note keeps lunch hours');
 assert(/Ciabatta/i.test(api.sectionLayoutForMenu('sandwiches').Sandwiches.note || ''),
   'Sandwiches card default note is the under-fillings spiel');
-assert(/Two Scoops of Ice-Cream/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].sell || ''),
-  'Little Bells card default sell is the ice cream block');
-assert(/half price of the adults/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].note || ''),
-  'Little Bells card default note is the Sunday foot line');
+assert(!/Two Scoops of Ice-Cream/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].sell || ''),
+  'Little Bells no longer uses a separate Two Scoops sell block');
+assert(/All £9\.50/.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].note || '') &&
+  /half the price of the adults/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].note || ''),
+  'Little Bells one outside-text note has price offer and Sunday line');
+var lbSplit = api.splitCardOutsideText(api.sectionLayoutForMenu('little-bells')['Little Bells'].note);
+assert(/£9\.50/.test(lbSplit.above) && /Sunday/i.test(lbSplit.below),
+  'Little Bells splits offer above the box and Sunday note below');
 assert(api.normalizeSectionLayout({ Sandwiches: { width: 'column', frame: true, tip: false, sell: 'Ask at the bar' } }).Sandwiches.tip === false,
   'normalize keeps tip off when explicitly false');
 assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') !== -1,
@@ -855,8 +866,9 @@ assert(printJs.indexOf('Tip box') !== -1 || printJs.indexOf('sandRule.tip') !== 
   'print honours tip when deciding sandwiches box');
 assert(/cardSandwichesInner\(dishes,\s*plan\)/.test(printJs),
   'sandwich card spiel reads plan sectionLayout note');
-assert(printJs.indexOf('lbRule.sell') !== -1 && printJs.indexOf('sundayNote') !== -1,
-  'Little Bells card foot reads sell (ice cream) and note (Sunday)');
+assert(printJs.indexOf('card-outside') !== -1 && printJs.indexOf('card-offer') !== -1 &&
+  printJs.indexOf('littleBellsOutsideText') !== -1,
+  'Little Bells card prints one outside-text block (offer above, note below the dish box)');
 assert(printJs.indexOf('startersInTop') !== -1 && printJs.indexOf('top-band-logo') !== -1,
   'starters sit beside logo spanning the top band');
 assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
@@ -1037,7 +1049,7 @@ var kidsColNoSides = print.build(api.menuById('sunday'), kidsColDishes, {
     { title: 'Gatherings', body: 'happy to host your event' }
   ]
 });
-assert(/cols-little-solo[\s\S]{0,800}Stay a While|cols-little-solo[\s\S]{0,800}Gatherings/.test(kidsColNoSides),
+assert(/cols-little-solo[\s\S]{0,4000}Stay a While|cols-little-solo[\s\S]{0,4000}Gatherings/.test(kidsColNoSides),
   'Column with no food partner gets feature panels so columns finish level');
 assert(printJs.indexOf('levelOppositeColumns') !== -1 && printJs.indexOf('even fill across pages') !== -1,
   'layout equalises opposite columns and leftover across two pages');
@@ -1082,7 +1094,8 @@ var sidesColAlonePlan = print.planFluidLayout(api.menuById('sunday'), sidesColAl
     Sides: { width: 'column', frame: false, note: '' },
     Sandwiches: { width: 'column', frame: true, tip: true, sell: 'Ask.' }
   }),
-  promos: sidesColAlonePromos
+  promos: sidesColAlonePromos,
+  includes: { sandwiches: true }
 });
 assert(sidesColAlonePlan.pages === 2 && sidesColAlonePlan.p2 && sidesColAlonePlan.p2.sidesOnP2,
   'fixture keeps Sides on page 2 alone (the orphan case)');
@@ -1093,7 +1106,8 @@ var sidesColAloneHtml = print.build(api.menuById('sunday'), sidesColAloneDishes,
     Sides: { width: 'column', frame: false, note: '' },
     Sandwiches: { width: 'column', frame: true, tip: true, sell: 'Ask.' }
   }),
-  promos: sidesColAlonePromos
+  promos: sidesColAlonePromos,
+  includes: { sandwiches: true }
 });
 var a4Only = sidesColAloneHtml.split('mode-panel mode-a5')[0] || sidesColAloneHtml;
 assert(!/<section class="sec"><div class="sec-title soft-left">Sides/.test(a4Only),
@@ -1284,8 +1298,12 @@ assert(printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
   'planner keeps Sandwiches on page 2 instead of pulling them forward');
 assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -1,
   'Gemini layout review can move Sides between pages for shared type');
-assert(aiGs.indexOf('stay on page 2') !== -1 || aiGs.indexOf('sandwichesOn page2') !== -1,
-  'Gemini keeps sandwiches on page 2 in a column');
+assert(printJs.indexOf('sandwichesLocked') !== -1,
+  'print locks sandwiches when staff ticked them or listed fillings');
+assert(page.indexOf('sandwichesLocked') !== -1 && page.indexOf("advice.sandwichesOn === 'omit'") !== -1,
+  'generate ignores Gemini omit when sandwiches are locked');
+assert(aiGs.indexOf('sandwichesLocked') !== -1 && aiGs.indexOf('NEVER omit') !== -1,
+  'Gemini must not omit ticked sandwiches');
 assert(page.indexOf('advice.sidesOn') !== -1,
   'generate applies AI sidesOn to the print layout');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
@@ -1527,15 +1545,25 @@ var sparse = [
 var sparseLayout = print.planFluidLayout(mainMenu, sparse);
 assert(sparseLayout.pages === 1, 'sparse menu stays on one page');
 assert(sparseLayout.p1.rooms || sparseLayout.fillers.some(function (f) { return /Stay|Gatherings|Sandwiches|Logo/i.test(f); }), 'sparse menu gets selling fillers');
-// Tip on (default) → empty Sandwiches still get a selling box; Tip off → omit
+// Tip on + Sandwiches ticked → empty selling box; unticked → no box even if Tip is on
 var tipOnLayout = print.planFluidLayout(mainMenu, sparse, {
-  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } })
+  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } }),
+  includes: { sandwiches: true }
 });
 assert(tipOnLayout.p1.sandwiches || (tipOnLayout.p2 && tipOnLayout.p2.sandwiches) ||
   tipOnLayout.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
-  'tip on keeps sandwiches selling box with 0 dishes');
+  'ticked sandwiches + tip on keeps selling box with 0 dishes');
+assert(tipOnLayout.sandwichesLocked === true, 'ticked empty sandwiches lock the box on the sheet');
+var noTickTip = print.planFluidLayout(mainMenu, sparse, {
+  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } }),
+  includes: { sandwiches: false }
+});
+assert(!noTickTip.p1.sandwiches && !(noTickTip.p2 && noTickTip.p2.sandwiches) &&
+  !noTickTip.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
+  'unticked sandwiches stay off even when Tip is on');
 var tipOffLayout = print.planFluidLayout(mainMenu, sparse, {
-  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: false, sell: '' } })
+  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: false, sell: '' } }),
+  includes: { sandwiches: true }
 });
 assert(!tipOffLayout.p1.sandwiches && !(tipOffLayout.p2 && tipOffLayout.p2.sandwiches) &&
   !tipOffLayout.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
@@ -1562,8 +1590,12 @@ var sandCardHtml = print.build(api.menuById('sandwiches'), sandCardDishes, {
     }
   })
 });
-assert(/EDITABLE CARD SPIEL/.test(sandCardHtml), 'sandwiches card prints editable note under fillings');
+assert(/EDITABLE CARD SPIEL/.test(sandCardHtml) && /card-outside/.test(sandCardHtml),
+  'sandwiches card prints editable note outside the dish box');
 assert(/All served with Fries/.test(sandCardHtml), 'sandwiches card note keeps line breaks as spiel');
+var sandInnerOnly = sandCardHtml.slice(0, sandCardHtml.indexOf('card-outside') === -1 ? sandCardHtml.length : sandCardHtml.indexOf('card-outside'));
+assert(sandInnerOnly.indexOf('EDITABLE CARD SPIEL') === -1,
+  'sandwiches hours/spiel is not inside the frilly dish box');
 var kidsCardDishes = [
   api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
   api.dish('Little Bells', 'Kids Mac & Cheese', '', '', '')
@@ -1571,18 +1603,17 @@ var kidsCardDishes = [
 var kidsCardHtml = print.build(api.menuById('little-bells'), kidsCardDishes, {
   sectionLayout: api.normalizeSectionLayout({
     'Little Bells': {
-      note: 'CUSTOM SUNDAY NOTE for Little Bells',
-      sell: 'Two Scoops of Ice-Cream\nVanilla only\n£8.00',
+      note: 'All £8.00\nto include a scoop.\n\nCUSTOM SUNDAY NOTE for Little Bells',
       frame: true,
       width: 'full'
     }
   })
 });
 assert(/CUSTOM SUNDAY NOTE for Little Bells/.test(kidsCardHtml),
-  'Little Bells card prints editable Sunday/foot note');
-assert(/Two Scoops of Ice-Cream/.test(kidsCardHtml) && /Vanilla only/.test(kidsCardHtml),
-  'Little Bells card prints editable ice cream sell lines');
-assert(/£8\.00/.test(kidsCardHtml), 'Little Bells card prints editable ice cream price');
+  'Little Bells card prints editable Sunday note below the box');
+assert(/All £8\.00/.test(kidsCardHtml) && /card-offer/.test(kidsCardHtml),
+  'Little Bells price offer prints above the dish box');
+assert(/kids-face/.test(kidsCardHtml), 'Little Bells card uses calmer kids type');
 
 // Promo must not force over
 var crowdedDishes = aloneDishes.concat(api.composeDishes(book, 'main', { desserts: true, sandwiches: true, 'little-bells': true }).filter(function (d) {
@@ -1666,7 +1697,8 @@ var tipOnlyPacked = [
 var tipPackedLayout = print.planFluidLayout(mainMenu, tipOnlyPacked, {
   sectionLayout: api.normalizeSectionLayout({
     Sandwiches: { tip: true, frame: true, width: 'column', sell: 'A selection of sandwiches is available — ask the team.' }
-  })
+  }),
+  includes: { sandwiches: true }
 });
 assert(tipPackedLayout.pages === 2, 'nibbles+mains+desserts packed menu uses two pages');
 assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPackedLayout.p1.sandwiches,
@@ -1705,6 +1737,9 @@ var clipRisk = [
 ];
 var clipLayout = print.planFluidLayout(mainMenu, clipRisk);
 assert(clipLayout.pages === 2, 'full starters/sandwiches/mains/desserts sheet uses two pages — no clipped desserts');
+assert(clipLayout.p1.sandwiches || (clipLayout.p2 && clipLayout.p2.sandwiches),
+  'named sandwich fillings stay on the sheet — never dropped to make space');
+assert(clipLayout.sandwichesLocked === true, 'named sandwich fillings lock sandwiches on the layout');
 assert(/minimum type|two A4/i.test(clipLayout.summary), 'summary explains two pages because one would clip at min type');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 

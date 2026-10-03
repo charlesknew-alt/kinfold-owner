@@ -425,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow124"></script>
-  <script src="menus-print.js?v=20260928-flow124"></script>
-  <script src="menus-ingest.js?v=20260928-flow124"></script>
+  <script src="menus.js?v=20260928-flow126"></script>
+  <script src="menus-print.js?v=20260928-flow126"></script>
+  <script src="menus-ingest.js?v=20260928-flow126"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -587,11 +587,22 @@
         : layoutFor(key);
       if (key === 'specials') return base;
       var specials = layoutBook.specials;
-      if (!specials) return base;
-      var noteSecs = (EBMenus.SPECIALS_SECTIONS) || ['Special Starters', 'Special Mains', 'Special Desserts'];
-      noteSecs.forEach(function (sec) {
-        if (specials[sec]) base[sec] = specials[sec];
-      });
+      if (specials && key !== 'specials') {
+        var noteSecs = (EBMenus.SPECIALS_SECTIONS) || ['Special Starters', 'Special Mains', 'Special Desserts'];
+        noteSecs.forEach(function (sec) {
+          if (specials[sec]) base[sec] = specials[sec];
+        });
+      }
+      var kidsLay = layoutBook['little-bells'];
+      if (kidsLay && kidsLay['Little Bells'] && key !== 'little-bells') {
+        var kidsNote = EBMenus.littleBellsOutsideText
+          ? EBMenus.littleBellsOutsideText(kidsLay['Little Bells'])
+          : (kidsLay['Little Bells'].note || '');
+        base['Little Bells'] = Object.assign({}, base['Little Bells'] || {}, {
+          note: kidsNote,
+          sell: ''
+        });
+      }
       return base;
     }
     function saveSectionLayout() {
@@ -1577,7 +1588,7 @@
       var extras = EBMenus.includableMenus(menuId);
       if (extras.length) {
         html += '<div class="include-box"><h3>Also put on this sheet</h3>';
-        html += '<p class="note" style="margin:0 0 8px">Tick another menu to try on the same print.</p><div class="include-row">';
+        html += '<p class="note" style="margin:0 0 8px">Tick what you want on this print. Generate keeps those ticks — it does not drop Sandwiches (or kids / desserts) to make space.</p><div class="include-row">';
         extras.forEach(function (m) {
           // Staff: same menus they can open as tabs (incl. Little Bells kids on Main/Sunday)
           if (isStaffMode && !staffCanSeeMenu(m)) return;
@@ -1773,25 +1784,22 @@
         html += '<label class="field">Under the fillings (card)</label>';
         html += '<textarea data-layout-note="Sandwiches" rows="3" placeholder="Served on either Ciabatta…">' +
           escapeAttr(sand.note || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 10px">Prints under the sandwich list on the Sandwiches card.</p>';
+        html += '<p class="note" style="margin:6px 0 10px">Prints <strong>under the dish box</strong> on the Sandwiches card — not inside the frilly frame.</p>';
         html += '<label class="field">Tip / selling box (Main &amp; Sunday when empty)</label>';
         html += '<textarea data-layout-sell="Sandwiches" rows="3" placeholder="A selection of sandwiches is available…">' +
           escapeAttr(sand.sell || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 0">Used when Tip box is on and there are no fillings listed on Main / Sunday.</p>';
+        html += '<p class="note" style="margin:6px 0 0">Used when you tick Sandwiches on Main / Sunday and that menu has 0 fillings. Unticked Sandwiches stay off the sheet.</p>';
         html += '</div>';
         return html;
       }
 
       if (menu.id === 'little-bells') {
-        var lb = menuRules['Little Bells'] || defaults['Little Bells'] || { note: '', sell: '' };
-        html += '<label class="field">Ice cream / extras under the dishes</label>';
-        html += '<textarea data-layout-sell="Little Bells" rows="3" placeholder="Two Scoops of Ice-Cream&#10;Flavours…&#10;£9.50">' +
-          escapeAttr(lb.sell || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 10px">First line = title, middle = flavours, last line starting with £ = price.</p>';
-        html += '<label class="field">Sunday / foot note</label>';
-        html += '<textarea data-layout-note="Little Bells" rows="3" placeholder="Little Bells on Sunday…">' +
-          escapeAttr(lb.note || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 0">Prints under the ice cream block on the Little Bells card (and as Extra info when Little Bells is on Main / Sunday).</p>';
+        var lb = menuRules['Little Bells'] || defaults['Little Bells'] || { note: '' };
+        var lbNote = EBMenus.littleBellsOutsideText ? EBMenus.littleBellsOutsideText(lb) : (lb.note || '');
+        html += '<label class="field">Text outside the dish box</label>';
+        html += '<textarea data-layout-note="Little Bells" rows="6" placeholder="All £9.50&#10;to include a choice of one scoop of ice cream or sorbet.&#10;&#10;Little Bells on Sunday have a choice of roasts at half the price of the adults.">' +
+          escapeAttr(lbNote) + '</textarea>';
+        html += '<p class="note" style="margin:6px 0 0">Same wording on the kids card, Sunday and Main. Blank line: price / ice cream prints <strong>above</strong> the dish box; the rest (Sunday roast) prints <strong>below</strong> — never inside the frilly frame.</p>';
         html += '</div>';
         return html;
       }
@@ -1818,15 +1826,17 @@
         html += '<div class="meta"><span class="chip">' + nIn + ' on this sheet</span></div></div>';
         html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
         if (sec === 'Little Bells') {
-          html += '<label class="field">Ice cream / extras (card + sheet)</label>';
-          html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="3">' +
-            escapeAttr(rule.sell || '') + '</textarea>';
-          html += '<label class="field" style="margin-top:10px">Sunday / foot note</label>';
+          html += '<label class="field">Text outside the dish box (card + Sunday + Main)</label>';
         } else {
           html += '<label class="field">Under title / card spiel</label>';
         }
-        html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="3">' +
-          escapeAttr(rule.note || '') + '</textarea>';
+        html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="4">' +
+          escapeAttr(sec === 'Little Bells' && EBMenus.littleBellsOutsideText
+            ? EBMenus.littleBellsOutsideText(rule)
+            : (rule.note || '')) + '</textarea>';
+        if (sec === 'Little Bells') {
+          html += '<p class="note" style="margin:6px 0 0">Blank line splits offer above the box (£9.50 / ice cream) from Sunday note below. Same text everywhere Little Bells prints.</p>';
+        }
         if (sec === 'Sandwiches') {
           html += '<label class="field" style="margin-top:10px">Tip box selling words</label>';
           html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2">' +
@@ -1899,11 +1909,6 @@
           html += '<label class="field">Text outside dishes (under the title)</label>';
           html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="Hours, “all served with…”, etc. Shows above the dishes in the box.">' +
             escapeAttr(rule.note || '') + '</textarea>';
-          if (sec === 'Little Bells') {
-            html += '<label class="field" style="margin-top:10px">Ice cream / extras (Little Bells card)</label>';
-            html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="3" placeholder="Two Scoops of Ice-Cream…">' +
-              escapeAttr(rule.sell || '') + '</textarea>';
-          }
           if (sec === 'Sandwiches') {
             html += '<div class="layout-row" style="grid-template-columns:1fr 1fr;border:0;padding:10px 0 0;margin-top:8px">';
             html += '<div><label class="field" style="margin-top:0">Tip box (no fillings)</label>';
@@ -1914,7 +1919,7 @@
             html += '<div><label class="field" style="margin-top:0">Tip box selling words</label>';
             html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2" placeholder="A selection of sandwiches is available…">' +
               escapeAttr(rule.sell || '') + '</textarea></div></div>';
-            html += '<p class="note" style="margin:6px 0 0">When Sandwiches has 0 dishes, Tip puts a selling box on Main / Sunday so guests still see sandwiches are available.</p>';
+            html += '<p class="note" style="margin:6px 0 0">When you tick Sandwiches on Main / Sunday and that menu has 0 fillings, Tip shows this selling box. The Dishes tick decides whether sandwiches appear — not whether they “fit”.</p>';
           }
           html += '</div>';
         }
@@ -2692,6 +2697,16 @@
           };
         });
         layoutBook[targetId] = EBMenus.normalizeSectionLayout(next);
+        if (next['Little Bells']) {
+          var sharedLb = EBMenus.littleBellsOutsideText
+            ? EBMenus.littleBellsOutsideText(next['Little Bells'])
+            : String(next['Little Bells'].note || '');
+          Object.keys(layoutBook).forEach(function (mid) {
+            if (!layoutBook[mid] || !layoutBook[mid]['Little Bells']) return;
+            layoutBook[mid]['Little Bells'].note = sharedLb;
+            layoutBook[mid]['Little Bells'].sell = '';
+          });
+        }
         saveSectionLayout();
       }
       document.querySelectorAll('[data-layout-width],[data-layout-frame],[data-layout-tip]').forEach(function (sel) {
@@ -3560,12 +3575,14 @@
         var promos = pickedPromosForSheet();
         var layout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
           promos: promos,
-          sectionLayout: sheetLayout
+          sectionLayout: sheetLayout,
+          includes: hostIncludes()
         });
         result.plan.layout = layout;
         result.plan.fit = layout.fit;
         result.plan.text = layout.summary;
         result.plan.promos = promos;
+        result.plan.includes = hostIncludes();
       } else if (menu.kind === 'party') {
         result.plan.promos = pickedPromosForSheet();
       }
@@ -3815,13 +3832,15 @@
         var sheetLayout = effectiveSectionLayout(menuId);
         layout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
           promos: promos,
-          sectionLayout: sheetLayout
+          sectionLayout: sheetLayout,
+          includes: hostIncludes()
         });
         result.plan.layout = layout;
         result.plan.fit = layout.fit;
         result.plan.text = layout.summary;
         result.plan.promos = promos;
         result.plan.sectionLayout = sheetLayout;
+        result.plan.includes = hostIncludes();
         if (layout.fit === 'over') {
           if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
           if (hint) hint.disabled = false;
@@ -3845,8 +3864,9 @@
         'Sell order inside each category (dearest first, mixed high/low — not a price ladder)',
         'Ordering sections (Nibbles → Starters → Sharing → Item Boost → Classics → Mains…)',
         'Choosing one or two pages and columns',
-        'Placing wording / sandwiches / logo only if they fit',
+        'Keeping Sandwiches, Little Bells and Desserts if you ticked them on Dishes — not only if they fit',
         'Gemini checking opposite columns match (adds feature panels if not)',
+        'Putting the logo on only if there’s room',
         'Opening classy print preview'
       ];
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px">Layout</div>';
@@ -3884,6 +3904,7 @@
             promos: promos
           });
         }
+        if (layout) payload.sandwichesLocked = !!layout.sandwichesLocked;
         return payload;
       }
 
@@ -3898,8 +3919,11 @@
           layout.p1.sandwiches = false;
           layout.p2.sandwiches = true;
         } else if (advice.sandwichesOn === 'omit') {
-          layout.p1.sandwiches = false;
-          if (layout.p2) layout.p2.sandwiches = false;
+          // Staff tick (or named fillings) wins — Gemini may not drop sandwiches to make space.
+          if (!layout.sandwichesLocked) {
+            layout.p1.sandwiches = false;
+            if (layout.p2) layout.p2.sandwiches = false;
+          }
         } else if (advice.sandwichesOn === 'page1' && !layout.p2) {
           // One-page sheet only — two-page menus keep Sandwiches quieter on page 2.
           layout.p1.sandwiches = true;
