@@ -9,11 +9,21 @@
 <script>
 (function () {
   var html = '';
-  if (window.opener) {
-    try { html = window.opener.__EB_PRINT_PREVIEW_HTML || ''; } catch (e) {}
+  var key = '';
+  try {
+    key = new URLSearchParams(window.location.search).get('k') || '';
+  } catch (e0) {}
+  if (key) {
+    try { html = localStorage.getItem(key) || ''; } catch (e1) {}
+  }
+  if (!html && window.opener) {
+    try { html = window.opener.__EB_PRINT_PREVIEW_HTML || ''; } catch (e2) {}
   }
   if (!html) {
-    try { html = sessionStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e2) {}
+    try { html = sessionStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e3) {}
+  }
+  if (!html) {
+    try { html = localStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e4) {}
   }
   if (html) {
     document.open();
