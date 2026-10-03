@@ -2616,10 +2616,10 @@
       '.specials-beside{width:100%;max-width:100%;align-self:stretch;box-sizing:border-box;margin:0 0 10px}' +
       '.specials-beside > .scallop,.specials-beside .scallop{' +
         'width:100%!important;max-width:100%;box-sizing:border-box;display:block}' +
-      /* Title centred in the box; pad matches unframed dish gutters so prices share a line */
+      // Title left like the parent sheet; pad matches unframed dish gutters so prices share a line
       '.specials-beside .specials-beside-title,.specials-beside .sec-title.specials-beside-title{' +
-        'font-size:11pt!important;letter-spacing:.1em;margin:0 0 4px;text-align:center!important;line-height:1.2}' +
-      '.specials-beside .sec-note{text-align:center!important;margin:0 0 6px;font-size:9.5pt}' +
+        'font-size:11pt!important;letter-spacing:.1em;margin:0 0 4px;text-align:left!important;line-height:1.2}' +
+      '.specials-beside .sec-note{text-align:left!important;margin:0 0 6px;font-size:9.5pt}' +
       '.specials-beside .scallop-pad{padding-left:2px;padding-right:2px}' +
       '.tracker{display:flex;justify-content:space-between;align-items:baseline;font-size:7.5pt;letter-spacing:.02em;text-transform:none;color:#8a8278;margin:0 0 6px;font-weight:400;flex:0 0 auto}' +
       '.tracker .week{text-transform:none;letter-spacing:.02em}' +
