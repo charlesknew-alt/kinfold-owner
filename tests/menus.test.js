@@ -79,6 +79,12 @@ assert(page.indexOf('dearest dish first') !== -1,
   'generate plan explains selling mix inside each category');
 assert(ingestJs.indexOf('reviewSpelling') !== -1 && aiGs.indexOf('reviewSpellingWithGemini_') !== -1,
   'Menu AI can proof-read the live sheet before print');
+assert(aiGs.indexOf("extraMenus: Array.isArray(raw.extraMenus)") !== -1 &&
+  aiGs.indexOf("extraSections: Array.isArray(raw.extraSections)") !== -1,
+  'cloud save keeps owner extra menus and categories');
+assert(page.indexOf('Print order in each category') !== -1 &&
+  page.indexOf('if (!list.length)') !== -1,
+  'Generate plan mentions selling mix and still early-returns when empty');
 assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
@@ -381,8 +387,22 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow122') !== -1, 'menus page cache-bust is flow122');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow122') !== -1, 'hub menus link cache-bust is flow122');
+assert(page.indexOf('flow123') !== -1, 'menus page cache-bust is flow123');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow123') !== -1, 'hub menus link cache-bust is flow123');
+(function checkMenusHtmlInlineScripts() {
+  var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
+  var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  var m;
+  var n = 0;
+  while ((m = re.exec(html))) {
+    n += 1;
+    var tmp = path.join('/tmp', 'menus-inline-' + n + '.js');
+    fs.writeFileSync(tmp, m[1]);
+    var chk = require('child_process').spawnSync('node', ['--check', tmp], { encoding: 'utf8' });
+    assert(chk.status === 0, 'menus.html inline script ' + n + ' parses: ' + String(chk.stderr || '').slice(0, 400));
+  }
+  assert(n >= 1, 'menus.html has inline scripts to syntax-check');
+})();
 assert(page.indexOf('dish-form-inline') !== -1 && page.indexOf('scrollToDishForm_') !== -1,
   'Adjust/Replace form opens inline under the dish being edited');
 assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typedName') !== -1,
