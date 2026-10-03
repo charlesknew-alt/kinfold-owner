@@ -418,8 +418,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow126') !== -1, 'menus page cache-bust is flow126');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow126') !== -1, 'hub menus link cache-bust is flow126');
+assert(page.indexOf('flow127') !== -1, 'menus page cache-bust is flow127');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow127') !== -1, 'hub menus link cache-bust is flow127');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -851,12 +851,37 @@ assert(/Ciabatta/i.test(api.sectionLayoutForMenu('sandwiches').Sandwiches.note |
   'Sandwiches card default note is the under-fillings spiel');
 assert(!/Two Scoops of Ice-Cream/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].sell || ''),
   'Little Bells no longer uses a separate Two Scoops sell block');
-assert(/All £9\.50/.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].note || '') &&
-  /half the price of the adults/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].note || ''),
-  'Little Bells one outside-text note has price offer and Sunday line');
-var lbSplit = api.splitCardOutsideText(api.sectionLayoutForMenu('little-bells')['Little Bells'].note);
+assert(api.OUTSIDE_KINDS && api.OUTSIDE_KINDS.some(function (k) { return k.id === 'heading'; }),
+  'outside-text type sizes match party blurbs');
+assert(page.indexOf('data-layout-above') !== -1 && page.indexOf('data-layout-below') !== -1,
+  'card menus have above/below text boxes');
+assert(page.indexOf('data-layout-above-kind') !== -1 && page.indexOf('Type size') !== -1,
+  'each outside-text box has a type-size picker');
+var lbDef = api.sectionLayoutForMenu('little-bells')['Little Bells'];
+assert(/All £9\.50/.test(lbDef.above || '') && /one scoop/i.test(lbDef.above || ''),
+  'Little Bells default above box is the £9.50 / ice cream offer');
+assert(/half the price of the adults/i.test(lbDef.below || ''),
+  'Little Bells default below box is the Sunday roast line');
+assert(lbDef.aboveKind === 'heading' && lbDef.belowKind === 'text',
+  'Little Bells defaults: offer as heading, Sunday as smaller text');
+var lbSplit = api.splitCardOutsideText(lbDef.note);
 assert(/£9\.50/.test(lbSplit.above) && /Sunday/i.test(lbSplit.below),
   'Little Bells splits offer above the box and Sunday note below');
+var sundayFirst = api.cardOutsideSlots({
+  note: 'LITTLE BELLS ON SUNDAY in addition have a choice of roasts at half price of the adults.\n\nAll £9.50\nto include a choice of one scoop of ice cream or sorbet.'
+});
+assert(/£9\.50/.test(sundayFirst.above) && /Sunday/i.test(sundayFirst.below),
+  'old Sunday-first note still puts the offer above and roast line below');
+var customSlots = api.normalizeSectionLayout({
+  'Little Bells': {
+    above: 'All £8.00\nto include a scoop.',
+    aboveKind: 'title',
+    below: 'CUSTOM SUNDAY NOTE for Little Bells',
+    belowKind: 'paragraph'
+  }
+})['Little Bells'];
+assert(customSlots.aboveKind === 'title' && customSlots.belowKind === 'paragraph',
+  'normalize keeps explicit outside-text type sizes');
 assert(api.normalizeSectionLayout({ Sandwiches: { width: 'column', frame: true, tip: false, sell: 'Ask at the bar' } }).Sandwiches.tip === false,
   'normalize keeps tip off when explicitly false');
 assert(printJs.indexOf('sandwichesBlock') !== -1 && printJs.indexOf('sec-note') !== -1,
@@ -866,9 +891,9 @@ assert(printJs.indexOf('Tip box') !== -1 || printJs.indexOf('sandRule.tip') !== 
   'print honours tip when deciding sandwiches box');
 assert(/cardSandwichesInner\(dishes,\s*plan\)/.test(printJs),
   'sandwich card spiel reads plan sectionLayout note');
-assert(printJs.indexOf('card-outside') !== -1 && printJs.indexOf('card-offer') !== -1 &&
-  printJs.indexOf('littleBellsOutsideText') !== -1,
-  'Little Bells card prints one outside-text block (offer above, note below the dish box)');
+assert(printJs.indexOf('card-outside') !== -1 && printJs.indexOf('cardBlurbHtml') !== -1 &&
+  printJs.indexOf('cardOutsideSlots') !== -1,
+  'Little Bells card prints above/below boxes with a chosen type size');
 assert(printJs.indexOf('startersInTop') !== -1 && printJs.indexOf('top-band-logo') !== -1,
   'starters sit beside logo spanning the top band');
 assert(printJs.indexOf('card-mid') !== -1 && printJs.indexOf('card-face.fill-page') !== -1,
@@ -1603,7 +1628,10 @@ var kidsCardDishes = [
 var kidsCardHtml = print.build(api.menuById('little-bells'), kidsCardDishes, {
   sectionLayout: api.normalizeSectionLayout({
     'Little Bells': {
-      note: 'All £8.00\nto include a scoop.\n\nCUSTOM SUNDAY NOTE for Little Bells',
+      above: 'All £8.00\nto include a scoop.',
+      aboveKind: 'heading',
+      below: 'CUSTOM SUNDAY NOTE for Little Bells',
+      belowKind: 'text',
       frame: true,
       width: 'full'
     }
@@ -1611,8 +1639,12 @@ var kidsCardHtml = print.build(api.menuById('little-bells'), kidsCardDishes, {
 });
 assert(/CUSTOM SUNDAY NOTE for Little Bells/.test(kidsCardHtml),
   'Little Bells card prints editable Sunday note below the box');
-assert(/All £8\.00/.test(kidsCardHtml) && /card-offer/.test(kidsCardHtml),
-  'Little Bells price offer prints above the dish box');
+assert(/All £8\.00/.test(kidsCardHtml) && /card-blurb-heading/.test(kidsCardHtml),
+  'Little Bells price offer prints above the dish box at heading size');
+assert(/card-blurb-text/.test(kidsCardHtml) && /card-blurb-below/.test(kidsCardHtml),
+  'Sunday line uses the smaller text size under the dish box');
+assert(kidsCardHtml.indexOf('CUSTOM SUNDAY NOTE') > kidsCardHtml.indexOf('All £8.00'),
+  'offer stays above the Sunday line');
 assert(/kids-face/.test(kidsCardHtml), 'Little Bells card uses calmer kids type');
 
 // Promo must not force over
