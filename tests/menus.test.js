@@ -148,6 +148,14 @@ assert(printJs.indexOf('display:flex') !== -1 && printJs.indexOf('dish-leader') 
   'dish lines use flex leaders that start after the name');
 assert(printJs.indexOf('.dish-line{display:flex') !== -1, 'dish-line flex rule present in source');
 assert(!/\*\/\s*\+/.test(printJs), 'print CSS has no comment-plus that becomes NaN');
+assert(printJs.indexOf('createObjectURL') !== -1, 'print preview opens as a blob URL not about:blank');
+assert(printJs.indexOf('fitPreviewToScreen') !== -1, 'preview scales A4 to the phone viewport');
+assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport tag');
+assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
+  'preview clips A4 overflow so dish prices cannot leak into the toolbar');
+assert(printJs.indexOf('skipPromos: true') !== -1,
+  'kids|desserts pair skips Stay a While under Little Bells');
+assert(printJs.indexOf('sheet-offer') !== -1, 'Sunday £9.50 offer has a larger sheet-offer style');
 require(path.join(root, 'menus-print.js'));
 var printApi = global.EBMenuPrint;
 assert(typeof printApi.build === 'function', 'EBMenuPrint.build exported');
@@ -418,8 +426,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow129') !== -1, 'menus page cache-bust is flow129');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow129') !== -1, 'hub menus link cache-bust is flow129');
+assert(page.indexOf('flow130') !== -1, 'menus page cache-bust is flow130');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow130') !== -1, 'hub menus link cache-bust is flow130');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1030,6 +1038,9 @@ var kidsColHtml = print.build(api.menuById('sunday'), kidsColDishes, {
 });
 assert(/cols-little-desserts/.test(kidsColHtml) && /col-little/.test(kidsColHtml),
   'Blocks Column puts Little Bells beside Desserts');
+var kidsDessRow = (kidsColHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
+assert(kidsDessRow && !/Stay a While|Gatherings|Pub Quiz/i.test(kidsDessRow),
+  'kids|desserts pair does not jam rooms promo under Little Bells');
 var kidsFullHtml = print.build(api.menuById('sunday'), kidsColDishes, {
   sectionLayout: api.normalizeSectionLayout({
     'Little Bells': { width: 'full', frame: true, note: 'All £9.50' }
@@ -1679,6 +1690,39 @@ assert(/sheet-blurb-title/.test(embedKidsHtml) && /sheet-blurb-heading/.test(emb
   'embedded Little Bells uses this sheet’s type-size pickers');
 assert(/cols-little-desserts[\s\S]*sheet-blurb-below/.test(embedKidsHtml),
   'Sunday line sits under both columns, not squeezed in the kids column');
+assert(/sheet-offer/.test(embedKidsHtml) && /lb-price-line/.test(embedKidsHtml),
+  'Sunday £9.50 offer prints as a sheet offer, larger than dish names');
+assert(/viewport/.test(embedKidsHtml) && /preview-clip/.test(embedKidsHtml),
+  'preview HTML includes viewport tag and overflow clip');
+var embedKidsRow = (embedKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
+assert(embedKidsRow && !/Stay a While|Gatherings|Pub Quiz/i.test(embedKidsRow),
+  'Sunday kids|desserts row keeps rooms promo out of the food pair');
+var embedKidsWithRooms = print.build(api.menuById('sunday'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Little Bells', 'Kids Mac & Cheese', '', '', ''),
+  api.dish('Desserts', 'Sticky Toffee', 'custard', '7.95', 'v'),
+  api.dish('Desserts', 'Treacle Tart', 'ice cream', '7.95', 'v')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      above: 'All £9.50\nto include a scoop.',
+      aboveKind: 'heading',
+      below: 'Sunday roasts at half adult price.',
+      belowKind: 'heading',
+      frame: false,
+      width: 'column'
+    },
+    Desserts: { width: 'column', frame: true }
+  }),
+  promos: [
+    { title: 'Stay a While', body: 'cosy rooms upstairs' },
+    { title: 'Gatherings', body: 'happy to host your event' }
+  ]
+});
+var embedKidsWithRoomsRow = (embedKidsWithRooms.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
+assert(embedKidsWithRoomsRow && !/Stay a While|Gatherings/i.test(embedKidsWithRoomsRow),
+  'explicit rooms panels still stay out of the kids|desserts pair');
 var embedSandHtml = print.build(api.menuById('main'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Sandwiches', 'BLT', 'fries', '10.95', ''),
