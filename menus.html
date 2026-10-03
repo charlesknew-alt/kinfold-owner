@@ -425,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20260928-flow128"></script>
-  <script src="menus-print.js?v=20260928-flow128"></script>
-  <script src="menus-ingest.js?v=20260928-flow128"></script>
+  <script src="menus.js?v=20260928-flow129"></script>
+  <script src="menus-print.js?v=20260928-flow129"></script>
+  <script src="menus-ingest.js?v=20260928-flow129"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -591,24 +591,6 @@
         var noteSecs = (EBMenus.SPECIALS_SECTIONS) || ['Special Starters', 'Special Mains', 'Special Desserts'];
         noteSecs.forEach(function (sec) {
           if (specials[sec]) base[sec] = specials[sec];
-        });
-      }
-      var kidsLay = layoutBook['little-bells'];
-      if (kidsLay && kidsLay['Little Bells'] && key !== 'little-bells') {
-        var kidsRule = kidsLay['Little Bells'];
-        var kidsSlots = EBMenus.cardOutsideSlots ? EBMenus.cardOutsideSlots(kidsRule) : {
-          above: kidsRule.above || '',
-          aboveKind: kidsRule.aboveKind || 'heading',
-          below: kidsRule.below || '',
-          belowKind: kidsRule.belowKind || 'text'
-        };
-        base['Little Bells'] = Object.assign({}, base['Little Bells'] || {}, {
-          note: [kidsSlots.above, kidsSlots.below].filter(Boolean).join('\n\n'),
-          sell: '',
-          above: kidsSlots.above,
-          aboveKind: kidsSlots.aboveKind,
-          below: kidsSlots.below,
-          belowKind: kidsSlots.belowKind
         });
       }
       return base;
@@ -1786,6 +1768,9 @@
           below: (rule && rule.below) || '',
           belowKind: (rule && rule.belowKind) || 'text'
         };
+      if (!slots.above && !slots.below && rule && rule.note) {
+        slots = Object.assign({}, slots, { above: String(rule.note).trim() });
+      }
       var html = '';
       html += '<label class="field" style="margin-top:0">Above the dish box</label>';
       html += '<div class="layout-row" style="grid-template-columns:1fr;border:0;padding:0;margin:0 0 6px">';
@@ -1801,7 +1786,10 @@
       html += '<textarea data-layout-below="' + escapeAttr(sec) + '" rows="' + (opts.belowRows || 3) + '" placeholder="' +
         escapeAttr(opts.belowPlaceholder || 'Optional — prints under the dishes') + '">' +
         escapeAttr(slots.below) + '</textarea>';
-      html += '<p class="note" style="margin:6px 0 0">Type size is for this <strong>card</strong> (Title / Heading / Paragraph / Text). When Little Bells or Sandwiches are ticked onto Main or Sunday, the same wording uses the parent menu type — not these card sizes.</p>';
+      var hostSheet = (menuId === 'main' || menuId === 'sunday' || menuId === 'main-next');
+      html += '<p class="note" style="margin:6px 0 0">' + (hostSheet
+        ? 'Type size is for <strong>this sheet</strong> when ' + escapeAttr(sec) + ' is ticked on. The ' + escapeAttr(sec) + ' card keeps its own wording and sizes.'
+        : 'Type size is for this <strong>card</strong>. Main and Sunday keep their own wording and sizes when this menu is ticked on.') + '</p>';
       return html;
     }
 
@@ -1874,7 +1862,7 @@
       }
 
       // Main / Sunday — call out Sandwiches + Little Bells wording specifically.
-      ['Sandwiches', 'Little Bells'].forEach(function (sec) {
+      ['Sandwiches', 'Little Bells', 'Desserts'].forEach(function (sec) {
         var rule = menuRules[sec] || defaults[sec] || { note: '', sell: '', tip: false };
         var nIn = (list || []).filter(function (d) {
           return (d.section || '') === sec || (sec === 'Sandwiches' && /sandwich/i.test(d.section || ''));
@@ -1883,16 +1871,10 @@
         html += '<div class="section-block-head"><div class="title">' + escapeAttr(sec) + '</div>';
         html += '<div class="meta"><span class="chip">' + nIn + ' on this sheet</span></div></div>';
         html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
-        if (sec === 'Little Bells') {
-          html += renderCardOutsideBoxes(sec, rule, {
-            abovePlaceholder: 'All £9.50\nto include a choice of one scoop…',
-            belowPlaceholder: 'Little Bells on Sunday…'
-          });
-        } else {
-          html += '<label class="field">Under title / card spiel</label>';
-          html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="4">' +
-            escapeAttr(rule.note || '') + '</textarea>';
-        }
+        html += renderCardOutsideBoxes(sec, rule, {
+          abovePlaceholder: sec === 'Little Bells' ? 'All £9.50\nto include a choice of one scoop…' : 'Optional line above the dishes',
+          belowPlaceholder: sec === 'Little Bells' ? 'Little Bells on Sunday…' : 'Optional line under the dishes'
+        });
         if (sec === 'Sandwiches') {
           html += '<label class="field" style="margin-top:10px">Tip box selling words</label>';
           html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2">' +
@@ -1962,10 +1944,10 @@
           html += '<option value="yes"' + (rule.frame ? ' selected' : '') + '>Yes</option>';
           html += '<option value="no"' + (!rule.frame ? ' selected' : '') + '>No</option>';
           html += '</select></div></div>';
-          if (sec === 'Little Bells') {
+          if (sec === 'Little Bells' || sec === 'Sandwiches' || sec === 'Desserts') {
             html += renderCardOutsideBoxes(sec, rule, {
-              abovePlaceholder: 'All £9.50\nto include a choice of one scoop…',
-              belowPlaceholder: 'Little Bells on Sunday…'
+              abovePlaceholder: sec === 'Little Bells' ? 'All £9.50\nto include a choice of one scoop…' : 'Optional line above the dishes',
+              belowPlaceholder: sec === 'Little Bells' ? 'Little Bells on Sunday…' : 'Optional line under the dishes'
             });
           } else {
             html += '<label class="field">Text outside dishes (under the title)</label>';
@@ -2772,22 +2754,6 @@
           };
         });
         layoutBook[targetId] = EBMenus.normalizeSectionLayout(next);
-        if (next['Little Bells']) {
-          var lbNorm = EBMenus.normalizeSectionLayout
-            ? EBMenus.normalizeSectionLayout({ 'Little Bells': next['Little Bells'] })['Little Bells']
-            : next['Little Bells'];
-          Object.keys(layoutBook).forEach(function (mid) {
-            if (!layoutBook[mid] || !layoutBook[mid]['Little Bells']) return;
-            layoutBook[mid]['Little Bells'] = Object.assign({}, layoutBook[mid]['Little Bells'], {
-              note: lbNorm.note || '',
-              sell: '',
-              above: lbNorm.above || '',
-              aboveKind: lbNorm.aboveKind || 'heading',
-              below: lbNorm.below || '',
-              belowKind: lbNorm.belowKind || 'text'
-            });
-          });
-        }
         saveSectionLayout();
       }
       document.querySelectorAll('[data-layout-width],[data-layout-frame],[data-layout-tip],[data-layout-above-kind],[data-layout-below-kind]').forEach(function (sel) {

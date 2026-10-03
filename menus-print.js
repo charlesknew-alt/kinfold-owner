@@ -311,26 +311,59 @@
     return '<div class="' + (cls || 'card-outside') + '">' + esc(raw).replace(/\n/g, '<br>') + '</div>';
   }
 
+  function blurbInnerHtml(text, kind) {
+    var raw = String(text || '').trim();
+    if (!raw) return '';
+    kind = String(kind || 'paragraph').toLowerCase();
+    var lines = raw.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    if ((kind === 'title' || kind === 'heading') && lines.length && /^all\s*£|^£\s*\d/i.test(lines[0])) {
+      var inner = '<div class="lb-price-line">' + esc(lines[0]) + '</div>';
+      if (lines.length > 1) {
+        inner += '<div class="lb-offer-sub">' + esc(lines.slice(1).join('\n')).replace(/\n/g, '<br>') + '</div>';
+      }
+      return inner;
+    }
+    return esc(raw).replace(/\n/g, '<br>');
+  }
+
   function cardBlurbHtml(text, kind, place) {
     var raw = String(text || '').trim();
     if (!raw) return '';
     kind = String(kind || 'paragraph').toLowerCase();
     if (['title', 'heading', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
     place = place === 'above' ? 'above' : 'below';
-    var lines = raw.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
-    var inner;
-    if ((kind === 'title' || kind === 'heading') && lines.length && /^all\s*£|^£\s*\d/i.test(lines[0])) {
-      inner = '<div class="lb-price-line">' + esc(lines[0]) + '</div>';
-      if (lines.length > 1) {
-        inner += '<div class="lb-offer-sub">' + esc(lines.slice(1).join('\n')).replace(/\n/g, '<br>') + '</div>';
-      }
-    } else {
-      inner = esc(raw).replace(/\n/g, '<br>');
-    }
     return '<div class="card-blurb card-blurb-' + kind + ' card-blurb-' + place +
       (place === 'above' && (kind === 'title' || kind === 'heading') ? ' card-offer' : '') +
       (place === 'below' ? ' card-outside' : '') +
-      '">' + inner + '</div>';
+      '">' + blurbInnerHtml(raw, kind) + '</div>';
+  }
+
+  /** Long-sheet outside text: Title/Heading/Paragraph/Text at parent type, not card pt sizes. */
+  function sheetBlurbHtml(text, kind, place) {
+    var raw = String(text || '').trim();
+    if (!raw) return '';
+    kind = String(kind || 'paragraph').toLowerCase();
+    if (['title', 'heading', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
+    place = place === 'above' ? 'above' : 'below';
+    return '<div class="sheet-blurb sheet-blurb-' + kind + ' sheet-blurb-' + place + '">' +
+      blurbInnerHtml(raw, kind) + '</div>';
+  }
+
+  function sheetOutsideParts(rule) {
+    var slots = { above: '', aboveKind: 'paragraph', below: '', belowKind: 'paragraph' };
+    if (root.EBMenus && root.EBMenus.cardOutsideSlots) {
+      slots = root.EBMenus.cardOutsideSlots(rule || {});
+    } else if (rule) {
+      slots.above = String(rule.above || '').trim();
+      slots.below = String(rule.below || '').trim();
+      slots.aboveKind = rule.aboveKind || slots.aboveKind;
+      slots.belowKind = rule.belowKind || slots.belowKind;
+    }
+    return {
+      slots: slots,
+      aboveHtml: sheetBlurbHtml(slots.above, slots.aboveKind, 'above'),
+      belowHtml: sheetBlurbHtml(slots.below, slots.belowKind, 'below')
+    };
   }
 
   function cardOutsideWrap(inner, rule) {
@@ -806,10 +839,9 @@
       : String(rule.sell || '').trim();
     var sandSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
       ? root.EBMenus.cardOutsideSlots(rule)
-      : { above: String(rule.above || '').trim(), below: String(rule.below || '').trim() };
-    // Long sheet: extra above/below lines stay at parent sec-note size, never card headings.
-    var extraAbove = sandSlots.above && sandSlots.above !== note ? sandSlots.above : '';
-    var extraBelow = sandSlots.below && sandSlots.below !== note ? sandSlots.below : '';
+      : { above: String(rule.above || '').trim(), below: String(rule.below || '').trim(),
+          aboveKind: rule.aboveKind || 'paragraph', belowKind: rule.belowKind || 'paragraph' };
+    var extras = sheetOutsideParts(rule);
     if (!dishes.length) {
       // Tip box: selling words first, then hours / “all served with…” under the title
       var spielParts = [];
@@ -837,17 +869,13 @@
       }
       return scallop(noteInner, frameKind);
     }
-    var noteHtml = note
-      ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
-      : '';
-    if (extraAbove) {
-      noteHtml = '<div class="sec-note">' + esc(extraAbove).replace(/\n/g, '<br>') + '</div>' + noteHtml;
+    var noteHtml = extras.aboveHtml;
+    if (!noteHtml && note && note !== sandSlots.below) {
+      noteHtml = '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
     }
     var body = noteHtml + listDishes(dishes);
     var titled = sectionTitle('Sandwiches') + body;
-    var afterHtml = extraBelow
-      ? '<div class="sec-note sec-note-after">' + esc(extraBelow).replace(/\n/g, '<br>') + '</div>'
-      : '';
+    var afterHtml = extras.belowHtml;
     function withAfter(block) {
       return afterHtml ? ('<div class="sec-stack">' + block + afterHtml + '</div>') : block;
     }
@@ -1557,15 +1585,30 @@
     var body = opts.twoCol ? listDishesCols(dishes) : listDishes(dishes);
     // Item Boost is a staff filing bucket — print the dish in the frilly box, not the label
     var head = opts.hideTitle ? '' : sectionTitle(title);
+    var extras = sheetOutsideParts(rule);
     var note = opts.note != null ? String(opts.note) : String((rule && rule.note) || '');
     note = note.trim();
-    var noteHtml = note
-      ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
-      : '';
-    var after = opts.afterNote != null ? String(opts.afterNote).trim() : '';
-    var afterHtml = after
-      ? '<div class="sec-note sec-note-after">' + esc(after).replace(/\n/g, '<br>') + '</div>'
-      : '';
+    var noteHtml;
+    if (opts.noteHtml != null) {
+      noteHtml = String(opts.noteHtml);
+    } else if (extras.aboveHtml) {
+      noteHtml = extras.aboveHtml;
+    } else {
+      noteHtml = note
+        ? '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>'
+        : '';
+    }
+    var afterHtml;
+    if (opts.afterHtml != null) {
+      afterHtml = String(opts.afterHtml);
+    } else if (opts.skipBelow) {
+      afterHtml = '';
+    } else if (opts.afterNote != null) {
+      var after = String(opts.afterNote).trim();
+      afterHtml = after ? sheetBlurbHtml(after, extras.slots.belowKind, 'below') : '';
+    } else {
+      afterHtml = extras.belowHtml;
+    }
     var block = framedBlock(head + noteHtml + body, rule, kind || 'wide');
     if (!afterHtml) return block;
     return '<div class="sec-stack">' + block + afterHtml + '</div>';
@@ -1671,7 +1714,7 @@
       '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
       '<div class="col ' + leftClass + '"><div class="col-body">' + leftInner + '</div>' + leftFeat + '</div>' +
       '<div class="col ' + rightClass + '"><div class="col-body">' + rightInner + '</div>' + rightFeat + '</div>' +
-      '</div></section>';
+      '</div>' + (opts.footer || '') + '</section>';
     return { html: html, usedTitles: fill.usedTitles || [] };
   }
 
@@ -1705,21 +1748,14 @@
     }
     var col = wantsColumn(littleRule);
     var frameKind = col ? 'box' : 'wide';
-    // On Main / Sunday the outside lines must use the parent sheet type
-    // (--desc / sec-note), not the A5 card Title/Heading sizes.
-    var slots = { above: '', below: '' };
-    if (root.EBMenus && root.EBMenus.cardOutsideSlots) {
-      slots = root.EBMenus.cardOutsideSlots(littleRule || {});
-    } else if (littleRule) {
-      slots.above = String(littleRule.above || '').trim();
-      slots.below = String(littleRule.below || '').trim();
-    }
+    // Host menu (Main / Sunday) owns its own wording + type sizes — never the card's.
+    var extras = sheetOutsideParts(littleRule);
     var kidsInner = sectionBlock(
       bag.littleBells.name,
       bag.littleBells.dishes,
       littleRule,
       frameKind,
-      { note: slots.above, afterNote: slots.below }
+      { noteHtml: extras.aboveHtml, skipBelow: !!col, afterHtml: col ? '' : extras.belowHtml }
     );
     if (!col) {
       return {
@@ -1730,7 +1766,8 @@
       };
     }
     var kidsU = sectionUnits(bag.littleBells, !!(littleRule && littleRule.frame)) +
-      noteUnits(littleRule && littleRule.note);
+      noteUnits(extras.slots.above);
+    var pairFooter = extras.belowHtml;
     // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
@@ -1743,7 +1780,8 @@
         secClass: 'little-desserts-row',
         colsClass: 'cols-little-desserts',
         leftClass: 'col-little',
-        rightClass: 'col-desserts'
+        rightClass: 'col-desserts',
+        footer: pairFooter
       });
       return {
         html: dessPair.html,
@@ -1764,7 +1802,8 @@
         secClass: 'little-sides-row',
         colsClass: 'cols-little-sides',
         leftClass: 'col-little',
-        rightClass: 'col-sides'
+        rightClass: 'col-sides',
+        footer: pairFooter
       });
       return {
         html: sidePair.html,
@@ -1780,7 +1819,8 @@
       secClass: 'little-solo-row',
       colsClass: 'cols-little-solo',
       leftClass: 'col-little',
-      rightClass: 'col-promo'
+      rightClass: 'col-promo',
+      footer: pairFooter
     });
     return {
       html: solo.html,
@@ -2608,6 +2648,15 @@
       '.sec-note-after{margin-top:8px}' +
       '.sec-stack{margin:0}' +
       '.scallop .sec-note{margin-top:0}' +
+      '.sheet-blurb{text-align:center;text-transform:none;letter-spacing:normal;color:var(--ink);max-width:36em;margin-left:auto;margin-right:auto}' +
+      '.sheet-blurb-above{margin:0 0 8px}' +
+      '.sheet-blurb-below{margin:10px 4px 0}' +
+      '.sheet-blurb-title{font-family:var(--serif);font-weight:700;font-size:clamp(var(--name-min),calc(var(--name) + 2.5pt),var(--title-max));line-height:1.25}' +
+      '.sheet-blurb-heading{font-family:var(--serif);font-weight:600;font-size:clamp(var(--name-min),calc(var(--name) + 0.4pt),var(--name-max));line-height:1.3}' +
+      '.sheet-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),calc(var(--desc) + 0.6pt),var(--desc-max));line-height:1.4}' +
+      '.sheet-blurb-text{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.4;color:#3a342c}' +
+      '.sheet-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 3px;text-transform:none}' +
+      '.sheet-blurb .lb-offer-sub{font-family:var(--sans);font-weight:500;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));line-height:1.35;text-transform:none}' +
       '.share-cols{margin:0 0 4px;gap:22px}' +
       '.share-cols .col{min-width:0}' +
       '.col-dishes,.col-promo,.col-sides,.col-sides-b,.col-events,.col-food{min-width:0;max-width:100%;overflow:hidden}' +
