@@ -140,6 +140,9 @@ function doPost(e) {
     if (action === 'reviewLayout') {
       return json_(reviewLayoutWithGemini_(body));
     }
+    if (action === 'reviewSpelling') {
+      return json_(reviewSpellingWithGemini_(body));
+    }
     var result = readMenuWithGemini_(body);
     return json_(result);
   } catch (err) {
@@ -180,7 +183,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'GET/POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout; or ?bridge=1',
+    hint: 'GET/POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
     mailQuota: (function () {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
@@ -202,6 +205,7 @@ function bridgeApi(action, body) {
     if (action === 'getMenusState') return getMenusState_();
     if (action === 'saveMenusState') return saveMenusState_(body.state || body);
     if (action === 'reviewLayout') return reviewLayoutWithGemini_(body);
+    if (action === 'reviewSpelling') return reviewSpellingWithGemini_(body);
     return { ok: false, error: 'Unknown action: ' + action };
   } catch (err) {
     return { ok: false, error: String(err && err.message ? err.message : err) };
@@ -525,6 +529,81 @@ function reviewLayoutWithGemini_(body) {
     okToPrint: advice.okToPrint !== false,
     columnBalance: columnBalance,
     notes: String(advice.notes || '').slice(0, 280)
+  };
+}
+
+/**
+ * Proof-read the live dish list before Generate. Returns spellingFixes only —
+ * never invents dishes. Local typo map still runs if this is offline.
+ */
+function reviewSpellingWithGemini_(body) {
+  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) {
+    return { ok: false, error: 'GEMINI_API_KEY is not set in Script Properties.' };
+  }
+  var dishes = Array.isArray(body.dishes) ? body.dishes.slice(0, 80) : [];
+  var slim = dishes.map(function (d) {
+    return {
+      id: String((d && d.id) || ''),
+      name: String((d && d.name) || '').slice(0, 120),
+      description: String((d && d.description) || '').slice(0, 240)
+    };
+  });
+  var prompt =
+    'Proof-read this Eight Bells (Bolney) pub menu. British English.\n' +
+    'Return ONLY valid JSON:\n' +
+    '{ "spellingFixes": [ { "from": "typo as written", "to": "correction", "where": "name|description", "dishId": "id" } ] }\n' +
+    'Rules:\n' +
+    '- Only real spelling / OCR mistakes. Do not restyle, rename, or rewrite dishes.\n' +
+    '- Prefer British spelling (chilli, fillet, colour) only when the written form is wrong.\n' +
+    '- Keep intentional names (Wagyu, Nduja, Padron, MP).\n' +
+    '- If nothing is wrong, return {"spellingFixes":[]}.\n' +
+    'Dishes:\n' + JSON.stringify(slim).slice(0, 9000);
+
+  var called = callGemini_(key, [{ text: prompt }], {
+    temperature: 0.1,
+    responseMimeType: 'application/json'
+  }, { maxModels: 2 });
+  if (!called.ok) {
+    return { ok: false, error: called.error };
+  }
+  var parsed = JSON.parse(called.text);
+  var parts = (((parsed || {}).candidates || [])[0] || {}).content || {};
+  var partList = parts.parts || [];
+  var outText = '';
+  for (var i = 0; i < partList.length; i++) {
+    if (partList[i].text) outText += partList[i].text;
+  }
+  outText = String(outText || '').replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+  var advice;
+  try {
+    advice = JSON.parse(outText);
+  } catch (e2) {
+    return { ok: false, error: 'Gemini returned non-JSON' };
+  }
+  var fixes = Array.isArray(advice.spellingFixes) ? advice.spellingFixes : [];
+  var clean = [];
+  var seen = {};
+  fixes.forEach(function (f) {
+    if (!f) return;
+    var from = String(f.from || '').trim();
+    var to = String(f.to || '').trim();
+    if (!from || !to || from === to) return;
+    var keyFix = from.toLowerCase() + '>' + to.toLowerCase() + '>' + String(f.dishId || '');
+    if (seen[keyFix]) return;
+    seen[keyFix] = true;
+    clean.push({
+      from: from.slice(0, 80),
+      to: to.slice(0, 80),
+      where: String(f.where || 'name').slice(0, 20),
+      dishId: String(f.dishId || '')
+    });
+  });
+  return {
+    ok: true,
+    source: 'gemini-spelling',
+    model: called.model,
+    spellingFixes: clean.slice(0, 40)
   };
 }
 
