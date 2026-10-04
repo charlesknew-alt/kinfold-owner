@@ -22,6 +22,40 @@
     return id === 'main' || id === 'main-next';
   }
 
+  /**
+   * Make Main (upcoming) the live Main, then clear upcoming for the next change.
+   * Moves dishes, Blocks, includes, promo ticks and meta — does not park the old
+   * live sheet on upcoming.
+   */
+  function promoteUpcomingMain(state) {
+    state = state || {};
+    var book = state.book && typeof state.book === 'object' ? state.book : {};
+    var layoutBook = state.layoutBook && typeof state.layoutBook === 'object' ? state.layoutBook : {};
+    var includes = state.includes && typeof state.includes === 'object' ? state.includes : {};
+    var promoTicks = state.promoTicks && typeof state.promoTicks === 'object' ? state.promoTicks : {};
+    var metaBook = state.metaBook && typeof state.metaBook === 'object' ? state.metaBook : {};
+    var moved = Array.isArray(book['main-next']) ? book['main-next'] : [];
+    book.main = moved;
+    book['main-next'] = [];
+    layoutBook.main = layoutBook['main-next'] || defaultSectionLayout();
+    layoutBook['main-next'] = defaultSectionLayout();
+    includes.main = includes['main-next'] || {};
+    includes['main-next'] = {};
+    promoTicks.main = promoTicks['main-next'] || {};
+    promoTicks['main-next'] = {};
+    metaBook.main = metaBook['main-next'] || emptyMeta();
+    metaBook['main-next'] = emptyMeta();
+    return {
+      ok: true,
+      moved: moved.length,
+      book: book,
+      layoutBook: layoutBook,
+      includes: includes,
+      promoTicks: promoTicks,
+      metaBook: metaBook
+    };
+  }
+
   /** Canonical sections staff pick from — print layout keys off these. */
   var SECTIONS = [
     'Nibbles',
@@ -2964,6 +2998,7 @@
     OUTSIDE_KINDS: OUTSIDE_KINDS,
     normalizeOutsideKind: normalizeOutsideKind,
     isMainSheet: isMainSheet,
+    promoteUpcomingMain: promoteUpcomingMain,
     seed: seed,
     menuById: menuById,
     applyExtras: applyExtras,

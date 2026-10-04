@@ -306,8 +306,33 @@ assert(!api.includableMenus('main').some(function (m) { return m.id === 'main-ne
   'upcoming Main is not pulled onto live Main as an include');
 assert(Array.isArray(api.seed()['main-next']) && api.seed()['main-next'].length === 0,
   'seed leaves Main (upcoming) empty');
-assert(page.indexOf('main-next') !== -1 && page.indexOf('Swap Main') !== -1,
-  'UI offers Main (upcoming) with swap/copy controls');
+assert(page.indexOf('main-next') !== -1 && page.indexOf('Make upcoming the live Main') !== -1,
+  'UI offers Main (upcoming) with copy and make-live controls');
+assert(page.indexOf('doPromoteUpcoming') !== -1 && page.indexOf('promoteUpcomingMain') !== -1,
+  'making upcoming live clears it for the next future menu');
+assert(typeof api.promoteUpcomingMain === 'function', 'promoteUpcomingMain is exported');
+var promoted = api.promoteUpcomingMain({
+  book: {
+    main: [api.dish('Mains', 'Old pie', '', '16', '')],
+    'main-next': [api.dish('Mains', 'New hake', '', '25', ''), api.dish('Starters', 'Soup', '', '8', '')]
+  },
+  layoutBook: { main: { Mains: { width: 'full' } }, 'main-next': { Mains: { width: 'column' } } },
+  includes: { main: { desserts: true }, 'main-next': { sandwiches: true } },
+  promoTicks: { main: { quiz: true }, 'main-next': { gatherings: true } },
+  metaBook: { main: { title: 'Old' }, 'main-next': { title: 'New' } }
+});
+assert(promoted.ok && promoted.moved === 2 && promoted.book.main.length === 2 &&
+  promoted.book.main[0].name === 'New hake',
+  'upcoming dishes become the live Main');
+assert(promoted.book['main-next'].length === 0,
+  'upcoming clears after it is made live');
+assert(promoted.includes.main.sandwiches === true && !promoted.includes['main-next'].sandwiches &&
+  Object.keys(promoted.includes['main-next']).length === 0,
+  'upcoming includes move to live Main then reset');
+assert(promoted.layoutBook.main.Mains && promoted.layoutBook.main.Mains.width === 'column',
+  'upcoming Blocks move onto live Main');
+assert(promoted.metaBook.main.title === 'New' && promoted.metaBook['main-next'].title === '',
+  'upcoming meta moves onto live Main then resets');
 assert(page.indexOf("'main-next'") !== -1 && /main-next/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
   'staff menu list includes Main (upcoming)');
 assert(page.indexOf('doAddExtraMenu') !== -1 && page.indexOf('doAddExtraSection') !== -1,
@@ -451,8 +476,8 @@ assert(aiGs.indexOf('Frilly frames sit UNDER') !== -1 && aiGs.indexOf('Little Be
   'Gemini layout rule: titles share a baseline; leftover gets a small panel on every pair');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow139') !== -1, 'menus page cache-bust is flow139');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow139') !== -1, 'hub menus link cache-bust is flow139');
+assert(page.indexOf('flow140') !== -1, 'menus page cache-bust is flow140');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow140') !== -1, 'hub menus link cache-bust is flow140');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
