@@ -593,14 +593,25 @@
   }
 
   /**
+   * Leftover under food (kids|desserts) may only take a small evergreen box.
+   * Dated events (Sip & Paint) are never auto-picked into that hole.
+   */
+  function isSmallLeftoverPromo(p) {
+    if (!p || !p.title || p.date) return false;
+    return promoUnits(p) <= 8.5;
+  }
+
+  /**
    * Smallest panel(s) that fit leftover. withGap (kids leftover) reserves a
-   * decent band after the food; page-1 events fill skips that so rooms copy
-   * can still sit in an even column.
+   * decent band after the food and only allows Stay a While / Gatherings-size
+   * copy; page-1 events fill skips that so rooms copy can still sit in an even column.
    */
   function pickFittingPromos(pool, leftover, n, withGap) {
+    var list = (pool || []).slice();
+    if (withGap) list = list.filter(isSmallLeftoverPromo);
     var budget = (leftover || 0) - (withGap ? FEATURE_GAP_UNITS : 0);
-    if (budget < 4 || !pool || !pool.length || n < 1) return [];
-    var ranked = pool.slice().sort(function (a, b) {
+    if (budget < 4 || !list.length || n < 1) return [];
+    var ranked = list.slice().sort(function (a, b) {
       return promoUnits(a) - promoUnits(b);
     });
     var out = [];
@@ -1999,13 +2010,14 @@
         usedPromoTitles: []
       };
     }
-    // Unframed titles live in pair-head; frilly titles go inside the food box.
+    // Frilly titles print inside the box (same as Nibbles / Sunday Roasts).
+    // Unframed titles are lifted to pair-head so they line up with dish text.
     kidsInner = sectionBlock(
       bag.littleBells.name,
       bag.littleBells.dishes,
       littleRule,
       frameKind,
-      { hideTitle: true, noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
+      { hideTitle: !(littleRule && littleRule.frame), noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
     );
     var kidsU = columnFillUnits(bag.littleBells, littleRule, extras.slots.above) +
       noteUnits(extras.slots.below);
@@ -2013,7 +2025,7 @@
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
       var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide', {
-        hideTitle: true
+        hideTitle: !(dessRule && dessRule.frame)
       });
       var dessU = columnFillUnits(bag.desserts, dessRule, dessRule && dessRule.note);
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
@@ -2039,7 +2051,7 @@
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide', {
-        hideTitle: true
+        hideTitle: !(sideRule && sideRule.frame)
       });
       var sideU = columnFillUnits(sidesPrint, sideRule, sideRule && sideRule.note);
       var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
@@ -2510,7 +2522,7 @@
         sandwichesBlock(bag, {
           frame: sandRule.frame ? 'box' : undefined,
           rule: sandRule,
-          hideTitle: true
+          hideTitle: !(sandRule && sandRule.frame)
         }),
         sandU2,
         framedBlock(listDishes(bag.mains.dishes), mainRule),
@@ -2594,7 +2606,7 @@
         }
         if (!leftInner) leftInner = '&nbsp;';
         var rightInner = p2opts.sandwiches
-          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: true })
+          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: !(sandRule && sandRule.frame) })
           : '&nbsp;';
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,

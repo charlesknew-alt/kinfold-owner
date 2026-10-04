@@ -453,8 +453,8 @@ assert(aiGs.indexOf('INSIDE the frame') !== -1 && aiGs.indexOf('Sip & Paint') !=
   'Gemini layout rule: frilly titles sit in the box; leftover panels must fit with a gap');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow141') !== -1, 'menus page cache-bust is flow141');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow141') !== -1, 'hub menus link cache-bust is flow141');
+assert(page.indexOf('flow142') !== -1, 'menus page cache-bust is flow142');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow142') !== -1, 'hub menus link cache-bust is flow142');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1586,6 +1586,12 @@ assert(typeof printApi.promoUnits === 'function' && typeof printApi.planPromoFil
   });
   assert(!cramped.left && !cramped.right && cramped.usedTitles.length === 0,
     'skip a leftover panel when only an oversized dated event would fit');
+  var hugeSip = printApi.planPromoFill(4, 28, [sip], {
+    shortOnly: true,
+    excludeTitles: ['Stay a While', 'Gatherings']
+  });
+  assert(hugeSip.usedTitles.indexOf('Sip & Paint') === -1 && hugeSip.usedTitles.length === 0,
+    'dated Sip & Paint is never a leftover filler under kids even when the hole is large');
   assert(printJs.indexOf('padding-top:18px') !== -1 && printJs.indexOf('FEATURE_GAP_UNITS') !== -1,
     'feature boxes keep a decent gap after the category');
 })();
