@@ -166,6 +166,9 @@
     map['pub classic'] = 'Pub Classics';
     map['sharing'] = 'Sharing Plates';
     map['to share'] = 'Sharing Plates';
+    map['sharing starters'] = 'Sharing Plates';
+    map['sharing starter'] = 'Sharing Plates';
+    map['sharing plates'] = 'Sharing Plates';
     map['light bites'] = 'Nibbles';
     map['nibble'] = 'Nibbles';
     map['starter'] = 'Starters';
@@ -232,6 +235,8 @@
       ['pub classic', 'Pub Classics'],
       ['sharing', 'Sharing Plates'],
       ['to share', 'Sharing Plates'],
+      ['sharing starters', 'Sharing Plates'],
+      ['sharing starter', 'Sharing Plates'],
       ['light bites', 'Nibbles'],
       ['nibble', 'Nibbles'],
       ['starter', 'Starters'],
@@ -330,8 +335,11 @@
     if (!bare) return 'Mains';
     var hit = SECTION_NAMES[bare.toLowerCase()];
     if (hit) return hit;
-    // Partial match
     var lower = bare.toLowerCase();
+    // Sharing Starters must not collapse to Starters (substring “starter”).
+    if (/shar(e|ing)|for the table/.test(lower) && !/special/.test(lower)) return 'Sharing Plates';
+    if (/special\s*starters?|specials?\s*starters?/.test(lower)) return 'Special Starters';
+    // Partial match
     for (var i = 0; i < SECTIONS.length; i++) {
       if (lower.indexOf(SECTIONS[i].toLowerCase()) !== -1) return SECTIONS[i];
     }
@@ -340,8 +348,6 @@
     if (/sandwich/.test(lower)) return 'Sandwiches';
     if (/nibble|light bite/.test(lower)) return 'Nibbles';
     if (/starter/.test(lower)) return 'Starters';
-    if (/shar(e|ing)|for the table/.test(lower)) return 'Sharing Plates';
-    if (/special\s*starters?|specials?\s*starters?/.test(lower)) return 'Special Starters';
     if (/special\s*desserts?|specials?\s*desserts?/.test(lower)) return 'Special Desserts';
     if (/special\s*mains?|specials?\s*mains?|^specials?$|today.?s specials?|chef.?s special/.test(lower)) {
       return 'Special Mains';

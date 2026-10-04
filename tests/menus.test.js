@@ -155,6 +155,10 @@ assert(printJs.indexOf('localStorage.setItem(key') !== -1 && printJs.indexOf('se
 assert(fs.existsSync(path.join(root, 'print-preview.html')), 'print-preview.html exists for GitHub Pages');
 assert(fs.readFileSync(path.join(root, 'print-preview.html'), 'utf8').indexOf('localStorage.getItem(key') !== -1,
   'print-preview.html reads the keyed HTML from localStorage');
+assert(page.indexOf('EBMenuPrint.openPrintHtml') !== -1 && page.indexOf("window.open('', '_blank')") === -1,
+  'Generate opens print-preview.html instead of writing into about:blank');
+assert(page.indexOf('layoutSource') !== -1 && printJs.indexOf('Layout: Gemini') !== -1,
+  'preview toolbar says whether Gemini or a JS guess placed the sheet');
 assert(printJs.indexOf('fitPreviewToScreen') !== -1, 'preview scales A4 to the phone viewport');
 assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport tag');
 assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
@@ -452,6 +456,12 @@ assert(printJs.indexOf('share-cols') !== -1, 'sharing plates can print in two co
 assert(printJs.indexOf('shareInLeft') !== -1 || printJs.indexOf('shareAsColumn') !== -1, 'sharing can sit in a column to balance');
 assert(printJs.indexOf('page-body-start') !== -1, 'page 2 gets extra top breathing room');
 assert(api.sectionLayoutFor('Sharing Plates').width === 'both', 'Sharing Plates default is best-fit (AI chooses)');
+assert(api.normalizeSectionName('Sharing Starters') === 'Sharing Plates',
+  'Sharing Starters is Sharing Plates, not Starters');
+assert(api.sectionLayoutFor('Sharing Starters', {
+  'Sharing Plates': { width: 'column', frame: false }
+}).width === 'column',
+  'Column lock on Sharing Plates applies to Sharing Starters');
 assert(api.WIDTH_OPTIONS.some(function (w) {
   return w.id === 'both' && /best fit/i.test(w.label) && /AI chooses/i.test(w.label);
 }), 'width “both” is labelled best fit / AI chooses, not column-if-it-fits');
@@ -530,8 +540,8 @@ assert(page.indexOf('advice.sectionWidths') !== -1 && page.indexOf("rule.width !
   'generate applies Gemini sectionWidths only to Best-fit sections');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow147') !== -1, 'menus page cache-bust is flow147');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow147') !== -1, 'hub menus link cache-bust is flow147');
+assert(page.indexOf('flow148') !== -1, 'menus page cache-bust is flow148');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow148') !== -1, 'hub menus link cache-bust is flow148');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1479,6 +1489,33 @@ var kidsColDessertsBoth = print.build(api.menuById('sunday'), kidsColDishes, {
 });
 assert(/cols-little-desserts/.test(kidsColDessertsBoth),
   'Blocks Best fit Desserts may still sit beside Little Bells Column');
+(function sharingColumnLockOnSunday() {
+  var dishes = [
+    api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+    api.dish('Starters', 'Bang Bang Cauliflower', 'sauce', '8.25', 'vg'),
+    api.dish('Sharing Starters', 'Baked Camembert (to share)', 'bacon jam', '16.95', 'v'),
+    api.dish('Sharing Starters', 'Beef Chilli Nachos', 'guacamole', '15.95', 'gf'),
+    api.dish('Sunday Roasts', 'Sirloin', 'roast potatoes', '21.95', ''),
+    api.dish('Sunday Roasts', 'Chicken', 'roast potatoes', '19.95', ''),
+    api.dish('Mains', 'Mushroom Stroganoff', 'rice', '16.95', ''),
+    api.dish('Little Bells', 'Fish Fingers', '', '', ''),
+    api.dish('Desserts', 'Sticky Toffee', 'custard', '8.25', '')
+  ];
+  var html = print.build(api.menuById('sunday'), dishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      'Sharing Plates': { width: 'column', frame: false },
+      'Little Bells': { width: 'column', frame: true },
+      Desserts: { width: 'column', frame: true }
+    })
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var pages = a4.split(/<div class="page /);
+  var p1 = pages[1] || a4;
+  assert(/col-events[\s\S]*Camembert/i.test(p1),
+    'Column Sharing Starters stay in a half-column on Sunday (rule before AI)');
+  assert(/cols-classics[\s\S]*Camembert/i.test(p1),
+    'Sunday Sharing Column sits in the opposite-column grid, not full-bleed under Starters');
+})();
 // Packed Sunday with Sides on page 2 alone: Blocks Column must not orphan to full-bleed
 var sidesColAloneDishes = [];
 for (var sci = 0; sci < 8; sci++) {
@@ -1719,8 +1756,8 @@ assert(typeof printApi.promoUnits === 'function' && typeof printApi.planPromoFil
   assert(printJs.indexOf('padding-top:18px') !== -1 && printJs.indexOf('FEATURE_GAP_UNITS') !== -1,
     'feature boxes keep a decent gap after the category');
 })();
-assert(printJs.indexOf('orphanColumnHole') !== -1 && printJs.indexOf('footPromoPair') !== -1,
-  'orphan Sandwiches/Sides span full-width with two foot feature panels');
+assert(printJs.indexOf('shareLockedCol') !== -1,
+  'Column Sharing is not orphaned to full-bleed when Burgers are missing');
 assert(printJs.indexOf('balanceOppositeColumns') !== -1,
   'print prunes surplus panels so opposite columns finish level');
 assert(printJs.indexOf('Two scallops') !== -1 || printJs.indexOf('stackForShort') !== -1,
@@ -1775,6 +1812,8 @@ assert(aiGs.indexOf('hasSharing') !== -1 && page.indexOf('sharingOnSheet') !== -
   'two-page Sharing sheets keep Sides and Sandwiches off page 1');
 assert(page.indexOf('advice.sidesOn') !== -1,
   'generate applies AI sidesOn to the print layout');
+assert(printJs.indexOf('Honour a layout already planned') !== -1,
+  'print build keeps Gemini-adjusted sidesOn instead of re-planning');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
   'week date is sentence case, not all-caps');
 assert(/p2 \+= trackerBar\(ver, \{ hideDate: true \}\)/.test(printJs),
@@ -2346,6 +2385,25 @@ assert(/type range/i.test(sharedTypeLayout.summary) || /minimum type/i.test(shar
   'layout summary states type range / min-type decision');
 assert(sharedTypeLayout.p1.sidesOnP1 !== true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === true,
   'starting guess keeps Sides on page 2 beside Sandwiches — Gemini may move them');
+(function buildKeepsGeminiSidesOn() {
+  var planned = print.planFluidLayout(mainMenu, sharedTypeDishes, {
+    sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
+  });
+  planned.p1.sidesOnP1 = true;
+  if (planned.p2) planned.p2.sidesOnP2 = false;
+  var html = print.build(mainMenu, sharedTypeDishes, {
+    layout: planned,
+    layoutSource: 'gemini-layout',
+    layoutReview: 'Sides on page 1 to fill Sharing.',
+    sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var pages = a4.split(/<div class="page /);
+  assert(/Layout: Gemini/.test(html) && /Sides on page 1 to fill Sharing/.test(html),
+    'toolbar names Gemini when advice came from Gemini');
+  assert(pages[1] && /Cheesy Garlic Bread|Loaded Fries|Chips/.test(pages[1]),
+    'Gemini sidesOn page1 survives print build instead of being re-planned');
+})();
 
 // Tip/sell sandwich box (0 fillings) must prefer page 1 when page 2 holds mains+desserts
 var tipOnlyPacked = [

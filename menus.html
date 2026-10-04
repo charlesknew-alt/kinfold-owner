@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261004-flow147"></script>
-  <script src="menus-print.js?v=20261004-flow147"></script>
-  <script src="menus-ingest.js?v=20261004-flow147"></script>
+  <script src="menus.js?v=20261004-flow148"></script>
+  <script src="menus-print.js?v=20261004-flow148"></script>
+  <script src="menus-ingest.js?v=20261004-flow148"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1917,7 +1917,8 @@
       // Quick cards for sections that have dishes
       var bySec = {};
       list.forEach(function (d) {
-        var s = d.section || 'Dishes';
+        var s = (EBMenus.normalizeSectionName && EBMenus.normalizeSectionName(d.section || 'Dishes')) ||
+          (d.section || 'Dishes');
         if (!bySec[s]) bySec[s] = [];
         bySec[s].push(d);
       });
@@ -4128,6 +4129,7 @@
           };
         }
         if (advice.notes) result.plan.layoutReview = advice.notes;
+        result.plan.layoutSource = advice.source || 'gemini';
         result.plan.layout = layout;
       }
 
@@ -4161,24 +4163,20 @@
       }
 
       function openPrintPreview() {
-        var w = window.open('', '_blank');
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
         if (hint) hint.disabled = false;
-        if (!w) {
-          alert('Allow pop-ups to open the menu preview, then Save or Discard.');
-          return;
-        }
         result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
         if (menu.kind === 'party' && !result.plan.meta.title) {
           result.plan.meta.title = 'Christmas Party Menu';
           result.plan.meta.coursePrices = result.plan.meta.coursePrices || '2 courses £32.95 · 3 courses £39.95';
         }
         if (result.plan.meta.paper === 'a5') result.plan.defaultPaper = 'a5';
-        w.document.open();
         var html = EBMenuPrint.build(menu, result.dishes, result.plan);
-        w.document.write(html);
-        w.document.close();
+        var opened = EBMenuPrint.openPrintHtml && EBMenuPrint.openPrintHtml(html);
+        if (!opened) {
+          alert('Allow pop-ups to open the menu preview, then Save or Discard.');
+        }
         // Preview is Save or Discard only. Save stamps history and returns here.
       }
 

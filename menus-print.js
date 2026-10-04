@@ -1177,7 +1177,7 @@
     return /^burgers?$/i.test(String(name || '').trim());
   }
   function isSharing(name) {
-    return /shar(e|ing)|for the table/i.test(name || '');
+    return /shar(e|ing)|for the table/i.test(name || '') && !/special/i.test(name || '');
   }
   function isItemBoost(name) {
     return /item\s*boost|fish of the day|pie of the day|catch of the day/i.test(
@@ -1222,7 +1222,7 @@
     return /little\s*bells|kids?\s*menu|children.?s/i.test(String(name || '').trim());
   }
   function isStarters(name) {
-    return /starter/i.test(name || '');
+    return /starter/i.test(name || '') && !isSharing(name) && !isSpecialStarters(name);
   }
 
   /** Canonical print order — layout brain reorders whatever staff pasted. */
@@ -1367,8 +1367,8 @@
     var straySandwiches = [];
     sections.forEach(function (s) {
       if (isNibbles(s.name) && !bag.nibbles) bag.nibbles = s;
-      else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isSharing(s.name) && !bag.sharing) bag.sharing = s;
+      else if (isStarters(s.name) && !bag.starters) bag.starters = s;
       else if (isItemBoost(s.name) && !bag.boost) bag.boost = { name: 'Item Boost', dishes: s.dishes };
       else if (isSpecialStarters(s.name) && !bag.specialStarters) {
         bag.specialStarters = { name: 'Special Starters', dishes: s.dishes };
@@ -2074,7 +2074,7 @@
 
     var nibRule = ruleFor('Nibbles', plan);
     var startRule = ruleFor('Starters', plan);
-    var shareRule = ruleFor('Sharing Plates', plan);
+    var shareRule = ruleFor((bag.sharing && bag.sharing.name) || 'Sharing Plates', plan);
     var boostRule = ruleFor('Item Boost', plan);
     var classRule = ruleFor('Pub Classics', plan);
     var burgRule = ruleFor('Burgers', plan);
@@ -2265,14 +2265,15 @@
 
       // Orphan column (e.g. Sandwiches alone): span food full-width, two feature
       // panels as a footer row — never leave a tall empty hole beside a column.
-      // Exception: Blocks “Column” lock on Sides or Sandwiches must stay half-width
-      // (never full-bleed) — pair with feature panels in the opposite column instead.
+      // Exception: Blocks “Column” lock must stay half-width — never orphan
+      // Sharing / Sides / Sandwiches to full-bleed. Pair with a feature panel.
+      var shareLockedCol = !!(shareInLeft && lockedColumnWidth(shareRule));
       var sidesLockedCol = !!(p1opts.sidesOnP1 && sidesPrint && lockedColumnWidth(sideRule));
       var sandLockedCol = !!(
         (sandOnLeftCol || sandOnRightCol) && lockedColumnWidth(sandRule)
       );
       if (orphanColumnHole(leftFoodU, rightFoodU) && !(leftHasFood && rightHasFood) &&
-          !sidesLockedCol && !sandLockedCol) {
+          !shareLockedCol && !sidesLockedCol && !sandLockedCol) {
         p1 += '<section class="sec classics-block">';
         if (!logoInTop) {
           p1 += '<div class="top-band top-band-logo"><div class="top-left"></div>' +
@@ -3127,12 +3128,21 @@
     var bodyClass = 'paper-' + defaultPaper;
     var layout = null;
     if (menu.kind === 'long') {
-      layout = planFluidLayout(menu, dishes, {
-        promos: plan.promos || [],
-        sectionLayout: plan.sectionLayout,
-        includes: plan.includes
-      });
-      plan.layout = layout;
+      // Honour a layout already planned + Gemini-adjusted. Re-planning here
+      // used to throw away sidesOn / sandwichesOn / dropFootLogo.
+      if (plan.layout && plan.layout.p1) {
+        layout = plan.layout;
+      } else if (plan.p1 && plan.pages) {
+        layout = plan;
+        plan.layout = layout;
+      } else {
+        layout = planFluidLayout(menu, dishes, {
+          promos: plan.promos || [],
+          sectionLayout: plan.sectionLayout,
+          includes: plan.includes
+        });
+        plan.layout = layout;
+      }
       plan.fit = layout.fit;
       plan.text = layout.summary;
       if (!plan.promos) plan.promos = layout.promos || [];
@@ -3159,6 +3169,15 @@
     var fillerHint = layout && layout.fillers && layout.fillers.length
       ? ' Auto: ' + layout.fillers.join(' · ') + '.'
       : (menu.kind === 'party' ? ' Standardised party layout.' : '');
+    var src = String(plan.layoutSource || '');
+    var decidedHint = '';
+    if (src === 'gemini-layout' || src === 'gemini') {
+      decidedHint = ' Layout: Gemini' + (plan.layoutReview ? ' — ' + plan.layoutReview : '.') ;
+    } else if (src === 'local-column-fallback' || src === 'local') {
+      decidedHint = ' Layout: JS guess — Gemini timed out.';
+    } else if (layout && menu.kind === 'long') {
+      decidedHint = ' Layout: JS starting guess.';
+    }
 
     var html = (
       '<!DOCTYPE html><html><head><meta charset="utf-8">' +
@@ -3182,7 +3201,8 @@
             (defaultPaper === 'a5' ? ' checked' : '') +
             ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint" id="printHint">' + esc(dateHint) +
-        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.</span>' +
+        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.' +
+        esc(decidedHint) + '</span>' +
       '</div>' +
       '<div class="preview-clip">' + a4Stack + a5Stack + '</div>' +
       '<script>(function(){' +
