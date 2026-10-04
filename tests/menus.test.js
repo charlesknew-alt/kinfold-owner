@@ -159,6 +159,8 @@ assert(printJs.indexOf('fitPreviewToScreen') !== -1, 'preview scales A4 to the p
 assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport tag');
 assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
   'preview clips A4 overflow so dish prices cannot leak into the toolbar');
+assert(printJs.indexOf('if (opts.force) fillOpts.force = opts.force') !== -1,
+  'layout review forceColumnFill applies to opposite food pairs');
 assert(printJs.indexOf('skipPromos: true') !== -1,
   'solo column pairs skip Stay a While in the empty opposite half');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
@@ -443,6 +445,8 @@ assert(ingestJs.indexOf('reviewLayout') !== -1, 'ingest can ask Gemini to review
 assert(aiGs.indexOf('reviewLayoutWithGemini_') !== -1, 'Apps Script supports layout review action');
 assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Classics') !== -1,
   'Gemini layout prompt has Eight Bells golden rules');
+assert(aiGs.indexOf('Frilly frames sit UNDER') !== -1 && aiGs.indexOf('Little Bells vs Desserts') !== -1,
+  'Gemini layout rule: titles share a baseline; leftover gets a small panel on every pair');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
 assert(page.indexOf('flow136') !== -1, 'menus page cache-bust is flow136');
@@ -623,7 +627,8 @@ assert(typeof api.normalizeSectionLayoutBook === 'function' && typeof api.sectio
 assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout') !== -1,
   'menus UI keeps a Blocks book per menu');
 assert(page.indexOf('this menu only') !== -1 && page.indexOf('drops onto this sheet') !== -1 &&
-  page.indexOf('Specials') !== -1 && page.indexOf('not centred like the card') !== -1,
+  page.indexOf('Specials') !== -1 && page.indexOf('not centred like the card') !== -1 &&
+  page.indexOf('leftover space in a column') !== -1,
   'Blocks step says every drop-in menu follows this sheet, not the card');
 var flatLegacy = api.normalizeSectionLayout({
   Desserts: { width: 'column', frame: true, note: 'legacy' },

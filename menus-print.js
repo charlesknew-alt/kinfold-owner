@@ -656,14 +656,17 @@
       var kidsCol = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
         littleRuleM && wantsColumn(littleRuleM));
       if (kidsCol) {
-        var kidsU2 = sectionUnits(bag.littleBells, false);
+        var kidsU2 = sectionUnits(bag.littleBells, !!(littleRuleM && littleRuleM.frame)) +
+          wrapUnits(bag.littleBells);
         var dessCol = !!(dessRuleM && wantsColumn(dessRuleM) && bag.desserts && bag.desserts.dishes &&
           bag.desserts.dishes.length);
         var sidesColPartner = !!(sideRuleM && wantsColumn(sideRuleM) && bag.sides && bag.sides.dishes &&
           bag.sides.dishes.length && !(layout.p1 && layout.p1.sidesOnP1));
         left2 += kidsU2;
-        if (dessCol) right2 += sectionUnits(bag.desserts, false);
-        else if (sidesColPartner) {
+        if (dessCol) {
+          right2 += sectionUnits(bag.desserts, !!(dessRuleM && dessRuleM.frame)) +
+            wrapUnits(bag.desserts);
+        } else if (sidesColPartner) {
           right2 += sectionUnits(bag.sides, false);
           // Sides already counted in the bottom pair — avoid double-count when only kids|sides.
           if (sideList.length) left2 -= sectionUnits(bag.sides, false);
@@ -877,8 +880,11 @@
         noteInner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
       });
       noteInner += '</div>';
+      if (opts.hideTitle) {
+        noteInner = noteInner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, '');
+      }
       if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
-      if (opts.alignTitle) {
+      if (opts.alignTitle && !opts.hideTitle) {
         return (
           '<div class="sandwich-aligned">' +
             '<div class="promo-head pair-head">' +
@@ -899,6 +905,10 @@
     var afterHtml = extras.belowHtml;
     function withAfter(block) {
       return afterHtml ? ('<div class="sec-stack">' + block + afterHtml + '</div>') : block;
+    }
+    if (opts.hideTitle) {
+      var hiddenInner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
+      return withAfter(hiddenInner);
     }
     if (opts.alignTitle) {
       var inner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
@@ -1742,6 +1752,7 @@
         excludeTitles: opts.excludeTitles || [],
         shortOnly: !!opts.shortOnly
       };
+      if (opts.force) fillOpts.force = opts.force;
       fill = planPromoFill(leftU || 0, rightU || 0, remaining, fillOpts);
       // If one side is still clearly short and planPromoFill returned nothing usable, force panels.
       var gap = (rightU || 0) - (leftU || 0);
@@ -1858,6 +1869,7 @@
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
         shortOnly: true,
+        force: opts.force,
         leftTitle: bag.littleBells.name,
         rightTitle: bag.desserts.name,
         secClass: 'little-desserts-row',
@@ -1883,6 +1895,7 @@
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
         shortOnly: true,
+        force: opts.force,
         leftTitle: bag.littleBells.name,
         rightTitle: sidesPrint.name,
         secClass: 'little-sides-row',
@@ -2331,20 +2344,33 @@
       p2 += '<section class="sec">' +
         sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
     }
+    var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
+    var littleFoodPartner = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
+      wantsColumn(littleRule) && (
+        (dessRule && wantsColumn(dessRule) && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) ||
+        (sideRule && wantsColumn(sideRule) && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)
+      ));
     if (bag.mains && !mainsPairedInCol && p2opts.sandwiches && canSitInColumn(mainRule) &&
         bag.mains.dishes && bag.mains.dishes.length) {
       // Page 2: Best-fit / Column Mains sit opposite Sandwiches — food before quiz boxes.
       var sandU2 = sandwichesPackCost(bag);
       var mainU2 = sectionUnits(bag.mains, false);
       var pair2 = levelOppositeColumns(
-        sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule }),
+        sandwichesBlock(bag, {
+          frame: sandRule.frame ? 'box' : undefined,
+          rule: sandRule,
+          hideTitle: true
+        }),
         sandU2,
-        framedBlock(sectionTitle(bag.mains.name) + listDishes(bag.mains.dishes), mainRule),
+        framedBlock(listDishes(bag.mains.dishes), mainRule),
         mainU2,
         {
           promos: promos,
           excludeTitles: usedPromoTitles,
-          skipPromos: true,
+          shortOnly: true,
+          force: littleFoodPartner ? null : p2Force,
+          leftTitle: 'Sandwiches',
+          rightTitle: bag.mains.name,
           secClass: 'mains-sand-row',
           leftClass: '',
           rightClass: 'col-food'
@@ -2362,7 +2388,7 @@
     // Food-first column pairing; feature panels fill any remaining short column.
     var littleP2 = renderLittleBellsRow(
       bag, littleRule, dessRule, sideRule, sidesPrint,
-      { promos: promos, excludeTitles: usedPromoTitles }
+      { promos: promos, excludeTitles: usedPromoTitles, force: littleFoodPartner ? p2Force : null }
     );
     usedPromoTitles = usedPromoTitles.concat(littleP2.usedPromoTitles || []);
     p2 += littleP2.html;
@@ -2409,11 +2435,10 @@
             else if (p2opts.rooms) p2 += renderFiller('rooms', bag, remainingPromos);
           }
         } else {
-        var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
         var p2Fill = planPromoFill(sideU, rightU, remainingPromos, {
           leftFrame: 'box',
           rightFrame: 'wide',
-          force: p2Force,
+          force: littleFoodPartner ? null : p2Force,
           excludeTitles: usedPromoTitles
         });
         usedPromoTitles = usedPromoTitles.concat(p2Fill.usedTitles || []);
