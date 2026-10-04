@@ -155,6 +155,10 @@ assert(printJs.indexOf('localStorage.setItem(key') !== -1 && printJs.indexOf('se
 assert(fs.existsSync(path.join(root, 'print-preview.html')), 'print-preview.html exists for GitHub Pages');
 assert(fs.readFileSync(path.join(root, 'print-preview.html'), 'utf8').indexOf('localStorage.getItem(key') !== -1,
   'print-preview.html reads the keyed HTML from localStorage');
+assert(page.indexOf('EBMenuPrint.openPrintHtml') !== -1 && page.indexOf("window.open('', '_blank')") === -1,
+  'Generate opens print-preview.html instead of writing into about:blank');
+assert(page.indexOf('layoutSource') !== -1 && printJs.indexOf('Layout: Gemini') !== -1,
+  'preview toolbar says whether Gemini or a JS guess placed the sheet');
 assert(printJs.indexOf('fitPreviewToScreen') !== -1, 'preview scales A4 to the phone viewport');
 assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport tag');
 assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
@@ -530,8 +534,8 @@ assert(page.indexOf('advice.sectionWidths') !== -1 && page.indexOf("rule.width !
   'generate applies Gemini sectionWidths only to Best-fit sections');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow147') !== -1, 'menus page cache-bust is flow147');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow147') !== -1, 'hub menus link cache-bust is flow147');
+assert(page.indexOf('flow148') !== -1, 'menus page cache-bust is flow148');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow148') !== -1, 'hub menus link cache-bust is flow148');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1775,6 +1779,8 @@ assert(aiGs.indexOf('hasSharing') !== -1 && page.indexOf('sharingOnSheet') !== -
   'two-page Sharing sheets keep Sides and Sandwiches off page 1');
 assert(page.indexOf('advice.sidesOn') !== -1,
   'generate applies AI sidesOn to the print layout');
+assert(printJs.indexOf('Honour a layout already planned') !== -1,
+  'print build keeps Gemini-adjusted sidesOn instead of re-planning');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
   'week date is sentence case, not all-caps');
 assert(/p2 \+= trackerBar\(ver, \{ hideDate: true \}\)/.test(printJs),
@@ -2346,6 +2352,25 @@ assert(/type range/i.test(sharedTypeLayout.summary) || /minimum type/i.test(shar
   'layout summary states type range / min-type decision');
 assert(sharedTypeLayout.p1.sidesOnP1 !== true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === true,
   'starting guess keeps Sides on page 2 beside Sandwiches — Gemini may move them');
+(function buildKeepsGeminiSidesOn() {
+  var planned = print.planFluidLayout(mainMenu, sharedTypeDishes, {
+    sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
+  });
+  planned.p1.sidesOnP1 = true;
+  if (planned.p2) planned.p2.sidesOnP2 = false;
+  var html = print.build(mainMenu, sharedTypeDishes, {
+    layout: planned,
+    layoutSource: 'gemini-layout',
+    layoutReview: 'Sides on page 1 to fill Sharing.',
+    sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var pages = a4.split(/<div class="page /);
+  assert(/Layout: Gemini/.test(html) && /Sides on page 1 to fill Sharing/.test(html),
+    'toolbar names Gemini when advice came from Gemini');
+  assert(pages[1] && /Cheesy Garlic Bread|Loaded Fries|Chips/.test(pages[1]),
+    'Gemini sidesOn page1 survives print build instead of being re-planned');
+})();
 
 // Tip/sell sandwich box (0 fillings) must prefer page 1 when page 2 holds mains+desserts
 var tipOnlyPacked = [

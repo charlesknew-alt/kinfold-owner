@@ -3127,12 +3127,21 @@
     var bodyClass = 'paper-' + defaultPaper;
     var layout = null;
     if (menu.kind === 'long') {
-      layout = planFluidLayout(menu, dishes, {
-        promos: plan.promos || [],
-        sectionLayout: plan.sectionLayout,
-        includes: plan.includes
-      });
-      plan.layout = layout;
+      // Honour a layout already planned + Gemini-adjusted. Re-planning here
+      // used to throw away sidesOn / sandwichesOn / dropFootLogo.
+      if (plan.layout && plan.layout.p1) {
+        layout = plan.layout;
+      } else if (plan.p1 && plan.pages) {
+        layout = plan;
+        plan.layout = layout;
+      } else {
+        layout = planFluidLayout(menu, dishes, {
+          promos: plan.promos || [],
+          sectionLayout: plan.sectionLayout,
+          includes: plan.includes
+        });
+        plan.layout = layout;
+      }
       plan.fit = layout.fit;
       plan.text = layout.summary;
       if (!plan.promos) plan.promos = layout.promos || [];
@@ -3159,6 +3168,15 @@
     var fillerHint = layout && layout.fillers && layout.fillers.length
       ? ' Auto: ' + layout.fillers.join(' · ') + '.'
       : (menu.kind === 'party' ? ' Standardised party layout.' : '');
+    var src = String(plan.layoutSource || '');
+    var decidedHint = '';
+    if (src === 'gemini-layout' || src === 'gemini') {
+      decidedHint = ' Layout: Gemini' + (plan.layoutReview ? ' — ' + plan.layoutReview : '.') ;
+    } else if (src === 'local-column-fallback' || src === 'local') {
+      decidedHint = ' Layout: JS guess — Gemini timed out.';
+    } else if (layout && menu.kind === 'long') {
+      decidedHint = ' Layout: JS starting guess.';
+    }
 
     var html = (
       '<!DOCTYPE html><html><head><meta charset="utf-8">' +
@@ -3182,7 +3200,8 @@
             (defaultPaper === 'a5' ? ' checked' : '') +
             ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint" id="printHint">' + esc(dateHint) +
-        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.</span>' +
+        ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.' +
+        esc(decidedHint) + '</span>' +
       '</div>' +
       '<div class="preview-clip">' + a4Stack + a5Stack + '</div>' +
       '<script>(function(){' +
