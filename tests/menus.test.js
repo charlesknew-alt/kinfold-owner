@@ -2460,6 +2460,20 @@ assert(/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSa
   'frilly Sandwiches title sits inside the frame with the fillings');
 assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
   'Sandwiches title is not perched above the outer wave');
+(function columnMainsKeepSidesWithSandwiches() {
+  var html = print.build(mainMenu, sidesSandDishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      Mains: { width: 'column', frame: false },
+      Sides: { width: 'column', frame: false },
+      Sandwiches: { width: 'column', frame: true }
+    })
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  assert(/sides-sand-row[\s\S]{0,4000}Cheesy Garlic Bread/.test(a4),
+    'Sides stay beside Sandwiches even when Mains are Column');
+  assert(!/mains-sand-row/.test(a4),
+    'Column Mains do not steal Sandwiches from Sides');
+})();
 (function bestFitUsesColumns() {
   var layout = api.normalizeSectionLayout({
     'Sharing Plates': { width: 'both', frame: false },

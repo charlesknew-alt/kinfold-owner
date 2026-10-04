@@ -2458,8 +2458,10 @@
         (sideRule && wantsColumn(sideRule) && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)
       ));
     if (bag.mains && !mainsPairedInCol && p2opts.sandwiches && canSitInColumn(mainRule) &&
-        bag.mains.dishes && bag.mains.dishes.length) {
-      // Page 2: Column Mains sit opposite Sandwiches. Best fit waits for Gemini.
+        bag.mains.dishes && bag.mains.dishes.length &&
+        !(p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)) {
+      // Column Mains sit opposite Sandwiches only when Sides are not also on page 2.
+      // Food map: Sides beside Sandwiches. Best fit waits for Gemini.
       var sandU2 = sandwichesPackCost(bag, sandRule);
       var mainU2 = sectionUnits(bag.mains, false);
       var pair2 = levelOppositeColumns(
