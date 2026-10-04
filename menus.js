@@ -511,6 +511,44 @@
     return [];
   }
 
+  /** Compare catalogue prices ignoring £ and extra spaces. */
+  function cataloguePriceKey_(price) {
+    return String(price == null ? '' : price).replace(/£/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * One row per price change. Consecutive same amounts collapse to the
+   * earliest date that amount was seen (when it changed to this price).
+   * Newest change first for display.
+   */
+  function compactPriceHistory_(hist) {
+    var rows = [];
+    (Array.isArray(hist) ? hist : []).forEach(function (h) {
+      if (!h) return;
+      var date = String(h.date || '').trim();
+      if (!date) return;
+      rows.push({
+        price: String(h.price != null ? h.price : '').trim(),
+        date: date
+      });
+    });
+    rows.sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date));
+    });
+    var compact = [];
+    rows.forEach(function (h) {
+      var last = compact[compact.length - 1];
+      if (last && cataloguePriceKey_(last.price) === cataloguePriceKey_(h.price)) return;
+      compact.push({ price: h.price, date: h.date });
+    });
+    compact.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+    return compact.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+  }
+
+  function mergePriceHistories_(a, b) {
+    return compactPriceHistory_([].concat(a || [], b || []));
+  }
+
   function normalizeDishCatalogue(raw) {
     if (!Array.isArray(raw)) return emptyDishCatalogue();
     var byKey = {};
@@ -518,16 +556,7 @@
       if (!row || !row.name) return;
       var key = String(row.key || dishCatalogueKey(row.name) || '').trim();
       if (!key) return;
-      var history = Array.isArray(row.priceHistory) ? row.priceHistory : [];
-      var cleanHist = [];
-      history.forEach(function (h) {
-        if (!h) return;
-        var price = String(h.price != null ? h.price : '').trim();
-        var date = String(h.date || '').trim();
-        if (!date) return;
-        cleanHist.push({ price: price, date: date });
-      });
-      cleanHist = cleanHist.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+      var cleanHist = compactPriceHistory_(row.priceHistory);
       var entry = {
         key: key,
         section: String(row.section || 'Mains'),
@@ -545,27 +574,11 @@
       } else if (String(entry.lastSeen) >= String(prev.lastSeen)) {
         entry.name = preferDietaryTitle_(entry.name, prev.name);
         entry.seenCount = Math.max(entry.seenCount || 1, prev.seenCount || 1);
-        // Merge unique price history from the older row.
-        var seenNew = {};
-        (entry.priceHistory || []).forEach(function (h) { seenNew[h.date + '|' + h.price] = true; });
-        (prev.priceHistory || []).forEach(function (h) {
-          var k = h.date + '|' + h.price;
-          if (!seenNew[k]) entry.priceHistory.push(h);
-        });
-        entry.priceHistory.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
-        entry.priceHistory = entry.priceHistory.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+        entry.priceHistory = mergePriceHistories_(entry.priceHistory, prev.priceHistory);
         byKey[key] = entry;
       } else {
-        // Keep older lastSeen winner but merge any unique price history.
         prev.name = preferDietaryTitle_(prev.name, entry.name);
-        var seen = {};
-        prev.priceHistory.forEach(function (h) { seen[h.date + '|' + h.price] = true; });
-        entry.priceHistory.forEach(function (h) {
-          var k = h.date + '|' + h.price;
-          if (!seen[k]) prev.priceHistory.push(h);
-        });
-        prev.priceHistory.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
-        prev.priceHistory = prev.priceHistory.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
+        prev.priceHistory = mergePriceHistories_(prev.priceHistory, entry.priceHistory);
         byKey[key] = prev;
       }
     });
@@ -606,7 +619,7 @@
           description: tidy.description || '',
           tags: tidy.tags || '',
           price: price,
-          priceHistory: price || date ? [{ price: price, date: date }] : [],
+          priceHistory: compactPriceHistory_([{ price: price, date: date }]),
           lastSeen: date,
           seenCount: 1
         };
@@ -621,12 +634,10 @@
       prev.lastSeen = date;
       prev.seenCount = (prev.seenCount || 1) + 1;
       var last = prev.priceHistory && prev.priceHistory[0];
-      if (!last || String(last.price) !== price) {
-        prev.priceHistory = [{ price: price, date: date }].concat(prev.priceHistory || []);
-        prev.priceHistory = prev.priceHistory.slice(0, CATALOGUE_PRICE_HISTORY_MAX_);
-      } else if (String(last.date) !== date) {
-        // Same price, new day — bump the date on the latest stamp.
-        last.date = date;
+      if (!last || cataloguePriceKey_(last.price) !== cataloguePriceKey_(price)) {
+        prev.priceHistory = compactPriceHistory_(
+          [{ price: price, date: date }].concat(prev.priceHistory || [])
+        );
       }
     });
     return pruneDishCatalogue(Object.keys(byKey).map(function (k) { return byKey[k]; }));
