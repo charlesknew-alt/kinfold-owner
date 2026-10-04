@@ -439,8 +439,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow135') !== -1, 'menus page cache-bust is flow135');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow135') !== -1, 'hub menus link cache-bust is flow135');
+assert(page.indexOf('flow138') !== -1, 'menus page cache-bust is flow138');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow138') !== -1, 'hub menus link cache-bust is flow138');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -588,6 +588,52 @@ assert(catSmoke.length === 2, 'catalogue dedupes the same dish title');
 var sirloin = catSmoke.filter(function (c) { return /Sirloin/.test(c.name); })[0];
 assert(sirloin && sirloin.price === '22.50' && sirloin.priceHistory.length === 2,
   'catalogue keeps price history with dates');
+var bang = api.upsertDishCatalogue([], [
+  api.dish('Starters', 'Bang Bang Cauliflower', 'florets', '8.25', 'vg')
+], { date: '2026-09-27' });
+bang = api.upsertDishCatalogue(bang, [
+  api.dish('Starters', 'Bang Bang Cauliflower', 'florets', '8.25', 'vg')
+], { date: '2026-10-04' });
+assert(bang[0].priceHistory.length === 1 && bang[0].priceHistory[0].date === '2026-09-27',
+  'same price on a later day does not add a history row');
+assert(bang[0].lastSeen === '2026-10-04' && bang[0].price === '8.25',
+  'last seen still updates when the price is unchanged');
+bang = api.upsertDishCatalogue(bang, [
+  api.dish('Starters', 'Bang Bang Cauliflower', 'florets', '8.50', 'vg')
+], { date: '2026-10-11' });
+assert(bang[0].priceHistory.length === 2 && bang[0].priceHistory[0].price === '8.50',
+  'a new amount adds one history row');
+bang = api.upsertDishCatalogue(bang, [
+  api.dish('Starters', 'Bang Bang Cauliflower', 'florets', '8.25', 'vg')
+], { date: '2026-10-18' });
+assert(bang[0].priceHistory.length === 3,
+  'changing back to an old amount is a real change and is stored');
+var collapsed = api.normalizeDishCatalogue([{
+  name: 'Bang Bang Cauliflower',
+  section: 'Starters',
+  price: '8.25',
+  lastSeen: '2026-10-04',
+  priceHistory: [
+    { price: '8.25', date: '2026-10-04' },
+    { price: '8.25', date: '2026-10-01' },
+    { price: '8.25', date: '2026-09-30' },
+    { price: '8.25', date: '2026-09-29' },
+    { price: '8.25', date: '2026-09-28' },
+    { price: '8.25', date: '2026-09-27' }
+  ]
+}]);
+assert(collapsed[0].priceHistory.length === 1 && collapsed[0].priceHistory[0].date === '2026-09-27',
+  'existing same-price daily stamps collapse to the first date of that amount');
+var mergedCat = api.mergeDishCatalogues(
+  [{ name: 'Bang Bang Cauliflower', price: '8.25', lastSeen: '2026-09-27',
+    priceHistory: [{ price: '8.25', date: '2026-09-27' }] }],
+  [{ name: 'Bang Bang Cauliflower', price: '8.25', lastSeen: '2026-10-04',
+    priceHistory: [{ price: '8.25', date: '2026-10-04' }, { price: '8.25', date: '2026-09-30' }] }]
+);
+assert(mergedCat[0].priceHistory.length === 1,
+  'cloud merge of the same amount on different days stays one history row');
+assert(page.indexOf('a row only when the amount changes') !== -1,
+  'All dishes copy says price history stores changes only');
 assert(api.searchDishCatalogue(catSmoke, 'beef short')[0].name.indexOf('Short Rib') !== -1,
   'catalogue search matches word by word');
 assert(api.searchDishCatalogue(catSmoke, '', { section: 'Mains', allowEmpty: true }).length === 2,
