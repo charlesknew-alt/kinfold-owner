@@ -2720,7 +2720,7 @@
    * width: 'full' | 'column' | 'both'
    *   full   — always full page width
    *   column — always sits in a column
-   *   both   — “best fit”: layout / AI picks column or full for this page
+   *   both   — “best fit”: prefer a column (pair or split) so food fits; full only if alone
    * frame: scalloped “frilly” box around the section
    * note: optional spiel printed under the title (hours, “all served with…”, etc.)
    * tip: include as a selling box on the long sheet even with 0 dishes

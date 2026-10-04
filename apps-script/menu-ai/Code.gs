@@ -476,7 +476,8 @@ function reviewLayoutWithGemini_(body) {
     'Never omit sandwiches when sandwichesLocked is true. ' +
     'Move sidesOn to page1 when that raises the shared density.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
-    '9. SECTION WIDTH “both” / best-fit: choose column OR full for balance on THIS sheet.\n' +
+    '9. SECTION WIDTH “both” / best-fit: PREFER a column, paired with another best-fit/column section, so food fits. ' +
+    'Full-bleed only when a section is alone and short. Never stack extra food under Sharing/Burgers if it would clip — move Sandwiches to page 2 and pair Desserts with Sides.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 7000);
 
   var called = callGemini_(key, [{ text: prompt }], {

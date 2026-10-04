@@ -522,10 +522,14 @@ assert(aiGs.indexOf('INSIDE the frame') !== -1 && aiGs.indexOf('Sip & Paint') !=
   'Gemini layout rule: frilly titles sit in the box; leftover panels must fit with a gap');
 assert(aiGs.indexOf('NEVER fall off the page') !== -1 && aiGs.indexOf('never clip food') !== -1,
   'Gemini layout rule: content must never fall off the page');
+assert(aiGs.indexOf('PREFER a column') !== -1 && printJs.indexOf('desserts-sides-row') !== -1,
+  'best-fit prefers columns: Desserts pair with Sides rather than stacking full-width');
+assert(printJs.indexOf('not stacked under Sharing') !== -1 && printJs.indexOf('mainsSectionHtml') !== -1,
+  'Sandwiches stay off a packed Sharing column; best-fit Mains can split');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow145') !== -1, 'menus page cache-bust is flow145');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow145') !== -1, 'hub menus link cache-bust is flow145');
+assert(page.indexOf('flow146') !== -1, 'menus page cache-bust is flow146');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow146') !== -1, 'hub menus link cache-bust is flow146');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -2439,6 +2443,70 @@ assert(/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSa
   'frilly Sandwiches title sits inside the frame with the fillings');
 assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
   'Sandwiches title is not perched above the outer wave');
+(function bestFitUsesColumns() {
+  var layout = api.normalizeSectionLayout({
+    'Sharing Plates': { width: 'both', frame: false },
+    Burgers: { width: 'column', frame: false },
+    Sandwiches: {
+      width: 'column',
+      frame: true,
+      note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with nachos & salad. FRIES UPGRADE +£2.'
+    },
+    Mains: { width: 'both', frame: false },
+    Desserts: { width: 'both', frame: true },
+    Sides: { width: 'column', frame: false },
+    'Item Boost': { width: 'full', frame: true }
+  });
+  var dishes = [
+    api.dish('Item Boost', 'Pie of the day', 'homemade with a generous filling mash vegetables gravy', '20.95', ''),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam sourdough', '16.95', 'v'),
+    api.dish('Sharing Plates', 'Beef Chilli Nachos', 'sour cream guacamole', '15.95', 'gf'),
+    api.dish('Burgers', 'Brisket Burger', 'brioche bacon jam onion rings fries', '18.95', ''),
+    api.dish('Burgers', 'Sweet Potato & Halloumi Burger', 'chilli cheese fries', '16.95', 'v'),
+    api.dish('Sandwiches', 'Beef, Chilli & Cheddar Quesadilla', 'tortilla wrap salad', '10.95', ''),
+    api.dish('Sandwiches', 'Falafel & Guacamole', 'mixed salad', '8.95', 'vg'),
+    api.dish('Sandwiches', 'Tuna Melt', 'cheddar', '9.95', ''),
+    api.dish('Mains', 'Osso Bucco', 'veal shank squash risotto', '23.95', 'gf'),
+    api.dish('Mains', 'Chilli Con Carne', 'rice', '17.95', 'gf'),
+    api.dish('Mains', 'Fish & Chips', 'mushy peas tartare', '18.95', 'gf, df'),
+    api.dish('Desserts', 'Cheeses', 'biscuits grapes', '9.95', ''),
+    api.dish('Desserts', 'Ice cream or Sorbet', 'three scoops', '5.95', ''),
+    api.dish('Desserts', 'Sticky Toffee Pudding', 'ice cream', '8.25', ''),
+    api.dish('Desserts', 'Lime Posset', 'shortbread', '8.25', ''),
+    api.dish('Desserts', 'White Chocolate Blondie', 'raspberry', '8.25', ''),
+    api.dish('Desserts', 'Apple Crumble', 'custard', '8.25', ''),
+    api.dish('Desserts', 'Cookie Dough', 'caramel', '8.25', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v')
+  ];
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    includes: { sandwiches: true }
+  });
+  assert(planned.pages === 2, 'screenshot-shaped best-fit sheet uses two pages');
+  assert(planned.p2 && planned.p2.sandwiches && !planned.p1.sandwiches,
+    'best-fit does not stack Sandwiches under Sharing on page 1');
+  var html = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    layout: planned,
+    includes: { sandwiches: true }
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var pages = a4.split(/<div class="page /);
+  assert(pages.length >= 3, 'best-fit print still uses two A4 pages');
+  assert(/Camembert/i.test(pages[1]) && /Brisket/i.test(pages[1]),
+    'page 1 keeps Sharing opposite Burgers');
+  assert(!/Quesadilla/i.test(pages[1]),
+    'page 1 does not clip Sandwiches under Sharing');
+  assert(/Quesadilla/i.test(pages[2]),
+    'Sandwiches print on page 2');
+  assert(/desserts-sides-row/.test(pages[2]) && /Cheesy Garlic Bread/i.test(pages[2]),
+    'best-fit Desserts sit in a column beside Sides');
+  assert(/share-cols/.test(pages[2]) || /mains-sand-row/.test(pages[2]),
+    'best-fit Mains use two columns or sit opposite Sandwiches');
+  assert(/Osso Bucco/i.test(pages[2]) && /Sticky Toffee/i.test(pages[2]),
+    'mains and desserts all print (nothing dropped off the page)');
+})();
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});
