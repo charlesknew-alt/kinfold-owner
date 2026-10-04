@@ -167,6 +167,14 @@ assert(printJs.indexOf('if (opts.force) fillOpts.force = opts.force') !== -1,
   'layout review forceColumnFill applies to opposite food pairs');
 assert(printJs.indexOf('skipPromos: true') !== -1,
   'solo column pairs skip Stay a While in the empty opposite half');
+assert(printJs.indexOf('function isBlankFoodInner') !== -1 && printJs.indexOf('rightPromoBody') !== -1,
+  'empty partner column sits the leftover panel at the top, not the page foot');
+assert(printJs.indexOf('.bottom-cols.cols-balanced .col-body{flex:0 0 auto}') !== -1,
+  'Sides partner column does not stretch and leave a hole above the panel');
+assert(printJs.indexOf('.cols.bottom-cols{flex:0 0 auto}') !== -1,
+  'spread leftover sits between sections, not inside the Sides row');
+assert(/\.scallop-pad\{padding:6px 12px 10px/.test(printJs),
+  'frilly pad keeps prices and last dessert lines inside the box');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
   'opposite columns keep category titles in a pair-head');
 assert(printJs.indexOf('function stripInnerSectionTitle') !== -1,
@@ -542,8 +550,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow151') !== -1, 'menus page cache-bust is flow151');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow151') !== -1, 'hub menus link cache-bust is flow151');
+assert(page.indexOf('flow152') !== -1, 'menus page cache-bust is flow152');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow152') !== -1, 'hub menus link cache-bust is flow152');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -2591,6 +2599,35 @@ assert(/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
   'frilly Sandwiches title sits in the pair-head with Sides');
 assert(!/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSandRow),
   'Sandwiches title is not inset by the scallop');
+(function sundaySidesPromoSitsUp() {
+  var dishes = jammedSunday.concat([
+    api.dish('Desserts', 'Cheeses', 'biscuits grapes quince jelly', '9.95/17.95', 'gf option'),
+    api.dish('Desserts', 'Apple & Blackberry Crumble', 'with ice cream or custard', '8.25', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', ''),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v')
+  ]);
+  var html = print.build(api.menuById('sunday'), dishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      'Little Bells': { width: 'column', frame: false },
+      Desserts: { width: 'column', frame: true },
+      Sides: { width: 'column', frame: false }
+    }),
+    promos: [
+      { title: 'Gatherings', body: 'happy to host your event' },
+      { title: 'Large Functions', body: 'we can cater for large groups' }
+    ]
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var sidesRow = (a4.match(/sides-sand-row[\s\S]*?<\/section>/) ||
+    a4.match(/column-solo-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(sidesRow && /Cheesy Garlic Bread/.test(sidesRow),
+    'Sunday Sides stay a column beside the leftover panel');
+  assert(/col-promo[\s\S]*col-body[\s\S]*(Large Functions|Gatherings|Stay a While)/.test(sidesRow),
+    'leftover panel sits at the top of the empty partner, beside Sides');
+  assert(!/col-promo[\s\S]*col-feature[\s\S]*(Large Functions|Gatherings)/.test(sidesRow),
+    'leftover panel is not a footer with a hole above it');
+})();
 (function columnMainsKeepSidesWithSandwiches() {
   var html = print.build(mainMenu, sidesSandDishes, {
     sectionLayout: api.normalizeSectionLayout({

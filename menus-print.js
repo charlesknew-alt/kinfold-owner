@@ -1818,6 +1818,13 @@
     return '<div class="promo-head pair-head"><span class="sec-title">' + esc(title) + '</span></div>';
   }
 
+  /** True when a column has no food — only &nbsp; / empty tags. */
+  function isBlankFoodInner(html) {
+    var s = String(html || '').replace(/&nbsp;|&#160;/gi, '');
+    s = s.replace(/<[^>]+>/g, '');
+    return !s.replace(/\s+/g, '');
+  }
+
   /** Pair-head is the only title; strip a copy that was left inside the food box. */
   function stripInnerSectionTitle(inner, title) {
     inner = String(inner || '');
@@ -1872,10 +1879,19 @@
     }
     var leftHtml = stripInnerSectionTitle(String(leftInner || ''), opts.leftTitle);
     var rightHtml = stripInnerSectionTitle(String(rightInner || ''), opts.rightTitle);
+    // Empty partner (Sides with no Sandwiches): the promo IS the column, sit it
+    // at the top beside the food — not as a footer with a hole above it.
+    var leftPromoBody = isBlankFoodInner(leftHtml) && fill.left;
+    var rightPromoBody = isBlankFoodInner(rightHtml) && fill.right;
+    if (leftPromoBody) { leftHtml = fill.left; leftFeat = ''; }
+    if (rightPromoBody) { rightHtml = fill.right; rightFeat = ''; }
     // Always pair-head — a frilly Desserts title must sit on the same line as
     // unframed Little Bells (and Sides | Sandwiches), not inset by the scallop.
-    var leftHead = (opts.leftTitle || opts.rightTitle) ? pairHeadHtml(opts.leftTitle || '') : '';
-    var rightHead = (opts.leftTitle || opts.rightTitle) ? pairHeadHtml(opts.rightTitle || '') : '';
+    // Skip the spacer head when that side is a leftover panel (it has its own title).
+    var leftHead = opts.leftTitle ? pairHeadHtml(opts.leftTitle)
+      : (opts.rightTitle && !leftPromoBody ? pairHeadHtml('') : '');
+    var rightHead = opts.rightTitle ? pairHeadHtml(opts.rightTitle)
+      : (opts.leftTitle && !rightPromoBody ? pairHeadHtml('') : '');
     var html = '<section class="sec ' + secClass + '">' +
       '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
       '<div class="col ' + leftClass + '">' + leftHead +
@@ -1895,7 +1911,7 @@
     var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
-      skipPromos: true,
+      skipPromos: opts.skipPromos !== false,
       secClass: 'column-solo-row',
       colsClass: 'column-solo-cols',
       leftClass: '',
@@ -2734,15 +2750,16 @@
       '.page{width:210mm;height:297mm;padding:11mm 10mm 9mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
       '.page-body.spread-even{justify-content:space-evenly}' +
+      /* Leftover space sits BETWEEN sections — never stretch a column pair so a
+         leftover panel drops to the page foot with a hole beside Sides. */
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo{flex:0 0 auto}' +
       /* When spreading, let the main column / bottom band grow so type stays large
          but the block reaches the foot — no blank bottom third. */
-      '.page-body.spread-even > .sec,.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols{flex:1 1 auto;min-height:0}' +
+      '.page-body.spread-even > .sec,.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols{flex:0 0 auto}' +
       '.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols,.page-body.spread-even > .foot-logo{display:flex;flex-direction:column}' +
-      '.page-body.spread-even > .classics-block > .cols,.page-body.spread-even > .cols.bottom-cols{flex:1 1 auto;min-height:0;align-items:stretch}' +
-      '.page-body.spread-even .cols-balanced .col{min-height:100%}' +
+      '.page-body.spread-even > .classics-block > .cols,.page-body.spread-even > .cols.bottom-cols{flex:0 0 auto;align-items:stretch}' +
       '.page-body.spread-even > .foot-logo{flex:0 0 auto;margin-top:auto}' +
       '.scallop,.sec,.cols,.foot-logo,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
@@ -2833,8 +2850,8 @@
         'overflow:hidden;max-width:100%}' +
       '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
       '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
-      '.scallop-pad{padding:4px 10px 3px;overflow:hidden;min-width:0}' +
-      '.scallop-box .scallop-pad{padding:4px 10px 4px}' +
+      '.scallop-pad{padding:6px 12px 10px;overflow:hidden;min-width:0}' +
+      '.scallop-box .scallop-pad{padding:6px 12px 10px}' +
       '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
@@ -2912,7 +2929,8 @@
       '.sandwich-aligned .scallop{margin-top:0}' +
       '.bottom-cols{margin-top:16px;margin-bottom:4px;align-items:stretch}' +
       '.bottom-cols.cols-balanced .col-sides,.bottom-cols.cols-balanced .col-promo{display:flex;flex-direction:column;min-height:0}' +
-      '.bottom-cols.cols-balanced .col-body{flex:1 1 auto}' +
+      '.bottom-cols.cols-balanced .col-body{flex:0 0 auto}' +
+      '.bottom-cols .col-promo > .col-feature{margin-top:0;padding-top:0}' +
       '.bottom-cols-balanced{grid-template-columns:1fr 1fr;gap:20px}' +
       /* Full-width food + two feature panels underneath (no orphan column hole) */
       '.foot-promos{margin:10px 0 6px;align-items:stretch}' +
@@ -2947,7 +2965,7 @@
       '.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
-      '.fill-dense .scallop-pad{padding:2px 8px 1px}' +
+      '.fill-dense .scallop-pad{padding:4px 10px 6px}' +
       '.fill-dense .sec-title,.fill-compact .sec-title{letter-spacing:.08em}' +
       '.fill-dense .allergy{margin-top:2mm;padding-top:1mm;font-size:9pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */
