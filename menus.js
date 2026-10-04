@@ -2507,6 +2507,10 @@
    * note: optional spiel printed under the title (hours, “all served with…”, etc.)
    * tip: include as a selling box on the long sheet even with 0 dishes
    * sell: selling words for the tip box (used when tip is on / no fillings)
+   *
+   * Opposite-column pairs (any two Column / Best-fit sections side by side):
+   * titles share a baseline (frilly frames sit under the heading);
+   * leftover space under the shorter stack gets a small feature panel.
    */
   var DEFAULT_SECTION_LAYOUT = {
     Nibbles: { width: 'column', frame: true, note: '' },

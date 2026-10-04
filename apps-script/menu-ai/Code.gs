@@ -414,9 +414,9 @@ function reviewLayoutWithGemini_(body) {
   var layout = body.layout || body;
   var prompt =
     'You are the final gate before an Eight Bells (Bolney) pub menu PDF opens.\n' +
-    'Your job: if ANY pair of opposite columns will not finish level, you MUST add feature panels ' +
-    'under the shorter stack. Do not release uneven columns. This applies to every generation — ' +
-    'Sandwiches vs Burgers, Sides vs Sandwiches, Events vs Classics, or any other opposite pair.\n' +
+    'Your job: if ANY pair of opposite columns will not start and finish level, you MUST add feature panels ' +
+    'under the shorter stack. Do not release uneven columns. This is a blanket layout rule for every pair — ' +
+    'Little Bells vs Desserts, Sides vs Sandwiches, Sandwiches vs Burgers, Events vs Classics — never one special case.\n' +
     'Return ONLY valid JSON (no markdown):\n' +
     '{\n' +
     '  "density": "airy"|"roomy"|"normal"|"tight"|"compact",\n' +
@@ -458,7 +458,12 @@ function reviewLayoutWithGemini_(body) {
     '- If page2 is null, omit page2 or set shorter:"even", panels:0.\n' +
     '- okToPrint may be true once columnBalance fixes the hole; set false only if type would be unreadable.\n' +
     'OTHER GOLDEN RULES:\n' +
-    '1. COLUMNS start on the same top baseline and finish at the same bottom point.\n' +
+    '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
+    'Category titles (Little Bells / Desserts / Sides / Sandwiches / Burgers / Classics) MUST share that top baseline. ' +
+    'Frilly frames sit UNDER the title — they must not drop a heading below its neighbour. ' +
+    'A little leftover under the shorter stack MUST get a small feature panel (panels:1). ' +
+    'Do not leave a blank band under kids plates, puddings, sides or sandwiches. ' +
+    'Solo column (no food partner) stays half-width; do not fill the empty half with rooms copy.\n' +
     '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
     '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
