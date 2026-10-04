@@ -165,6 +165,8 @@ assert(printJs.indexOf('skipPromos: true') !== -1,
   'solo column pairs skip Stay a While in the empty opposite half');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
   'opposite food columns lift category titles into a shared pair-head');
+assert(printJs.indexOf('sides-sand-row') !== -1 && printJs.indexOf("rightTitle: p2opts.sandwiches ? 'Sandwiches'") !== -1,
+  'Sides|Sandwiches bottom pair uses the same pair-head baseline');
 assert(printJs.indexOf('shortOnly: true') !== -1,
   'kids|desserts leftover space gets a small panel under the shorter column only');
 assert(printJs.indexOf('function wrapUnits') !== -1 && printJs.indexOf('function columnFillUnits') !== -1,
@@ -449,8 +451,8 @@ assert(aiGs.indexOf('Frilly frames sit UNDER') !== -1 && aiGs.indexOf('Little Be
   'Gemini layout rule: titles share a baseline; leftover gets a small panel on every pair');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow138') !== -1, 'menus page cache-bust is flow138');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow138') !== -1, 'hub menus link cache-bust is flow138');
+assert(page.indexOf('flow139') !== -1, 'menus page cache-bust is flow139');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow139') !== -1, 'hub menus link cache-bust is flow139');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -2239,6 +2241,41 @@ assert(clipLayout.p1.sandwiches || (clipLayout.p2 && clipLayout.p2.sandwiches),
   'named sandwich fillings stay on the sheet — never dropped to make space');
 assert(clipLayout.sandwichesLocked === true, 'named sandwich fillings lock sandwiches on the layout');
 assert(/minimum type|two A4/i.test(clipLayout.summary), 'summary explains two pages because one would clip at min type');
+var sidesSandDishes = [];
+['Olives', 'Whitebait', 'Arancini', 'Bruschetta', 'Camembert', 'Falafel'].forEach(function (n) {
+  sidesSandDishes.push(api.dish('Starters', n, 'starter description for fill', '8.95', ''));
+});
+['Wagyu Burger', 'Asian Burger', 'Cheese Burger'].forEach(function (n) {
+  sidesSandDishes.push(api.dish('Burgers', n, 'bun fries salad onion rings', '18.95', ''));
+});
+['Haddock & Chips', 'Pie of the Day', 'Liver', 'Fish Pie'].forEach(function (n) {
+  sidesSandDishes.push(api.dish('Pub Classics', n, 'peas tartare mash gravy', '17.95', ''));
+});
+sidesSandDishes.push(api.dish('Mains', 'Fish & Chips', 'mushy peas lemon tartare', '18.95', 'gf, df'));
+sidesSandDishes.push(api.dish('Mains', 'Pie of the day', 'mash vegetables gravy', '20.95', ''));
+['Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg', 'Garlic Bread', 'House Salad', 'Fries'].forEach(function (n) {
+  sidesSandDishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+});
+[
+  ['Beef, Chilli & Cheddar Quesadilla', 'beef chilli cheddar', '10.95'],
+  ['Falafel & Guacamole', 'mixed salad ciabatta', '8.95'],
+  ['Cajun Chicken Wrap', 'coleslaw', '10.95'],
+  ['Tuna & Red Onion Melt', 'melted cheddar', '9.95']
+].forEach(function (x) {
+  sidesSandDishes.push(api.dish('Sandwiches', x[0], x[1], x[2], ''));
+});
+var sidesSandPlan = print.planFluidLayout(mainMenu, sidesSandDishes);
+assert(sidesSandPlan.p2 && sidesSandPlan.p2.sandwiches && sidesSandPlan.p2.sidesOnP2,
+  'screenshot-shaped sheet keeps Sides beside Sandwiches on page 2');
+var clipHtml = print.build(mainMenu, sidesSandDishes, sidesSandPlan);
+var clipA4 = clipHtml.split('mode-panel mode-a5')[0] || clipHtml;
+var sidesSandRow = (clipA4.match(/sides-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+assert(sidesSandRow && /cols-pair-titles/.test(sidesSandRow) && /pair-head/.test(sidesSandRow),
+  'Sides and Sandwiches titles share a pair-head baseline');
+assert(/pair-head[\s\S]*Sides/.test(sidesSandRow) && /pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
+  'pair-head carries both Sides and Sandwiches');
+assert(/pair-head[\s\S]*Sandwiches[\s\S]*scallop/.test(sidesSandRow),
+  'Sandwiches title sits outside the frilly frame so it lines up with Sides');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});

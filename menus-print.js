@@ -2520,40 +2520,31 @@
             else if (p2opts.rooms) p2 += renderFiller('rooms', bag, remainingPromos);
           }
         } else {
-        var p2Fill = planPromoFill(sideU, rightU, remainingPromos, {
-          leftFrame: 'box',
-          rightFrame: 'wide',
-          force: littleFoodPartner ? null : p2Force,
-          excludeTitles: usedPromoTitles
-        });
-        usedPromoTitles = usedPromoTitles.concat(p2Fill.usedTitles || []);
-        p2 += '<div class="cols bottom-cols cols-balanced cols-features">';
-        p2 += '<div class="col col-sides">';
-        p2 += '<div class="col-body">';
-        if (sideList.length) {
-          p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-          p2 += listDishes(sideList);
-        }
+        var leftInner = '';
+        if (sideList.length) leftInner += listDishes(sideList);
         if (p2opts.sidesOnP2 && bag.sauces) {
-          p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
-          p2 += listDishes(bag.sauces.dishes);
+          leftInner += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
+          leftInner += listDishes(bag.sauces.dishes);
         }
-        if (!sideList.length && !(p2opts.sidesOnP2 && bag.sauces)) p2 += '&nbsp;';
-        p2 += '</div>';
-        if (p2Fill.left) p2 += '<div class="col-feature">' + p2Fill.left + '</div>';
-        p2 += '</div>';
-        p2 += '<div class="col col-promo">';
-        p2 += '<div class="col-body">';
-        if (p2opts.sandwiches) {
-          p2 += sandwichesBlock(bag, { rule: sandRule, alignTitle: true });
-        } else if (p2opts.rooms && !p2Fill.right) {
-          p2 += promoBesidePartner(remainingPromos, sideU, 'box');
-        } else if (!p2Fill.right) {
-          p2 += '&nbsp;';
-        }
-        p2 += '</div>';
-        if (p2Fill.right) p2 += '<div class="col-feature">' + p2Fill.right + '</div>';
-        p2 += '</div></div>';
+        if (!leftInner) leftInner = '&nbsp;';
+        var rightInner = p2opts.sandwiches
+          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: true })
+          : '&nbsp;';
+        var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
+          promos: remainingPromos,
+          excludeTitles: usedPromoTitles,
+          force: littleFoodPartner ? null : p2Force,
+          leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
+          rightTitle: p2opts.sandwiches ? 'Sandwiches' : '',
+          secClass: 'sides-sand-row',
+          colsClass: 'bottom-cols',
+          leftClass: 'col-sides',
+          rightClass: 'col-promo',
+          leftFrame: 'box',
+          rightFrame: 'wide'
+        });
+        usedPromoTitles = usedPromoTitles.concat(p2Pair.usedTitles || []);
+        p2 += p2Pair.html;
         }
       } else if (p2opts.sidesOnP2 && sidesPrint) {
         if (lockedColumnWidth(sideRule)) {
@@ -2879,14 +2870,16 @@
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
-      // Opposite-column titles sit outside scallops so LITTLE BELLS / DESSERTS share a baseline.
+      // Opposite-column titles sit outside scallops so SIDES / SANDWICHES
+      // (and LITTLE BELLS / DESSERTS) share a baseline.
       '.cols-pair-titles{align-items:stretch}' +
       '.cols-pair-titles > .col > .pair-head{flex:0 0 auto;margin:0 0 var(--sec-gap)}' +
       '.cols-pair-titles > .col > .pair-head .sec-title{margin:0;text-align:left;letter-spacing:.12em}' +
       '.cols-pair-titles .col-body > .scallop,.cols-pair-titles .col-body > .sec-plain,' +
         '.cols-pair-titles .col-body > .sec-stack{margin-top:0}' +
       '.col-little .sec-title,.col-desserts .sec-title,.col-sides .sec-title{text-align:left;margin-top:0}' +
-      '.sandwich-aligned{margin:10px 0 0}' +
+      '.sandwich-aligned{margin:0}' +
+      '.cols-pair-titles .sandwich-aligned{margin:0}' +
       '.sandwich-aligned .scallop{margin-top:0}' +
       '.bottom-cols{margin-top:16px;margin-bottom:4px;align-items:stretch}' +
       '.bottom-cols.cols-balanced .col-sides,.bottom-cols.cols-balanced .col-promo{display:flex;flex-direction:column;min-height:0}' +

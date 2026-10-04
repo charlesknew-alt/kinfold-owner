@@ -460,6 +460,7 @@ function reviewLayoutWithGemini_(body) {
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
     'Category titles (Little Bells / Desserts / Sides / Sandwiches / Burgers / Classics) MUST share that top baseline. ' +
+    'That includes the page-2 Sides column beside the Sandwiches frilly box — same rule as Little Bells vs Desserts. ' +
     'Frilly frames sit UNDER the title — they must not drop a heading below its neighbour. ' +
     'A little leftover under the shorter stack MUST get a small feature panel (panels:1). ' +
     'Do not leave a blank band under kids plates, puddings, sides or sandwiches. ' +
