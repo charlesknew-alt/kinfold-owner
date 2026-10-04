@@ -414,7 +414,9 @@ function reviewLayoutWithGemini_(body) {
   var layout = body.layout || body;
   var prompt =
     'You are the final gate before an Eight Bells (Bolney) pub menu PDF opens.\n' +
-    'Layout is decided by YOU alongside these rules. The JS planner is only a starting guess — honour staff Blocks locks, then choose pages, columns and Best-fit widths.\n' +
+    'The JS planner has already placed the food. Honour staff Blocks locks. ' +
+    'Do not undo the food map. You may only: set sectionWidths for Best-fit sections, ' +
+    'drop extra feature panels, and refuse to clip dishes.\n' +
     'Return ONLY valid JSON (no markdown):\n' +
     '{\n' +
     '  "density": "airy"|"roomy"|"normal"|"tight"|"compact",\n' +

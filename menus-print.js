@@ -1796,9 +1796,9 @@
     return !!(rule && wantsFull(rule) && !wantsColumn(rule));
   }
 
-  /** Column lock, or Best fit after Gemini chose column. Untouched “both” stays full. */
+  /** Best fit or Column — may sit opposite another column. Full-width lock may not. */
   function canSitInColumn(rule) {
-    return lockedColumnWidth(rule);
+    return !!(rule && wantsColumn(rule) && !lockedFullWidth(rule));
   }
 
   /** Blocks “Column” lock (not Best fit). Must stay half-column — never orphaned to full-bleed. */
@@ -1906,15 +1906,17 @@
     return { html: leveled.html, usedPromoTitles: leveled.usedTitles };
   }
 
-  /** Drop-in / leftover section stays in its Blocks area: Column lock stays a column. */
+  /** Drop-in / leftover section: Column lock stays a column; Best fit with
+   *  enough dishes splits so food still fits. Full width stays full-bleed. */
   function renderUnpairedSection(title, dishes, rule, opts) {
     opts = opts || {};
     if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
     if (lockedColumnWidth(rule)) {
       return columnSoloSection(title, dishes, rule, opts);
     }
+    var twoCol = canSitInColumn(rule) && dishes.length >= 4;
     return {
-      html: '<section class="sec">' + sectionBlock(title, dishes, rule) + '</section>',
+      html: '<section class="sec">' + sectionBlock(title, dishes, rule, 'wide', { twoCol: twoCol }) + '</section>',
       usedPromoTitles: []
     };
   }
@@ -1958,7 +1960,11 @@
       bag.littleBells.dishes,
       littleRule,
       frameKind,
-      { hideTitle: !(littleRule && littleRule.frame), noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
+      {
+        hideTitle: !(littleRule && littleRule.frame),
+        noteHtml: extras.aboveHtml,
+        afterHtml: extras.belowHtml
+      }
     );
     var kidsU = columnFillUnits(bag.littleBells, littleRule, extras.slots.above) +
       noteUnits(extras.slots.below);
@@ -2252,9 +2258,8 @@
       var rightHasFood = !!(burgerDishes.length || classicDishes.length || sandOnRightCol ||
         (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule) && !sidesOnLeftCol));
       var mainsInRightCol = false;
-      // Only Column Mains (Blocks lock or Gemini already chose column) fill a hole
-      // opposite Sandwiches. Best fit still “both” stays full — do not steal the
-      // Sandwiches column from Sides.
+      // Only Column / Best-fit Mains fill a hole opposite Sandwiches.
+      // Locked Full stays full-bleed. Do not steal the Sandwiches column from Sides.
       if ((sandOnLeftCol || sandOnRightCol) && !rightHasFood && bag.mains &&
           bag.mains.dishes && bag.mains.dishes.length && canSitInColumn(mainRule)) {
         mainsInRightCol = true;
@@ -2462,7 +2467,7 @@
         bag.mains.dishes && bag.mains.dishes.length &&
         !(p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)) {
       // Column Mains sit opposite Sandwiches only when Sides are not also on page 2.
-      // Food map: Sides beside Sandwiches. Best fit waits for Gemini.
+      // Food map: Sides beside Sandwiches. Best-fit Mains may fill the hole if Sides are elsewhere.
       var sandU2 = sandwichesPackCost(bag, sandRule);
       var mainU2 = sectionUnits(bag.mains, false);
       var pair2 = levelOppositeColumns(
