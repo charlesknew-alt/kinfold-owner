@@ -1917,7 +1917,8 @@
       // Quick cards for sections that have dishes
       var bySec = {};
       list.forEach(function (d) {
-        var s = d.section || 'Dishes';
+        var s = (EBMenus.normalizeSectionName && EBMenus.normalizeSectionName(d.section || 'Dishes')) ||
+          (d.section || 'Dishes');
         if (!bySec[s]) bySec[s] = [];
         bySec[s].push(d);
       });
