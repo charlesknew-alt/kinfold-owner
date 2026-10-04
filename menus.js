@@ -772,6 +772,106 @@
     return tid === 'specials' ? 'Special Mains' : 'Mains';
   }
 
+  /**
+   * Card / own-page menu that holds a drop-in category (Sandwiches, Desserts,
+   * Little Bells, Specials, or an extra card whose name matches the category).
+   */
+  function ownPageMenuForSection(section) {
+    var s = String(section || '').trim();
+    if (!s) return null;
+    var builtIn = {
+      Sandwiches: 'sandwiches',
+      Desserts: 'desserts',
+      'Little Bells': 'little-bells',
+      'Special Starters': 'specials',
+      'Special Mains': 'specials',
+      'Special Desserts': 'specials'
+    };
+    if (builtIn[s]) return menuById(builtIn[s]);
+    var lower = s.toLowerCase();
+    var extra = null;
+    MENUS.forEach(function (m) {
+      if (extra || !m || m.kind !== 'card' || m.id === 'lunch-club') return;
+      if (String(m.name || '').toLowerCase() === lower) extra = m;
+    });
+    return extra;
+  }
+
+  /**
+   * Move every dish in `section` from a long host (Main / upcoming / Sunday /
+   * extra long) onto that category’s own-page menu. Replaces existing dishes
+   * on the destination (Specials: only that course). Removes them from the host.
+   * Ticks the include so they still print on the host sheet.
+   */
+  function pushSectionToOwnMenu(book, hostId, section, opts) {
+    opts = opts || {};
+    book = book || {};
+    var host = menuById(hostId);
+    if (!host || host.kind !== 'long') {
+      return { ok: false, error: 'Send a category from Main, Sunday, or another long sheet.' };
+    }
+    var dest = ownPageMenuForSection(section);
+    if (!dest) {
+      return { ok: false, error: section + ' does not have its own menu yet. Add it as a card menu first.' };
+    }
+    if (dest.id === hostId) {
+      return { ok: false, error: 'Already on that menu.' };
+    }
+    var hostList = Array.isArray(book[hostId]) ? book[hostId] : [];
+    var moving = hostList.filter(function (d) { return d && d.section === section; });
+    if (!moving.length) {
+      return { ok: false, error: 'No ' + section + ' dishes on this sheet.' };
+    }
+    var destSection = sectionForTargetMenu(section, '', '', dest.id);
+    var destList = Array.isArray(book[dest.id]) ? book[dest.id] : [];
+    var keepOnDest = destList.filter(function (d) {
+      if (dest.id !== 'specials') return false;
+      return coerceSpecialsSection(d.section, d.name, d.description) !== destSection;
+    });
+    var clones = moving.map(function (d) {
+      return dishFromCatalogueEntry(d, { menuId: dest.id, lunchClub: !!(d && d.lunchClub) });
+    });
+    book[dest.id] = keepOnDest.concat(clones);
+    book[hostId] = hostList.filter(function (d) { return !d || d.section !== section; });
+    if (opts.includes) {
+      if (!opts.includes[hostId]) opts.includes[hostId] = {};
+      opts.includes[hostId][dest.id] = true;
+    }
+    return {
+      ok: true,
+      moved: clones.length,
+      replaced: destList.length - keepOnDest.length,
+      from: hostId,
+      to: dest.id,
+      section: section,
+      destName: dest.name
+    };
+  }
+
+  /** Send every drop-in category on this long sheet to its own menu. */
+  function pushAllOwnPageSections(book, hostId, opts) {
+    var host = menuById(hostId);
+    if (!host || host.kind !== 'long') {
+      return { ok: false, error: 'Send categories from Main, Sunday, or another long sheet.' };
+    }
+    var sections = [];
+    (book[hostId] || []).forEach(function (d) {
+      if (!d || !d.section || sections.indexOf(d.section) !== -1) return;
+      if (ownPageMenuForSection(d.section)) sections.push(d.section);
+    });
+    var results = [];
+    sections.forEach(function (sec) {
+      var res = pushSectionToOwnMenu(book, hostId, sec, opts);
+      if (res && res.ok) results.push(res);
+    });
+    if (!results.length) {
+      return { ok: false, error: 'No Sandwiches, Desserts, Little Bells or Specials dishes on this sheet.' };
+    }
+    var moved = 0;
+    results.forEach(function (r) { moved += r.moved; });
+    return { ok: true, results: results, moved: moved };
+  }
+
   /** Clone a catalogue (or live menu) dish onto a target menu with a fresh id. */
   function dishFromCatalogueEntry(entry, opts) {
     opts = opts || {};
@@ -2955,6 +3055,9 @@
     filterDishCatalogue: filterDishCatalogue,
     dishCatalogueSections: dishCatalogueSections,
     sectionForTargetMenu: sectionForTargetMenu,
+    ownPageMenuForSection: ownPageMenuForSection,
+    pushSectionToOwnMenu: pushSectionToOwnMenu,
+    pushAllOwnPageSections: pushAllOwnPageSections,
     dishFromCatalogueEntry: dishFromCatalogueEntry,
     isoDateToday: isoDateToday
   };

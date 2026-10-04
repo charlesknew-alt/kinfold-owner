@@ -106,7 +106,8 @@
     .section-block-body { padding: 4px 14px 10px; }
     .section-block .dish-row:last-child { border-bottom: 0; }
     .section-add-row {
-      display: flex; justify-content: flex-start; padding: 10px 0 4px; margin-top: 4px;
+      display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px;
+      padding: 10px 0 4px; margin-top: 4px;
       border-top: 1px dashed var(--line);
     }
     .section-add-row .soft { font-size: 13px; padding: 8px 12px; }
@@ -425,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261004-flow136"></script>
-  <script src="menus-print.js?v=20261004-flow136"></script>
-  <script src="menus-ingest.js?v=20261004-flow136"></script>
+  <script src="menus.js?v=20261004-flow137"></script>
+  <script src="menus-print.js?v=20261004-flow137"></script>
+  <script src="menus-ingest.js?v=20261004-flow137"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1564,9 +1565,9 @@
     function renderDishesStep(menu, list) {
       var html = '';
       if (isStaffMode) {
-        html += '<p class="step-lede">Upload or paste a menu, edit dishes, clear when you need a fresh start, then generate. Layout and event wording stay as the owner set them.</p>';
+        html += '<p class="step-lede">Upload or paste a menu, edit dishes, clear when you need a fresh start, then generate. Layout and event wording stay as the owner set them. Send a whole category (Sandwiches, Desserts, Little Bells, Specials) to its own menu in one go.</p>';
       } else {
-        html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract.</p>';
+        html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract. Send Sandwiches, Desserts, Little Bells or Specials to their own menu in one go (replaces that menu and removes them from this sheet).</p>';
       }
 
       if (!isStaffMode) html += renderOwnerExtrasBox();
@@ -1587,6 +1588,19 @@
           html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(label) + '</label>';
         });
         html += '</div></div>';
+      }
+
+      if (menu.kind === 'long' && EBMenus.ownPageMenuForSection) {
+        var dropN = 0;
+        (list || []).forEach(function (d) {
+          if (d && d.section && EBMenus.ownPageMenuForSection(d.section)) dropN += 1;
+        });
+        if (dropN) {
+          html += '<div class="toolbar-row no-print" style="margin:0 0 12px">';
+          html += '<button type="button" class="soft" id="doPushAllOwnPages">Send drop-in categories to their own menus</button>';
+          html += '</div>';
+          html += '<p class="note no-print" style="margin:-6px 0 12px">Sandwiches, Desserts, Little Bells and Specials can move to their own menu in one go. That replaces what is on that menu, removes them from this sheet, and ticks them so they still print here.</p>';
+        }
       }
 
       // Card menus + staff (no Blocks step): edit spiel / ice cream / notes here.
@@ -2365,9 +2379,17 @@
     }
 
     function sectionAddFooter_(sec) {
-      return '<div class="section-add-row no-print">' +
-        '<button type="button" class="soft" data-add-section="' + escapeAttr(sec) + '">' +
-        'Add to ' + escapeAttr(sec) + '</button></div>';
+      var html = '<div class="section-add-row no-print">';
+      html += '<button type="button" class="soft" data-add-section="' + escapeAttr(sec) + '">' +
+        'Add to ' + escapeAttr(sec) + '</button>';
+      var host = EBMenus.menuById(menuId);
+      var dest = EBMenus.ownPageMenuForSection ? EBMenus.ownPageMenuForSection(sec) : null;
+      if (host && host.kind === 'long' && dest && dest.id !== menuId) {
+        html += '<button type="button" class="soft" data-push-section="' + escapeAttr(sec) + '">' +
+          'Send to ' + escapeAttr(dest.name) + ' menu</button>';
+      }
+      html += '</div>';
+      return html;
     }
 
     function scrollToDishForm_() {
@@ -2608,6 +2630,65 @@
           scrollToDishForm_();
         };
       });
+      document.querySelectorAll('[data-push-section]').forEach(function (b) {
+        b.onclick = function () {
+          var sec = b.getAttribute('data-push-section') || '';
+          var dest = EBMenus.ownPageMenuForSection ? EBMenus.ownPageMenuForSection(sec) : null;
+          if (!dest) {
+            alert(sec + ' does not have its own menu yet. Add it as a card menu first.');
+            return;
+          }
+          var moving = (dishes() || []).filter(function (d) { return d.section === sec; });
+          var destList = book[dest.id] || [];
+          var destSection = EBMenus.sectionForTargetMenu
+            ? EBMenus.sectionForTargetMenu(sec, '', '', dest.id)
+            : sec;
+          var replaced = dest.id === 'specials'
+            ? destList.filter(function (d) {
+              return EBMenus.coerceSpecialsSection(d.section, d.name, d.description) === destSection;
+            }).length
+            : destList.length;
+          var hostName = (EBMenus.menuById(menuId) && EBMenus.menuById(menuId).name) || 'this sheet';
+          var msg = 'Send ' + moving.length + ' ' + sec + ' dish' + (moving.length === 1 ? '' : 'es') +
+            ' to the ' + dest.name + ' menu?\n\n';
+          if (replaced) {
+            msg += 'This replaces ' + replaced + ' dish' + (replaced === 1 ? '' : 'es') +
+              ' currently on ' + dest.name + ', ';
+          } else {
+            msg += dest.name + ' will get these dishes, ';
+          }
+          msg += 'removes them from ' + hostName +
+            ', and ticks ' + dest.name + ' so they still print on this sheet.';
+          if (!confirm(msg)) return;
+          var res = EBMenus.pushSectionToOwnMenu(book, menuId, sec, { includes: includes });
+          if (!res.ok) {
+            alert(res.error || 'Could not send that category.');
+            return;
+          }
+          save();
+          render();
+        };
+      });
+      var pushAll = document.getElementById('doPushAllOwnPages');
+      if (pushAll) {
+        pushAll.onclick = function () {
+          var secs = [];
+          (dishes() || []).forEach(function (d) {
+            if (!d || !d.section || secs.indexOf(d.section) !== -1) return;
+            if (EBMenus.ownPageMenuForSection && EBMenus.ownPageMenuForSection(d.section)) secs.push(d.section);
+          });
+          var msg = 'Send ' + secs.join(', ') + ' to their own menus?\n\n' +
+            'Each own-page menu is replaced. Those dishes leave this sheet and stay on the print when their tick is on.';
+          if (!confirm(msg)) return;
+          var res = EBMenus.pushAllOwnPageSections(book, menuId, { includes: includes });
+          if (!res.ok) {
+            alert(res.error || 'Nothing to send.');
+            return;
+          }
+          save();
+          render();
+        };
+      }
       document.querySelectorAll('[data-mode]').forEach(function (b) {
         b.onclick = function () {
           var next = b.getAttribute('data-mode');
