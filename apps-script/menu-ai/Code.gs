@@ -459,11 +459,11 @@ function reviewLayoutWithGemini_(body) {
     '- okToPrint may be true once columnBalance fixes the hole; set false only if type would be unreadable.\n' +
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
-    'Category titles (Little Bells / Desserts / Sides / Sandwiches / Burgers / Classics) MUST share that top baseline. ' +
-    'That includes the page-2 Sides column beside the Sandwiches frilly box — same rule as Little Bells vs Desserts. ' +
-    'Frilly frames sit UNDER the title — they must not drop a heading below its neighbour. ' +
-    'A little leftover under the shorter stack MUST get a small feature panel (panels:1). ' +
-    'Do not leave a blank band under kids plates, puddings, sides or sandwiches. ' +
+    'Unframed titles (Little Bells / Sides) sit as pair-head with their dish text. ' +
+    'A frilly column puts its title INSIDE the frame with the dishes (Desserts / Sandwiches) — never perched above the outer wave. ' +
+    'A little leftover under the shorter stack gets a SMALL evergreen panel (Stay a While / Gatherings) only if it fits with a decent gap after the food. ' +
+    'Never auto-pick a dated event (Sip & Paint) as leftover under kids or puddings — skip it rather than sit flush under the category or overshoot the other column. ' +
+    'Do not leave a blank band under kids plates, puddings, sides or sandwiches when a small panel would fit. ' +
     'Solo column (no food partner) stays half-width; do not fill the empty half with rooms copy.\n' +
     '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +

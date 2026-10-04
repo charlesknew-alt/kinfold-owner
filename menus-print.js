@@ -578,9 +578,61 @@
   }
 
   /**
+   * Height of a leftover feature panel. Long dated events (Sip & Paint) score
+   * much taller than Stay a While / Gatherings.
+   */
+  var FEATURE_GAP_UNITS = 2.4;
+  function promoUnits(p) {
+    if (!p) return 0;
+    var body = String(p.body || '');
+    var u = 3.4;
+    u += 1.8;
+    if (p.date) u += 0.7;
+    u += 1 + Math.floor(body.length / 58);
+    return u;
+  }
+
+  /**
+   * Leftover under food (kids|desserts) may only take a small evergreen box.
+   * Dated events (Sip & Paint) are never auto-picked into that hole.
+   */
+  function isSmallLeftoverPromo(p) {
+    if (!p || !p.title || p.date) return false;
+    return promoUnits(p) <= 8.5;
+  }
+
+  /**
+   * Smallest panel(s) that fit leftover. withGap (kids leftover) reserves a
+   * decent band after the food and only allows Stay a While / Gatherings-size
+   * copy; page-1 events fill skips that so rooms copy can still sit in an even column.
+   */
+  function pickFittingPromos(pool, leftover, n, withGap) {
+    var list = (pool || []).slice();
+    if (withGap) list = list.filter(isSmallLeftoverPromo);
+    var budget = (leftover || 0) - (withGap ? FEATURE_GAP_UNITS : 0);
+    if (budget < 4 || !list.length || n < 1) return [];
+    var ranked = list.slice().sort(function (a, b) {
+      return promoUnits(a) - promoUnits(b);
+    });
+    var out = [];
+    var used = 0;
+    ranked.forEach(function (p) {
+      if (out.length >= n) return;
+      var u = promoUnits(p);
+      if (used + u <= budget) {
+        out.push(p);
+        used += u;
+      }
+    });
+    return out;
+  }
+
+  /**
    * Place feature panels only to even opposite columns.
    * leftFood / rightFood = rough height units of the food stacks.
    * Positive (rightFood - leftFood) means the LEFT column is shorter → fill left.
+   * A panel must FIT the leftover minus a gap — skip long events that would
+   * sit flush under the category or overshoot the taller food column.
    * opts.force = { shorter:'left'|'right'|'even', panels:0|1|2 } from Gemini
    * opts.excludeTitles = titles already printed on an earlier page (never reuse).
    * Returns usedTitles so the next page can skip them.
@@ -608,77 +660,78 @@
       di += 1;
     }
 
-    function stackForShort(side, panels) {
+    function stackForShort(side, panels, leftover) {
       var kind = side === 'left' ? leftKind : rightKind;
       var alt = kind === 'box' ? 'wide' : 'box';
       var n = Math.max(0, Math.min(2, parseInt(panels, 10) || 0));
-      var used = [];
-      var html = '';
-      if (!pool.length || n < 1) {
-        if (side === 'left') return { left: '', right: '', note: 'No unused panels left', usedTitles: used };
-        return { left: '', right: '', note: 'No unused panels left', usedTitles: used };
+      var hole = leftover != null ? leftover : Math.abs((rightFood || 0) - (leftFood || 0));
+      var fit = pickFittingPromos(pool, hole, n, !!opts.shortOnly);
+      if (!fit.length) {
+        return { left: '', right: '', note: 'Leftover too small for a feature panel', usedTitles: [] };
       }
-      if (n >= 2 && pool.length >= 2) {
-        used = [pool[0].title, pool[1].title];
-        html = renderOnePromoBox([pool[0]], kind) + renderOnePromoBox([pool[1]], alt);
-      } else {
-        var take = Math.min(n === 1 ? 1 : Math.min(2, pool.length), pool.length);
-        used = pool.slice(0, take).map(function (p) { return p.title; });
-        html = renderOnePromoBox(pool.slice(0, take), kind);
-      }
+      var used = fit.map(function (p) { return p.title; });
+      var html = fit.length >= 2
+        ? renderOnePromoBox([fit[0]], kind) + renderOnePromoBox([fit[1]], alt)
+        : renderOnePromoBox(fit, kind);
       if (side === 'left') {
         return { left: html, right: '', note: 'Feature under shorter left column', usedTitles: used };
       }
       return { left: '', right: html, note: 'Feature under shorter right column', usedTitles: used };
     }
 
+    var gap = (rightFood || 0) - (leftFood || 0);
+    var hole = Math.abs(gap);
     var force = opts.force || null;
     if (force && force.shorter && force.shorter !== 'even') {
       var forcedPanels = Math.max(1, Math.min(2, parseInt(force.panels, 10) || 1));
-      // Prefer one little promo — two stacked panels only for huge holes.
-      if (forcedPanels > 1 && Math.abs((rightFood || 0) - (leftFood || 0)) < 12) forcedPanels = 1;
-      // Only ask for as many panels as we still have unused titles.
+      if (forcedPanels > 1 && hole < 12) forcedPanels = 1;
       forcedPanels = Math.min(forcedPanels, Math.max(1, pool.length));
       if (!pool.length) {
         return { left: '', right: '', note: 'No unused feature panels left', usedTitles: [] };
       }
       if (force.shorter === 'left' || force.shorter === 'right') {
-        return stackForShort(force.shorter, forcedPanels);
+        return stackForShort(force.shorter, forcedPanels, hole);
       }
     }
 
-    var gap = (rightFood || 0) - (leftFood || 0);
     // Food pairs: only plug the shorter column. Never add a panel under both
     // when the stacks are already close — that inflates the taller puddings.
     if (opts.shortOnly) {
-      if (gap > 1.2) return stackForShort('left', gap > 9 ? 2 : 1);
-      if (gap < -1.2) return stackForShort('right', -gap > 9 ? 2 : 1);
+      if (gap > 1.2) return stackForShort('left', gap > 9 ? 2 : 1, hole);
+      if (gap < -1.2) return stackForShort('right', -gap > 9 ? 2 : 1, hole);
       return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
     }
-    if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1);
-    if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1);
+    if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1, hole);
+    if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1, hole);
     if (pool.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
-      return {
-        left: renderOnePromoBox([pool[0]], leftKind),
-        right: renderOnePromoBox([pool[1]], rightKind),
-        note: 'Paired feature panels (even columns)',
-        usedTitles: [pool[0].title, pool[1].title]
-      };
+      var evenFit = pickFittingPromos(pool, 8, 2);
+      if (evenFit.length >= 2) {
+        return {
+          left: renderOnePromoBox([evenFit[0]], leftKind),
+          right: renderOnePromoBox([evenFit[1]], rightKind),
+          note: 'Paired feature panels (even columns)',
+          usedTitles: [evenFit[0].title, evenFit[1].title]
+        };
+      }
     }
     if (pool.length && Math.abs(gap) <= 2.5) {
+      var one = pickFittingPromos(pool, 8, 1);
+      if (!one.length) {
+        return { left: '', right: '', note: 'No feature panels — leftover too small', usedTitles: [] };
+      }
       if (gap >= 0) {
         return {
-          left: renderOnePromoBox([pool[0]], leftKind),
+          left: renderOnePromoBox(one, leftKind),
           right: '',
           note: 'One panel on left',
-          usedTitles: [pool[0].title]
+          usedTitles: [one[0].title]
         };
       }
       return {
         left: '',
-        right: renderOnePromoBox([pool[0]], rightKind),
+        right: renderOnePromoBox(one, rightKind),
         note: 'One panel on right',
-        usedTitles: [pool[0].title]
+        usedTitles: [one[0].title]
       };
     }
     return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
@@ -1815,15 +1868,30 @@
     return !!(rule && String(rule.width || '').toLowerCase() === 'column');
   }
 
-  /** Category title outside any scallop so opposite columns share a baseline. */
+  /** Category title outside any scallop so an unframed column lines up with its dishes. */
   function pairHeadHtml(title) {
     if (!title) return '';
     return '<div class="promo-head pair-head"><span class="sec-title">' + esc(title) + '</span></div>';
   }
 
+  function innerHasSectionTitle(inner, title) {
+    var t = String(title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!t) return true;
+    return new RegExp('(sec-title|promo-title)[^>]*>\\s*' + t + '\\s*<', 'i').test(String(inner || ''));
+  }
+
+  /** Frilly column: sit the category title inside the frame with the dishes. */
+  function nestTitleInFrilly(title, inner) {
+    inner = String(inner || '');
+    if (!title || innerHasSectionTitle(inner, title)) return inner;
+    if (inner.indexOf('<div class="scallop-pad">') === -1) return inner;
+    return inner.replace('<div class="scallop-pad">', '<div class="scallop-pad">' + sectionTitle(title));
+  }
+
   /**
    * GOLDEN RULE: opposite columns start and finish level.
-   * Category titles sit in a pair-head row (not inside a frilly frame).
+   * Frilly food boxes carry their category title inside the frame.
+   * Unframed neighbours keep a pair-head so the title lines up with dish text.
    * Food on both sides first; a small feature panel under the shorter stack only.
    */
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
@@ -1861,12 +1929,20 @@
     if (opts.leftTitle || opts.rightTitle) {
       colsClass = (colsClass ? colsClass + ' ' : '') + 'cols-pair-titles';
     }
+    var leftHtml = String(leftInner || '');
+    var rightHtml = String(rightInner || '');
+    var leftFrilly = /class="[^"]*scallop/.test(leftHtml);
+    var rightFrilly = /class="[^"]*scallop/.test(rightHtml);
+    if (leftFrilly) leftHtml = nestTitleInFrilly(opts.leftTitle, leftHtml);
+    if (rightFrilly) rightHtml = nestTitleInFrilly(opts.rightTitle, rightHtml);
+    var leftHead = (!leftFrilly && opts.leftTitle) ? pairHeadHtml(opts.leftTitle) : '';
+    var rightHead = (!rightFrilly && opts.rightTitle) ? pairHeadHtml(opts.rightTitle) : '';
     var html = '<section class="sec ' + secClass + '">' +
       '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
-      '<div class="col ' + leftClass + '">' + pairHeadHtml(opts.leftTitle) +
-        '<div class="col-body">' + leftInner + '</div>' + leftFeat + '</div>' +
-      '<div class="col ' + rightClass + '">' + pairHeadHtml(opts.rightTitle) +
-        '<div class="col-body">' + rightInner + '</div>' + rightFeat + '</div>' +
+      '<div class="col ' + leftClass + '">' + leftHead +
+        '<div class="col-body">' + leftHtml + '</div>' + leftFeat + '</div>' +
+      '<div class="col ' + rightClass + '">' + rightHead +
+        '<div class="col-body">' + rightHtml + '</div>' + rightFeat + '</div>' +
       '</div>' + (opts.footer || '') + '</section>';
     return { html: html, usedTitles: fill.usedTitles || [] };
   }
@@ -1906,8 +1982,9 @@
    * Little Bells respects this host menu’s Blocks width.
    * Column stays a column; Full width stays full-bleed. Drop-in wording
    * (offer / Sunday line) stays in the Little Bells area — never across Desserts.
-   * Opposite food columns share a pair-head so titles line up; a small feature
-   * panel drops into leftover space under the shorter stack.
+   * Frilly partner (Desserts) keeps its title inside the frame; unframed
+   * Little Bells keeps a pair-head. A small feature panel drops into leftover
+   * space under the shorter stack when it fits with a gap.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
     opts = opts || {};
@@ -1933,13 +2010,14 @@
         usedPromoTitles: []
       };
     }
-    // Titles live in pair-head (outside any scallop) so both columns share a baseline.
+    // Frilly titles print inside the box (same as Nibbles / Sunday Roasts).
+    // Unframed titles are lifted to pair-head so they line up with dish text.
     kidsInner = sectionBlock(
       bag.littleBells.name,
       bag.littleBells.dishes,
       littleRule,
       frameKind,
-      { hideTitle: true, noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
+      { hideTitle: !(littleRule && littleRule.frame), noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
     );
     var kidsU = columnFillUnits(bag.littleBells, littleRule, extras.slots.above) +
       noteUnits(extras.slots.below);
@@ -1947,7 +2025,7 @@
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
       var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide', {
-        hideTitle: true
+        hideTitle: !(dessRule && dessRule.frame)
       });
       var dessU = columnFillUnits(bag.desserts, dessRule, dessRule && dessRule.note);
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
@@ -1973,7 +2051,7 @@
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide', {
-        hideTitle: true
+        hideTitle: !(sideRule && sideRule.frame)
       });
       var sideU = columnFillUnits(sidesPrint, sideRule, sideRule && sideRule.note);
       var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
@@ -2444,7 +2522,7 @@
         sandwichesBlock(bag, {
           frame: sandRule.frame ? 'box' : undefined,
           rule: sandRule,
-          hideTitle: true
+          hideTitle: !(sandRule && sandRule.frame)
         }),
         sandU2,
         framedBlock(listDishes(bag.mains.dishes), mainRule),
@@ -2528,7 +2606,7 @@
         }
         if (!leftInner) leftInner = '&nbsp;';
         var rightInner = p2opts.sandwiches
-          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: true })
+          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: !(sandRule && sandRule.frame) })
           : '&nbsp;';
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
@@ -2839,7 +2917,7 @@
       '.cols-balanced .col-logo{flex:0 0 auto;display:flex;justify-content:flex-end;margin:0 0 8px}' +
       '.cols-balanced .col-logo .logo-tr{width:160px!important;margin:0}' +
       '.cols-with-logo{align-items:stretch;margin-top:0}' +
-      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px}' +
+      '.cols-balanced .col-feature,.cols-balanced .col-fill{margin-top:auto;padding-top:18px;flex:0 0 auto;min-width:0;width:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:10px}' +
       '.cols-balanced .col-feature > .scallop,.cols-balanced .col-fill > .scallop{width:100%;flex:0 0 auto}' +
       '.cols-balanced .col-feature > .scallop .scallop-pad,.cols-balanced .col-fill > .scallop .scallop-pad{flex:0 0 auto}' +
       '.sec-note{font-family:var(--sans);font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));color:#3a342c;line-height:1.35;margin:0 0 8px;font-weight:400;text-transform:none;letter-spacing:normal}' +
@@ -2870,13 +2948,13 @@
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
-      // Opposite-column titles sit outside scallops so SIDES / SANDWICHES
-      // (and LITTLE BELLS / DESSERTS) share a baseline.
+      // Unframed pair titles sit outside the food; frilly titles live in the scallop.
       '.cols-pair-titles{align-items:stretch}' +
       '.cols-pair-titles > .col > .pair-head{flex:0 0 auto;margin:0 0 var(--sec-gap)}' +
       '.cols-pair-titles > .col > .pair-head .sec-title{margin:0;text-align:left;letter-spacing:.12em}' +
       '.cols-pair-titles .col-body > .scallop,.cols-pair-titles .col-body > .sec-plain,' +
         '.cols-pair-titles .col-body > .sec-stack{margin-top:0}' +
+      '.cols-pair-titles .scallop-pad > .sec-title:first-child{text-align:left;margin-top:0}' +
       '.col-little .sec-title,.col-desserts .sec-title,.col-sides .sec-title{text-align:left;margin-top:0}' +
       '.sandwich-aligned{margin:0}' +
       '.cols-pair-titles .sandwich-aligned{margin:0}' +
@@ -3196,14 +3274,10 @@
               'if(Math.abs(lh-rh)<28)break;' +
               'var tall=lh>rh?left:right;' +
               'var short=lh>rh?right:left;' +
-              'var boxes=removableBoxes(tall);' +
+              'var boxes=removableBoxes(tall).filter(function(b){return b.closest&&b.closest(".col-feature");});' +
               'if(!boxes.length)break;' +
-              // Drop the last feature box on the taller side until heights match
+              // Oversized leftover panels must go — a quiet gap is better than overshooting.
               'var last=boxes[boxes.length-1];' +
-              'if(contentHeight(tall)-last.offsetHeight+12<contentHeight(short)-8){' +
-                // Removing would undershoot badly — keep and stop
-                'break;' +
-              '}' +
               'last.parentNode.removeChild(last);' +
             '}' +
             // Feature panels stay content-sized — do not stretch them to match
@@ -4238,6 +4312,7 @@
     emailPrintHtml: emailPrintHtml,
     historyCloudUrl: historyCloudUrl,
     measureOppositeColumns: measureOppositeColumns,
-    planPromoFill: planPromoFill
+    planPromoFill: planPromoFill,
+    promoUnits: promoUnits
   };
 })(typeof window !== 'undefined' ? window : global);

@@ -164,9 +164,11 @@ assert(printJs.indexOf('if (opts.force) fillOpts.force = opts.force') !== -1,
 assert(printJs.indexOf('skipPromos: true') !== -1,
   'solo column pairs skip Stay a While in the empty opposite half');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
-  'opposite food columns lift category titles into a shared pair-head');
+  'unframed opposite columns keep category titles in a pair-head');
+assert(printJs.indexOf('function nestTitleInFrilly') !== -1,
+  'frilly columns put the category title inside the food frame');
 assert(printJs.indexOf('sides-sand-row') !== -1 && printJs.indexOf("rightTitle: p2opts.sandwiches ? 'Sandwiches'") !== -1,
-  'Sides|Sandwiches bottom pair uses the same pair-head baseline');
+  'Sides|Sandwiches bottom pair still shares the column-pair layout');
 assert(printJs.indexOf('shortOnly: true') !== -1,
   'kids|desserts leftover space gets a small panel under the shorter column only');
 assert(printJs.indexOf('function wrapUnits') !== -1 && printJs.indexOf('function columnFillUnits') !== -1,
@@ -447,12 +449,12 @@ assert(ingestJs.indexOf('reviewLayout') !== -1, 'ingest can ask Gemini to review
 assert(aiGs.indexOf('reviewLayoutWithGemini_') !== -1, 'Apps Script supports layout review action');
 assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Classics') !== -1,
   'Gemini layout prompt has Eight Bells golden rules');
-assert(aiGs.indexOf('Frilly frames sit UNDER') !== -1 && aiGs.indexOf('Little Bells vs Desserts') !== -1,
-  'Gemini layout rule: titles share a baseline; leftover gets a small panel on every pair');
+assert(aiGs.indexOf('INSIDE the frame') !== -1 && aiGs.indexOf('Sip & Paint') !== -1,
+  'Gemini layout rule: frilly titles sit in the box; leftover panels must fit with a gap');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow139') !== -1, 'menus page cache-bust is flow139');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow139') !== -1, 'hub menus link cache-bust is flow139');
+assert(page.indexOf('flow142') !== -1, 'menus page cache-bust is flow142');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow142') !== -1, 'hub menus link cache-bust is flow142');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1213,13 +1215,15 @@ var kidsColHtml = print.build(api.menuById('sunday'), kidsColDishes, {
 assert(/cols-little-desserts/.test(kidsColHtml) && /col-little/.test(kidsColHtml),
   'Blocks Column puts Little Bells beside Desserts');
 var kidsDessRow = (kidsColHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(kidsDessRow && /cols-pair-titles/.test(kidsDessRow) && /pair-head/.test(kidsDessRow),
-  'kids|desserts titles sit in a pair-head so they share a baseline');
-assert(/pair-head[\s\S]*Little Bells/.test(kidsDessRow) && /pair-head[\s\S]*Desserts/.test(kidsDessRow),
-  'LITTLE BELLS and DESSERTS titles both print in the pair-head row');
+assert(kidsDessRow && /cols-pair-titles/.test(kidsDessRow) && /pair-head[\s\S]*Desserts/.test(kidsDessRow),
+  'unframed Desserts keeps a pair-head beside framed Little Bells');
+assert(/col-little[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Little Bells<\/div>/.test(kidsDessRow),
+  'frilly Little Bells title sits inside the kids frame');
+assert(!/pair-head[\s\S]*Little Bells/.test(kidsDessRow),
+  'frilly Little Bells does not perch its title above the outer wave');
 var kidsDessColBody = kidsDessRow.replace(/<div class="promo-head pair-head">[\s\S]*?<\/div>/g, '');
 assert(!/<div class="sec-title">Desserts<\/div>/.test(kidsDessColBody),
-  'Desserts title is not nested inside the scallop (that dropped it below Little Bells)');
+  'unframed Desserts title stays out of any scallop');
 var tallDessKidsHtml = print.build(api.menuById('sunday'), [
   api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
   api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
@@ -1246,6 +1250,11 @@ var tallDessKidsHtml = print.build(api.menuById('sunday'), [
     Desserts: { width: 'column', frame: true, note: '' }
   }),
   promos: [
+    {
+      title: 'Sip & Paint',
+      date: '2025-10-28',
+      body: 'Weds 28th Oct from 7pm. Join us at the pub for a relaxed evening painting an autumnal picture, enjoying a drink and having something to nibble while you get creative. Bring a friend, settle in and enjoy a cosy evening of painting and good company. Please book in advance.'
+    },
     { title: 'Stay a While', body: 'cosy rooms upstairs' },
     { title: 'Gatherings', body: 'happy to host your event' },
     { title: 'Pub Quiz', body: 'quiz night tonight' },
@@ -1253,10 +1262,18 @@ var tallDessKidsHtml = print.build(api.menuById('sunday'), [
   ]
 });
 var tallDessRow = (tallDessKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(/cols-little-desserts/.test(tallDessRow) && /pair-head/.test(tallDessRow),
-  'Sunday kids|desserts pair keeps titles in a pair-head');
-assert(/col-little[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz|How are we doing)/i.test(tallDessRow),
-  'leftover space under shorter Little Bells gets a small feature panel');
+assert(/cols-little-desserts/.test(tallDessRow) && /pair-head[\s\S]*Little Bells/.test(tallDessRow),
+  'unframed Little Bells keeps its title as pair-head beside Desserts');
+assert(/col-desserts[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Desserts<\/div>/.test(tallDessRow),
+  'frilly Desserts title sits inside the scallop with the puddings');
+assert(!/col-desserts[\s\S]*pair-head/.test(tallDessRow),
+  'frilly Desserts does not perch its title above the outer wave');
+assert(!/col-little[\s\S]*col-feature[\s\S]*Sip & Paint/i.test(tallDessRow),
+  'leftover under Little Bells does not auto-pick an oversized Sip & Paint');
+if (/col-little[\s\S]*col-feature/.test(tallDessRow)) {
+  assert(/col-little[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz|How are we doing)/i.test(tallDessRow),
+    'leftover space under shorter Little Bells gets a small feature panel when it fits');
+}
 assert(!/col-desserts[\s\S]*col-feature/.test(tallDessRow),
   'the leftover panel stays in the Little Bells column — not under Desserts');
 assert(/col-little[\s\S]*a choice of roasts[\s\S]*col-desserts/.test(tallDessRow),
@@ -1539,6 +1556,45 @@ assert(dayA[0].id !== dayB[0].id || dayA[1].id !== dayB[1].id,
   'evergreen bank wording rotates by calendar day');
 assert(printJs.indexOf('planPromoFill') !== -1 && printJs.indexOf('promoBesidePartner') !== -1,
   'feature panels placed only to even opposite columns');
+assert(typeof printApi.promoUnits === 'function' && typeof printApi.planPromoFill === 'function',
+  'promo fit helpers are exported');
+(function leftoverPromoFit() {
+  var sip = {
+    title: 'Sip & Paint',
+    date: '2025-10-28',
+    body: 'Weds 28th Oct from 7pm. Join us at the pub for a relaxed evening painting an autumnal picture, enjoying a drink and having something to nibble while you get creative. Bring a friend, settle in and enjoy a cosy evening of painting and good company. Please book in advance.'
+  };
+  var stay = {
+    title: 'Stay a While',
+    body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.'
+  };
+  var gatherings = {
+    title: 'Gatherings',
+    body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event'
+  };
+  assert(printApi.promoUnits(sip) > printApi.promoUnits(stay) &&
+    printApi.promoUnits(sip) > printApi.promoUnits(gatherings),
+    'Sip & Paint scores taller than Stay a While / Gatherings');
+  var modest = printApi.planPromoFill(8, 20, [sip, stay, gatherings], { shortOnly: true });
+  assert(modest.usedTitles.indexOf('Sip & Paint') === -1,
+    'modest leftover skips oversized Sip & Paint');
+  assert(modest.usedTitles.indexOf('Stay a While') !== -1 || modest.usedTitles.indexOf('Gatherings') !== -1,
+    'modest leftover prefers a small Stay a While / Gatherings panel');
+  var cramped = printApi.planPromoFill(10, 18, [sip], {
+    shortOnly: true,
+    excludeTitles: ['Stay a While', 'Gatherings']
+  });
+  assert(!cramped.left && !cramped.right && cramped.usedTitles.length === 0,
+    'skip a leftover panel when only an oversized dated event would fit');
+  var hugeSip = printApi.planPromoFill(4, 28, [sip], {
+    shortOnly: true,
+    excludeTitles: ['Stay a While', 'Gatherings']
+  });
+  assert(hugeSip.usedTitles.indexOf('Sip & Paint') === -1 && hugeSip.usedTitles.length === 0,
+    'dated Sip & Paint is never a leftover filler under kids even when the hole is large');
+  assert(printJs.indexOf('padding-top:18px') !== -1 && printJs.indexOf('FEATURE_GAP_UNITS') !== -1,
+    'feature boxes keep a decent gap after the category');
+})();
 assert(printJs.indexOf('orphanColumnHole') !== -1 && printJs.indexOf('footPromoPair') !== -1,
   'orphan Sandwiches/Sides span full-width with two foot feature panels');
 assert(printJs.indexOf('balanceOppositeColumns') !== -1,
@@ -1968,8 +2024,10 @@ assert(/sheet-offer/.test(embedKidsHtml) && /lb-price-line/.test(embedKidsHtml),
   'Sunday £9.50 offer prints as a sheet offer, larger than dish names');
 assert(/viewport/.test(embedKidsHtml) && /preview-clip/.test(embedKidsHtml),
   'preview HTML includes viewport tag and overflow clip');
-assert(/cols-pair-titles/.test(embedKidsRow) && /pair-head/.test(embedKidsRow),
-  'Sunday kids|desserts titles share a pair-head so they line up');
+assert(/cols-pair-titles/.test(embedKidsRow) && /pair-head[\s\S]*Little Bells/.test(embedKidsRow),
+  'unframed Little Bells keeps a pair-head beside frilly Desserts');
+assert(/col-desserts[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Desserts<\/div>/.test(embedKidsRow),
+  'embedded Sunday Desserts title sits inside the frilly box');
 var embedKidsWithRooms = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
@@ -2270,12 +2328,12 @@ assert(sidesSandPlan.p2 && sidesSandPlan.p2.sandwiches && sidesSandPlan.p2.sides
 var clipHtml = print.build(mainMenu, sidesSandDishes, sidesSandPlan);
 var clipA4 = clipHtml.split('mode-panel mode-a5')[0] || clipHtml;
 var sidesSandRow = (clipA4.match(/sides-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(sidesSandRow && /cols-pair-titles/.test(sidesSandRow) && /pair-head/.test(sidesSandRow),
-  'Sides and Sandwiches titles share a pair-head baseline');
-assert(/pair-head[\s\S]*Sides/.test(sidesSandRow) && /pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
-  'pair-head carries both Sides and Sandwiches');
-assert(/pair-head[\s\S]*Sandwiches[\s\S]*scallop/.test(sidesSandRow),
-  'Sandwiches title sits outside the frilly frame so it lines up with Sides');
+assert(sidesSandRow && /cols-pair-titles/.test(sidesSandRow) && /pair-head[\s\S]*Sides/.test(sidesSandRow),
+  'unframed Sides keeps a pair-head beside Sandwiches');
+assert(/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSandRow),
+  'frilly Sandwiches title sits inside the frame with the fillings');
+assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
+  'Sandwiches title is not perched above the outer wave');
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 
 var alone = api.sheetPlanFor(book, 'main', {});
