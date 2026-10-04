@@ -2620,8 +2620,9 @@
    * sell: selling words for the tip box (used when tip is on / no fillings)
    *
    * Opposite-column pairs (any two Column / Best-fit sections side by side):
-   * titles share a baseline (frilly frames sit under the heading);
-   * leftover space under the shorter stack gets a small feature panel.
+   * frilly titles sit inside the frame with the dishes; unframed titles stay
+   * as pair-head. Leftover under the shorter stack gets a small feature panel
+   * only when it fits with a gap.
    */
   var DEFAULT_SECTION_LAYOUT = {
     Nibbles: { width: 'column', frame: true, note: '' },
