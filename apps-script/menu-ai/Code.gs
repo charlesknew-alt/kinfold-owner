@@ -465,7 +465,9 @@ function reviewLayoutWithGemini_(body) {
     'Never auto-pick a dated event (Sip & Paint) as leftover under kids or puddings — skip it rather than sit flush under the category or overshoot the other column. ' +
     'Do not leave a blank band under kids plates, puddings, sides or sandwiches when a small panel would fit. ' +
     'Solo column (no food partner) stays half-width; do not fill the empty half with rooms copy.\n' +
-    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly.\n' +
+    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly. ' +
+    'Content must NEVER fall off the page. Drop leftover feature panels and foot logos before hiding a dish. ' +
+    'Two pages if one would clip at minimum type; never clip food.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
     '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
     '5. PAGE 1: LEFT often Sharing/events; RIGHT = Burgers then Pub Classics. Sandwiches prefer page 2 column.\n' +
