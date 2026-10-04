@@ -22,6 +22,110 @@
     return id === 'main' || id === 'main-next';
   }
 
+  function clonePlain_(value) {
+    if (value == null) return value;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (e) {
+      return value;
+    }
+  }
+
+  function cloneTickMap_(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    Object.keys(raw).forEach(function (k) {
+      if (raw[k]) out[k] = true;
+    });
+    return out;
+  }
+
+  /**
+   * Copy one long sheet onto another: dishes, Blocks, includes, promo ticks, meta.
+   * Source is unchanged. Destination is replaced with clones (not shared refs).
+   */
+  function copyLongSheetState(state, fromId, toId) {
+    state = state || {};
+    var book = state.book && typeof state.book === 'object' ? state.book : {};
+    var layoutBook = state.layoutBook && typeof state.layoutBook === 'object' ? state.layoutBook : {};
+    var includes = state.includes && typeof state.includes === 'object' ? state.includes : {};
+    var promoTicks = state.promoTicks && typeof state.promoTicks === 'object' ? state.promoTicks : {};
+    var metaBook = state.metaBook && typeof state.metaBook === 'object' ? state.metaBook : {};
+    fromId = String(fromId || '');
+    toId = String(toId || '');
+    if (!fromId || !toId || fromId === toId) {
+      return { ok: false, error: 'Pick two different menus to copy.', book: book, layoutBook: layoutBook,
+        includes: includes, promoTicks: promoTicks, metaBook: metaBook };
+    }
+    var srcList = Array.isArray(book[fromId]) ? book[fromId] : [];
+    book[toId] = srcList.map(function (d) {
+      return dishFromCatalogueEntry(d, { menuId: toId, lunchClub: !!(d && d.lunchClub) });
+    });
+    layoutBook[toId] = normalizeSectionLayout(layoutBook[fromId] || {});
+    includes[toId] = cloneTickMap_(includes[fromId]);
+    promoTicks[toId] = cloneTickMap_(promoTicks[fromId]);
+    metaBook[toId] = normalizeMeta(metaBook[fromId] || {});
+    return {
+      ok: true,
+      copied: book[toId].length,
+      from: fromId,
+      to: toId,
+      book: book,
+      layoutBook: layoutBook,
+      includes: includes,
+      promoTicks: promoTicks,
+      metaBook: metaBook
+    };
+  }
+
+  /**
+   * Make Main (upcoming) the live Main, then clear upcoming for the next change.
+   * Moves dishes, Blocks, includes, promo ticks and meta — does not park the old
+   * live sheet on upcoming.
+   */
+  function promoteUpcomingMain(state) {
+    state = state || {};
+    var book = state.book && typeof state.book === 'object' ? state.book : {};
+    var layoutBook = state.layoutBook && typeof state.layoutBook === 'object' ? state.layoutBook : {};
+    var includes = state.includes && typeof state.includes === 'object' ? state.includes : {};
+    var promoTicks = state.promoTicks && typeof state.promoTicks === 'object' ? state.promoTicks : {};
+    var metaBook = state.metaBook && typeof state.metaBook === 'object' ? state.metaBook : {};
+    var moved = Array.isArray(book['main-next']) ? book['main-next'] : [];
+    book.main = moved;
+    book['main-next'] = [];
+    layoutBook.main = normalizeSectionLayout(layoutBook['main-next'] || {});
+    layoutBook['main-next'] = defaultSectionLayout();
+    includes.main = cloneTickMap_(includes['main-next']);
+    includes['main-next'] = {};
+    promoTicks.main = cloneTickMap_(promoTicks['main-next']);
+    promoTicks['main-next'] = {};
+    metaBook.main = normalizeMeta(metaBook['main-next'] || {});
+    metaBook['main-next'] = emptyMeta();
+    return {
+      ok: true,
+      moved: moved.length,
+      book: book,
+      layoutBook: layoutBook,
+      includes: includes,
+      promoTicks: promoTicks,
+      metaBook: metaBook
+    };
+  }
+
+  /** Keep a card menu’s own Blocks for this category — never copy the host sheet’s rules. */
+  function retainDestSectionLayout_(layoutBook, destId, section) {
+    if (!layoutBook || !destId || !section) return null;
+    var existing = layoutBook[destId];
+    if (!existing || typeof existing !== 'object') return null;
+    var kept = existing[section] ? clonePlain_(existing[section]) : null;
+    layoutBook[destId] = normalizeSectionLayout(existing);
+    if (kept) {
+      layoutBook[destId][section] = Object.assign({}, layoutBook[destId][section], kept);
+      layoutBook[destId] = normalizeSectionLayout(layoutBook[destId]);
+    }
+    return layoutBook[destId][section] || null;
+  }
+
   /** Canonical sections staff pick from — print layout keys off these. */
   var SECTIONS = [
     'Nibbles',
@@ -848,6 +952,7 @@
       if (!opts.includes[hostId]) opts.includes[hostId] = {};
       opts.includes[hostId][dest.id] = true;
     }
+    var keptLayout = retainDestSectionLayout_(opts.layoutBook, dest.id, destSection);
     return {
       ok: true,
       moved: clones.length,
@@ -855,7 +960,8 @@
       from: hostId,
       to: dest.id,
       section: section,
-      destName: dest.name
+      destName: dest.name,
+      keptLayout: keptLayout
     };
   }
 
@@ -2965,6 +3071,8 @@
     OUTSIDE_KINDS: OUTSIDE_KINDS,
     normalizeOutsideKind: normalizeOutsideKind,
     isMainSheet: isMainSheet,
+    copyLongSheetState: copyLongSheetState,
+    promoteUpcomingMain: promoteUpcomingMain,
     seed: seed,
     menuById: menuById,
     applyExtras: applyExtras,

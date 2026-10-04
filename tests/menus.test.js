@@ -315,6 +315,63 @@ assert(Array.isArray(api.seed()['main-next']) && api.seed()['main-next'].length 
   'seed leaves Main (upcoming) empty');
 assert(page.indexOf('main-next') !== -1 && page.indexOf('Swap Main') !== -1,
   'UI offers Main (upcoming) with swap/copy controls');
+assert(page.indexOf('copyLongSheetState') !== -1 && page.indexOf('Blocks, includes and wording ticks') !== -1,
+  'copy upcoming into live Main takes Blocks with the dishes');
+assert(typeof api.copyLongSheetState === 'function' && typeof api.promoteUpcomingMain === 'function',
+  'copy and promote upcoming helpers are exported');
+(function upcomingTakesBlocks() {
+  var srcLayout = api.normalizeSectionLayout({
+    Desserts: { width: 'column', frame: true, note: 'upcoming puds' },
+    Nibbles: { width: 'full', frame: false, note: '' }
+  });
+  var liveLayout = api.normalizeSectionLayout({
+    Desserts: { width: 'full', frame: false, note: 'old puds' }
+  });
+  var copied = api.copyLongSheetState({
+    book: {
+      main: [api.dish('Mains', 'Old pie', '', '16', '')],
+      'main-next': [api.dish('Mains', 'New hake', '', '25', ''), api.dish('Desserts', 'Posset', '', '8', '')]
+    },
+    layoutBook: { main: liveLayout, 'main-next': srcLayout },
+    includes: { main: { desserts: true }, 'main-next': { sandwiches: true } },
+    promoTicks: { main: { quiz: true }, 'main-next': { gatherings: true } },
+    metaBook: { main: { title: 'Old' }, 'main-next': { title: 'New' } }
+  }, 'main-next', 'main');
+  assert(copied.ok && copied.copied === 2 && copied.book.main[0].name === 'New hake',
+    'copy upcoming onto live Main replaces the dishes');
+  assert(copied.book['main-next'].length === 2 && copied.book['main-next'][0].name === 'New hake',
+    'copy leaves upcoming dishes in place');
+  assert(copied.layoutBook.main.Desserts.frame === true &&
+    copied.layoutBook.main.Desserts.width === 'column' &&
+    copied.layoutBook.main.Desserts.note === 'upcoming puds',
+    'copy upcoming onto live Main takes all Blocks setups');
+  assert(copied.layoutBook['main-next'].Desserts.frame === true,
+    'upcoming keeps its own Blocks after the copy');
+  copied.layoutBook.main.Desserts.frame = false;
+  assert(copied.layoutBook['main-next'].Desserts.frame === true,
+    'copied Blocks are cloned, not a shared object');
+  assert(copied.includes.main.sandwiches === true && copied.includes['main-next'].sandwiches === true,
+    'copy upcoming includes onto live Main');
+  assert(copied.metaBook.main.title === 'New' && copied.metaBook['main-next'].title === 'New',
+    'copy upcoming meta onto live Main');
+  var promoted = api.promoteUpcomingMain({
+    book: {
+      main: [api.dish('Mains', 'Old pie', '', '16', '')],
+      'main-next': [api.dish('Mains', 'New hake', '', '25', '')]
+    },
+    layoutBook: { main: liveLayout, 'main-next': srcLayout },
+    includes: { main: { desserts: true }, 'main-next': { sandwiches: true } },
+    promoTicks: { main: { quiz: true }, 'main-next': { gatherings: true } },
+    metaBook: { main: { title: 'Old' }, 'main-next': { title: 'New' } }
+  });
+  assert(promoted.ok && promoted.book.main[0].name === 'New hake' && promoted.book['main-next'].length === 0,
+    'making upcoming live moves dishes then clears upcoming');
+  assert(promoted.layoutBook.main.Desserts.frame === true &&
+    promoted.layoutBook.main.Desserts.note === 'upcoming puds',
+    'making upcoming live takes upcoming Blocks');
+  assert(promoted.layoutBook['main-next'].Desserts.frame === false,
+    'upcoming Blocks reset after it is made live');
+})();
 assert(page.indexOf("'main-next'") !== -1 && /main-next/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
   'staff menu list includes Main (upcoming)');
 assert(page.indexOf('doAddExtraMenu') !== -1 && page.indexOf('doAddExtraSection') !== -1,
@@ -551,6 +608,38 @@ assert(pushBook.sandwiches.length === 2 && pushBook.sandwiches.every(function (d
 assert(pushBook.sandwiches.some(function (d) { return d.name === 'Tuna Melt'; }),
   'new fillings land on the Sandwiches menu');
 assert(pushInc.main.sandwiches === true, 'Sandwiches stay ticked so they still print on Main');
+(function pushKeepsDestBlocks() {
+  var hostHours = '(12 – 2.45 pm Mon to Fri)';
+  var cardSpiel = 'Served on either Ciabatta vg, Farmhouse White or Granary';
+  var layoutBook = {
+    main: api.normalizeSectionLayout({
+      Sandwiches: { width: 'column', frame: true, note: hostHours, tip: true }
+    }),
+    sandwiches: api.normalizeSectionLayout({
+      Sandwiches: { width: 'full', frame: false, note: cardSpiel, tip: false, below: cardSpiel }
+    })
+  };
+  var destBefore = layoutBook.sandwiches.Sandwiches.note;
+  var destFrame = layoutBook.sandwiches.Sandwiches.frame;
+  var destWidth = layoutBook.sandwiches.Sandwiches.width;
+  var res = api.pushSectionToOwnMenu({
+    main: [
+      api.dish('Sandwiches', 'Club', '', '11', ''),
+      api.dish('Mains', 'Pie', '', '16', '')
+    ],
+    sandwiches: [api.dish('Sandwiches', 'Old', '', '9', '')]
+  }, 'main', 'Sandwiches', { includes: { main: {} }, layoutBook: layoutBook });
+  assert(res.ok, 'push with layoutBook still sends Sandwiches');
+  assert(layoutBook.sandwiches.Sandwiches.note === destBefore,
+    'subcategory transfer keeps the Sandwiches card extra-info');
+  assert(layoutBook.sandwiches.Sandwiches.frame === destFrame &&
+    layoutBook.sandwiches.Sandwiches.width === destWidth,
+    'subcategory transfer keeps the Sandwiches card width and frilly setting');
+  assert(layoutBook.main.Sandwiches.note === hostHours,
+    'host sheet Blocks for Sandwiches are not rewritten by the push');
+  assert(page.indexOf('layoutBook: layoutBook') !== -1,
+    'send-to-own-menu passes Blocks through so the card rules can be kept');
+})();
 var specBook = {
   main: [
     api.dish('Special Mains', 'Pie special', '', '18', ''),
