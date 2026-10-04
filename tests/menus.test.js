@@ -439,8 +439,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow135') !== -1, 'menus page cache-bust is flow135');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow135') !== -1, 'hub menus link cache-bust is flow135');
+assert(page.indexOf('flow137') !== -1, 'menus page cache-bust is flow137');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow137') !== -1, 'hub menus link cache-bust is flow137');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -501,6 +501,96 @@ assert(aiGs.indexOf('readPostBody_') !== -1 && aiGs.indexOf('parameter.payload')
   'Menu AI accepts form field payload for iframe POSTs');
 assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,
   'each subcategory has an Add to section button');
+assert(page.indexOf('data-push-section') !== -1 && page.indexOf('Send to') !== -1,
+  'long sheets can send a category to its own menu in one go');
+assert(page.indexOf('doPushAllOwnPages') !== -1,
+  'Main can send every drop-in category to its own menu');
+assert(typeof api.ownPageMenuForSection === 'function' && api.ownPageMenuForSection('Sandwiches').id === 'sandwiches',
+  'Sandwiches category maps to the Sandwiches menu');
+assert(api.ownPageMenuForSection('Little Bells').id === 'little-bells' &&
+  api.ownPageMenuForSection('Special Mains').id === 'specials',
+  'Little Bells and Specials map to their own menus');
+var pushBook = {
+  main: [
+    api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+    api.dish('Sandwiches', 'Tuna Melt', '', '10.50', ''),
+    api.dish('Sandwiches', 'Fish Finger', '', '10.50', '')
+  ],
+  sandwiches: [
+    api.dish('Sandwiches', 'Old filling', '', '9.00', '')
+  ]
+};
+var pushInc = { main: {} };
+var pushRes = api.pushSectionToOwnMenu(pushBook, 'main', 'Sandwiches', { includes: pushInc });
+assert(pushRes.ok && pushRes.moved === 2 && pushRes.replaced === 1, 'push sends the whole Sandwiches section');
+assert(pushBook.main.length === 1 && pushBook.main[0].name === 'Pie of the Day',
+  'Sandwiches leave Main after the push');
+assert(pushBook.sandwiches.length === 2 && pushBook.sandwiches.every(function (d) { return d.name !== 'Old filling'; }),
+  'Sandwiches menu is replaced, not merged with the old list');
+assert(pushBook.sandwiches.some(function (d) { return d.name === 'Tuna Melt'; }),
+  'new fillings land on the Sandwiches menu');
+assert(pushInc.main.sandwiches === true, 'Sandwiches stay ticked so they still print on Main');
+var specBook = {
+  main: [
+    api.dish('Special Mains', 'Pie special', '', '18', ''),
+    api.dish('Mains', 'Hake', '', '25', '')
+  ],
+  specials: [
+    api.dish('Special Starters', 'Soup special', '', '8', ''),
+    api.dish('Special Mains', 'Old special pie', '', '17', '')
+  ]
+};
+var specRes = api.pushSectionToOwnMenu(specBook, 'main', 'Special Mains');
+assert(specRes.ok && specBook.specials.some(function (d) { return d.name === 'Soup special'; }),
+  'pushing Special Mains keeps Special Starters on the Specials board');
+assert(specBook.specials.some(function (d) { return d.name === 'Pie special'; }) &&
+  specBook.specials.every(function (d) { return d.name !== 'Old special pie'; }),
+  'Special Mains on the board are replaced');
+assert(!api.pushSectionToOwnMenu({ sandwiches: [api.dish('Sandwiches', 'X', '', '1', '')] }, 'sandwiches', 'Sandwiches').ok,
+  'cannot push a card menu onto itself');
+var bulkBook = {
+  main: [
+    api.dish('Desserts', 'Sticky Toffee', '', '8.25', ''),
+    api.dish('Little Bells', 'Fish Fingers', '', '', ''),
+    api.dish('Mains', 'Pie', '', '16', '')
+  ],
+  desserts: [],
+  'little-bells': [api.dish('Little Bells', 'Old kids', '', '', '')]
+};
+var bulkInc = { main: {} };
+var bulkRes = api.pushAllOwnPageSections(bulkBook, 'main', { includes: bulkInc });
+assert(bulkRes.ok && bulkRes.moved === 2, 'bulk send moves every drop-in category');
+assert(bulkBook.main.length === 1 && bulkBook.main[0].name === 'Pie', 'Mains stay on Main after bulk send');
+assert(bulkInc.main.desserts && bulkInc.main['little-bells'], 'bulk send ticks Desserts and Little Bells');
+var nextBook = {
+  'main-next': [
+    api.dish('Sandwiches', 'Club', '', '11', ''),
+    api.dish('Mains', 'Hake', '', '25', '')
+  ],
+  sandwiches: [api.dish('Sandwiches', 'Old next', '', '9', '')]
+};
+var nextInc = { 'main-next': {} };
+var nextRes = api.pushSectionToOwnMenu(nextBook, 'main-next', 'Sandwiches', { includes: nextInc });
+assert(nextRes.ok && nextBook['main-next'].length === 1 && nextBook['main-next'][0].name === 'Hake',
+  'Main (upcoming) can send Sandwiches to their own menu');
+assert(nextInc['main-next'].sandwiches === true, 'upcoming Main ticks Sandwiches after the push');
+api.resetExtras();
+var extraSec = api.addCustomSection('Bar snacks');
+var extraCard = api.addCustomMenu({ name: 'Bar snacks', kind: 'card' });
+assert(extraSec.ok && extraCard.ok && api.ownPageMenuForSection(extraSec.section).id === extraCard.menu.id,
+  'a custom category maps to a card menu of the same name');
+var extraBook = {
+  main: [
+    api.dish(extraSec.section, 'Nuts', '', '4', ''),
+    api.dish('Mains', 'Pie', '', '16', '')
+  ]
+};
+extraBook[extraCard.menu.id] = [api.dish(extraSec.section, 'Old nuts', '', '3', '')];
+var extraInc = { main: {} };
+var extraRes = api.pushSectionToOwnMenu(extraBook, 'main', extraSec.section, { includes: extraInc });
+assert(extraRes.ok && extraBook.main.length === 1 && extraBook[extraCard.menu.id][0].name === 'Nuts',
+  'custom drop-in category replaces its own card and leaves Main');
+api.resetExtras();
 assert(page.indexOf('pendingAddSection') !== -1 && page.indexOf('rememberScroll_') !== -1,
   'add-from-section pre-fills category and save keeps page place');
 assert(page.indexOf('data-view="panels"') !== -1 && page.indexOf('renderFeaturePanels') !== -1,
