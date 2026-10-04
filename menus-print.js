@@ -39,6 +39,19 @@
     return out;
   }
 
+  function romanToInt(s) {
+    var map = { M: 1000, D: 500, C: 100, L: 50, X: 10, V: 5, I: 1 };
+    s = String(s || '').toUpperCase().replace(/[^MDCLXVI]/g, '');
+    var n = 0;
+    var prev = 0;
+    for (var i = s.length - 1; i >= 0; i--) {
+      var v = map[s.charAt(i)] || 0;
+      n += v < prev ? -v : v;
+      prev = v;
+    }
+    return n;
+  }
+
   function weekStart(d) {
     d = d ? new Date(d) : new Date();
     var day = d.getDay(); // 0 Sun
@@ -120,9 +133,9 @@
     return sun.getFullYear() + '-' + (sun.getMonth() + 1) + '-' + sun.getDate();
   }
 
-  function printVersionStorageKey(menuId) {
+  function printVersionStorageKey(menuId, wk) {
     var isSunday = menuId === 'sunday';
-    return 'eb-print-ver-' + menuId + '-' + (isSunday ? sundayKey() : weekKey());
+    return 'eb-print-ver-' + menuId + '-' + (wk || (isSunday ? sundayKey() : weekKey()));
   }
 
   function printVersionMeta(menuId, n) {
@@ -136,21 +149,93 @@
     };
   }
 
-  /** Next Roman for preview — does not burn a number until Save to menus. */
+  function entryVersionN(row) {
+    var n = parseInt(row && row.n, 10);
+    if (n > 0) return n;
+    return romanToInt(row && row.roman) || 0;
+  }
+
+  var versionHistoryCache = [];
+
+  function rowMatchesVersionWeek(row, menuId, wk) {
+    if (!row || String(row.menuId || '') !== String(menuId || '')) return false;
+    var rowWk = String(row.weekKey || '');
+    if (rowWk) return rowWk === String(wk);
+    if (row.week) {
+      var curWeek = menuId === 'sunday' ? sundayLabel() : weekLabel();
+      return String(row.week) === String(curWeek);
+    }
+    if (row.generatedAt) {
+      var d = new Date(row.generatedAt);
+      var derived = menuId === 'sunday' ? sundayKey(d) : weekKey(d);
+      return derived === String(wk);
+    }
+    return false;
+  }
+
+  function maxHistoryPrintN(menuId, wk) {
+    wk = wk || (menuId === 'sunday' ? sundayKey() : weekKey());
+    var max = 0;
+    function consider(row) {
+      if (!rowMatchesVersionWeek(row, menuId, wk)) return;
+      var n = entryVersionN(row);
+      if (n > max) max = n;
+    }
+    try {
+      if (typeof lsLoadIndex === 'function') lsLoadIndex().forEach(consider);
+    } catch (e) {}
+    (versionHistoryCache || []).forEach(consider);
+    return max;
+  }
+
+  function readStoredPrintN(menuId, wk) {
+    try {
+      return parseInt(localStorage.getItem(printVersionStorageKey(menuId, wk)) || '0', 10) || 0;
+    } catch (e) { return 0; }
+  }
+
+  /**
+   * Next Roman comes from the higher of this device’s counter and Print history
+   * for the same menu + week. Varlo/iframe storage often resets, so Main (upcoming)
+   * stayed on I; history is shared across phones and is the source of truth.
+   */
   function peekPrintVersion(menuId) {
-    var n = 0;
-    try { n = parseInt(localStorage.getItem(printVersionStorageKey(menuId)) || '0', 10) || 0; } catch (e) {}
+    var wk = menuId === 'sunday' ? sundayKey() : weekKey();
+    var n = Math.max(readStoredPrintN(menuId, wk), maxHistoryPrintN(menuId, wk));
     return printVersionMeta(menuId, n + 1);
   }
 
   /** Stamp the next Roman when staff click Save to menus on the print sheet. */
   function commitPrintVersion(menuId) {
-    var key = printVersionStorageKey(menuId);
-    var n = 0;
-    try { n = parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch (e) {}
-    n += 1;
+    var wk = menuId === 'sunday' ? sundayKey() : weekKey();
+    var key = printVersionStorageKey(menuId, wk);
+    var n = Math.max(readStoredPrintN(menuId, wk), maxHistoryPrintN(menuId, wk)) + 1;
     try { localStorage.setItem(key, String(n)); } catch (e) {}
     return printVersionMeta(menuId, n);
+  }
+
+  /** After cloud/local history loads, bump each menu’s week counter to the highest saved n. */
+  function hydratePrintVersionsFromHistory(rows) {
+    versionHistoryCache = Array.isArray(rows) ? rows.slice() : [];
+    var byKey = {};
+    versionHistoryCache.forEach(function (row) {
+      if (!row || !row.menuId) return;
+      var wk = String(row.weekKey || '');
+      if (!wk && row.generatedAt) {
+        var d = new Date(row.generatedAt);
+        wk = row.menuId === 'sunday' ? sundayKey(d) : weekKey(d);
+      }
+      if (!wk) return;
+      var k = printVersionStorageKey(row.menuId, wk);
+      var n = entryVersionN(row);
+      if (n > (byKey[k] || 0)) byKey[k] = n;
+    });
+    Object.keys(byKey).forEach(function (k) {
+      try {
+        var cur = parseInt(localStorage.getItem(k) || '0', 10) || 0;
+        if (byKey[k] > cur) localStorage.setItem(k, String(byKey[k]));
+      } catch (e) {}
+    });
   }
 
   /** @deprecated use commitPrintVersion — kept for older callers/tests */
@@ -3785,6 +3870,7 @@
     var entry = normalizeHistoryEntry(raw || lastBuildMeta);
     if (!entry) return Promise.resolve(null);
     return localSaveOnly(entry).then(function (saved) {
+      hydratePrintVersionsFromHistory((versionHistoryCache || []).concat([saved]));
       return historyCloudPost({
         action: 'savePrintHistory',
         entry: saved
@@ -3835,10 +3921,15 @@
           .then(function () { return purgeLocalDeleted(deleted); })
           .then(function () { return migrateLocalToCloud(known, deleted); })
           .catch(function () {});
-        return sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
+        var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
+        hydratePrintVersionsFromHistory(rows);
+        return rows;
       });
     }).catch(function () {
-      return localListOnly();
+      return localListOnly().then(function (rows) {
+        hydratePrintVersionsFromHistory(rows || []);
+        return rows;
+      });
     });
   }
 
@@ -4050,6 +4141,7 @@
     nextPrintVersion: nextPrintVersion,
     peekPrintVersion: peekPrintVersion,
     commitPrintVersion: commitPrintVersion,
+    hydratePrintVersionsFromHistory: hydratePrintVersionsFromHistory,
     wrapGuillotine: wrapGuillotine,
     getLastBuild: getLastBuild,
     savePrintHistory: savePrintHistory,

@@ -439,8 +439,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow135') !== -1, 'menus page cache-bust is flow135');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow135') !== -1, 'hub menus link cache-bust is flow135');
+assert(page.indexOf('flow136') !== -1, 'menus page cache-bust is flow136');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow136') !== -1, 'hub menus link cache-bust is flow136');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1413,6 +1413,25 @@ var v2 = print.commitPrintVersion('main');
 assert(v1.roman === peekA.roman, 'Save to menus stamps the peeked Roman');
 assert(v1.roman === 'I' && v2.roman === 'II', 'print version increments only when stamped');
 assert(v1.week === v2.week, 'same week label within the week');
+assert(typeof print.hydratePrintVersionsFromHistory === 'function',
+  'print versions can hydrate from shared Print history');
+var upcomingKey = 'eb-print-ver-main-next-' + print.weekKey();
+try { global.localStorage.removeItem(upcomingKey); } catch (eUp) {}
+print.hydratePrintVersionsFromHistory([
+  { menuId: 'main-next', roman: 'I', n: 1, weekKey: print.weekKey(), week: print.weekLabel() },
+  { menuId: 'main-next', roman: 'I', n: 1, weekKey: print.weekKey(), week: print.weekLabel() }
+]);
+assert(print.peekPrintVersion('main-next').roman === 'II',
+  'Main (upcoming) advances from Print history in the same week (not stuck on I)');
+assert(print.commitPrintVersion('main-next').roman === 'II',
+  'stamping Main (upcoming) after a saved I yields II');
+assert(print.peekPrintVersion('main-next').roman === 'III',
+  'next Main (upcoming) preview is III in the same week');
+print.hydratePrintVersionsFromHistory([
+  { menuId: 'main-next', roman: 'V', n: 5, weekKey: '2020-1-6' }
+]);
+assert(print.peekPrintVersion('main-next').roman === 'III',
+  'a previous week’s Main (upcoming) V does not steal this week’s count');
 assert(typeof print.savePrintHistory === 'function' && typeof print.listPrintHistory === 'function',
   'history helpers exported');
 assert(typeof print.groupHistoryByDay === 'function', 'groupHistoryByDay exported');
