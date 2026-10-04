@@ -540,8 +540,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow149') !== -1, 'menus page cache-bust is flow149');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow149') !== -1, 'hub menus link cache-bust is flow149');
+assert(page.indexOf('flow150') !== -1, 'menus page cache-bust is flow150');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow150') !== -1, 'hub menus link cache-bust is flow150');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1674,6 +1674,69 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
 });
 assert(jamLayout.pages === 2 && jamLayout.p1.sundayRoasts === true,
   'Sunday planner puts Roasts on page 1 when openers are light');
+(function sundaySharingMustNotKeepRoastsOffPage1() {
+  var dishes = [
+    api.dish('Nibbles', 'Vegetable Samosas', '', '6.95', 'v'),
+    api.dish('Nibbles', 'Mini Bread Rolls', 'bacon jam', '5.95', ''),
+    api.dish('Nibbles', 'Vegetable Spring Rolls', '', '6.95', 'v'),
+    api.dish('Nibbles', 'Nacho Cheese Triangles', '', '6.95', ''),
+    api.dish('Starters', 'Pan Fried King Prawns', 'romesco', '10.95', 'gf'),
+    api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+    api.dish('Starters', 'Hoi Sin Jackfruit Bao Buns', 'chilli oil', '8.95', 'vg'),
+    api.dish('Starters', 'Bang Bang Cauliflower', 'sauce', '8.25', 'vg'),
+    api.dish('Sharing Starters', 'Baked Camembert (to share)', 'bacon jam', '16.95', 'v'),
+    api.dish('Sharing Starters', 'Beef Chilli Nachos', 'guacamole', '15.95', 'gf'),
+    api.dish('Sunday Roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
+    api.dish('Sunday Roasts', 'Nut Roast', '', '18.95', 'vg'),
+    api.dish('Sunday Roasts', 'Leg of Lamb', 'cooked pink', '21.95', ''),
+    api.dish('Sunday Roasts', 'Chicken Supreme', 'crispy skin', '18.95', ''),
+    api.dish('Sunday Roasts', 'Loin of Pork', 'crackling', '19.95', ''),
+    api.dish('Mains', 'Venison Casserole', 'mash', '17.95', ''),
+    api.dish('Mains', 'Beef Chilli', 'rice', '15.95', 'gf'),
+    api.dish('Mains', 'Mushroom Stroganoff', 'rice', '16.95', ''),
+    api.dish('Mains', 'Butternut Squash Risotto', 'pesto', '16.95', 'v'),
+    api.dish('Mains', 'Sweet Potato & Halloumi Burger', 'fries', '16.95', 'v'),
+    api.dish('Mains', 'Cottage Pie', 'gravy', '16.95', ''),
+    api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+    api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Beef Burger, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Pasta Bolognese', '', '', ''),
+    api.dish('Little Bells', 'Ham & Cheese Pizza', '', '', ''),
+    api.dish('Desserts', 'Cheeses', 'biscuits', '9.95', ''),
+    api.dish('Desserts', 'Three Scoops of Ice Cream or Sorbet', 'vanilla', '5.95', ''),
+    api.dish('Desserts', 'Chocolate & Raspberry Tart', 'ice cream', '8.25', 'vg'),
+    api.dish('Desserts', 'Lime Posset', 'shortbread', '8.25', ''),
+    api.dish('Desserts', 'Sticky Toffee Pudding', 'toffee sauce', '8.25', '')
+  ];
+  var layout = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      'Sharing Plates': { width: 'column', frame: false },
+      'Sunday Roasts': { width: 'full', frame: true },
+      'Little Bells': { width: 'column', frame: false },
+      Desserts: { width: 'column', frame: true }
+    }),
+    promos: [{ title: 'How are we doing?', body: 'Please drop us a message' }]
+  });
+  assert(layout.pages === 2 && layout.p1.sundayRoasts === true,
+    'Sunday with Sharing still puts Roasts on page 1 so Desserts are not clipped');
+  var html = print.build(api.menuById('sunday'), dishes, {
+    layout: layout,
+    sectionLayout: api.normalizeSectionLayout({
+      'Sharing Plates': { width: 'column', frame: false },
+      'Sunday Roasts': { width: 'full', frame: true },
+      'Little Bells': { width: 'column', frame: false },
+      Desserts: { width: 'column', frame: true }
+    }),
+    promos: [{ title: 'How are we doing?', body: 'Please drop us a message' }]
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var pages = a4.split(/<div class="page /);
+  assert(/Sirloin of Beef/i.test(pages[1]) && !/Sirloin of Beef/i.test(pages[2]),
+    'Sunday Roasts print on the sparse first page');
+  assert(/Sticky Toffee Pudding/i.test(pages[2]) && /Venison Casserole/i.test(pages[2]),
+    'Mains and Desserts stay together on page 2');
+  assert(!/Sticky Toffee Pudding/i.test(pages[1]), 'Desserts are not forced onto page 1');
+})();
 var jamHtml = print.build(api.menuById('sunday'), jammedSunday, {
   sectionLayout: api.defaultSectionLayout(),
   promos: []

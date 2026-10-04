@@ -1471,8 +1471,8 @@
     if (bag.sides) back += sectionUnits(bag.sides, false);
     if (bag.sauces) back += sectionUnits(bag.sauces, false);
 
-    // Balance: pull Sunday Roasts onto page 1 when openers are light and the
-    // roast/mains/desserts stack would jam page 2 (the uploaded Sunday IV case).
+    // Balance: pull Sunday Roasts onto page 1 when they fit, so page 2 is not
+    // jammed with Roasts + Mains + Little Bells + Desserts (desserts clipping).
     var roastsOnP1 = false;
     if (bag.sundayRoasts && roastCost > 0) {
       var frontWithRoasts = front + roastCost;
@@ -1480,13 +1480,16 @@
       var p1HasRoom = frontWithRoasts <= PAGE - 8;
       var p1Sparse = front < PAGE * 0.48;
       var p2Heavier = backWithoutRoasts >= frontWithRoasts - 6;
+      var p2WouldClip = back > PAGE - 12 ||
+        !!(bag.mains && bag.desserts && (bag.littleBells || bag.sundayRoasts));
       if (p1HasRoom && p1Sparse && p2Heavier) {
         roastsOnP1 = true;
-        front = frontWithRoasts;
-        back = backWithoutRoasts;
-      } else if (p1HasRoom && menu.id === 'sunday' && p1Sparse) {
-        // Sunday hero: roasts sit after starters on page 1 whenever they fit.
+      } else if (p1HasRoom && (menu.id === 'sunday' || p2WouldClip)) {
+        // Sunday hero: roasts sit after starters on page 1 whenever they fit,
+        // even if Sharing/Nibbles push the unit tally just over “sparse”.
         roastsOnP1 = true;
+      }
+      if (roastsOnP1) {
         front = frontWithRoasts;
         back = backWithoutRoasts;
       }
@@ -1544,7 +1547,7 @@
 
     // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
-    if (bag.sundayRoasts) oneNeed += sectionUnits(bag.sundayRoasts, false);
+    if (bag.sundayRoasts && !roastsOnP1) oneNeed += roastCost;
     if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
     if (bag.specialMains) oneNeed += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
