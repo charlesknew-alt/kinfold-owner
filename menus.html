@@ -425,9 +425,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261003-flow136"></script>
-  <script src="menus-print.js?v=20261003-flow136"></script>
-  <script src="menus-ingest.js?v=20261003-flow136"></script>
+  <script src="menus.js?v=20261004-flow136"></script>
+  <script src="menus-print.js?v=20261004-flow136"></script>
+  <script src="menus-ingest.js?v=20261004-flow136"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4065,6 +4065,9 @@
         var reviewPromise = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewLayout && menu.kind === 'long')
           ? EBMenuIngest.reviewLayout(layoutPayload())
           : Promise.resolve(null);
+        var versionPromise = (EBMenuPrint && typeof EBMenuPrint.listPrintHistory === 'function')
+          ? EBMenuPrint.listPrintHistory().catch(function () { return []; })
+          : Promise.resolve([]);
         var settled = false;
         function finishArrange(advice) {
           if (settled) return;
@@ -4098,6 +4101,10 @@
           if (li4) li4.style.opacity = '1';
           setTimeout(openPrintPreview, 420);
         }
+        // Absolute ceiling — if Gemini/Apps Script hangs, open preview with local fill.
+        reviewPromise = Promise.all([reviewPromise, versionPromise]).then(function (pair) {
+          return pair[0];
+        });
         // Absolute ceiling — if Gemini/Apps Script hangs, open preview with local fill.
         var hangWatch = setTimeout(function () { finishArrange(null); }, 14000);
         reviewPromise.then(function (advice) {
@@ -4137,7 +4144,11 @@
       // Pull shared cloud first so phones/PCs do not flash different local books.
       var edBoot = document.getElementById('editor');
       if (edBoot) edBoot.innerHTML = '<p class="note">Syncing shared menus…</p>';
-      pullMenusFromCloud().then(function () { render(); }, function () { render(); });
+      pullMenusFromCloud().then(function () {
+        if (EBMenuPrint && typeof EBMenuPrint.listPrintHistory === 'function') {
+          return EBMenuPrint.listPrintHistory().catch(function () {});
+        }
+      }).then(function () { render(); }, function () { render(); });
       // When switching back to this tab/app, reload shared state.
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') pullMenusFromCloud();

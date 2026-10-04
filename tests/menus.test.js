@@ -1476,6 +1476,25 @@ var v2 = print.commitPrintVersion('main');
 assert(v1.roman === peekA.roman, 'Save to menus stamps the peeked Roman');
 assert(v1.roman === 'I' && v2.roman === 'II', 'print version increments only when stamped');
 assert(v1.week === v2.week, 'same week label within the week');
+assert(typeof print.hydratePrintVersionsFromHistory === 'function',
+  'print versions can hydrate from shared Print history');
+var upcomingKey = 'eb-print-ver-main-next-' + print.weekKey();
+try { global.localStorage.removeItem(upcomingKey); } catch (eUp) {}
+print.hydratePrintVersionsFromHistory([
+  { menuId: 'main-next', roman: 'I', n: 1, weekKey: print.weekKey(), week: print.weekLabel() },
+  { menuId: 'main-next', roman: 'I', n: 1, weekKey: print.weekKey(), week: print.weekLabel() }
+]);
+assert(print.peekPrintVersion('main-next').roman === 'II',
+  'Main (upcoming) advances from Print history in the same week (not stuck on I)');
+assert(print.commitPrintVersion('main-next').roman === 'II',
+  'stamping Main (upcoming) after a saved I yields II');
+assert(print.peekPrintVersion('main-next').roman === 'III',
+  'next Main (upcoming) preview is III in the same week');
+print.hydratePrintVersionsFromHistory([
+  { menuId: 'main-next', roman: 'V', n: 5, weekKey: '2020-1-6' }
+]);
+assert(print.peekPrintVersion('main-next').roman === 'III',
+  'a previous week’s Main (upcoming) V does not steal this week’s count');
 assert(typeof print.savePrintHistory === 'function' && typeof print.listPrintHistory === 'function',
   'history helpers exported');
 assert(typeof print.groupHistoryByDay === 'function', 'groupHistoryByDay exported');
