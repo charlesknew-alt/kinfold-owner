@@ -522,14 +522,16 @@ assert(aiGs.indexOf('INSIDE the frame') !== -1 && aiGs.indexOf('Sip & Paint') !=
   'Gemini layout rule: frilly titles sit in the box; leftover panels must fit with a gap');
 assert(aiGs.indexOf('NEVER fall off the page') !== -1 && aiGs.indexOf('never clip food') !== -1,
   'Gemini layout rule: content must never fall off the page');
-assert(aiGs.indexOf('PREFER a column') !== -1 && printJs.indexOf('desserts-sides-row') !== -1,
-  'best-fit prefers columns: Desserts pair with Sides rather than stacking full-width');
-assert(printJs.indexOf('not stacked under Sharing') !== -1 && printJs.indexOf('mainsSectionHtml') !== -1,
-  'Sandwiches stay off a packed Sharing column; best-fit Mains can split');
+assert(aiGs.indexOf('Layout is decided by YOU alongside these rules') !== -1 && aiGs.indexOf('sectionWidths') !== -1,
+  'Gemini decides Best-fit widths alongside the rules');
+assert(aiGs.indexOf('Do NOT put Sides or Sandwiches under Sharing') !== -1 && printJs.indexOf('sides-sand-row') !== -1,
+  'Sides and Sandwiches stay off Sharing; JS executes the Sides|Sandwiches pair');
+assert(page.indexOf('advice.sectionWidths') !== -1 && page.indexOf("rule.width !== 'both'") !== -1,
+  'generate applies Gemini sectionWidths only to Best-fit sections');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow146') !== -1, 'menus page cache-bust is flow146');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow146') !== -1, 'hub menus link cache-bust is flow146');
+assert(page.indexOf('flow147') !== -1, 'menus page cache-bust is flow147');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow147') !== -1, 'hub menus link cache-bust is flow147');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1219,12 +1221,13 @@ assert(aiGs.indexOf('2×A5') !== -1 || aiGs.indexOf('two A5') !== -1, 'Gemini kn
 assert(aiGs.indexOf('A4 or 2×A5') !== -1 || aiGs.indexOf('party paper') !== -1,
   'Gemini respects party paper choice');
 assert(aiGs.indexOf('shorter stack') !== -1 || aiGs.indexOf('SHORTER') !== -1 ||
-  aiGs.indexOf('panels MUST be 1 or 2') !== -1,
+  aiGs.indexOf('panels:0 only when shorter is "even"') !== -1,
   'Gemini golden rule: feature panels only to even opposite columns');
 assert(aiGs.indexOf('oval') !== -1 || aiGs.indexOf('box beside wide') !== -1 ||
   aiGs.indexOf('contrasting frames') !== -1,
   'Gemini golden rules contrast side-by-side feature frames');
-assert(page.indexOf('opposite columns match') !== -1 || page.indexOf('Gemini checking') !== -1,
+assert(page.indexOf('opposite columns match') !== -1 || page.indexOf('Gemini checking') !== -1 ||
+  page.indexOf('Gemini choosing columns') !== -1,
   'Generate runs Gemini balance check step');
 assert(printJs.indexOf('leftFrame') !== -1 && printJs.indexOf('rightFrame') !== -1,
   'paired promo panels pick opposite frame kinds');
@@ -1464,8 +1467,8 @@ assert(/column-solo-row[\s\S]*Sticky Toffee/.test(dessColKidsFull),
 var dessSoloRow = (dessColKidsFull.match(/column-solo-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(dessSoloRow && !/Stay a While|Gatherings|Pub Quiz/i.test(dessSoloRow),
   'solo Desserts column is not filled with rooms promo');
-assert(printJs.indexOf('levelOppositeColumns') !== -1 && printJs.indexOf('even fill across pages') !== -1,
-  'layout equalises opposite columns and leftover across two pages');
+assert(printJs.indexOf('levelOppositeColumns') !== -1 && printJs.indexOf('Gemini layout review chooses') !== -1,
+  'JS equalises opposite columns; Gemini chooses which page Sides and Sandwiches sit on');
 // Best fit (both) still allows the kids|desserts column pair
 var kidsColDessertsBoth = print.build(api.menuById('sunday'), kidsColDishes, {
   sectionLayout: api.normalizeSectionLayout({
@@ -1564,18 +1567,17 @@ assert(/cols-classics[\s\S]{0,2500}Sandwiches/i.test(sandColA4),
   'Blocks Column Sandwiches stay in a column when alone under Specials');
 assert(printJs.indexOf('sandLockedCol') !== -1,
   'print respects Sandwiches Column lock against orphan full-bleed');
-assert(printJs.indexOf('Lower-margin section') !== -1 &&
-  printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
+assert(printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
   'two-page planner prefers Sandwiches on page 2');
 assert(printJs.indexOf('mainsPairedInCol') !== -1 && printJs.indexOf('canSitInColumn') !== -1,
-  'Best-fit Mains can sit opposite Sandwiches instead of a quiz-only column');
+  'Column Mains (after Gemini or Blocks lock) can sit opposite Sandwiches');
 
 var sandMainsPairDishes = sandColAloneDishes.concat([
   api.dish('Mains', 'Cheese & Bacon Burger', 'fries', '18.95', ''),
   api.dish('Mains', 'Homemade Beef Lasagne', 'garlic bread', '15.95', ''),
   api.dish('Mains', 'Ham, Egg & Chips', '', '18.95', 'gf')
 ]);
-var sandMainsPairHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
+var sandMainsBestFitHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
   sectionLayout: api.normalizeSectionLayout({
     Starters: { width: 'full', frame: false },
     Sandwiches: { width: 'column', frame: false, tip: true, note: 'hours' },
@@ -1583,9 +1585,22 @@ var sandMainsPairHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
   }),
   promos: sandColAlonePromos
 });
+var sandMainsBestFitA4 = sandMainsBestFitHtml.split('mode-panel mode-a5')[0] || sandMainsBestFitHtml;
+assert(!/mains-sand-row[\s\S]{0,8000}Cheese &amp; Bacon Burger/.test(sandMainsBestFitA4),
+  'Best-fit Mains stay full until Gemini chooses column — do not steal Sandwiches');
+assert(/Cheese &amp; Bacon Burger/.test(sandMainsBestFitA4),
+  'Best-fit Mains still print');
+var sandMainsPairHtml = print.build(api.menuById('main'), sandMainsPairDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    Starters: { width: 'full', frame: false },
+    Sandwiches: { width: 'column', frame: false, tip: true, note: 'hours' },
+    Mains: { width: 'column', frame: false }
+  }),
+  promos: sandColAlonePromos
+});
 var sandMainsA4 = sandMainsPairHtml.split('mode-panel mode-a5')[0] || sandMainsPairHtml;
 assert(/cols-classics[\s\S]{0,8000}Cheese &amp; Bacon Burger|mains-sand-row[\s\S]{0,8000}Cheese &amp; Bacon Burger/.test(sandMainsA4),
-  'Best-fit Mains fill the column opposite Sandwiches');
+  'Column Mains fill the column opposite Sandwiches');
 
 // Sparse openers + full roast/mains/desserts must not dump everything on page 2
 var jammedSunday = [
@@ -1728,12 +1743,12 @@ assert(ingestJs.indexOf('reviewLayout') !== -1 && /fetchWithTimeout\([\s\S]*1200
   'layout review uses a 12s fetch timeout');
 assert(aiGs.indexOf('maxModels') !== -1,
   'layout review Gemini call limits model retries so Apps Script cannot run for minutes');
-assert(page.indexOf('opposite columns match') !== -1,
-  'arrange step says Gemini checks columns before release');
+assert(page.indexOf('Gemini choosing columns') !== -1,
+  'arrange step says Gemini chooses columns, Best-fit widths, and Sides/Sandwiches pages');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('reviewLayout') !== -1,
   'layout review uses cloud Menu AI URL on every generate');
-assert(aiGs.indexOf('columnBalance') !== -1 && aiGs.indexOf('panels MUST be 1 or 2') !== -1,
-  'Gemini layout review requires panels under uneven columns');
+assert(aiGs.indexOf('columnBalance') !== -1 && aiGs.indexOf('Food first') !== -1,
+  'Gemini layout review places food before filling leftover with panels');
 assert(printJs.indexOf('sandOnLeftCol') !== -1 && printJs.indexOf('CONTENT-SIZED') !== -1,
   'feature panels stay little promotions; Sides/sandwich sell balance the short column');
 assert(printJs.indexOf('preferReadableType') !== -1 && printJs.indexOf('clearFitArtifacts') !== -1,
@@ -1742,8 +1757,8 @@ assert(printJs.indexOf('No page-2 logo (keep type readable)') !== -1,
   'planner skips page-2 logo when it would cost readable type');
 assert(printJs.indexOf('fitGroup') !== -1 && printJs.indexOf('SHARED TYPE SCALE') !== -1,
   'print fits page 1 and page 2 to one shared type density');
-assert(printJs.indexOf('sidesOnP1') !== -1 && printJs.indexOf('keep type size equal') !== -1,
-  'planner can move Sides to page 1 so both pages stay the same size');
+assert(printJs.indexOf('sidesOnP1') !== -1 && printJs.indexOf('Gemini layout review chooses') !== -1,
+  'planner starts Sides on page 2; Gemini chooses sidesOn');
 assert(printJs.indexOf('spreadPage') !== -1 && printJs.indexOf('spread-even') !== -1,
   'after shared type, leftover vertical space is spread evenly down the page');
 assert(printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
@@ -1752,10 +1767,12 @@ assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -
   'Gemini layout review can move Sides between pages for shared type');
 assert(printJs.indexOf('sandwichesLocked') !== -1,
   'print locks sandwiches when staff ticked them or listed fillings');
-assert(page.indexOf('sandwichesLocked') !== -1 && page.indexOf("advice.sandwichesOn === 'omit'") !== -1,
+assert(page.indexOf('sandwichesLocked') !== -1 && page.indexOf("sandwichesOn === 'omit'") !== -1,
   'generate ignores Gemini omit when sandwiches are locked');
-assert(aiGs.indexOf('sandwichesLocked') !== -1 && aiGs.indexOf('NEVER omit') !== -1,
+assert(aiGs.indexOf('sandwichesLocked') !== -1 && /never omit/i.test(aiGs),
   'Gemini must not omit ticked sandwiches');
+assert(aiGs.indexOf('hasSharing') !== -1 && page.indexOf('sharingOnSheet') !== -1,
+  'two-page Sharing sheets keep Sides and Sandwiches off page 1');
 assert(page.indexOf('advice.sidesOn') !== -1,
   'generate applies AI sidesOn to the print layout');
 assert(printJs.indexOf('tracker .week') !== -1 && /tracker\{[^}]*text-transform:none/.test(printJs),
@@ -2327,8 +2344,8 @@ assert(sharedTypeLayout.p2 && sharedTypeLayout.p2.sandwiches === true && !shared
   'named sandwich fillings sit on page 2 (less prominent, column)');
 assert(/type range/i.test(sharedTypeLayout.summary) || /minimum type/i.test(sharedTypeLayout.summary),
   'layout summary states type range / min-type decision');
-assert(sharedTypeLayout.p1.sidesOnP1 === true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === false,
-  'Sides move to page 1 so both pages can open type toward the maximum');
+assert(sharedTypeLayout.p1.sidesOnP1 !== true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === true,
+  'starting guess keeps Sides on page 2 beside Sandwiches — Gemini may move them');
 
 // Tip/sell sandwich box (0 fillings) must prefer page 1 when page 2 holds mains+desserts
 var tipOnlyPacked = [
@@ -2443,6 +2460,20 @@ assert(/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSa
   'frilly Sandwiches title sits inside the frame with the fillings');
 assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
   'Sandwiches title is not perched above the outer wave');
+(function columnMainsKeepSidesWithSandwiches() {
+  var html = print.build(mainMenu, sidesSandDishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      Mains: { width: 'column', frame: false },
+      Sides: { width: 'column', frame: false },
+      Sandwiches: { width: 'column', frame: true }
+    })
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  assert(/sides-sand-row[\s\S]{0,4000}Cheesy Garlic Bread/.test(a4),
+    'Sides stay beside Sandwiches even when Mains are Column');
+  assert(!/mains-sand-row/.test(a4),
+    'Column Mains do not steal Sandwiches from Sides');
+})();
 (function bestFitUsesColumns() {
   var layout = api.normalizeSectionLayout({
     'Sharing Plates': { width: 'both', frame: false },
@@ -2500,12 +2531,12 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'page 1 does not clip Sandwiches under Sharing');
   assert(/Quesadilla/i.test(pages[2]),
     'Sandwiches print on page 2');
-  assert(/desserts-sides-row/.test(pages[2]) && /Cheesy Garlic Bread/i.test(pages[2]),
-    'best-fit Desserts sit in a column beside Sides');
-  assert(/share-cols/.test(pages[2]) || /mains-sand-row/.test(pages[2]),
-    'best-fit Mains use two columns or sit opposite Sandwiches');
+  assert(/sides-sand-row/.test(pages[2]) && /Cheesy Garlic Bread/i.test(pages[2]),
+    'Sides sit beside Sandwiches on page 2 (not under Desserts or Sharing)');
   assert(/Osso Bucco/i.test(pages[2]) && /Sticky Toffee/i.test(pages[2]),
     'mains and desserts all print (nothing dropped off the page)');
+  assert(!/mains-sand-row/.test(pages[2]),
+    'Best-fit Mains stay full until Gemini chooses a column');
 })();
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 

@@ -1518,24 +1518,6 @@
     var hasBackContent = !!(bag.sundayRoasts || bag.mains || bag.specialMains || bag.littleBells ||
       bag.desserts || bag.specialDesserts || bag.sides || bag.sauces || bag.sandwiches);
 
-    // Best-fit / Column sections share a row — sequential full-width cost over-counts
-    // page 2 and then dumps Sandwiches under Sharing on page 1, where they clip.
-    var dessRuleP = ruleFor('Desserts', { sectionLayout: opts.sectionLayout });
-    var sideRuleP = ruleFor('Sides', { sectionLayout: opts.sectionLayout });
-    var mainRuleP = ruleFor('Mains', { sectionLayout: opts.sectionLayout });
-    var dessCostP = bag.desserts ? sectionUnits(bag.desserts, !!(dessRuleP && dessRuleP.frame)) : 0;
-    var sideCostP = bag.sides ? sectionUnits(bag.sides, false) : 0;
-    var mainCostP = bag.mains ? sectionUnits(bag.mains, false) : 0;
-    var mainsCountP = bag.mains && bag.mains.dishes ? bag.mains.dishes.length : 0;
-    var pairSave = 0;
-    if (dessCostP && sideCostP && canSitInColumn(dessRuleP) && canSitInColumn(sideRuleP)) {
-      pairSave += Math.min(dessCostP, sideCostP) * 0.9;
-    }
-    if (mainCostP && canSitInColumn(mainRuleP) && mainsCountP >= 3) {
-      pairSave += mainCostP * 0.32;
-    }
-    if (pairSave > 0) back = Math.max(chrome, back - pairSave);
-
     var layout = {
       pages: 1,
       fit: 'one',
@@ -1640,53 +1622,12 @@
       // Desserts + a full mains list leave little room — be stricter about fillers
       var tightBack = !!(bag.desserts && bag.mains && bag.mains.dishes.length >= 6);
       if (wantSandwiches) {
-        // Lower-margin section — quieter on page 2, in a column.
-        // Fall back to page 1 if page 2 is jammed.
-        // Never drop — staff ticked Sandwiches (or listed fillings).
-        var p2SandCost = tightBack ? sandCost + 2 : sandCost;
-        var addSx = tryAdd(p2left, p2SandCost);
-        if (addSx.ok) {
-          layout.p2.sandwiches = true;
-          p2left = addSx.left;
-          layout.fillers.push(sandDishCount ? 'Sandwiches (page 2)' : 'Sandwiches box (page 2)');
-        } else {
-          var addSandP1 = tryAdd(p1left, sandCost + (sandDishCount > 0 ? 0 : 1));
-          if (addSandP1.ok) {
-            layout.p1.sandwiches = true;
-            p1left = addSandP1.left;
-            layout.leftover.p1 = p1left;
-            layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches box (page 1)');
-          } else if (bag.sides) {
-            var addS = tryAdd(p1left, sandCost);
-            if (addS.ok) {
-              layout.p1.sandwiches = true;
-              p1left = addS.left;
-              layout.p1.sidesOnP1 = true;
-              layout.p2.sidesOnP2 = false;
-              p2left += sectionUnits(bag.sides, false);
-              layout.leftover.p1 = p1left;
-              layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches + sides (page 1)');
-            } else {
-              layout.p2.sandwiches = true;
-              p2left = Math.max(0, p2left - sandCost);
-              layout.fillers.push(sandDishCount ? 'Sandwiches (page 2 — kept)' : 'Sandwiches box (page 2 — kept)');
-            }
-          } else {
-            layout.p2.sandwiches = true;
-            p2left = Math.max(0, p2left - sandCost);
-            layout.fillers.push(sandDishCount ? 'Sandwiches (page 2 — kept)' : 'Sandwiches box (page 2 — kept)');
-          }
-        }
-      }
-      // Sharing already occupies the page-1 left column opposite Burgers.
-      // Stacking Sandwiches under it clips the fillings — keep them on page 2
-      // and pair with Mains / Sides / Desserts instead.
-      if (wantSandwiches && bag.sharing && layout.p1.sandwiches) {
-        layout.p1.sandwiches = false;
+        // Starting guess: quieter on page 2, beside Sides. Do not pull Sandwiches onto page 1.
+        // Gemini may move them via sandwichesOn; JS must not override that later.
         layout.p2.sandwiches = true;
-        layout.p1.sidesOnP1 = false;
-        if (bag.sides) layout.p2.sidesOnP2 = true;
-        layout.fillers.push('Sandwiches (page 2 — not stacked under Sharing)');
+        layout.p1.sandwiches = false;
+        p2left = Math.max(0, p2left - (tightBack ? sandCost + 2 : sandCost));
+        layout.fillers.push(sandDishCount ? 'Sandwiches (page 2)' : 'Sandwiches box (page 2)');
       }
       if (wantPromoBox && !layout.p1.rooms) {
         // Prefer NOT stacking an extra promo beside sandwiches on a packed page 2 —
@@ -1699,44 +1640,9 @@
         }
       }
 
-      // SHARED TYPE + EVEN FILL: same type on both pages, and spread movable
-      // blocks (Sides / Sandwiches) so leftover room is similar — not one airy
-      // page and one packed page.
-      var p2Crowded = p2left < 14 ||
-        (bag.mains && bag.desserts && (bag.mains.dishes || []).length >= 5) ||
-        (bag.mains && (bag.mains.dishes || []).length >= 7) ||
-        (!!bag.sundayRoasts && !layout.p1.sundayRoasts && bag.desserts) ||
-        tightBack;
-      var sideCost = bag.sides ? sectionUnits(bag.sides, false) : 0;
-      var dessWantsPair = !!(bag.desserts && canSitInColumn(dessRuleP) && canSitInColumn(sideRuleP));
-      var p1MuchEmptier = p1left > p2left + 12;
-      if (bag.sides && layout.p2.sidesOnP2 && sideCost > 0 && !dessWantsPair) {
-        var takeSides = tryAdd(p1left, sideCost + (layout.p1.sandwiches ? 1 : 3));
-        if ((p2Crowded || p1MuchEmptier) && takeSides.ok) {
-          layout.p1.sidesOnP1 = true;
-          layout.p2.sidesOnP2 = false;
-          p1left = takeSides.left;
-          p2left += sideCost;
-          layout.fillers.push(p2Crowded
-            ? 'Sides (page 1 — keep type size equal on both pages)'
-            : 'Sides (page 1 — even fill across pages)');
-        }
-      }
-      // Do not pull Sandwiches onto page 1 to even leftover — they stay quieter
-      // on page 2 (lower margin) unless page 2 could not fit them.
-      // If Sides landed on page 1 but page 1 is now the packed one and page 2 is
-      // sparse, move them back — never undo a move that was required for shared type.
-      if (layout.p1.sidesOnP1 && !layout.p2.sidesOnP2 && sideCost > 0 &&
-          !p2Crowded && p1left < 10 && p2left > p1left + 14) {
-        var p2CanTake = tryAdd(p2left, sideCost + 2);
-        if (p2CanTake.ok) {
-          layout.p1.sidesOnP1 = false;
-          layout.p2.sidesOnP2 = true;
-          p1left += sideCost;
-          p2left = p2CanTake.left;
-          layout.fillers.push('Sides (page 2 — even fill across pages)');
-        }
-      }
+      // Starting guess only — Gemini layout review chooses sidesOn / sandwichesOn.
+      // Do not dump Sides under Sharing|Burgers to even leftover; that clips page 1
+      // and leaves event boxes opposite Sandwiches.
 
       // Foot logo is optional chrome — only keep it when page 2 still has generous
       // leftover after mains/desserts. Readable shared type beats a second logo.
@@ -1890,9 +1796,9 @@
     return !!(rule && wantsFull(rule) && !wantsColumn(rule));
   }
 
-  /** Best fit or Column — may sit opposite another column. Full-width lock may not. */
+  /** Column lock, or Best fit after Gemini chose column. Untouched “both” stays full. */
   function canSitInColumn(rule) {
-    return !!(rule && wantsColumn(rule) && !lockedFullWidth(rule));
+    return lockedColumnWidth(rule);
   }
 
   /** Blocks “Column” lock (not Best fit). Must stay half-column — never orphaned to full-bleed. */
@@ -2000,64 +1906,17 @@
     return { html: leveled.html, usedPromoTitles: leveled.usedTitles };
   }
 
-  /** Drop-in / leftover section stays in its Blocks area: Column lock stays a column.
-   *  Best-fit with enough dishes splits into two columns so food fits. */
+  /** Drop-in / leftover section stays in its Blocks area: Column lock stays a column. */
   function renderUnpairedSection(title, dishes, rule, opts) {
     opts = opts || {};
     if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
     if (lockedColumnWidth(rule)) {
       return columnSoloSection(title, dishes, rule, opts);
     }
-    var twoCol = canSitInColumn(rule) && dishes.length >= 4;
     return {
-      html: '<section class="sec">' + sectionBlock(title, dishes, rule, 'wide', { twoCol: twoCol }) + '</section>',
+      html: '<section class="sec">' + sectionBlock(title, dishes, rule) + '</section>',
       usedPromoTitles: []
     };
-  }
-
-  /** Best-fit / Column food pair — titles follow frilly vs pair-head rules. */
-  function renderFoodPairRow(leftTitle, leftDishes, leftRule, rightTitle, rightDishes, rightRule, opts) {
-    opts = opts || {};
-    if (!leftDishes || !leftDishes.length || !rightDishes || !rightDishes.length) {
-      return { html: '', usedLeft: false, usedRight: false, usedPromoTitles: [] };
-    }
-    if (!canSitInColumn(leftRule) || !canSitInColumn(rightRule)) {
-      return { html: '', usedLeft: false, usedRight: false, usedPromoTitles: [] };
-    }
-    var leftInner = sectionBlock(leftTitle, leftDishes, leftRule, leftRule && leftRule.frame ? 'wide' : 'box', {
-      hideTitle: !(leftRule && leftRule.frame)
-    });
-    var rightInner = sectionBlock(rightTitle, rightDishes, rightRule, rightRule && rightRule.frame ? 'wide' : 'box', {
-      hideTitle: !(rightRule && rightRule.frame)
-    });
-    var leftU = columnFillUnits({ name: leftTitle, dishes: leftDishes }, leftRule, leftRule && leftRule.note);
-    var rightU = columnFillUnits({ name: rightTitle, dishes: rightDishes }, rightRule, rightRule && rightRule.note);
-    var pair = levelOppositeColumns(leftInner, leftU, rightInner, rightU, {
-      promos: opts.promos,
-      excludeTitles: opts.excludeTitles,
-      shortOnly: true,
-      force: opts.force,
-      leftTitle: leftTitle,
-      rightTitle: rightTitle,
-      secClass: opts.secClass || 'food-pair-row',
-      colsClass: opts.colsClass || 'cols-food-pair',
-      leftClass: opts.leftClass || '',
-      rightClass: opts.rightClass || ''
-    });
-    return {
-      html: pair.html,
-      usedLeft: true,
-      usedRight: true,
-      usedPromoTitles: pair.usedTitles || []
-    };
-  }
-
-  function mainsSectionHtml(bag, mainRule) {
-    if (!bag.mains || !bag.mains.dishes || !bag.mains.dishes.length) return '';
-    var twoCol = canSitInColumn(mainRule) && bag.mains.dishes.length >= 3;
-    return '<section class="sec">' +
-      sectionBlock(bag.mains.name, bag.mains.dishes, mainRule, 'wide', { twoCol: twoCol }) +
-      '</section>';
   }
 
   /**
@@ -2230,7 +2089,6 @@
     // Best-fit / Column Mains sit opposite Sandwiches when that column is empty
     // (Burgers/Classics missing) — do not leave quiz boxes in a food hole.
     var mainsPairedInCol = false;
-    var sandwichesHeldForP2 = false;
 
     var p1 = '<div class="page fill-page ' + fill1 + '">';
     p1 += trackerBar(ver, { hideDate: hideDate });
@@ -2369,17 +2227,8 @@
       var sandOnLeftCol = false;
       var sandOnRightCol = false;
       if (sandwichesInCol && sandList.length) {
-        // Do not stack fillings under Sharing when the left column would be
-        // much taller than Burgers — that clips Sandwiches off the page.
-        var sandTall = sandwichesPackCost(bag, sandRule);
-        var stackUnderShare = !!(shareInLeft && layout.pages >= 2 &&
-          (leftFoodU + sandTall > rightFoodU + 6));
-        if (stackUnderShare) {
-          sandwichesHeldForP2 = true;
-        } else {
-          sandOnLeftCol = true;
-          leftFoodU += sandTall;
-        }
+        sandOnLeftCol = true;
+        leftFoodU += sandwichesPackCost(bag, sandRule);
       } else if (sandwichesInCol) {
         if (leftFoodU <= rightFoodU) {
           sandOnLeftCol = true;
@@ -2403,6 +2252,9 @@
       var rightHasFood = !!(burgerDishes.length || classicDishes.length || sandOnRightCol ||
         (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule) && !sidesOnLeftCol));
       var mainsInRightCol = false;
+      // Only Column Mains (Blocks lock or Gemini already chose column) fill a hole
+      // opposite Sandwiches. Best fit still “both” stays full — do not steal the
+      // Sandwiches column from Sides.
       if ((sandOnLeftCol || sandOnRightCol) && !rightHasFood && bag.mains &&
           bag.mains.dishes && bag.mains.dishes.length && canSitInColumn(mainRule)) {
         mainsInRightCol = true;
@@ -2548,7 +2400,7 @@
     }
 
     if (layout.pages === 1) {
-      if (bag.mains && !mainsPairedInCol) p1 += mainsSectionHtml(bag, mainRule);
+      if (bag.mains && !mainsPairedInCol) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
       }
@@ -2559,24 +2411,7 @@
       );
       usedPromoTitles = usedPromoTitles.concat(littleP1.usedPromoTitles || []);
       p1 += littleP1.html;
-      var dessSides1 = { usedLeft: false, usedRight: false, html: '', usedPromoTitles: [] };
-      if (bag.desserts && !littleP1.usedDesserts && sidesPrint && !p1opts.sidesOnP1 && !littleP1.usedSides) {
-        dessSides1 = renderFoodPairRow(
-          bag.desserts.name, bag.desserts.dishes, dessRule,
-          sidesPrint.name, sidesPrint.dishes, sideRule,
-          {
-            promos: promos,
-            excludeTitles: usedPromoTitles,
-            secClass: 'desserts-sides-row',
-            colsClass: 'cols-desserts-sides',
-            leftClass: 'col-desserts',
-            rightClass: 'col-sides'
-          }
-        );
-        usedPromoTitles = usedPromoTitles.concat(dessSides1.usedPromoTitles || []);
-        p1 += dessSides1.html;
-      }
-      if (bag.desserts && !littleP1.usedDesserts && !dessSides1.usedLeft) {
+      if (bag.desserts && !littleP1.usedDesserts) {
         var dessSolo1 = renderUnpairedSection(bag.desserts.name, bag.desserts.dishes, dessRule, {
           promos: promos, excludeTitles: usedPromoTitles
         });
@@ -2586,7 +2421,7 @@
       if (bag.specialDesserts && bag.specialDesserts.dishes && bag.specialDesserts.dishes.length) {
         p1 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
       }
-      if (sidesPrint && !p1opts.sidesOnP1 && !littleP1.usedSides && !dessSides1.usedRight) {
+      if (sidesPrint && !p1opts.sidesOnP1 && !littleP1.usedSides) {
         if (lockedColumnWidth(sideRule)) {
           var sideSolo1 = columnSoloSection(sidesPrint.name, sidesPrint.dishes, sideRule, {
             promos: promos, excludeTitles: usedPromoTitles
@@ -2608,11 +2443,6 @@
 
     if (layout.pages < 2 || !p2opts) return p1;
 
-    if (sandwichesHeldForP2) {
-      p2opts.sandwiches = true;
-      p1opts.sandwiches = false;
-    }
-
     var p2 = '<div class="page fill-page ' + fill2 + '">';
     // Week / Sunday date only on page 1 — page 2 keeps the quiet Roman only.
     p2 += trackerBar(ver, { hideDate: true });
@@ -2628,8 +2458,10 @@
         (sideRule && wantsColumn(sideRule) && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)
       ));
     if (bag.mains && !mainsPairedInCol && p2opts.sandwiches && canSitInColumn(mainRule) &&
-        bag.mains.dishes && bag.mains.dishes.length) {
-      // Page 2: Best-fit / Column Mains sit opposite Sandwiches — food before quiz boxes.
+        bag.mains.dishes && bag.mains.dishes.length &&
+        !(p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)) {
+      // Column Mains sit opposite Sandwiches only when Sides are not also on page 2.
+      // Food map: Sides beside Sandwiches. Best fit waits for Gemini.
       var sandU2 = sandwichesPackCost(bag, sandRule);
       var mainU2 = sectionUnits(bag.mains, false);
       var pair2 = levelOppositeColumns(
@@ -2658,7 +2490,7 @@
       mainsPairedInCol = true;
       p2opts.sandwiches = false;
     }
-    if (bag.mains && !mainsPairedInCol) p2 += mainsSectionHtml(bag, mainRule);
+    if (bag.mains && !mainsPairedInCol) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
     }
@@ -2669,25 +2501,7 @@
     );
     usedPromoTitles = usedPromoTitles.concat(littleP2.usedPromoTitles || []);
     p2 += littleP2.html;
-    var dessSides2 = { usedLeft: false, usedRight: false, html: '', usedPromoTitles: [] };
-    if (bag.desserts && !littleP2.usedDesserts && sidesPrint && p2opts.sidesOnP2 && !littleP2.usedSides) {
-      dessSides2 = renderFoodPairRow(
-        bag.desserts.name, bag.desserts.dishes, dessRule,
-        sidesPrint.name, sidesPrint.dishes, sideRule,
-        {
-          promos: promos,
-          excludeTitles: usedPromoTitles,
-          force: littleFoodPartner ? null : p2Force,
-          secClass: 'desserts-sides-row',
-          colsClass: 'cols-desserts-sides',
-          leftClass: 'col-desserts',
-          rightClass: 'col-sides'
-        }
-      );
-      usedPromoTitles = usedPromoTitles.concat(dessSides2.usedPromoTitles || []);
-      p2 += dessSides2.html;
-    }
-    if (bag.desserts && !littleP2.usedDesserts && !dessSides2.usedLeft) {
+    if (bag.desserts && !littleP2.usedDesserts) {
       var dessSolo2 = renderUnpairedSection(bag.desserts.name, bag.desserts.dishes, dessRule, {
         promos: promos, excludeTitles: usedPromoTitles
       });
@@ -2698,11 +2512,11 @@
       p2 += specialsBesideCourse(bag.specialDesserts.dishes, plan, 'Special Desserts');
     }
 
-    var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces) && !littleP2.usedSides && !dessSides2.usedRight) ||
+    var showBottom = (p2opts.sidesOnP2 && (sidesPrint || bag.sauces) && !littleP2.usedSides) ||
       p2opts.sandwiches || p2opts.rooms;
     if (showBottom) {
       var sidesCol = sidesPrint && wantsColumn(sideRule);
-      var sideList = (p2opts.sidesOnP2 && sidesPrint && !littleP2.usedSides && !dessSides2.usedRight) ? sidesPrint.dishes.slice() : [];
+      var sideList = (p2opts.sidesOnP2 && sidesPrint && !littleP2.usedSides) ? sidesPrint.dishes.slice() : [];
       // Sides (and sauces) in the left column; Sandwiches fully in the frilly box on the right.
       // If Sides sit alone (no sandwiches opposite), Best fit may span full-width + foot panels.
       // Blocks “Column” lock must stay half-width — never orphan to full-bleed.
@@ -2744,6 +2558,7 @@
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
           force: littleFoodPartner ? null : p2Force,
+          skipPromos: !!(p2opts.sandwiches && !sideList.length),
           leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
           rightTitle: p2opts.sandwiches ? 'Sandwiches' : '',
           secClass: 'sides-sand-row',
