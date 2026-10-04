@@ -160,7 +160,13 @@ assert(printJs.indexOf('name="viewport"') !== -1, 'preview has a mobile viewport
 assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-clip') !== -1,
   'preview clips A4 overflow so dish prices cannot leak into the toolbar');
 assert(printJs.indexOf('skipPromos: true') !== -1,
-  'kids|desserts pair skips Stay a While under Little Bells');
+  'solo column pairs skip Stay a While in the empty opposite half');
+assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
+  'opposite food columns lift category titles into a shared pair-head');
+assert(printJs.indexOf('shortOnly: true') !== -1,
+  'kids|desserts leftover space gets a small panel under the shorter column only');
+assert(printJs.indexOf('function wrapUnits') !== -1 && printJs.indexOf('function columnFillUnits') !== -1,
+  'column fill counts wrapping descriptions so leftover panels can drop in');
 assert(printJs.indexOf('sheet-offer') !== -1, 'Sunday £9.50 offer has a larger sheet-offer style');
 require(path.join(root, 'menus-print.js'));
 var printApi = global.EBMenuPrint;
@@ -439,8 +445,8 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow135') !== -1, 'menus page cache-bust is flow135');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow135') !== -1, 'hub menus link cache-bust is flow135');
+assert(page.indexOf('flow136') !== -1, 'menus page cache-bust is flow136');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow136') !== -1, 'hub menus link cache-bust is flow136');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1064,8 +1070,54 @@ var kidsColHtml = print.build(api.menuById('sunday'), kidsColDishes, {
 assert(/cols-little-desserts/.test(kidsColHtml) && /col-little/.test(kidsColHtml),
   'Blocks Column puts Little Bells beside Desserts');
 var kidsDessRow = (kidsColHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(kidsDessRow && !/Stay a While|Gatherings|Pub Quiz/i.test(kidsDessRow),
-  'kids|desserts pair does not jam rooms promo under Little Bells');
+assert(kidsDessRow && /cols-pair-titles/.test(kidsDessRow) && /pair-head/.test(kidsDessRow),
+  'kids|desserts titles sit in a pair-head so they share a baseline');
+assert(/pair-head[\s\S]*Little Bells/.test(kidsDessRow) && /pair-head[\s\S]*Desserts/.test(kidsDessRow),
+  'LITTLE BELLS and DESSERTS titles both print in the pair-head row');
+var kidsDessColBody = kidsDessRow.replace(/<div class="promo-head pair-head">[\s\S]*?<\/div>/g, '');
+assert(!/<div class="sec-title">Desserts<\/div>/.test(kidsDessColBody),
+  'Desserts title is not nested inside the scallop (that dropped it below Little Bells)');
+var tallDessKidsHtml = print.build(api.menuById('sunday'), [
+  api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+  api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
+  api.dish('Little Bells', 'Beef Burger, Fries & Dressed Salad', '', '', ''),
+  api.dish('Little Bells', 'Pasta Bolognese', '', '', 'vg option'),
+  api.dish('Little Bells', 'Ham & Cheese Pizza', '', '', 'v option'),
+  api.dish('Desserts', 'Half-Baked Cookie Dough', 'with salted caramel ice cream', '8.25', ''),
+  api.dish('Desserts', 'Three Scoops of Ice Cream or Sorbet',
+    'vanilla, strawberry, chocolate, salted caramel, marshmallow mudslide, honeycomb, cookie crumble & selected sorbets',
+    '5.95', 'vg & gf option'),
+  api.dish('Desserts', 'Apple & Blackberry Crumble', 'with ice cream or custard', '8.25', 'gf option'),
+  api.dish('Desserts', 'Citrus Posset', 'served with homemade compote & shortbread', '8.25', ''),
+  api.dish('Desserts', 'Sticky Toffee Pudding', 'served with ice cream and toffee sauce', '8.25', 'gf option')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      width: 'column',
+      frame: false,
+      above: 'All below £9.50 to include a choice of one scoop of ice cream or sorbet.',
+      aboveKind: 'paragraph',
+      below: 'a choice of roasts at half price of the adults',
+      belowKind: 'text'
+    },
+    Desserts: { width: 'column', frame: true, note: '' }
+  }),
+  promos: [
+    { title: 'Stay a While', body: 'cosy rooms upstairs' },
+    { title: 'Gatherings', body: 'happy to host your event' },
+    { title: 'Pub Quiz', body: 'quiz night tonight' },
+    { title: 'How are we doing?', body: 'tell us' }
+  ]
+});
+var tallDessRow = (tallDessKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
+assert(/cols-little-desserts/.test(tallDessRow) && /pair-head/.test(tallDessRow),
+  'Sunday kids|desserts pair keeps titles in a pair-head');
+assert(/col-little[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz|How are we doing)/i.test(tallDessRow),
+  'leftover space under shorter Little Bells gets a small feature panel');
+assert(!/col-desserts[\s\S]*col-feature/.test(tallDessRow),
+  'the leftover panel stays in the Little Bells column — not under Desserts');
+assert(/col-little[\s\S]*a choice of roasts[\s\S]*col-desserts/.test(tallDessRow),
+  'Sunday roast line stays in the Little Bells column above the leftover panel');
 var kidsFullHtml = print.build(api.menuById('sunday'), kidsColDishes, {
   sectionLayout: api.normalizeSectionLayout({
     'Little Bells': { width: 'full', frame: true, note: 'All £9.50' }
@@ -1097,8 +1149,14 @@ assert(/cols-little-sides/.test(kidsColDessertsFull),
 assert(!/cols-little-solo/.test(kidsColDessertsFull),
   'food partner preferred over a solo kids column');
 var kidsSidesRow = (kidsColDessertsFull.match(/little-sides-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(kidsSidesRow && !/Stay a While|Gatherings|Pub Quiz/i.test(kidsSidesRow),
-  'kids|sides pair keeps each section in its own column — no rooms promo under the plates');
+assert(kidsSidesRow && /cols-pair-titles/.test(kidsSidesRow) && /pair-head/.test(kidsSidesRow),
+  'kids|sides titles share a pair-head baseline');
+assert(kidsSidesRow.indexOf('col-little') !== -1 && kidsSidesRow.indexOf('col-sides') !== -1,
+  'kids|sides pair keeps each section in its own column');
+if (/Stay a While|Gatherings/i.test(kidsSidesRow)) {
+  assert(/col-feature/.test(kidsSidesRow),
+    'a small leftover panel stays inside the shorter kids|sides column');
+}
 var fishIdx = kidsColDessertsFull.indexOf('Fish Fingers');
 var dessIdx = kidsColDessertsFull.indexOf('Sticky Toffee');
 var halloumiIdx = kidsColDessertsFull.indexOf('Halloumi Fries');
@@ -1748,8 +1806,8 @@ assert(/sheet-offer/.test(embedKidsHtml) && /lb-price-line/.test(embedKidsHtml),
   'Sunday £9.50 offer prints as a sheet offer, larger than dish names');
 assert(/viewport/.test(embedKidsHtml) && /preview-clip/.test(embedKidsHtml),
   'preview HTML includes viewport tag and overflow clip');
-assert(embedKidsRow && !/Stay a While|Gatherings|Pub Quiz/i.test(embedKidsRow),
-  'Sunday kids|desserts row keeps rooms promo out of the food pair');
+assert(/cols-pair-titles/.test(embedKidsRow) && /pair-head/.test(embedKidsRow),
+  'Sunday kids|desserts titles share a pair-head so they line up');
 var embedKidsWithRooms = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
@@ -1774,8 +1832,10 @@ var embedKidsWithRooms = print.build(api.menuById('sunday'), [
   ]
 });
 var embedKidsWithRoomsRow = (embedKidsWithRooms.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(embedKidsWithRoomsRow && !/Stay a While|Gatherings/i.test(embedKidsWithRoomsRow),
-  'explicit rooms panels still stay out of the kids|desserts pair');
+assert(embedKidsWithRoomsRow && /cols-pair-titles/.test(embedKidsWithRoomsRow),
+  'explicit rooms Sunday still keeps kids|desserts titles in a pair-head');
+assert(!/col-desserts[\s\S]*Sunday roasts at half adult price/.test(embedKidsWithRoomsRow),
+  'rooms panel does not pull the Sunday roast line into Desserts');
 var liveWordingHtml = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),

@@ -563,6 +563,13 @@
     }
 
     var gap = (rightFood || 0) - (leftFood || 0);
+    // Food pairs: only plug the shorter column. Never add a panel under both
+    // when the stacks are already close — that inflates the taller puddings.
+    if (opts.shortOnly) {
+      if (gap > 1.2) return stackForShort('left', gap > 9 ? 2 : 1);
+      if (gap < -1.2) return stackForShort('right', -gap > 9 ? 2 : 1);
+      return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
+    }
     if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1);
     if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1);
     if (pool.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
@@ -1175,6 +1182,24 @@
     return Math.min(8, 2 + lines * 1.6 + Math.floor(t.length / 70));
   }
 
+  /**
+   * Extra height the unit math misses in a half-column: wrapping descriptions,
+   * dietary tags on their own line. Used only to decide leftover feature panels.
+   */
+  function wrapUnits(sec) {
+    var u = 0;
+    ((sec && sec.dishes) || []).forEach(function (d) {
+      if (!d) return;
+      if (d.description) u += 0.8;
+      if (d.tags) u += 0.45;
+    });
+    return u;
+  }
+
+  function columnFillUnits(sec, rule, extraNote) {
+    return sectionUnits(sec, !!(rule && rule.frame)) + noteUnits(extraNote) + wrapUnits(sec);
+  }
+
   function pickSections(dishes) {
     var sections = groupBySection(dishes);
     var bag = {
@@ -1695,9 +1720,16 @@
     return !!(rule && String(rule.width || '').toLowerCase() === 'column');
   }
 
+  /** Category title outside any scallop so opposite columns share a baseline. */
+  function pairHeadHtml(title) {
+    if (!title) return '';
+    return '<div class="promo-head pair-head"><span class="sec-title">' + esc(title) + '</span></div>';
+  }
+
   /**
    * GOLDEN RULE: opposite columns start and finish level.
-   * Food on both sides first; feature panels under the shorter stack only.
+   * Category titles sit in a pair-head row (not inside a frilly frame).
+   * Food on both sides first; a small feature panel under the shorter stack only.
    */
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
     opts = opts || {};
@@ -1707,16 +1739,19 @@
       var fillOpts = {
         leftFrame: opts.leftFrame || 'box',
         rightFrame: opts.rightFrame || 'wide',
-        excludeTitles: opts.excludeTitles || []
+        excludeTitles: opts.excludeTitles || [],
+        shortOnly: !!opts.shortOnly
       };
       fill = planPromoFill(leftU || 0, rightU || 0, remaining, fillOpts);
       // If one side is still clearly short and planPromoFill returned nothing usable, force panels.
       var gap = (rightU || 0) - (leftU || 0);
-      if (!fill.left && !fill.right && remaining.length && Math.abs(gap) > 2.5) {
+      var minGap = opts.shortOnly ? 1.2 : 2.5;
+      if (!fill.left && !fill.right && remaining.length && Math.abs(gap) > minGap) {
         fill = planPromoFill(leftU || 0, rightU || 0, remaining, {
           leftFrame: fillOpts.leftFrame,
           rightFrame: fillOpts.rightFrame,
           excludeTitles: fillOpts.excludeTitles,
+          shortOnly: fillOpts.shortOnly,
           force: { shorter: gap > 0 ? 'left' : 'right', panels: Math.abs(gap) > 9 ? 2 : 1 }
         });
       }
@@ -1727,10 +1762,15 @@
     var colsClass = opts.colsClass || '';
     var leftClass = opts.leftClass || '';
     var rightClass = opts.rightClass || 'col-promo';
+    if (opts.leftTitle || opts.rightTitle) {
+      colsClass = (colsClass ? colsClass + ' ' : '') + 'cols-pair-titles';
+    }
     var html = '<section class="sec ' + secClass + '">' +
       '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
-      '<div class="col ' + leftClass + '"><div class="col-body">' + leftInner + '</div>' + leftFeat + '</div>' +
-      '<div class="col ' + rightClass + '"><div class="col-body">' + rightInner + '</div>' + rightFeat + '</div>' +
+      '<div class="col ' + leftClass + '">' + pairHeadHtml(opts.leftTitle) +
+        '<div class="col-body">' + leftInner + '</div>' + leftFeat + '</div>' +
+      '<div class="col ' + rightClass + '">' + pairHeadHtml(opts.rightTitle) +
+        '<div class="col-body">' + rightInner + '</div>' + rightFeat + '</div>' +
       '</div>' + (opts.footer || '') + '</section>';
     return { html: html, usedTitles: fill.usedTitles || [] };
   }
@@ -1769,8 +1809,9 @@
   /**
    * Little Bells respects this host menu’s Blocks width.
    * Column stays a column; Full width stays full-bleed. Drop-in wording
-   * (offer / Sunday line) stays in the Little Bells area — never across Desserts
-   * and never with Stay a While jammed under the plates.
+   * (offer / Sunday line) stays in the Little Bells area — never across Desserts.
+   * Opposite food columns share a pair-head so titles line up; a small feature
+   * panel drops into leftover space under the shorter stack.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
     opts = opts || {};
@@ -1796,18 +1837,29 @@
         usedPromoTitles: []
       };
     }
-    var kidsU = sectionUnits(bag.littleBells, !!(littleRule && littleRule.frame)) +
-      noteUnits(extras.slots.above) + noteUnits(extras.slots.below);
+    // Titles live in pair-head (outside any scallop) so both columns share a baseline.
+    kidsInner = sectionBlock(
+      bag.littleBells.name,
+      bag.littleBells.dishes,
+      littleRule,
+      frameKind,
+      { hideTitle: true, noteHtml: extras.aboveHtml, afterHtml: extras.belowHtml }
+    );
+    var kidsU = columnFillUnits(bag.littleBells, littleRule, extras.slots.above) +
+      noteUnits(extras.slots.below);
     // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
-      var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide');
-      var dessU = sectionUnits(bag.desserts, !!(dessRule && dessRule.frame)) +
-        noteUnits(dessRule && dessRule.note);
+      var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide', {
+        hideTitle: true
+      });
+      var dessU = columnFillUnits(bag.desserts, dessRule, dessRule && dessRule.note);
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
-        skipPromos: true,
+        shortOnly: true,
+        leftTitle: bag.littleBells.name,
+        rightTitle: bag.desserts.name,
         secClass: 'little-desserts-row',
         colsClass: 'cols-little-desserts',
         leftClass: 'col-little',
@@ -1823,13 +1875,16 @@
     // Food first: Sides when Blocks allows Column / Best fit.
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
-      var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide');
-      var sideU = sectionUnits(sidesPrint, !!(sideRule && sideRule.frame)) +
-        noteUnits(sideRule && sideRule.note);
+      var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide', {
+        hideTitle: true
+      });
+      var sideU = columnFillUnits(sidesPrint, sideRule, sideRule && sideRule.note);
       var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
-        skipPromos: true,
+        shortOnly: true,
+        leftTitle: bag.littleBells.name,
+        rightTitle: sidesPrint.name,
         secClass: 'little-sides-row',
         colsClass: 'cols-little-sides',
         leftClass: 'col-little',
@@ -1847,6 +1902,7 @@
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
       skipPromos: true,
+      leftTitle: bag.littleBells.name,
       secClass: 'little-solo-row',
       colsClass: 'cols-little-solo',
       leftClass: 'col-little',
@@ -2713,6 +2769,13 @@
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
+      // Opposite-column titles sit outside scallops so LITTLE BELLS / DESSERTS share a baseline.
+      '.cols-pair-titles{align-items:stretch}' +
+      '.cols-pair-titles > .col > .pair-head{flex:0 0 auto;margin:0 0 var(--sec-gap)}' +
+      '.cols-pair-titles > .col > .pair-head .sec-title{margin:0;text-align:left;letter-spacing:.12em}' +
+      '.cols-pair-titles .col-body > .scallop,.cols-pair-titles .col-body > .sec-plain,' +
+        '.cols-pair-titles .col-body > .sec-stack{margin-top:0}' +
+      '.col-little .sec-title,.col-desserts .sec-title,.col-sides .sec-title{text-align:left;margin-top:0}' +
       '.sandwich-aligned{margin:10px 0 0}' +
       '.sandwich-aligned .scallop{margin-top:0}' +
       '.bottom-cols{margin-top:16px;margin-bottom:4px;align-items:stretch}' +
