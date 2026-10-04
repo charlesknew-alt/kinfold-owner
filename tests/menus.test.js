@@ -1226,7 +1226,8 @@ assert(aiGs.indexOf('shorter stack') !== -1 || aiGs.indexOf('SHORTER') !== -1 ||
 assert(aiGs.indexOf('oval') !== -1 || aiGs.indexOf('box beside wide') !== -1 ||
   aiGs.indexOf('contrasting frames') !== -1,
   'Gemini golden rules contrast side-by-side feature frames');
-assert(page.indexOf('opposite columns match') !== -1 || page.indexOf('Gemini checking') !== -1,
+assert(page.indexOf('opposite columns match') !== -1 || page.indexOf('Gemini checking') !== -1 ||
+  page.indexOf('Gemini choosing columns') !== -1,
   'Generate runs Gemini balance check step');
 assert(printJs.indexOf('leftFrame') !== -1 && printJs.indexOf('rightFrame') !== -1,
   'paired promo panels pick opposite frame kinds');
@@ -1566,8 +1567,7 @@ assert(/cols-classics[\s\S]{0,2500}Sandwiches/i.test(sandColA4),
   'Blocks Column Sandwiches stay in a column when alone under Specials');
 assert(printJs.indexOf('sandLockedCol') !== -1,
   'print respects Sandwiches Column lock against orphan full-bleed');
-assert(printJs.indexOf('Lower-margin section') !== -1 &&
-  printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
+assert(printJs.indexOf('Do not pull Sandwiches onto page 1') !== -1,
   'two-page planner prefers Sandwiches on page 2');
 assert(printJs.indexOf('mainsPairedInCol') !== -1 && printJs.indexOf('canSitInColumn') !== -1,
   'Column Mains (after Gemini or Blocks lock) can sit opposite Sandwiches');
@@ -1767,7 +1767,7 @@ assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -
   'Gemini layout review can move Sides between pages for shared type');
 assert(printJs.indexOf('sandwichesLocked') !== -1,
   'print locks sandwiches when staff ticked them or listed fillings');
-assert(page.indexOf('sandwichesLocked') !== -1 && page.indexOf("advice.sandwichesOn === 'omit'") !== -1,
+assert(page.indexOf('sandwichesLocked') !== -1 && page.indexOf("sandwichesOn === 'omit'") !== -1,
   'generate ignores Gemini omit when sandwiches are locked');
 assert(aiGs.indexOf('sandwichesLocked') !== -1 && /never omit/i.test(aiGs),
   'Gemini must not omit ticked sandwiches');

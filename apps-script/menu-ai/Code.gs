@@ -448,7 +448,7 @@ function reviewLayoutWithGemini_(body) {
     '- A solo food column stays half-width; do not fill the empty half with Gatherings / Large Functions.\n' +
     '- Small leftover under a shorter FOOD stack: panels 1 only if it fits with a gap. panels 2 only for a huge leftover after food.\n' +
     '- panels:0 only when shorter is "even". Put panels ONLY under the shorter side.\n' +
-    '- Each event title once per menu.\n' +
+    '- Each event title only once per menu.\n' +
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
     'Unframed titles (Little Bells / Sides) sit as pair-head with their dish text. ' +
