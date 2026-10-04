@@ -1812,30 +1812,27 @@
     return !!(rule && String(rule.width || '').toLowerCase() === 'column');
   }
 
-  /** Category title outside any scallop so an unframed column lines up with its dishes. */
+  /** Category title in the shared pair-head row — same baseline whether frilly or not. */
   function pairHeadHtml(title) {
-    if (!title) return '';
+    if (!title) return '<div class="promo-head pair-head pair-head-spacer"><span class="sec-title">&nbsp;</span></div>';
     return '<div class="promo-head pair-head"><span class="sec-title">' + esc(title) + '</span></div>';
   }
 
-  function innerHasSectionTitle(inner, title) {
-    var t = String(title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (!t) return true;
-    return new RegExp('(sec-title|promo-title)[^>]*>\\s*' + t + '\\s*<', 'i').test(String(inner || ''));
-  }
-
-  /** Frilly column: sit the category title inside the frame with the dishes. */
-  function nestTitleInFrilly(title, inner) {
+  /** Pair-head is the only title; strip a copy that was left inside the food box. */
+  function stripInnerSectionTitle(inner, title) {
     inner = String(inner || '');
-    if (!title || innerHasSectionTitle(inner, title)) return inner;
-    if (inner.indexOf('<div class="scallop-pad">') === -1) return inner;
-    return inner.replace('<div class="scallop-pad">', '<div class="scallop-pad">' + sectionTitle(title));
+    if (!title) return inner;
+    var t = String(title).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    inner = inner.replace(new RegExp('<div class="sec-title"[^>]*>\\s*' + t + '\\s*</div>\\s*', 'i'), '');
+    inner = inner.replace(new RegExp('<span class="(?:sec-title|promo-title)[^"]*">\\s*' + t + '\\s*</span>', 'i'), '');
+    inner = inner.replace(/<div class="promo-head">\s*<\/div>\s*/i, '');
+    return inner;
   }
 
   /**
    * GOLDEN RULE: opposite columns start and finish level.
-   * Frilly food boxes carry their category title inside the frame.
-   * Unframed neighbours keep a pair-head so the title lines up with dish text.
+   * Category titles share a pair-head row so they line up whether a column
+   * is in a frilly box or not. The frame wraps the food under that title.
    * Food on both sides first; a small feature panel under the shorter stack only.
    */
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
@@ -1873,14 +1870,12 @@
     if (opts.leftTitle || opts.rightTitle) {
       colsClass = (colsClass ? colsClass + ' ' : '') + 'cols-pair-titles';
     }
-    var leftHtml = String(leftInner || '');
-    var rightHtml = String(rightInner || '');
-    var leftFrilly = /class="[^"]*scallop/.test(leftHtml);
-    var rightFrilly = /class="[^"]*scallop/.test(rightHtml);
-    if (leftFrilly) leftHtml = nestTitleInFrilly(opts.leftTitle, leftHtml);
-    if (rightFrilly) rightHtml = nestTitleInFrilly(opts.rightTitle, rightHtml);
-    var leftHead = (!leftFrilly && opts.leftTitle) ? pairHeadHtml(opts.leftTitle) : '';
-    var rightHead = (!rightFrilly && opts.rightTitle) ? pairHeadHtml(opts.rightTitle) : '';
+    var leftHtml = stripInnerSectionTitle(String(leftInner || ''), opts.leftTitle);
+    var rightHtml = stripInnerSectionTitle(String(rightInner || ''), opts.rightTitle);
+    // Always pair-head — a frilly Desserts title must sit on the same line as
+    // unframed Little Bells (and Sides | Sandwiches), not inset by the scallop.
+    var leftHead = (opts.leftTitle || opts.rightTitle) ? pairHeadHtml(opts.leftTitle || '') : '';
+    var rightHead = (opts.leftTitle || opts.rightTitle) ? pairHeadHtml(opts.rightTitle || '') : '';
     var html = '<section class="sec ' + secClass + '">' +
       '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
       '<div class="col ' + leftClass + '">' + leftHead +
@@ -1928,9 +1923,9 @@
    * Little Bells respects this host menu’s Blocks width.
    * Column stays a column; Full width stays full-bleed. Drop-in wording
    * (offer / Sunday line) stays in the Little Bells area — never across Desserts.
-   * Frilly partner (Desserts) keeps its title inside the frame; unframed
-   * Little Bells keeps a pair-head. A small feature panel drops into leftover
-   * space under the shorter stack when it fits with a gap.
+   * Both titles sit in a pair-head so they line up whether either column is
+   * frilly. A small feature panel drops into leftover space under the shorter
+   * stack when it fits with a gap.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
     opts = opts || {};
@@ -1956,15 +1951,14 @@
         usedPromoTitles: []
       };
     }
-    // Frilly titles print inside the box (same as Nibbles / Sunday Roasts).
-    // Unframed titles are lifted to pair-head so they line up with dish text.
+    // Titles always live in the pair-head row so they line up, frilly or not.
     kidsInner = sectionBlock(
       bag.littleBells.name,
       bag.littleBells.dishes,
       littleRule,
       frameKind,
       {
-        hideTitle: !(littleRule && littleRule.frame),
+        hideTitle: true,
         noteHtml: extras.aboveHtml,
         afterHtml: extras.belowHtml
       }
@@ -1975,7 +1969,7 @@
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
       var dessInner = sectionBlock(bag.desserts.name, bag.desserts.dishes, dessRule, 'wide', {
-        hideTitle: !(dessRule && dessRule.frame)
+        hideTitle: true
       });
       var dessU = columnFillUnits(bag.desserts, dessRule, dessRule && dessRule.note);
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
@@ -2001,7 +1995,7 @@
     var sidesAllowColumn = !!(sideRule && wantsColumn(sideRule));
     if (sidesAllowColumn && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
       var sideInner = sectionBlock(sidesPrint.name, sidesPrint.dishes, sideRule, 'wide', {
-        hideTitle: !(sideRule && sideRule.frame)
+        hideTitle: true
       });
       var sideU = columnFillUnits(sidesPrint, sideRule, sideRule && sideRule.note);
       var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
@@ -2477,7 +2471,7 @@
         sandwichesBlock(bag, {
           frame: sandRule.frame ? 'box' : undefined,
           rule: sandRule,
-          hideTitle: !(sandRule && sandRule.frame)
+          hideTitle: true
         }),
         sandU2,
         framedBlock(listDishes(bag.mains.dishes), mainRule),
@@ -2561,7 +2555,7 @@
         }
         if (!leftInner) leftInner = '&nbsp;';
         var rightInner = p2opts.sandwiches
-          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: !(sandRule && sandRule.frame) })
+          ? sandwichesBlock(bag, { rule: sandRule, hideTitle: true })
           : '&nbsp;';
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
@@ -2904,7 +2898,8 @@
       '.promo-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 4px}' +
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
-      // Unframed pair titles sit outside the food; frilly titles live in the scallop.
+      '.promo-head.pair-head-spacer .sec-title{visibility:hidden}' +
+      // Opposite-column titles share one baseline, frilly box or not.
       '.cols-pair-titles{align-items:stretch}' +
       '.cols-pair-titles > .col > .pair-head{flex:0 0 auto;margin:0 0 var(--sec-gap)}' +
       '.cols-pair-titles > .col > .pair-head .sec-title{margin:0;text-align:left;letter-spacing:.12em}' +

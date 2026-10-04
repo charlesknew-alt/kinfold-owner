@@ -168,9 +168,11 @@ assert(printJs.indexOf('if (opts.force) fillOpts.force = opts.force') !== -1,
 assert(printJs.indexOf('skipPromos: true') !== -1,
   'solo column pairs skip Stay a While in the empty opposite half');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
-  'unframed opposite columns keep category titles in a pair-head');
-assert(printJs.indexOf('function nestTitleInFrilly') !== -1,
-  'frilly columns put the category title inside the food frame');
+  'opposite columns keep category titles in a pair-head');
+assert(printJs.indexOf('function stripInnerSectionTitle') !== -1,
+  'pair-head strips a leftover title inside the food frame');
+assert(printJs.indexOf('Always pair-head') !== -1 && printJs.indexOf('pair-head-spacer') !== -1,
+  'frilly and unframed titles share one pair-head baseline');
 assert(printJs.indexOf('sides-sand-row') !== -1 && printJs.indexOf("rightTitle: p2opts.sandwiches ? 'Sandwiches'") !== -1,
   'Sides|Sandwiches bottom pair still shares the column-pair layout');
 assert(printJs.indexOf('shortOnly: true') !== -1,
@@ -528,8 +530,8 @@ assert(ingestJs.indexOf('reviewLayout') !== -1, 'ingest can ask Gemini to review
 assert(aiGs.indexOf('reviewLayoutWithGemini_') !== -1, 'Apps Script supports layout review action');
 assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Classics') !== -1,
   'Gemini layout prompt has Eight Bells golden rules');
-assert(aiGs.indexOf('INSIDE the frame') !== -1 && aiGs.indexOf('Sip & Paint') !== -1,
-  'Gemini layout rule: frilly titles sit in the box; leftover panels must fit with a gap');
+assert(aiGs.indexOf('share a pair-head row') !== -1 && aiGs.indexOf('Sip & Paint') !== -1,
+  'Gemini layout rule: titles line up frilly or not; leftover panels must fit with a gap');
 assert(aiGs.indexOf('NEVER fall off the page') !== -1 && aiGs.indexOf('never clip food') !== -1,
   'Gemini layout rule: content must never fall off the page');
 assert(aiGs.indexOf('The JS planner has already placed the food') !== -1 && aiGs.indexOf('sectionWidths') !== -1,
@@ -540,8 +542,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow150') !== -1, 'menus page cache-bust is flow150');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow150') !== -1, 'hub menus link cache-bust is flow150');
+assert(page.indexOf('flow151') !== -1, 'menus page cache-bust is flow151');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow151') !== -1, 'hub menus link cache-bust is flow151');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -726,6 +728,12 @@ assert(extraRes.ok && extraBook.main.length === 1 && extraBook[extraCard.menu.id
 api.resetExtras();
 assert(page.indexOf('pendingAddSection') !== -1 && page.indexOf('rememberScroll_') !== -1,
   'add-from-section pre-fills category and save keeps page place');
+assert(page.indexOf('restorePendingScroll_') !== -1 && page.indexOf('rememberScroll_(sec, focusSel)') !== -1,
+  'Blocks width/frilly changes keep the same section card in view');
+assert(page.indexOf('html += \'<div class="section-block" data-section="\'') !== -1,
+  'Blocks cards have data-section so scroll restore can find them');
+assert(page.indexOf('category titles share one line whether a column is in a frilly box or not') !== -1,
+  'Blocks lede says titles line up in a frilly box or not');
 assert(page.indexOf('data-view="panels"') !== -1 && page.indexOf('renderFeaturePanels') !== -1,
   'Feature panels is a top-level view (not buried in Main → Wording)');
 assert(page.indexOf('doSyncNow') !== -1 && page.indexOf('syncNowFromCloud') !== -1,
@@ -1339,10 +1347,10 @@ assert(/cols-little-desserts/.test(kidsColHtml) && /col-little/.test(kidsColHtml
 var kidsDessRow = (kidsColHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(kidsDessRow && /cols-pair-titles/.test(kidsDessRow) && /pair-head[\s\S]*Desserts/.test(kidsDessRow),
   'unframed Desserts keeps a pair-head beside framed Little Bells');
-assert(/col-little[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Little Bells<\/div>/.test(kidsDessRow),
-  'frilly Little Bells title sits inside the kids frame');
-assert(!/pair-head[\s\S]*Little Bells/.test(kidsDessRow),
-  'frilly Little Bells does not perch its title above the outer wave');
+assert(/pair-head[\s\S]*Little Bells/.test(kidsDessRow),
+  'frilly Little Bells title sits in the pair-head with Desserts');
+assert(!/col-little[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Little Bells<\/div>/.test(kidsDessRow),
+  'frilly Little Bells title is not inset by the scallop');
 var kidsDessColBody = kidsDessRow.replace(/<div class="promo-head pair-head">[\s\S]*?<\/div>/g, '');
 assert(!/<div class="sec-title">Desserts<\/div>/.test(kidsDessColBody),
   'unframed Desserts title stays out of any scallop');
@@ -1386,10 +1394,10 @@ var tallDessKidsHtml = print.build(api.menuById('sunday'), [
 var tallDessRow = (tallDessKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(/cols-little-desserts/.test(tallDessRow) && /pair-head[\s\S]*Little Bells/.test(tallDessRow),
   'unframed Little Bells keeps its title as pair-head beside Desserts');
-assert(/col-desserts[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Desserts<\/div>/.test(tallDessRow),
-  'frilly Desserts title sits inside the scallop with the puddings');
-assert(!/col-desserts[\s\S]*pair-head/.test(tallDessRow),
-  'frilly Desserts does not perch its title above the outer wave');
+assert(/pair-head[\s\S]*Desserts/.test(tallDessRow),
+  'frilly Desserts title sits in the pair-head with Little Bells');
+assert(!/col-desserts[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Desserts<\/div>/.test(tallDessRow),
+  'frilly Desserts title is not inset by the scallop');
 assert(!/col-little[\s\S]*col-feature[\s\S]*Sip & Paint/i.test(tallDessRow),
   'leftover under Little Bells does not auto-pick an oversized Sip & Paint');
 if (/col-little[\s\S]*col-feature/.test(tallDessRow)) {
@@ -2254,8 +2262,10 @@ assert(/viewport/.test(embedKidsHtml) && /preview-clip/.test(embedKidsHtml),
   'preview HTML includes viewport tag and overflow clip');
 assert(/cols-pair-titles/.test(embedKidsRow) && /pair-head[\s\S]*Little Bells/.test(embedKidsRow),
   'unframed Little Bells keeps a pair-head beside frilly Desserts');
-assert(/col-desserts[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Desserts<\/div>/.test(embedKidsRow),
-  'embedded Sunday Desserts title sits inside the frilly box');
+assert(/pair-head[\s\S]*Desserts/.test(embedKidsRow),
+  'embedded Sunday Desserts title lines up in the pair-head, frilly or not');
+assert(!/col-desserts[\s\S]*scallop-pad[\s\S]*<div class="sec-title">Desserts<\/div>/.test(embedKidsRow),
+  'embedded Sunday Desserts title is not inset by the scallop');
 var embedKidsWithRooms = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
@@ -2577,10 +2587,10 @@ var clipA4 = clipHtml.split('mode-panel mode-a5')[0] || clipHtml;
 var sidesSandRow = (clipA4.match(/sides-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(sidesSandRow && /cols-pair-titles/.test(sidesSandRow) && /pair-head[\s\S]*Sides/.test(sidesSandRow),
   'unframed Sides keeps a pair-head beside Sandwiches');
-assert(/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSandRow),
-  'frilly Sandwiches title sits inside the frame with the fillings');
-assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
-  'Sandwiches title is not perched above the outer wave');
+assert(/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
+  'frilly Sandwiches title sits in the pair-head with Sides');
+assert(!/scallop-pad[\s\S]*<div class="sec-title">Sandwiches<\/div>/.test(sidesSandRow),
+  'Sandwiches title is not inset by the scallop');
 (function columnMainsKeepSidesWithSandwiches() {
   var html = print.build(mainMenu, sidesSandDishes, {
     sectionLayout: api.normalizeSectionLayout({
