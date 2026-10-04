@@ -462,10 +462,12 @@ function reviewLayoutWithGemini_(body) {
     'Category titles (Little Bells / Desserts / Sides / Sandwiches / Burgers / Classics) MUST share that top baseline. ' +
     'That includes the page-2 Sides column beside the Sandwiches frilly box — same rule as Little Bells vs Desserts. ' +
     'Frilly frames sit UNDER the title — they must not drop a heading below its neighbour. ' +
-    'A little leftover under the shorter stack MUST get a small feature panel (panels:1). ' +
-    'Do not leave a blank band under kids plates, puddings, sides or sandwiches. ' +
+    'A little leftover under the shorter stack gets a small feature panel only if it still fits on the page with a gap. ' +
+    'Do not leave a blank band under kids plates, puddings, sides or sandwiches when a small panel would fit. ' +
     'Solo column (no food partner) stays half-width; do not fill the empty half with rooms copy.\n' +
-    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly.\n' +
+    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly. ' +
+    'Content must NEVER fall off the page. Drop leftover feature panels and foot logos before hiding a dish. ' +
+    'Two pages if one would clip at minimum type; never clip food.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
     '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
     '5. PAGE 1: LEFT often Sharing/events; RIGHT = Burgers then Pub Classics. Sandwiches prefer page 2 column.\n' +

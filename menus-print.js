@@ -1238,7 +1238,7 @@
   /**
    * Adult pub type range (pt). Auto-fit steps between max → min; never above max.
    * Decision rule: if food will not fit one A4 even at MINIMUM type, use two
-   * pages and open type toward the maximum. Never clip desserts off the foot.
+   * pages and open type toward the maximum. Never clip food off the page.
    */
   var TYPE_RANGE = {
     name: { min: 11, max: 11.5 },
@@ -3171,6 +3171,10 @@
           'if(body&&body.scrollHeight>body.clientHeight+2)return true;' +
           'var mid=page.querySelector(".card-mid");' +
           'if(mid&&mid.scrollHeight>mid.clientHeight+2)return true;' +
+          'var cols=page.querySelectorAll(".col");' +
+          'for(var ci=0;ci<cols.length;ci++){' +
+            'if(cols[ci].scrollHeight>cols[ci].clientHeight+2)return true;' +
+          '}' +
           'return false;' +
         '}' +
         // GOLDEN RULE: opposite columns must start AND finish at the same point.
@@ -3269,6 +3273,28 @@
           'group.forEach(function(pg){if(dropJammedFootPromos(pg))changed=true;});' +
           'if(changed)fitGroup(group);' +
         '}' +
+        // NEVER clip food off the page. Drop leftover feature panels, then foot
+        // promos, then logos, until the sheet fits. Dishes stay.
+        'function dropOverflowingChrome(page){' +
+          'if(!overflows(page))return false;' +
+          'var feat=page.querySelector(".col-feature .scallop");' +
+          'if(feat&&feat.parentNode){feat.parentNode.removeChild(feat);return true;}' +
+          'var foot=page.querySelector(".foot-promos,.foot-promos-one");' +
+          'if(foot&&foot.parentNode){foot.parentNode.removeChild(foot);return true;}' +
+          'var logo=page.querySelector(".foot-logo");' +
+          'if(logo&&logo.style.display!=="none"){logo.style.display="none";return true;}' +
+          'return false;' +
+        '}' +
+        'function keepContentOnPage(group){' +
+          'if(!group.length)return;' +
+          'var n=0;' +
+          'while(n++<12){' +
+            'var dirty=false;' +
+            'group.forEach(function(pg){if(dropOverflowingChrome(pg))dirty=true;});' +
+            'if(!dirty)break;' +
+            'fitGroup(group);' +
+          '}' +
+        '}' +
         // After shared type is locked, grow gaps / spread sections so leftover space
         // is not a blank bottom third — fill top→bottom evenly without changing type size.
         'function clearSpread(page){' +
@@ -3320,14 +3346,21 @@
           'preferReadableType(a5);' +
           'dropJammedPromos(a4);' +
           'dropJammedPromos(a5);' +
+          'keepContentOnPage(a4);' +
+          'keepContentOnPage(a5);' +
           '[].slice.call(document.querySelectorAll(".card-face.fill-page")).forEach(function(page){' +
             'clearFitArtifacts(page);' +
             'for(var j=0;j<STEPS.length;j++){strip(page);page.classList.add("fill-page");page.classList.add(STEPS[j]);' +
             'if(!overflows(page))break;}' +
+            'while(dropOverflowingChrome(page)){}' +
           '});' +
           'balanceOppositeColumns();' +
+          'keepContentOnPage(a4);' +
+          'keepContentOnPage(a5);' +
           'a4.forEach(spreadPage);' +
           'a5.forEach(spreadPage);' +
+          'keepContentOnPage(a4);' +
+          'keepContentOnPage(a5);' +
           'fitPreviewToScreen();' +
         '}' +
         'function fitPreviewToScreen(){' +

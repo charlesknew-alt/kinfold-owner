@@ -197,6 +197,11 @@ assert(printJs.indexOf('align-items:center') !== -1 && printJs.indexOf('no lunch
   'dish-line centers mark so lunch/non-lunch gaps stay even');
 assert(printJs.indexOf('body.scrollHeight>body.clientHeight') !== -1,
   'fitPages measures page-body overflow (not only the clipped page)');
+assert(printJs.indexOf('cols[ci].scrollHeight') !== -1 && printJs.indexOf('function keepContentOnPage') !== -1,
+  'fit also measures column overflow and drops chrome so food never falls off the page');
+assert(printJs.indexOf('function dropOverflowingChrome') !== -1 &&
+  printJs.indexOf('.col-feature .scallop') !== -1,
+  'overflowing leftover feature panels are removed before dishes clip');
 assert(printJs.indexOf('splitPromosForColumns') !== -1, 'event panels can split across columns');
 assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as separate boxes');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
@@ -449,10 +454,12 @@ assert(aiGs.indexOf('GOLDEN RULES') !== -1 && aiGs.indexOf('Burgers then Pub Cla
   'Gemini layout prompt has Eight Bells golden rules');
 assert(aiGs.indexOf('Frilly frames sit UNDER') !== -1 && aiGs.indexOf('Little Bells vs Desserts') !== -1,
   'Gemini layout rule: titles share a baseline; leftover gets a small panel on every pair');
+assert(aiGs.indexOf('NEVER fall off the page') !== -1 && aiGs.indexOf('never clip food') !== -1,
+  'Gemini layout rule: content must never fall off the page');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow139') !== -1, 'menus page cache-bust is flow139');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow139') !== -1, 'hub menus link cache-bust is flow139');
+assert(page.indexOf('flow144') !== -1, 'menus page cache-bust is flow144');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow144') !== -1, 'hub menus link cache-bust is flow144');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -881,6 +888,8 @@ assert(printJs.indexOf('canFitFootPromos') !== -1 && printJs.indexOf('footPromos
   'foot feature panels require spare room (not jammed at min type)');
 assert(printJs.indexOf('dropJammedFootPromos') !== -1,
   'fit script drops jammed foot feature panels at dense/compact type');
+assert(printJs.indexOf('keepContentOnPage(a4)') !== -1,
+  'fitPages re-checks overflow after type, balance and spread');
 assert(printJs.indexOf('specials-face') !== -1 && printJs.indexOf('specials-course') !== -1,
   'Specials card uses compact specials-course titles');
 assert(/\.card-face\.specials-face h1\{[^}]*font-size:14pt/.test(printJs),
