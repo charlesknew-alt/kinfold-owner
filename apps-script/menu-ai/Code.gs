@@ -453,8 +453,7 @@ function reviewLayoutWithGemini_(body) {
     '- Each event title only once per menu.\n' +
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
-    'Category titles (Little Bells / Desserts / Sides / Sandwiches) share a pair-head row so they line up whether a column is in a frilly box or not. ' +
-    'The frilly frame wraps the food under that title. ' +
+    'Category titles line up across columns: a frilly section (Desserts / Sandwiches) puts its title INSIDE the frame; the unframed neighbour (Little Bells / Sides) sits as pair-head on the same baseline. ' +
     'A little leftover under the shorter stack gets a SMALL evergreen panel (Stay a While / Gatherings) only if it fits with a decent gap after the food. ' +
     'Never auto-pick a dated event (Sip & Paint) as leftover under kids or puddings.\n' +
     '2. PAGE COUNT: only ONE or TWO pages. Content must NEVER fall off the page. ' +
