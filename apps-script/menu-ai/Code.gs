@@ -414,9 +414,7 @@ function reviewLayoutWithGemini_(body) {
   var layout = body.layout || body;
   var prompt =
     'You are the final gate before an Eight Bells (Bolney) pub menu PDF opens.\n' +
-    'Your job: if ANY pair of opposite columns will not start and finish level, you MUST add feature panels ' +
-    'under the shorter stack. Do not release uneven columns. This is a blanket layout rule for every pair — ' +
-    'Little Bells vs Desserts, Sides vs Sandwiches, Sandwiches vs Burgers, Events vs Classics — never one special case.\n' +
+    'Layout is decided by YOU alongside these rules. The JS planner is only a starting guess — honour staff Blocks locks, then choose pages, columns and Best-fit widths.\n' +
     'Return ONLY valid JSON (no markdown):\n' +
     '{\n' +
     '  "density": "airy"|"roomy"|"normal"|"tight"|"compact",\n' +
@@ -424,60 +422,48 @@ function reviewLayoutWithGemini_(body) {
     '  "sidesOn": "page1"|"page2",\n' +
     '  "dropFootLogo": true|false,\n' +
     '  "okToPrint": true|false,\n' +
+    '  "sectionWidths": { "<section name>": "column"|"full" },\n' +
     '  "columnBalance": {\n' +
     '    "page1": { "shorter": "left"|"right"|"even", "panels": 0|1|2 },\n' +
     '    "page2": { "shorter": "left"|"right"|"even", "panels": 0|1|2 }\n' +
     '  },\n' +
     '  "notes": "one short sentence for staff"\n' +
     '}\n' +
-    'SHARED TYPE SCALE (CRITICAL — blanket policy for every menu):\n' +
-    '- Titles, dish names and descriptions must be the SAME size on page 1 and page 2.\n' +
-    '- Never leave page 1 enlarged/airy while page 2 is compact/smaller — one density for the whole menu.\n' +
-    '- Maximise that shared size: the packed page is the ceiling. Move Sides or feature panels ' +
-    'OFF the packed page onto the roomier page so both can enlarge together.\n' +
-    '- Sandwiches (fillings or tip/sell box) stay on page 2 in a column — quieter, lower-margin. ' +
-    'Do not pull them onto page 1 to even leftover. Only use sandwichesOn page1 if page 2 cannot fit them.\n' +
-    '- If layout.sandwichesLocked is true, sandwichesOn must be page1 or page2 — NEVER omit. Staff ticked Sandwiches; you only choose which page.\n' +
-    '- If sandwichesLocked is false, sandwichesOn should be omit (they were not ticked on Dishes).\n' +
-    '- Prefer fewer feature panels on the packed page over shrinking type. One panel is enough when two ' +
-    'would force smaller shared type.\n' +
-    '- Feature panels are LITTLE promotions — never a tall empty frame. Balance columns with food ' +
-    '(Sides / sandwich sell box under the shorter stack) first; only then add a compact promo foot.\n' +
-    '- dropFootLogo: true when keeping the page-2 logo would force tight/compact type — readable mains/desserts ' +
-    'beat a second logo. Always prefer larger shared type over decorative chrome.\n' +
-    '- After type is set, both pages should fill top→bottom (no blank bottom third with content jammed up).\n' +
-    '- Moving Sides / feature boxes between pages to equalise fill is required when it raises ' +
-    'shared type; inventing a third page is not. Leave Sandwiches on page 2.\n' +
-    'COLUMN BALANCE RULES (mandatory before okToPrint):\n' +
-    '- Read layout.columns (leftFood / rightFood / shorter). If shorter is left or right, panels MUST be 1 or 2.\n' +
-    '- panels:0 is only allowed when shorter is "even".\n' +
-    '- Large holes (big |gap|): panels=2 (stack event + rooms filler). Modest holes: panels=1.\n' +
-    '- Put panels ONLY under the shorter side — never pile onto the taller food stack.\n' +
-    '- Each event / feature title may appear ONLY ONCE on the whole menu. If page 1 used “Next Pub Quiz”, ' +
-    'page 2 must pick a different unused title (e.g. Stay a While / Gatherings) — never reprint the same box.\n' +
-    '- If page2 is null, omit page2 or set shorter:"even", panels:0.\n' +
-    '- okToPrint may be true once columnBalance fixes the hole; set false only if type would be unreadable.\n' +
+    'FOOD MAP (default — change only to stop clipping):\n' +
+    '- Page 1: Sharing | Burgers (then Pub Classics). Do NOT put Sides or Sandwiches under Sharing.\n' +
+    '- Page 2: Mains, Desserts, then Sides beside Sandwiches.\n' +
+    '- sidesOn is page2 so Sides sit with Sandwiches. Never sidesOn page1 when Sharing/Burgers already occupy page 1.\n' +
+    '- sandwichesOn is page2 (quieter column). Never omit when sandwichesLocked is true.\n' +
+    '- If sandwichesLocked is false, sandwichesOn should be omit.\n' +
+    'BEST-FIT WIDTHS: layout.bestFit lists sections staff set to “Best fit (AI chooses)”. ' +
+    'For those only, set sectionWidths to column or full. Prefer column so food fits. ' +
+    'Locked Column / Full in layout.sectionWidths must not change.\n' +
+    'SHARED TYPE SCALE:\n' +
+    '- Same title/name/description size on both pages. Maximise that shared size.\n' +
+    '- Prefer fewer feature panels on the packed page over shrinking type.\n' +
+    '- dropFootLogo: true when a page-2 logo would force tight/compact type.\n' +
+    '- After type is set, fill each used page top→bottom. Never a third page.\n' +
+    'COLUMN BALANCE (after food is placed):\n' +
+    '- Food first. If a hole exists because Sides were taken off page 2, set sidesOn page2 — do not fill that hole with two event panels.\n' +
+    '- A solo food column stays half-width; do not fill the empty half with Gatherings / Large Functions.\n' +
+    '- Small leftover under a shorter FOOD stack: panels 1 only if it fits with a gap. panels 2 only for a huge leftover after food.\n' +
+    '- panels:0 only when shorter is "even". Put panels ONLY under the shorter side.\n' +
+    '- Each event title once per menu.\n' +
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
     'Unframed titles (Little Bells / Sides) sit as pair-head with their dish text. ' +
     'A frilly column puts its title INSIDE the frame with the dishes (Desserts / Sandwiches) — never perched above the outer wave. ' +
     'A little leftover under the shorter stack gets a SMALL evergreen panel (Stay a While / Gatherings) only if it fits with a decent gap after the food. ' +
-    'Never auto-pick a dated event (Sip & Paint) as leftover under kids or puddings — skip it rather than sit flush under the category or overshoot the other column. ' +
-    'Do not leave a blank band under kids plates, puddings, sides or sandwiches when a small panel would fit. ' +
-    'Solo column (no food partner) stays half-width; do not fill the empty half with rooms copy.\n' +
-    '2. PAGE COUNT: only ONE or TWO pages. Never a third. Fill each used page top to bottom evenly. ' +
-    'Content must NEVER fall off the page. Drop leftover feature panels and foot logos before hiding a dish. ' +
-    'Two pages if one would clip at minimum type; never clip food.\n' +
+    'Never auto-pick a dated event (Sip & Paint) as leftover under kids or puddings.\n' +
+    '2. PAGE COUNT: only ONE or TWO pages. Content must NEVER fall off the page. ' +
+    'Drop leftover feature panels and foot logos before hiding a dish. Two pages if one would clip at minimum type; never clip food.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
-    '4. Feature panels: prefer contrasting frames (box beside wide/oval). Use Stay a While / Gatherings / quiz wording.\n' +
-    '5. PAGE 1: LEFT often Sharing/events; RIGHT = Burgers then Pub Classics. Sandwiches prefer page 2 column.\n' +
+    '4. Feature panels: prefer contrasting frames. Use Stay a While / Gatherings / quiz wording.\n' +
+    '5. PAGE 1: LEFT Sharing; RIGHT Burgers then Pub Classics.\n' +
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
-    '7. Prefer sandwichesOn page2 (fillings or sell box), always as a column. ' +
-    'Never omit sandwiches when sandwichesLocked is true. ' +
-    'Move sidesOn to page1 when that raises the shared density.\n' +
+    '7. sandwichesOn page2; sidesOn page2 beside Sandwiches. Never omit locked sandwiches.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
-    '9. SECTION WIDTH “both” / best-fit: PREFER a column, paired with another best-fit/column section, so food fits. ' +
-    'Full-bleed only when a section is alone and short. Never stack extra food under Sharing/Burgers if it would clip — move Sandwiches to page 2 and pair Desserts with Sides.\n' +
+    '9. SECTION WIDTH “both” / best-fit: YOU choose column or full in sectionWidths so this sheet fits.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 7000);
 
   var called = callGemini_(key, [{ text: prompt }], {
@@ -514,6 +500,22 @@ function reviewLayoutWithGemini_(body) {
   }
   var sidesOn = String(advice.sidesOn || '').toLowerCase();
   if (['page1', 'page2'].indexOf(sidesOn) === -1) sidesOn = '';
+  var hasSharing = !!(layout.sections && (layout.sections['Sharing Plates'] || layout.sections.Sharing));
+  if (layout.pages === 2 && hasSharing) {
+    if (sidesOn === 'page1') sidesOn = 'page2';
+    if (sandwichesOn === 'page1') sandwichesOn = 'page2';
+  }
+
+  var sectionWidths = {};
+  if (advice.sectionWidths && typeof advice.sectionWidths === 'object') {
+    var bestFit = Array.isArray(layout.bestFit) ? layout.bestFit : [];
+    Object.keys(advice.sectionWidths).forEach(function (sec) {
+      var w = String(advice.sectionWidths[sec] || '').toLowerCase();
+      if (w !== 'column' && w !== 'full') return;
+      if (bestFit.length && bestFit.indexOf(sec) === -1) return;
+      sectionWidths[sec] = w;
+    });
+  }
 
   function normPage(raw, fallbackShorter) {
     raw = raw && typeof raw === 'object' ? raw : {};
@@ -547,6 +549,7 @@ function reviewLayoutWithGemini_(body) {
     dropFootLogo: !!advice.dropFootLogo,
     okToPrint: advice.okToPrint !== false,
     columnBalance: columnBalance,
+    sectionWidths: sectionWidths,
     notes: String(advice.notes || '').slice(0, 280)
   };
 }
