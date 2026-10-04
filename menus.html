@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261004-flow139"></script>
-  <script src="menus-print.js?v=20261004-flow139"></script>
-  <script src="menus-ingest.js?v=20261004-flow139"></script>
+  <script src="menus.js?v=20261004-flow143"></script>
+  <script src="menus-print.js?v=20261004-flow143"></script>
+  <script src="menus-ingest.js?v=20261004-flow143"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1713,7 +1713,8 @@
       html += '</div>';
       html += '<p class="note" style="margin:8px 0 0">' + escapeAttr(other.name) + ' has ' +
         otherCount + ' dish' + (otherCount === 1 ? '' : 'es') +
-        (list && list.length ? ' · this sheet has ' + list.length : '') + '.</p>';
+        (list && list.length ? ' · this sheet has ' + list.length : '') +
+        '. Copy / swap take Blocks, includes and wording ticks with the dishes.</p>';
       html += '</div>';
       return html;
     }
@@ -1738,22 +1739,28 @@
       var b = book['main-next'] || [];
       book.main = b;
       book['main-next'] = a;
-      var la = layoutBook.main;
-      var lb = layoutBook['main-next'];
-      layoutBook.main = lb || (EBMenus.defaultSectionLayout ? EBMenus.defaultSectionLayout() : {});
-      layoutBook['main-next'] = la || (EBMenus.defaultSectionLayout ? EBMenus.defaultSectionLayout() : {});
+      var la = EBMenus.normalizeSectionLayout
+        ? EBMenus.normalizeSectionLayout(layoutBook.main)
+        : (layoutBook.main || {});
+      var lb = EBMenus.normalizeSectionLayout
+        ? EBMenus.normalizeSectionLayout(layoutBook['main-next'])
+        : (layoutBook['main-next'] || {});
+      layoutBook.main = lb;
+      layoutBook['main-next'] = la;
       var ia = includes.main;
       var ib = includes['main-next'];
-      includes.main = ib || {};
-      includes['main-next'] = ia || {};
+      includes.main = ib && typeof ib === 'object' ? JSON.parse(JSON.stringify(ib)) : {};
+      includes['main-next'] = ia && typeof ia === 'object' ? JSON.parse(JSON.stringify(ia)) : {};
       var pa = promoTicks.main;
       var pb = promoTicks['main-next'];
-      promoTicks.main = pb || {};
-      promoTicks['main-next'] = pa || {};
+      promoTicks.main = pb && typeof pb === 'object' ? JSON.parse(JSON.stringify(pb)) : {};
+      promoTicks['main-next'] = pa && typeof pa === 'object' ? JSON.parse(JSON.stringify(pa)) : {};
       var ma = metaBook.main;
       var mb = metaBook['main-next'];
-      metaBook.main = mb || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {});
-      metaBook['main-next'] = ma || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {});
+      metaBook.main = EBMenus.normalizeMeta ? EBMenus.normalizeMeta(mb || {}) :
+        (mb || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {}));
+      metaBook['main-next'] = EBMenus.normalizeMeta ? EBMenus.normalizeMeta(ma || {}) :
+        (ma || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {}));
       save();
     }
 
@@ -2660,7 +2667,10 @@
           msg += 'removes them from ' + hostName +
             ', and ticks ' + dest.name + ' so they still print on this sheet.';
           if (!confirm(msg)) return;
-          var res = EBMenus.pushSectionToOwnMenu(book, menuId, sec, { includes: includes });
+          var res = EBMenus.pushSectionToOwnMenu(book, menuId, sec, {
+            includes: includes,
+            layoutBook: layoutBook
+          });
           if (!res.ok) {
             alert(res.error || 'Could not send that category.');
             return;
@@ -2680,7 +2690,10 @@
           var msg = 'Send ' + secs.join(', ') + ' to their own menus?\n\n' +
             'Each own-page menu is replaced. Those dishes leave this sheet and stay on the print when their tick is on.';
           if (!confirm(msg)) return;
-          var res = EBMenus.pushAllOwnPageSections(book, menuId, { includes: includes });
+          var res = EBMenus.pushAllOwnPageSections(book, menuId, {
+            includes: includes,
+            layoutBook: layoutBook
+          });
           if (!res.ok) {
             alert(res.error || 'Nothing to send.');
             return;
@@ -2967,8 +2980,26 @@
             alert(srcName + ' is empty — nothing to copy.');
             return;
           }
-          if (!confirm('Replace all dishes on ' + dstName + ' with a copy of ' + srcName + ' (' + n + ' dishes)?')) return;
-          book[menuId] = cloneDishesForMenu_(book[srcId]);
+          if (!confirm('Replace all dishes, Blocks, includes and wording ticks on ' + dstName +
+            ' with a copy of ' + srcName + ' (' + n + ' dishes)?')) return;
+          var copied = EBMenus.copyLongSheetState
+            ? EBMenus.copyLongSheetState({
+              book: book,
+              layoutBook: layoutBook,
+              includes: includes,
+              promoTicks: promoTicks,
+              metaBook: metaBook
+            }, srcId, menuId)
+            : null;
+          if (copied && copied.ok) {
+            book = copied.book;
+            layoutBook = copied.layoutBook;
+            includes = copied.includes;
+            promoTicks = copied.promoTicks;
+            metaBook = copied.metaBook;
+          } else {
+            book[menuId] = cloneDishesForMenu_(book[srcId]);
+          }
           dishId = (book[menuId][0] && book[menuId][0].id) || '';
           save();
           mode = 'complete';
