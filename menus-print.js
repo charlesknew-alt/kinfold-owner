@@ -1818,6 +1818,27 @@
     return '<div class="promo-head pair-head"><span class="sec-title">' + esc(title) + '</span></div>';
   }
 
+  /** True when a column has no food — only &nbsp; / empty tags. */
+  function isBlankFoodInner(html) {
+    var s = String(html || '').replace(/&nbsp;|&#160;/gi, '');
+    s = s.replace(/<[^>]+>/g, '');
+    return !s.replace(/\s+/g, '');
+  }
+
+  function innerHasSectionTitle(inner, title) {
+    var t = String(title || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!t) return true;
+    return new RegExp('(sec-title|promo-title)[^>]*>\\s*' + t + '\\s*<', 'i').test(String(inner || ''));
+  }
+
+  /** Frilly column: sit the category title inside the frame with the dishes. */
+  function nestTitleInFrilly(title, inner) {
+    inner = String(inner || '');
+    if (!title || innerHasSectionTitle(inner, title)) return inner;
+    if (inner.indexOf('<div class="scallop-pad">') === -1) return inner;
+    return inner.replace('<div class="scallop-pad">', '<div class="scallop-pad">' + sectionTitle(title));
+  }
+
   /** Pair-head is the only title; strip a copy that was left inside the food box. */
   function stripInnerSectionTitle(inner, title) {
     inner = String(inner || '');
@@ -1831,8 +1852,8 @@
 
   /**
    * GOLDEN RULE: opposite columns start and finish level.
-   * Category titles share a pair-head row so they line up whether a column
-   * is in a frilly box or not. The frame wraps the food under that title.
+   * Frilly food boxes carry their category title inside the frame (Desserts).
+   * Unframed neighbours keep a pair-head, inset so it lines up with that title.
    * Food on both sides first; a small feature panel under the shorter stack only.
    */
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
@@ -1870,12 +1891,34 @@
     if (opts.leftTitle || opts.rightTitle) {
       colsClass = (colsClass ? colsClass + ' ' : '') + 'cols-pair-titles';
     }
-    var leftHtml = stripInnerSectionTitle(String(leftInner || ''), opts.leftTitle);
-    var rightHtml = stripInnerSectionTitle(String(rightInner || ''), opts.rightTitle);
-    // Always pair-head — a frilly Desserts title must sit on the same line as
-    // unframed Little Bells (and Sides | Sandwiches), not inset by the scallop.
-    var leftHead = (opts.leftTitle || opts.rightTitle) ? pairHeadHtml(opts.leftTitle || '') : '';
-    var rightHead = (opts.leftTitle || opts.rightTitle) ? pairHeadHtml(opts.rightTitle || '') : '';
+    var leftHtml = String(leftInner || '');
+    var rightHtml = String(rightInner || '');
+    // Empty partner (Sides with no Sandwiches): the promo IS the column, sit it
+    // at the top beside the food — not as a footer with a hole above it.
+    var leftPromoBody = isBlankFoodInner(leftHtml) && fill.left;
+    var rightPromoBody = isBlankFoodInner(rightHtml) && fill.right;
+    if (leftPromoBody) { leftHtml = fill.left; leftFeat = ''; }
+    if (rightPromoBody) { rightHtml = fill.right; rightFeat = ''; }
+    var leftFrilly = /class="[^"]*scallop/.test(leftHtml) && !leftPromoBody;
+    var rightFrilly = /class="[^"]*scallop/.test(rightHtml) && !rightPromoBody;
+    if (leftFrilly) leftHtml = nestTitleInFrilly(opts.leftTitle, leftHtml);
+    else if (opts.leftTitle) leftHtml = stripInnerSectionTitle(leftHtml, opts.leftTitle);
+    if (rightFrilly) rightHtml = nestTitleInFrilly(opts.rightTitle, rightHtml);
+    else if (opts.rightTitle) rightHtml = stripInnerSectionTitle(rightHtml, opts.rightTitle);
+    // Unframed titles sit as pair-head; inset them when the neighbour is frilly
+    // so LITTLE BELLS lines up with DESSERTS inside the box.
+    function headFor(title, frilly, promoBody, otherTitle, otherFrilly) {
+      if (frilly || promoBody) return '';
+      if (title) {
+        var cls = otherFrilly ? ' pair-head-inset' : '';
+        return '<div class="promo-head pair-head' + cls + '"><span class="sec-title">' +
+          esc(title) + '</span></div>';
+      }
+      if (otherTitle && !otherFrilly) return pairHeadHtml('');
+      return '';
+    }
+    var leftHead = headFor(opts.leftTitle, leftFrilly, leftPromoBody, opts.rightTitle, rightFrilly);
+    var rightHead = headFor(opts.rightTitle, rightFrilly, rightPromoBody, opts.leftTitle, leftFrilly);
     var html = '<section class="sec ' + secClass + '">' +
       '<div class="cols cols-balanced cols-features ' + colsClass + '">' +
       '<div class="col ' + leftClass + '">' + leftHead +
@@ -1895,7 +1938,7 @@
     var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
-      skipPromos: true,
+      skipPromos: opts.skipPromos !== false,
       secClass: 'column-solo-row',
       colsClass: 'column-solo-cols',
       leftClass: '',
@@ -1923,9 +1966,9 @@
    * Little Bells respects this host menu’s Blocks width.
    * Column stays a column; Full width stays full-bleed. Drop-in wording
    * (offer / Sunday line) stays in the Little Bells area — never across Desserts.
-   * Both titles sit in a pair-head so they line up whether either column is
-   * frilly. A small feature panel drops into leftover space under the shorter
-   * stack when it fits with a gap.
+   * Frilly Desserts keeps its title inside the frame; unframed Little Bells
+   * keeps a pair-head, inset so the two headings share a line. A small feature
+   * panel drops into leftover space under the shorter stack when it fits with a gap.
    */
   function renderLittleBellsRow(bag, littleRule, dessRule, sideRule, sidesPrint, opts) {
     opts = opts || {};
@@ -1951,7 +1994,7 @@
         usedPromoTitles: []
       };
     }
-    // Titles always live in the pair-head row so they line up, frilly or not.
+    // Frilly titles print inside the box. Unframed titles lift to pair-head.
     kidsInner = sectionBlock(
       bag.littleBells.name,
       bag.littleBells.dishes,
@@ -2734,15 +2777,16 @@
       '.page{width:210mm;height:297mm;padding:11mm 10mm 9mm;position:relative;display:flex;flex-direction:column;overflow:hidden}' +
       '.page-body{flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:hidden}' +
       '.page-body.spread-even{justify-content:space-evenly}' +
+      /* Leftover space sits BETWEEN sections — never stretch a column pair so a
+         leftover panel drops to the page foot with a hole beside Sides. */
       '.page-body-start{padding-top:0}' +
       '.page-spacer{flex:1 1 auto;min-height:0}' +
       '.page-body > .sec,.page-body > .top-band,.page-body > .cols,.page-body > .classics-block,.page-body > .foot-logo{flex:0 0 auto}' +
       /* When spreading, let the main column / bottom band grow so type stays large
          but the block reaches the foot — no blank bottom third. */
-      '.page-body.spread-even > .sec,.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols{flex:1 1 auto;min-height:0}' +
+      '.page-body.spread-even > .sec,.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols{flex:0 0 auto}' +
       '.page-body.spread-even > .classics-block,.page-body.spread-even > .cols.bottom-cols,.page-body.spread-even > .foot-logo{display:flex;flex-direction:column}' +
-      '.page-body.spread-even > .classics-block > .cols,.page-body.spread-even > .cols.bottom-cols{flex:1 1 auto;min-height:0;align-items:stretch}' +
-      '.page-body.spread-even .cols-balanced .col{min-height:100%}' +
+      '.page-body.spread-even > .classics-block > .cols,.page-body.spread-even > .cols.bottom-cols{flex:0 0 auto;align-items:stretch}' +
       '.page-body.spread-even > .foot-logo{flex:0 0 auto;margin-top:auto}' +
       '.scallop,.sec,.cols,.foot-logo,.col-promo,.col-events,.col-food{page-break-inside:avoid}' +
       '.sheet.landscape{width:297mm;height:210mm;overflow:hidden}' +
@@ -2833,8 +2877,8 @@
         'overflow:hidden;max-width:100%}' +
       '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
       '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
-      '.scallop-pad{padding:4px 10px 3px;overflow:hidden;min-width:0}' +
-      '.scallop-box .scallop-pad{padding:4px 10px 4px}' +
+      '.scallop-pad{padding:6px 12px 10px;overflow:hidden;min-width:0}' +
+      '.scallop-box .scallop-pad{padding:6px 12px 10px}' +
       '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
@@ -2899,7 +2943,8 @@
       '.promo-head.pair-head{margin:0 0 6px}' +
       '.promo-head.pair-head .sec-title{margin:0}' +
       '.promo-head.pair-head-spacer .sec-title{visibility:hidden}' +
-      // Opposite-column titles share one baseline, frilly box or not.
+      '.promo-head.pair-head-inset{padding-top:18px}' +
+      // Frilly titles live in the scallop; unframed pair-heads inset to that baseline.
       '.cols-pair-titles{align-items:stretch}' +
       '.cols-pair-titles > .col > .pair-head{flex:0 0 auto;margin:0 0 var(--sec-gap)}' +
       '.cols-pair-titles > .col > .pair-head .sec-title{margin:0;text-align:left;letter-spacing:.12em}' +
@@ -2912,7 +2957,8 @@
       '.sandwich-aligned .scallop{margin-top:0}' +
       '.bottom-cols{margin-top:16px;margin-bottom:4px;align-items:stretch}' +
       '.bottom-cols.cols-balanced .col-sides,.bottom-cols.cols-balanced .col-promo{display:flex;flex-direction:column;min-height:0}' +
-      '.bottom-cols.cols-balanced .col-body{flex:1 1 auto}' +
+      '.bottom-cols.cols-balanced .col-body{flex:0 0 auto}' +
+      '.bottom-cols .col-promo > .col-feature{margin-top:0;padding-top:0}' +
       '.bottom-cols-balanced{grid-template-columns:1fr 1fr;gap:20px}' +
       /* Full-width food + two feature panels underneath (no orphan column hole) */
       '.foot-promos{margin:10px 0 6px;align-items:stretch}' +
@@ -2947,7 +2993,7 @@
       '.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
-      '.fill-dense .scallop-pad{padding:2px 8px 1px}' +
+      '.fill-dense .scallop-pad{padding:4px 10px 6px}' +
       '.fill-dense .sec-title,.fill-compact .sec-title{letter-spacing:.08em}' +
       '.fill-dense .allergy{margin-top:2mm;padding-top:1mm;font-size:9pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */
