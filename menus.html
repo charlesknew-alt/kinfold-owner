@@ -1692,7 +1692,8 @@
     }
 
     /**
-     * Live Main + Main (upcoming) — copy / swap without wiping the printed menu.
+     * Live Main + Main (upcoming) — copy one onto the other, or make upcoming live
+     * (which then clears upcoming for the next change).
      */
     function renderMainPairBox(menu, list) {
       var otherId = menu.id === 'main' ? 'main-next' : 'main';
@@ -1701,20 +1702,20 @@
       var html = '<div class="include-box outside-text-box" style="margin-bottom:14px">';
       html += '<h3>' + (menu.id === 'main-next' ? 'Upcoming Main' : 'Live Main') + '</h3>';
       if (menu.id === 'main-next') {
-        html += '<p class="note" style="margin:0 0 10px">Build the <strong>next</strong> Main here. The live <strong>Main menu</strong> stays as-is until you swap.</p>';
+        html += '<p class="note" style="margin:0 0 10px">Build the <strong>next</strong> Main here. The live <strong>Main menu</strong> stays as-is until you make this one live — upcoming then clears, ready for the change after that.</p>';
       } else {
-        html += '<p class="note" style="margin:0 0 10px">This is the live Main guests get today. Use <strong>Main (upcoming)</strong> to prepare a replacement without deleting this one.</p>';
+        html += '<p class="note" style="margin:0 0 10px">This is the live Main guests get today. When the new menu is ready on <strong>Main (upcoming)</strong>, make it live — upcoming then clears for the next future change.</p>';
       }
       html += '<div class="toolbar-row" style="margin:0;flex-wrap:wrap;gap:8px">';
       html += '<button type="button" class="soft" id="doCopyMainFrom">' +
         (menu.id === 'main-next' ? 'Copy live Main into upcoming' : 'Copy upcoming into live Main') +
         '</button>';
-      html += '<button type="button" class="go" id="doSwapMains">Swap Main ↔ Upcoming</button>';
+      html += '<button type="button" class="go" id="doPromoteUpcoming">Make upcoming the live Main</button>';
       html += '</div>';
       html += '<p class="note" style="margin:8px 0 0">' + escapeAttr(other.name) + ' has ' +
         otherCount + ' dish' + (otherCount === 1 ? '' : 'es') +
         (list && list.length ? ' · this sheet has ' + list.length : '') +
-        '. Copy / swap take Blocks, includes and wording ticks with the dishes.</p>';
+        '. Copy and make-live take Blocks, includes and wording ticks with the dishes.</p>';
       html += '</div>';
       return html;
     }
@@ -1734,33 +1735,24 @@
       });
     }
 
-    function swapMainPair_() {
-      var a = book.main || [];
-      var b = book['main-next'] || [];
-      book.main = b;
-      book['main-next'] = a;
-      var la = EBMenus.normalizeSectionLayout
-        ? EBMenus.normalizeSectionLayout(layoutBook.main)
-        : (layoutBook.main || {});
-      var lb = EBMenus.normalizeSectionLayout
-        ? EBMenus.normalizeSectionLayout(layoutBook['main-next'])
-        : (layoutBook['main-next'] || {});
-      layoutBook.main = lb;
-      layoutBook['main-next'] = la;
-      var ia = includes.main;
-      var ib = includes['main-next'];
-      includes.main = ib && typeof ib === 'object' ? JSON.parse(JSON.stringify(ib)) : {};
-      includes['main-next'] = ia && typeof ia === 'object' ? JSON.parse(JSON.stringify(ia)) : {};
-      var pa = promoTicks.main;
-      var pb = promoTicks['main-next'];
-      promoTicks.main = pb && typeof pb === 'object' ? JSON.parse(JSON.stringify(pb)) : {};
-      promoTicks['main-next'] = pa && typeof pa === 'object' ? JSON.parse(JSON.stringify(pa)) : {};
-      var ma = metaBook.main;
-      var mb = metaBook['main-next'];
-      metaBook.main = EBMenus.normalizeMeta ? EBMenus.normalizeMeta(mb || {}) :
-        (mb || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {}));
-      metaBook['main-next'] = EBMenus.normalizeMeta ? EBMenus.normalizeMeta(ma || {}) :
-        (ma || (EBMenus.emptyMeta ? EBMenus.emptyMeta() : {}));
+    function promoteUpcomingMain_() {
+      var state = {
+        book: book,
+        layoutBook: layoutBook,
+        includes: includes,
+        promoTicks: promoTicks,
+        metaBook: metaBook
+      };
+      var res = EBMenus.promoteUpcomingMain
+        ? EBMenus.promoteUpcomingMain(state)
+        : null;
+      if (res && res.ok) {
+        book = res.book;
+        layoutBook = res.layoutBook;
+        includes = res.includes;
+        promoTicks = res.promoTicks;
+        metaBook = res.metaBook;
+      }
       save();
     }
 
@@ -3006,13 +2998,18 @@
           render();
         };
       }
-      var doSwapMains = document.getElementById('doSwapMains');
-      if (doSwapMains) {
-        doSwapMains.onclick = function () {
-          var liveN = (book.main || []).length;
+      var doPromoteUpcoming = document.getElementById('doPromoteUpcoming');
+      if (doPromoteUpcoming) {
+        doPromoteUpcoming.onclick = function () {
           var nextN = (book['main-next'] || []).length;
-          if (!confirm('Swap live Main (' + liveN + ' dishes) with Main (upcoming) (' + nextN + ' dishes)?\n\nBlocks, includes and wording ticks swap too.')) return;
-          swapMainPair_();
+          if (!nextN) {
+            alert('Main (upcoming) is empty — nothing to make live.');
+            return;
+          }
+          var liveN = (book.main || []).length;
+          if (!confirm('Replace live Main (' + liveN + ' dishes) with Main (upcoming) (' + nextN + ' dishes)?\n\nUpcoming then clears, ready for the next future menu. Blocks, includes and wording ticks move across too.')) return;
+          promoteUpcomingMain_();
+          if (menuId === 'main-next') menuId = 'main';
           dishId = (dishes()[0] && dishes()[0].id) || '';
           mode = 'complete';
           render();

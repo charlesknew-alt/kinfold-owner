@@ -313,8 +313,10 @@ assert(!api.includableMenus('main').some(function (m) { return m.id === 'main-ne
   'upcoming Main is not pulled onto live Main as an include');
 assert(Array.isArray(api.seed()['main-next']) && api.seed()['main-next'].length === 0,
   'seed leaves Main (upcoming) empty');
-assert(page.indexOf('main-next') !== -1 && page.indexOf('Swap Main') !== -1,
-  'UI offers Main (upcoming) with swap/copy controls');
+assert(page.indexOf('main-next') !== -1 && page.indexOf('Make upcoming the live Main') !== -1,
+  'UI offers Main (upcoming) with copy and make-live controls');
+assert(page.indexOf('doPromoteUpcoming') !== -1 && page.indexOf('promoteUpcomingMain') !== -1,
+  'making upcoming live clears it for the next future menu');
 assert(page.indexOf('copyLongSheetState') !== -1 && page.indexOf('Blocks, includes and wording ticks') !== -1,
   'copy upcoming into live Main takes Blocks with the dishes');
 assert(typeof api.copyLongSheetState === 'function' && typeof api.promoteUpcomingMain === 'function',
@@ -371,6 +373,11 @@ assert(typeof api.copyLongSheetState === 'function' && typeof api.promoteUpcomin
     'making upcoming live takes upcoming Blocks');
   assert(promoted.layoutBook['main-next'].Desserts.frame === false,
     'upcoming Blocks reset after it is made live');
+  assert(promoted.includes.main.sandwiches === true && !promoted.includes['main-next'].sandwiches &&
+    Object.keys(promoted.includes['main-next']).length === 0,
+    'upcoming includes move to live Main then reset');
+  assert(promoted.metaBook.main.title === 'New' && promoted.metaBook['main-next'].title === '',
+    'upcoming meta moves onto live Main then resets');
 })();
 assert(page.indexOf("'main-next'") !== -1 && /main-next/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
   'staff menu list includes Main (upcoming)');
