@@ -166,7 +166,9 @@ assert(printJs.indexOf('overflow-x:hidden') !== -1 && printJs.indexOf('preview-c
 assert(printJs.indexOf('if (opts.force) fillOpts.force = opts.force') !== -1,
   'layout review forceColumnFill applies to opposite food pairs');
 assert(printJs.indexOf('skipPromos: true') !== -1,
-  'solo column pairs skip Stay a While in the empty opposite half');
+  'Little Bells solo can skip rooms copy in the empty opposite half');
+assert(printJs.indexOf('skipPromos: !!opts.skipPromos') !== -1,
+  'unpaired Column / Best-fit rows fill the short side with a feature panel');
 assert(printJs.indexOf('function isBlankFoodInner') !== -1 && printJs.indexOf('rightPromoBody') !== -1,
   'empty partner column sits the leftover panel at the top, not the page foot');
 assert(printJs.indexOf('.bottom-cols.cols-balanced .col-body{flex:0 0 auto}') !== -1,
@@ -548,8 +550,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow157') !== -1, 'menus page cache-bust is flow157');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow157') !== -1, 'hub menus link cache-bust is flow157');
+assert(page.indexOf('flow158') !== -1, 'menus page cache-bust is flow158');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow158') !== -1, 'hub menus link cache-bust is flow158');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1299,6 +1301,8 @@ assert(printJs.indexOf('leftFrame') !== -1 && printJs.indexOf('rightFrame') !== 
 assert(printJs.indexOf("leftFrame: 'box', rightFrame: 'wide'") !== -1 ||
   printJs.indexOf('two matching rectangles never sit side by side') !== -1,
   'side-by-side feature panels alternate rect box vs oval wide');
+assert(printJs.indexOf('function contrastAdjacentScallops') !== -1,
+  'adjacent frilly food boxes pick opposite wave / corner treatments');
 assert(printJs.indexOf('balanceFeatures') !== -1,
   'print equalises paired feature panel heights after fit');
 assert(printJs.indexOf('cols-features') !== -1,
@@ -1532,8 +1536,8 @@ assert(!/cols-little-desserts/.test(dessColKidsFull),
 assert(/column-solo-row[\s\S]*Sticky Toffee/.test(dessColKidsFull),
   'Column Desserts stay a column when Little Bells is Full width');
 var dessSoloRow = (dessColKidsFull.match(/column-solo-row[\s\S]*?<\/section>/) || [])[0] || '';
-assert(dessSoloRow && !/Stay a While|Gatherings|Pub Quiz/i.test(dessSoloRow),
-  'solo Desserts column is not filled with rooms promo');
+assert(dessSoloRow && /Stay a While|Gatherings|Pub Quiz/i.test(dessSoloRow),
+  'solo Desserts column fills the empty half with a feature panel so bottoms line up');
 assert(printJs.indexOf('levelOppositeColumns') !== -1 && printJs.indexOf('Gemini layout review chooses') !== -1,
   'JS equalises opposite columns; Gemini chooses which page Sides and Sandwiches sit on');
 // Best fit (both) still allows the kids|desserts column pair
@@ -2592,18 +2596,44 @@ var colSpecHtml = print.build(api.menuById('main'), [
   })
 });
 var colSpecA4 = colSpecHtml.split('mode-panel mode-a5')[0] || colSpecHtml;
-assert(/column-solo-row[\s\S]*Mackerel Pate/.test(colSpecA4) &&
+assert((/column-solo-row[\s\S]*Mackerel Pate/.test(colSpecA4) ||
+    /col-pair-row[\s\S]*Mackerel Pate/.test(colSpecA4)) &&
   /data-specials-course="Special Starters"/.test(colSpecA4),
-  'Special Starters Column lock stays a half-column under Starters');
+  'Special Starters Column lock stays a column under Starters');
 assert(!/<section class="sec specials-beside"[\s\S]*Mackerel Pate/.test(colSpecA4),
   'Column Specials are not stretched full-bleed under the course');
 assert(/column-solo-row[\s\S]*Pan Roasted Duck Breast/.test(colSpecA4) &&
   /data-specials-course="Special Mains"/.test(colSpecA4),
   'Special Mains Column lock stays a half-column under Mains');
-assert(/column-solo-row[\s\S]*Pie of the day/.test(colSpecA4),
-  'Item Boost Column lock stays a half-column, not a full-bleed box');
-assert(printJs.indexOf('Sides (page 1 — Specials sit with Sandwiches)') !== -1,
-  'planner moves Sides to page 1 when Specials take the Sandwiches column');
+assert(/column-solo-row[\s\S]*Pie of the day/.test(colSpecA4) ||
+  /col-pair-row[\s\S]*Pie of the day/.test(colSpecA4),
+  'Item Boost Column lock stays a column, not a full-bleed box');
+assert(printJs.indexOf('function pairColumnFood') !== -1 &&
+  printJs.indexOf('takeColumnPending') !== -1,
+  'consecutive Column / Best-fit sections share a row, titles level, panels fill the short side');
+(function consecutiveColumnSectionsShareARow() {
+  var html = print.build(mainMenu, [
+    api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+    api.dish('Special Starters', 'Mackerel Pate', 'salad & sourdough toast', '7.25', 'gf'),
+    api.dish('Item Boost', 'Pie of the day', 'mash vegetables gravy', '20.95', ''),
+    api.dish('Burgers', 'Brisket Burger', 'fries', '18.95', ''),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam', '16.95', 'v')
+  ], {
+    sectionLayout: api.normalizeSectionLayout({
+      'Special Starters': { width: 'column', frame: true, note: '' },
+      'Item Boost': { width: 'column', frame: true }
+    })
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  assert(/col-pair-row[\s\S]*Mackerel Pate[\s\S]*Pie of the day/.test(a4) ||
+    /col-pair-row[\s\S]*Pie of the day[\s\S]*Mackerel Pate/.test(a4),
+    'Column Special Starters and Item Boost sit in one row, not two stacked full-bleed boxes');
+  assert(!/<section class="sec specials-beside"[\s\S]*Mackerel Pate/.test(a4),
+    'Column Special Starters are not a full-bleed box above Item Boost');
+  var pairRow = (a4.match(/col-pair-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(/scallop-box/.test(pairRow) && /scallop-wide/.test(pairRow),
+    'adjacent frilly boxes use different wave / corner treatments');
+})();
 var specialsCardHtml = print.build(api.menuById('specials'), [
   api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
 ], {
@@ -2659,8 +2689,8 @@ assert(sharedTypeLayout.p2 && sharedTypeLayout.p2.sandwiches === true && !shared
   'named sandwich fillings sit on page 2 (less prominent, column)');
 assert(/type range/i.test(sharedTypeLayout.summary) || /minimum type/i.test(sharedTypeLayout.summary),
   'layout summary states type range / min-type decision');
-assert(sharedTypeLayout.p1.sidesOnP1 !== true && sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === true,
-  'JS keeps Sides on page 2 beside Sandwiches');
+assert(sharedTypeLayout.p1.sidesOnP1 === true || (sharedTypeLayout.p2 && sharedTypeLayout.p2.sidesOnP2 === true),
+  'Sides stay on the sheet — leftover column space if the other page would clip');
 (function buildKeepsGeminiSidesOn() {
   var planned = print.planFluidLayout(mainMenu, sharedTypeDishes, {
     sectionLayout: { Sandwiches: { tip: true, frame: true, width: 'column' } }
@@ -2853,6 +2883,8 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
   var specSand = (a4.match(/specials-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
   assert(specSand && /Pan Roasted Duck Breast/.test(specSand) && /Quesadilla|Falafel/.test(specSand),
     'Column Specials sit in a half-column beside Sandwiches');
+  assert(/scallop-box/.test(specSand) && /scallop-wide/.test(specSand),
+    'Specials and Sandwiches use different scallop waves so the pair does not match');
   assert(/data-specials-course="Special Mains"/.test(specSand),
     'Specials|Sandwiches row is marked Special Mains');
   assert(!/<section class="sec specials-beside"[\s\S]*Pan Roasted Duck Breast/.test(a4),
@@ -2860,14 +2892,14 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
   var plannedCol = print.planFluidLayout(mainMenu, dishes, { sectionLayout: colLayout });
   assert(plannedCol.pages === 2 && plannedCol.p1.sidesOnP1 === true &&
     plannedCol.p2 && plannedCol.p2.sidesOnP2 === false,
-    'Sides move to page 1 when Specials sit with Sandwiches on page 2');
+    'when page 2 would clip, leftover column Sides sit in page 1 leftover');
   var pageBits = a4.split('class="page fill-page');
   var page1Html = pageBits[1] || '';
   var page2Html = pageBits[2] || '';
   assert(/Cheesy Garlic Bread/.test(page1Html),
-    'Sides print on page 1 in the leftover under Sharing|Burgers');
+    'Sides print in page 1 leftover (food first, then feature panels)');
   assert(!/Cheesy Garlic Bread/.test(page2Html),
-    'Sides do not start a clipped row under Specials|Sandwiches on page 2');
+    'Sides do not clip off the bottom of page 2');
 })();
 (function specialsBestFitChoosesColumnBesideSandwiches() {
   var dishes = sidesSandDishes.concat([

@@ -514,8 +514,35 @@
   function scallop(inner, kind) {
     // Real Canva/print frames via border-image so waves sit in the border
     // gutter and never cut through dish text (unlike stretched SVG/PNG fill).
+    // box = tight scallop, squarer corners; wide = looser wave, rounder corners.
     var cls = kind === 'box' ? 'scallop scallop-box' : 'scallop scallop-wide';
     return '<div class="' + cls + '"><div class="scallop-pad">' + inner + '</div></div>';
+  }
+
+  function oppositeScallopKind(kind) {
+    return kind === 'wide' ? 'box' : 'wide';
+  }
+
+  function firstScallopKind(html) {
+    var m = String(html || '').match(/\bscallop-(box|wide)\b/);
+    return m ? m[1] : '';
+  }
+
+  function setFirstScallopKind(html, kind) {
+    html = String(html || '');
+    if (kind !== 'box' && kind !== 'wide') return html;
+    if (!/\bscallop-(box|wide)\b/.test(html)) return html;
+    return html.replace(/\bscallop-(box|wide)\b/, 'scallop-' + kind);
+  }
+
+  /** Two matching rectangles never sit side by side — neighbour uses the other wave. */
+  function contrastAdjacentScallops(leftHtml, rightHtml) {
+    var lk = firstScallopKind(leftHtml);
+    var rk = firstScallopKind(rightHtml);
+    if (lk && rk && lk === rk) {
+      rightHtml = setFirstScallopKind(rightHtml, oppositeScallopKind(lk));
+    }
+    return { leftHtml: leftHtml, rightHtml: rightHtml };
   }
 
   function sectionTitle(name) {
@@ -1631,29 +1658,55 @@
         p2left = Math.max(0, p2left - (tightBack ? sandCost + 2 : sandCost));
         layout.fillers.push(sandDishCount ? 'Sandwiches (page 2)' : 'Sandwiches box (page 2)');
       }
-      // Column / Best-fit Specials sit opposite Sandwiches on page 2. A leftover
-      // Sides row under that pair clips into the allergy footer while page 1
-      // (Sharing|Burgers) still has a hole. Sit Sides on page 1 when they fit.
+      // Overflow (any sheet): food must not clip. Two Column / Best-fit sections
+      // that can share a row count as the taller one, not a stack. A trailing
+      // column section with no partner sits in leftover column space on the
+      // other page (food first). Full-width locks stay full-bleed.
+      // Gemini layout review chooses leftover panel fill after this food map.
       var specMainRulePlan = { width: 'full' };
+      var mainRulePlan = { width: 'full' };
+      var sideRulePlan = { width: 'column' };
       if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
         specMainRulePlan = root.EBMenus.sectionLayoutFor('Special Mains', opts.sectionLayout) || specMainRulePlan;
-      } else if (opts.sectionLayout && opts.sectionLayout['Special Mains']) {
-        specMainRulePlan = opts.sectionLayout['Special Mains'];
+        mainRulePlan = root.EBMenus.sectionLayoutFor('Mains', opts.sectionLayout) || mainRulePlan;
+        sideRulePlan = root.EBMenus.sectionLayoutFor('Sides', opts.sectionLayout) || sideRulePlan;
+      } else if (opts.sectionLayout) {
+        if (opts.sectionLayout['Special Mains']) specMainRulePlan = opts.sectionLayout['Special Mains'];
+        if (opts.sectionLayout.Mains) mainRulePlan = opts.sectionLayout.Mains;
+        if (opts.sectionLayout.Sides) sideRulePlan = opts.sectionLayout.Sides;
       }
-      if (bag.sides && layout.p2.sandwiches && layout.p2.sidesOnP2 &&
-          bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length &&
-          canSitInColumn(specMainRulePlan)) {
-        var sideCostP1 = sectionUnits(bag.sides, false);
-        if (p1left >= sideCostP1 + 8) {
-          layout.p1.sidesOnP1 = true;
-          layout.p2.sidesOnP2 = false;
-          p1left -= sideCostP1;
-          p2left += sideCostP1;
-          p1used += sideCostP1;
-          p2used -= sideCostP1;
-          layout.fillers.push('Sides (page 1 — Specials sit with Sandwiches)');
-        }
+      var specCostP2 = bag.specialMains ? sectionUnits(bag.specialMains, true) : 0;
+      var mainCostP2 = bag.mains ? sectionUnits(bag.mains, false) : 0;
+      var sideCostP2 = bag.sides ? sectionUnits(bag.sides, false) : 0;
+      var p2Load = p2used + (layout.p2.sandwiches ? sandCost : 0);
+      var sandPartner = '';
+      if (layout.p2.sandwiches) {
+        if (specCostP2 && canSitInColumn(specMainRulePlan)) sandPartner = 'specials';
+        else if (sideCostP2 && layout.p2.sidesOnP2 && canSitInColumn(sideRulePlan)) sandPartner = 'sides';
+        else if (mainCostP2 && canSitInColumn(mainRulePlan)) sandPartner = 'mains';
       }
+      if (sandPartner === 'specials') {
+        p2Load = p2used - specCostP2 + Math.max(specCostP2, sandCost);
+      } else if (sandPartner === 'mains') {
+        p2Load = p2used - mainCostP2 + Math.max(mainCostP2, sandCost);
+      }
+      var CLIP = PAGE - 10;
+      var sideCostP1 = sideCostP2;
+      var moveSidesToP1 = bag.sides && layout.p2.sidesOnP2 && p1left >= sideCostP1 + 8 && (
+        p2Load > CLIP ||
+        (sandPartner && sandPartner !== 'sides')
+      );
+      if (moveSidesToP1) {
+        layout.p1.sidesOnP1 = true;
+        layout.p2.sidesOnP2 = false;
+        p1left -= sideCostP1;
+        p2left += sideCostP1;
+        p1used += sideCostP1;
+        p2used -= sideCostP1;
+        p2Load -= sideCostP1;
+        layout.fillers.push('Sides (page 1 leftover — keep food on the page)');
+      }
+      p2left = Math.max(0, PAGE - p2Load);
       if (wantPromoBox && !layout.p1.rooms) {
         // Prefer NOT stacking an extra promo beside sandwiches on a packed page 2 —
         // that is the type ceiling. Only add when page 2 still has generous room.
@@ -1665,9 +1718,9 @@
         }
       }
 
-      // Starting guess only — Gemini layout review chooses sidesOn / sandwichesOn.
-      // Do not dump Sides under Sharing|Burgers to even leftover; that clips page 1
-      // and leaves event boxes opposite Sandwiches.
+      // Starting guess only — Gemini layout review chooses leftover fill.
+      // Do not dump Sides under Sharing|Burgers just to even leftover. Do move a
+      // trailing unpaired column there when stacking it would clip food.
 
       // Foot logo is optional chrome — only keep it when page 2 still has generous
       // leftover after mains/desserts. Readable shared type beats a second logo.
@@ -1817,30 +1870,68 @@
     var rule = ruleFor('Special Mains', plan);
     if (rule.frame == null) rule.frame = true;
     var sandRule = opts.sandRule || ruleFor('Sandwiches', plan);
-    var specU = sectionUnits(bag.specialMains, !!(rule && rule.frame));
-    var sandU = sandwichesPackCost(bag, sandRule);
-    var specInner = sectionBlock('Specials', bag.specialMains.dishes, rule, 'box', { hideTitle: true });
-    var sandInner = sandwichesBlock(bag, {
-      rule: sandRule,
-      hideTitle: true,
-      frame: sandRule.frame ? 'box' : undefined
-    });
-    var pair = levelOppositeColumns(specInner, specU, sandInner, sandU, {
+    return pairColumnFood(
+      { title: 'Specials', dishes: bag.specialMains.dishes, rule: rule, leftClass: 'col-specials' },
+      {
+        title: 'Sandwiches',
+        dishes: sandwichDishesOf(bag),
+        rule: sandRule,
+        html: sandwichesBlock(bag, {
+          rule: sandRule,
+          hideTitle: true,
+          frame: sandRule.frame ? 'wide' : undefined
+        }),
+        units: sandwichesPackCost(bag, sandRule),
+        rightClass: 'col-food'
+      },
+      {
+        promos: opts.promos,
+        excludeTitles: opts.excludeTitles,
+        force: opts.force,
+        secClass: 'specials-sand-row',
+        dataSpecials: 'Special Mains'
+      }
+    );
+  }
+
+  /** Two Column / Best-fit sections in one row: titles share a line, food first,
+   *  then a feature panel under the shorter stack so the bottoms line up. */
+  function pairColumnFood(left, right, opts) {
+    opts = opts || {};
+    left = left || {};
+    right = right || {};
+    var leftRule = left.rule || {};
+    var rightRule = right.rule || {};
+    var leftU = left.units != null ? left.units : sectionUnits({ name: left.title, dishes: left.dishes }, !!leftRule.frame);
+    var rightU = right.units != null ? right.units : sectionUnits({ name: right.title, dishes: right.dishes }, !!rightRule.frame);
+    var leftFoodKind = leftRule.frame ? 'box' : '';
+    var rightFoodKind = rightRule.frame ? (leftFoodKind ? 'wide' : 'box') : '';
+    var leftInner = left.html
+      ? (leftFoodKind ? setFirstScallopKind(left.html, leftFoodKind) : left.html)
+      : sectionBlock(left.title, left.dishes, leftRule, leftFoodKind || 'box', { hideTitle: true });
+    var rightInner = right.html
+      ? (rightFoodKind ? setFirstScallopKind(right.html, rightFoodKind) : right.html)
+      : sectionBlock(right.title, right.dishes, rightRule, rightFoodKind || 'box', { hideTitle: true });
+    var leftFrame = leftFoodKind === 'box' ? 'wide' : 'box';
+    var rightFrame = oppositeScallopKind(leftFrame);
+    if (rightFoodKind === rightFrame) rightFrame = oppositeScallopKind(rightFoodKind);
+    var pair = levelOppositeColumns(leftInner, leftU, rightInner, rightU, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
       force: opts.force,
-      leftTitle: 'Specials',
-      rightTitle: 'Sandwiches',
-      secClass: 'specials-sand-row',
-      leftClass: 'col-specials',
-      rightClass: 'col-food',
-      leftFrame: 'box',
-      rightFrame: sandRule.frame ? 'box' : 'wide'
+      leftTitle: left.hideTitle ? '' : (left.title || ''),
+      rightTitle: right.hideTitle ? '' : (right.title || ''),
+      secClass: opts.secClass || 'col-pair-row',
+      leftClass: left.leftClass || '',
+      rightClass: right.rightClass || 'col-food',
+      leftFrame: leftFrame,
+      rightFrame: rightFrame
     });
-    if (pair && pair.html) {
+    if (opts.dataSpecials && pair && pair.html) {
       pair.html = pair.html.replace(
-        '<section class="sec specials-sand-row">',
-        '<section class="sec specials-sand-row" data-specials-course="Special Mains">'
+        '<section class="sec ' + (opts.secClass || 'col-pair-row') + '">',
+        '<section class="sec ' + (opts.secClass || 'col-pair-row') + '" data-specials-course="' +
+          esc(opts.dataSpecials) + '">'
       );
     }
     return pair;
@@ -1986,6 +2077,11 @@
     else if (opts.leftTitle) leftHtml = stripInnerSectionTitle(leftHtml, opts.leftTitle);
     if (rightFrilly) rightHtml = nestTitleInFrilly(opts.rightTitle, rightHtml);
     else if (opts.rightTitle) rightHtml = stripInnerSectionTitle(rightHtml, opts.rightTitle);
+    if (leftFrilly && rightFrilly) {
+      var waved = contrastAdjacentScallops(leftHtml, rightHtml);
+      leftHtml = waved.leftHtml;
+      rightHtml = waved.rightHtml;
+    }
     // Unframed titles sit as pair-head; inset them when the neighbour is frilly
     // so LITTLE BELLS lines up with DESSERTS inside the box.
     function headFor(title, frilly, promoBody, otherTitle, otherFrilly) {
@@ -2019,7 +2115,7 @@
     var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
-      skipPromos: opts.skipPromos !== false,
+      skipPromos: !!opts.skipPromos,
       secClass: 'column-solo-row' + (opts.dataSpecials ? ' specials-col-row' : ''),
       colsClass: 'column-solo-cols',
       leftClass: opts.dataSpecials ? 'col-specials' : '',
@@ -2045,7 +2141,10 @@
     if (lockedColumnWidth(rule)) {
       return columnSoloSection(title, dishes, rule, opts);
     }
-    var twoCol = canSitInColumn(rule) && dishes.length >= 4;
+    var twoCol = canSitInColumn(rule) && dishes.length >= 4 && !opts.preferColumn;
+    if (canSitInColumn(rule) && (opts.preferColumn || dishes.length < 4)) {
+      return columnSoloSection(title, dishes, rule, opts);
+    }
     return {
       html: '<section class="sec">' + sectionBlock(title, dishes, rule, 'wide', {
         twoCol: twoCol,
@@ -2229,13 +2328,7 @@
     // (Burgers/Classics missing) — do not leave quiz boxes in a food hole.
     var mainsPairedInCol = false;
     var specialsPairedInCol = false;
-    // Same food map as the planner: Column / Best-fit Specials take Sandwiches
-    // on page 2, so Sides must not start a clipped row under that pair.
-    if (p2opts && p2opts.sandwiches && p2opts.sidesOnP2 && !p1opts.sidesOnP1 &&
-        canPairSpecialsWithSandwiches(bag.specialMains && bag.specialMains.dishes, plan, true)) {
-      p1opts.sidesOnP1 = true;
-      p2opts.sidesOnP2 = false;
-    }
+    // Honour the planner: trailing unpaired column food already sat in leftover.
 
     var p1 = '<div class="page fill-page ' + fill1 + '">';
     p1 += trackerBar(ver, { hideDate: hideDate });
@@ -2324,12 +2417,70 @@
     if (startersBelowNibbles) {
       p1 += '<section class="sec">' + sectionBlock(bag.starters.name, bag.starters.dishes, startRule) + '</section>';
     }
-    // Special Starters sit under the regular starters — frilly box, no “Starters” label
+    // Consecutive Column / Best-fit sections share a row (titles level, panels
+    // fill the short side). Full-width locks still print full-bleed on their own.
+    var colPending = null;
+    function flushColumnPending() {
+      if (!colPending) return;
+      if (colPending.kind === 'specials') {
+        p1 += specialsBesideCourse(colPending.dishes, plan, colPending.sectionKey);
+      } else {
+        var flushed = renderUnpairedSection(colPending.title, colPending.dishes, colPending.rule, colPending.opts || {});
+        usedPromoTitles = usedPromoTitles.concat(flushed.usedPromoTitles || []);
+        p1 += flushed.html;
+      }
+      colPending = null;
+    }
+    function takeColumnPending(block) {
+      if (!block || !block.dishes || !block.dishes.length) return;
+      var rule = block.rule;
+      if (!canSitInColumn(rule)) {
+        flushColumnPending();
+        if (block.kind === 'specials') {
+          p1 += specialsBesideCourse(block.dishes, plan, block.sectionKey);
+        } else {
+          var outFull = renderUnpairedSection(block.title, block.dishes, rule, block.opts || {});
+          usedPromoTitles = usedPromoTitles.concat(outFull.usedPromoTitles || []);
+          p1 += outFull.html;
+        }
+        return;
+      }
+      if (colPending && canSitInColumn(colPending.rule)) {
+        var leftBlk = colPending.kind === 'specials'
+          ? { title: 'Specials', dishes: colPending.dishes, rule: colPending.rule, leftClass: 'col-specials' }
+          : { title: colPending.title, dishes: colPending.dishes, rule: colPending.rule, hideTitle: !!(colPending.opts && colPending.opts.hideTitle) };
+        var rightBlk = block.kind === 'specials'
+          ? { title: 'Specials', dishes: block.dishes, rule: block.rule }
+          : { title: block.title, dishes: block.dishes, rule: block.rule, hideTitle: !!(block.opts && block.opts.hideTitle) };
+        var paired = pairColumnFood(leftBlk, rightBlk, {
+          promos: promos,
+          excludeTitles: usedPromoTitles,
+          secClass: 'col-pair-row',
+          dataSpecials: colPending.kind === 'specials' ? colPending.sectionKey
+            : (block.kind === 'specials' ? block.sectionKey : '')
+        });
+        usedPromoTitles = usedPromoTitles.concat(paired.usedTitles || []);
+        p1 += paired.html || '';
+        colPending = null;
+        return;
+      }
+      colPending = block;
+    }
+
     if (bag.specialStarters && bag.specialStarters.dishes && bag.specialStarters.dishes.length) {
-      p1 += specialsBesideCourse(bag.specialStarters.dishes, plan, 'Special Starters');
+      var specStartRule = ruleFor('Special Starters', plan);
+      if (specStartRule.frame == null) specStartRule.frame = true;
+      takeColumnPending({
+        kind: 'specials',
+        sectionKey: 'Special Starters',
+        title: 'Specials',
+        dishes: bag.specialStarters.dishes,
+        rule: specStartRule
+      });
     }
 
     if (shareAsFull && !shareInLeft) {
+      flushColumnPending();
       p1 += '<section class="sec">' +
         sectionBlock(bag.sharing.name, shareDishes, shareRule, 'wide', {
           twoCol: shareDishes.length >= 2
@@ -2337,14 +2488,14 @@
         '</section>';
     }
     if (bag.boost) {
-      var boostOut = renderUnpairedSection(bag.boost.name, bag.boost.dishes, boostRule, {
-        hideTitle: true,
-        promos: promos,
-        excludeTitles: usedPromoTitles
+      takeColumnPending({
+        title: bag.boost.name,
+        dishes: bag.boost.dishes,
+        rule: boostRule,
+        opts: { hideTitle: true, promos: promos, excludeTitles: usedPromoTitles }
       });
-      usedPromoTitles = usedPromoTitles.concat(boostOut.usedPromoTitles || []);
-      p1 += boostOut.html;
     }
+    flushColumnPending();
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isSundayRoasts(s.name) && !isDessert(s.name) && !isSandwich(s.name) &&
           !isBurgers(s.name) && !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
@@ -3047,6 +3198,11 @@
         'overflow:hidden;max-width:100%}' +
       '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
       '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
+      // Adjacent food scallops: matching rects pick the oval wave on the neighbour.
+      '.cols-balanced > .col:has(> .col-body > .scallop-box) + .col > .col-body > .scallop-box{' +
+        'border-image-source:url("' + asset('frame-wide.png') + '");border-image-slice:42 fill}' +
+      '.cols-balanced > .col:has(> .col-body > .scallop-wide) + .col > .col-body > .scallop-wide{' +
+        'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       '.scallop-pad{padding:6px 12px 10px;overflow:hidden;min-width:0}' +
       '.scallop-box .scallop-pad{padding:6px 12px 10px}' +
       '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +

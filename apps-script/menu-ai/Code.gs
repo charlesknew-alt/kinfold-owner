@@ -459,7 +459,7 @@ function reviewLayoutWithGemini_(body) {
     '2. PAGE COUNT: only ONE or TWO pages. Content must NEVER fall off the page. ' +
     'Drop leftover feature panels and foot logos before hiding a dish. Two pages if one would clip at minimum type; never clip food.\n' +
     '3. READABILITY: never shrink below comfortable type. Prefer tight over compact.\n' +
-    '4. Feature panels: prefer contrasting frames. Use Stay a While / Gatherings / quiz wording.\n' +
+    '4. Feature panels: prefer contrasting frames (rect box beside oval wide). Adjacent frilly food boxes must not match — different wave or corner so they do not look like a work project. Use Stay a While / Gatherings / quiz wording.\n' +
     '5. PAGE 1: LEFT Sharing; RIGHT Burgers then Pub Classics.\n' +
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
     '7. sandwichesOn page2; sidesOn page2 beside Sandwiches. Never omit locked sandwiches.\n' +

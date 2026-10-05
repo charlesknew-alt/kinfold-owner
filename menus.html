@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261005-flow157"></script>
-  <script src="menus-print.js?v=20261005-flow157"></script>
-  <script src="menus-ingest.js?v=20261005-flow157"></script>
+  <script src="menus.js?v=20261005-flow158"></script>
+  <script src="menus-print.js?v=20261005-flow158"></script>
+  <script src="menus-ingest.js?v=20261005-flow158"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1938,7 +1938,7 @@
         if (opts.noNav) return html;
         return withFlowNav(html, 1, 3, 'Next · Wording');
       }
-      html += '<p class="step-lede">Rules for <strong>this menu only</strong>. Any menu with its own page — Little Bells, Sandwiches, Desserts, Specials, and extras — <strong>drops onto this sheet</strong> when ticked. Each keeps the Column or Full width you set here, stays in that area, and its wording lines up with this sheet (not centred like the card). Drop-in wording sits in that section’s box (frilly if Yes). Opposite columns line up; a frilly title sits in the box and the unframed neighbour lines up with it; leftover space in a column gets a small feature panel. <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit</strong> uses columns so food fits (Sides beside Sandwiches, never under Sharing). Gemini only checks leftover panels — it does not rebuild the sheet. Frilly box = scalloped frame.</p>';
+      html += '<p class="step-lede">Rules for <strong>this menu only</strong>. Any menu with its own page — Little Bells, Sandwiches, Desserts, Specials, and extras — <strong>drops onto this sheet</strong> when ticked. Each keeps the Column or Full width you set here, stays in that area, and its wording lines up with this sheet (not centred like the card). Drop-in wording sits in that section’s box (frilly if Yes). Opposite columns line up; a frilly title sits in the box and the unframed neighbour lines up with it; leftover space in a column gets a small feature panel of the right height. Two frilly boxes side by side use different waves or corners. <strong>Full width</strong> or <strong>Column</strong> lock the shape; <strong>Best fit</strong> uses columns so food fits (Sides beside Sandwiches, never under Sharing). Gemini only checks leftover panels — it does not rebuild the sheet. Frilly box = scalloped frame.</p>';
 
       // Quick cards for sections that have dishes
       var bySec = {};
