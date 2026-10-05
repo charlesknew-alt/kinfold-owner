@@ -548,8 +548,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow153') !== -1, 'menus page cache-bust is flow153');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow153') !== -1, 'hub menus link cache-bust is flow153');
+assert(page.indexOf('flow154') !== -1, 'menus page cache-bust is flow154');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow154') !== -1, 'hub menus link cache-bust is flow154');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1118,6 +1118,16 @@ assert(page.indexOf('Top &amp; bottom blurbs') !== -1 || page.indexOf('Top & bot
 assert(page.indexOf('metaTopKind') !== -1 && page.indexOf('metaBottomKind') !== -1,
   'party blurbs have title/paragraph/text style');
 assert(page.indexOf('Heading (between title') !== -1, 'party blurbs offer heading between title and paragraph');
+assert(page.indexOf('Subheading (between heading') !== -1,
+  'all type-size dropdowns offer subheading between heading and paragraph');
+assert(api.OUTSIDE_KINDS && api.OUTSIDE_KINDS.map(function (k) { return k.id; }).join(',') ===
+  'title,heading,subhead,paragraph,text',
+  'type sizes go Title → Heading → Subheading → Paragraph → Text');
+assert(api.normalizeOutsideKind('subhead') === 'subhead',
+  'normalize keeps subheading');
+assert(api.normalizeMeta({ title: 'X', notes: 'Y', topKind: 'subhead' }).topKind === 'subhead' &&
+  api.normalizeMeta({ bottomKind: 'subhead' }).bottomKind === 'subhead',
+  'party blurbs accept subheading');
 assert(api.PROMO_NONE_ID === '__none__', 'promo none tick id exported');
 assert(api.pickPromos(api.seedPromoBank(), { __none__: true }).length === 0,
   'no-events tick yields zero promos');
@@ -1127,6 +1137,9 @@ assert(api.normalizeMeta({ bottomKind: 'heading' }).bottomKind === 'heading',
   'normalizeMeta accepts heading blurb kind');
 assert(printJs.indexOf('partyBlurbBlock') !== -1, 'party print uses blurb kinds');
 assert(printJs.indexOf('party-blurb-heading') !== -1, 'party print has heading blurb size');
+assert(printJs.indexOf('party-blurb-subhead') !== -1 && printJs.indexOf('sheet-blurb-subhead') !== -1 &&
+  printJs.indexOf('card-blurb-subhead') !== -1,
+  'subheading prints on cards, long sheets and party menus');
 assert(ingestJs.indexOf('fetchWithTimeout') !== -1 && ingestJs.indexOf('imageFileForAi') !== -1,
   'AI reader shrinks images and times out instead of hanging');
 assert(aiGs.indexOf('gemini-2.5-flash') !== -1 && aiGs.indexOf('callGemini_') !== -1,
@@ -1165,8 +1178,9 @@ assert(/Ciabatta/i.test(api.sectionLayoutForMenu('sandwiches').Sandwiches.note |
   'Sandwiches card default note is the under-fillings spiel');
 assert(!/Two Scoops of Ice-Cream/i.test(api.sectionLayoutForMenu('little-bells')['Little Bells'].sell || ''),
   'Little Bells no longer uses a separate Two Scoops sell block');
-assert(api.OUTSIDE_KINDS && api.OUTSIDE_KINDS.some(function (k) { return k.id === 'heading'; }),
-  'outside-text type sizes match party blurbs');
+assert(api.OUTSIDE_KINDS && api.OUTSIDE_KINDS.some(function (k) { return k.id === 'heading'; }) &&
+  api.OUTSIDE_KINDS.some(function (k) { return k.id === 'subhead'; }),
+  'outside-text type sizes match party blurbs including subheading');
 assert(page.indexOf('data-layout-above') !== -1 && page.indexOf('data-layout-below') !== -1,
   'card menus have above/below text boxes');
 assert(page.indexOf('data-layout-above-kind') !== -1 && page.indexOf('Type size') !== -1,
@@ -2268,6 +2282,20 @@ assert(/All £8\.00/.test(kidsCardHtml) && /card-blurb-heading/.test(kidsCardHtm
   'Little Bells price offer prints above the dish box at heading size');
 assert(/card-blurb-text/.test(kidsCardHtml) && /card-blurb-below/.test(kidsCardHtml),
   'Sunday line uses the smaller text size under the dish box');
+var kidsCardSubhead = print.build(api.menuById('little-bells'), kidsCardDishes, {
+  sectionLayout: api.normalizeSectionLayout({
+    'Little Bells': {
+      above: 'All £8.00\nto include a scoop.',
+      aboveKind: 'subhead',
+      below: 'Sunday roasts at half adult price.',
+      belowKind: 'subhead',
+      frame: true,
+      width: 'full'
+    }
+  })
+});
+assert(/card-blurb-subhead/.test(kidsCardSubhead) && /Sunday roasts at half adult price/.test(kidsCardSubhead),
+  'Little Bells card can use subheading on above and below boxes');
 assert(kidsCardHtml.indexOf('CUSTOM SUNDAY NOTE') > kidsCardHtml.indexOf('All £8.00'),
   'offer stays above the Sunday line');
 assert(/kids-face/.test(kidsCardHtml), 'Little Bells card uses calmer kids type');
@@ -2468,6 +2496,27 @@ assert(friesPad.indexOf('Upgrade to Fries +£2') !== -1 && friesPad.indexOf('BLT
   'Upgrade to Fries prints inside the Sandwiches frilly box, not outside it');
 assert(friesPad.indexOf('Choose ciabatta') !== -1,
   'Sandwiches hours/spiel also stays inside the same frilly box');
+var subheadEmbedHtml = print.build(api.menuById('main'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Sandwiches', 'BLT', 'fries', '10.95', '')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    Sandwiches: {
+      above: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with tortilla chips & salad.',
+      aboveKind: 'subhead',
+      below: 'Upgrade to Fries +£2',
+      belowKind: 'subhead',
+      frame: true,
+      width: 'column',
+      tip: true
+    }
+  })
+});
+assert(/sheet-blurb-subhead[\s\S]*12\s*[–-]\s*2\.45/.test(subheadEmbedHtml) &&
+  /sheet-blurb-subhead[\s\S]*Upgrade to Fries \+£2/.test(subheadEmbedHtml),
+  'subheading prints hours and Upgrade to Fries between heading and paragraph size');
+assert(!/lb-price-line/.test(subheadEmbedHtml.split('</style>')[1] || subheadEmbedHtml),
+  'subheading does not blow the £ line up like Title/Heading');
 var embedDessHtml = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Desserts', 'Sticky Toffee', 'custard', '7.95', 'v')

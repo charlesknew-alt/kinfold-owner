@@ -546,8 +546,8 @@
     if (!raw || typeof raw !== 'object') return base;
     var topKind = String(raw.topKind || base.topKind).toLowerCase();
     var bottomKind = String(raw.bottomKind || base.bottomKind).toLowerCase();
-    if (['title', 'heading', 'paragraph', 'text'].indexOf(topKind) === -1) topKind = 'title';
-    if (['title', 'heading', 'paragraph', 'text'].indexOf(bottomKind) === -1) bottomKind = 'heading';
+    if (['title', 'heading', 'subhead', 'paragraph', 'text'].indexOf(topKind) === -1) topKind = 'title';
+    if (['title', 'heading', 'subhead', 'paragraph', 'text'].indexOf(bottomKind) === -1) bottomKind = 'heading';
     return {
       title: String(raw.title != null ? raw.title : ''),
       subtitle: String(raw.subtitle != null ? raw.subtitle : ''),
@@ -2787,17 +2787,18 @@
     { id: 'both', label: 'Best fit for this page (AI chooses)' }
   ];
 
-  /** Type size for text outside the dish box — same four steps as party blurbs. */
+  /** Type size for wording around dishes — same five steps as party blurbs. */
   var OUTSIDE_KINDS = [
     { id: 'title', label: 'Title (large heading)' },
     { id: 'heading', label: 'Heading (between title & paragraph)' },
+    { id: 'subhead', label: 'Subheading (between heading & paragraph)' },
     { id: 'paragraph', label: 'Paragraph (body)' },
     { id: 'text', label: 'Text (smaller plain line)' }
   ];
 
   function normalizeOutsideKind(kind, fallback) {
     var k = String(kind || fallback || 'paragraph').toLowerCase();
-    if (['title', 'heading', 'paragraph', 'text'].indexOf(k) === -1) {
+    if (['title', 'heading', 'subhead', 'paragraph', 'text'].indexOf(k) === -1) {
       return fallback || 'paragraph';
     }
     return k;
