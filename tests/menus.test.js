@@ -548,8 +548,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow155') !== -1, 'menus page cache-bust is flow155');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow155') !== -1, 'hub menus link cache-bust is flow155');
+assert(page.indexOf('flow156') !== -1, 'menus page cache-bust is flow156');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow156') !== -1, 'hub menus link cache-bust is flow156');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -897,8 +897,29 @@ assert(printJs.indexOf('function noteUnits') !== -1,
   'Blocks notes count toward column height for level finishes');
 assert(typeof api.normalizeSectionLayoutBook === 'function' && typeof api.sectionLayoutForMenu === 'function',
   'Blocks rules are stored per menu');
-assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout') !== -1,
-  'menus UI keeps a Blocks book per menu');
+assert(typeof api.overlaySpecialsBoardNotes === 'function',
+  'Specials-card notes overlay helper is exported');
+var hostColSpec = api.normalizeSectionLayout({
+  'Special Mains': { width: 'column', frame: true, note: 'Host note' },
+  'Special Starters': { width: 'column', frame: false, note: '' }
+});
+var cardFullSpec = api.normalizeSectionLayout({
+  'Special Mains': { width: 'full', frame: true, note: 'When it’s gone, it’s gone' },
+  'Special Starters': { width: 'full', frame: true, note: 'Board starters' }
+});
+var overlaidSpec = api.overlaySpecialsBoardNotes(hostColSpec, cardFullSpec);
+assert(overlaidSpec['Special Mains'].width === 'column',
+  'Main Blocks Column lock is not replaced by the Specials-card Full default');
+assert(overlaidSpec['Special Mains'].frame === true,
+  'Main Blocks frilly box is kept when overlaying the Specials note');
+assert(/gone/i.test(overlaidSpec['Special Mains'].note || ''),
+  'Specials-card board note still follows onto Main');
+assert(overlaidSpec['Special Starters'].width === 'column' &&
+  /starters/i.test(overlaidSpec['Special Starters'].note || ''),
+  'Special Starters host width stays; only the card note overlays');
+assert(page.indexOf('overlaySpecialsBoardNotes') !== -1 &&
+  page.indexOf('the card’s default Full must not') !== -1,
+  'Generate uses note-only Specials overlay so host Column / Best fit win');
 assert(page.indexOf('this menu only') !== -1 && page.indexOf('drops onto this sheet') !== -1 &&
   page.indexOf('Specials') !== -1 && page.indexOf('not centred like the card') !== -1 &&
   page.indexOf('leftover space in a column') !== -1 &&
@@ -2581,6 +2602,9 @@ assert(/column-solo-row[\s\S]*Pan Roasted Duck Breast/.test(colSpecA4) &&
   'Special Mains Column lock stays a half-column under Mains');
 assert(/column-solo-row[\s\S]*Pie of the day/.test(colSpecA4),
   'Item Boost Column lock stays a half-column, not a full-bleed box');
+assert(printJs.indexOf('specials-sand-row') !== -1 &&
+  printJs.indexOf('canPairSpecialsWithSandwiches') !== -1,
+  'Column / Best-fit Specials can sit opposite Sandwiches');
 var specialsCardHtml = print.build(api.menuById('specials'), [
   api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
 ], {
@@ -2813,6 +2837,67 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'Sides stay beside Sandwiches even when Mains are Column');
   assert(!/mains-sand-row/.test(a4),
     'Column Mains do not steal Sandwiches from Sides');
+})();
+(function specialsColumnSitsBesideSandwiches() {
+  var dishes = sidesSandDishes.concat([
+    api.dish('Special Mains', 'Pan Roasted Duck Breast', 'duck fat potatoes parsnip puree', '22.95', 'gf'),
+    api.dish('Special Mains', 'Loaded Fries', 'pulled pork or beef brisket bbq cheese', '10.95', ''),
+    api.dish('Special Mains', 'Mushroom Stroganoff', 'served with rice and garlic bread', '16.95', 'gf')
+  ]);
+  var colLayout = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: 'When it’s gone, it’s gone' },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: { width: 'column', frame: true }
+  });
+  var html = print.build(mainMenu, dishes, { sectionLayout: colLayout });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var specSand = (a4.match(/specials-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(specSand && /Pan Roasted Duck Breast/.test(specSand) && /Quesadilla|Falafel/.test(specSand),
+    'Column Specials sit in a half-column beside Sandwiches');
+  assert(/data-specials-course="Special Mains"/.test(specSand),
+    'Specials|Sandwiches row is marked Special Mains');
+  assert(!/<section class="sec specials-beside"[\s\S]*Pan Roasted Duck Breast/.test(a4),
+    'Column Specials do not print a full-bleed box above Sides|Sandwiches');
+  assert(!/sides-sand-row[\s\S]{0,4000}Quesadilla/.test(a4) &&
+    /Cheesy Garlic Bread/.test(a4),
+    'Sandwiches leave the Sides pair so fillings start higher on the page');
+})();
+(function specialsBestFitChoosesColumnBesideSandwiches() {
+  var dishes = sidesSandDishes.concat([
+    api.dish('Special Mains', 'Pan Roasted Duck Breast', 'duck fat potatoes', '22.95', 'gf'),
+    api.dish('Special Mains', 'Loaded Fries', 'bbq cheese', '10.95', ''),
+    api.dish('Special Mains', 'Mushroom Stroganoff', 'rice and garlic bread', '16.95', 'gf')
+  ]);
+  var bothLayout = api.normalizeSectionLayout({
+    'Special Mains': { width: 'both', frame: true, note: 'When it’s gone, it’s gone' },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: { width: 'column', frame: true }
+  });
+  var html = print.build(mainMenu, dishes, { sectionLayout: bothLayout });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  assert(/specials-sand-row[\s\S]*Pan Roasted Duck Breast/.test(a4) &&
+    /specials-sand-row[\s\S]*Falafel/.test(a4),
+    'Best-fit Specials become a column beside Sandwiches so fillings stay on the page');
+  assert(!/<section class="sec specials-beside"[\s\S]*Pan Roasted Duck Breast/.test(a4),
+    'Best-fit Specials do not stay full-bleed when Sandwiches need the height');
+})();
+(function specialsFullKeepsBleedAboveSidesSandwiches() {
+  var dishes = sidesSandDishes.concat([
+    api.dish('Special Mains', 'Pan Roasted Duck Breast', 'duck fat potatoes', '22.95', 'gf'),
+    api.dish('Special Mains', 'Loaded Fries', 'bbq cheese', '10.95', ''),
+    api.dish('Special Mains', 'Mushroom Stroganoff', 'rice and garlic bread', '16.95', 'gf')
+  ]);
+  var fullLayout = api.normalizeSectionLayout({
+    'Special Mains': { width: 'full', frame: true, note: 'When it’s gone, it’s gone' },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: { width: 'column', frame: true }
+  });
+  var html = print.build(mainMenu, dishes, { sectionLayout: fullLayout });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  assert(/specials-beside[\s\S]*Pan Roasted Duck Breast/.test(a4),
+    'Full-width Specials stay a full-bleed box under Mains');
+  assert(!/specials-sand-row/.test(a4),
+    'Full-width Specials do not steal Sandwiches from Sides');
 })();
 (function bestFitUsesColumns() {
   var layout = api.normalizeSectionLayout({
