@@ -29,8 +29,8 @@ assert(page.indexOf('Keeping Sandwiches, Little Bells and Desserts if you ticked
   'arrange keeps ticked sandwiches; does not treat them as optional-if-they-fit');
 assert(page.indexOf('Putting the logo on only if') !== -1,
   'logo is still optional chrome if there is room');
-assert(page.indexOf('does not drop Sandwiches') !== -1,
-  'include ticks explain sandwiches are not optional-if-they-fit');
+assert(page.indexOf('does not drop food off the page') !== -1,
+  'include ticks explain food is not dropped off the page to make space');
 assert(page.indexOf('Clear this menu') !== -1, 'clear this menu control');
 assert(page.indexOf("getElementById('doGenerate').onclick") === -1, 'do not bind Generate before step renders');
 assert(/try\s*\{/.test(page) && page.indexOf('pullMenusFromCloud()') !== -1,
@@ -271,14 +271,19 @@ assert(printJs.indexOf('Always start airy') !== -1 || /for\(var j=0;j<STEPS\.len
   'fit always starts airy so sparse pages fill top to bottom');
 assert(page.indexOf('partyPaper') !== -1 && page.indexOf('2×A5 on A4') !== -1,
   'party sheet can choose full A4 or 2×A5 guillotine');
-assert(page.indexOf('Too much information for two readable pages') !== -1,
-  'generate warns when sheet is over capacity');
+assert(page.indexOf('too much content to fit on one page') !== -1 ||
+  page.indexOf('Too much content to fit on one page') !== -1,
+  'generate warns when the sheet cannot fit all food');
+assert(page.indexOf('overflowGateOverlay') !== -1 && page.indexOf('data-overflow-include') !== -1,
+  'overflow gate lets staff untick a dropped-in menu before generate');
+assert(page.indexOf('Please remove a dropped-in menu') !== -1,
+  'overflow copy asks to remove a dropped-in menu');
 assert(api.emptyMeta().paper === 'a4', 'party meta defaults to full A4 paper');
 assert(api.sheetPlan('desserts', 3).fit === 'two-up', 'desserts card is two-up A5');
 assert(api.sheetPlan('sandwiches', 4).fit === 'two-up', 'sandwiches card is two-up A5');
 assert(api.sheetPlan('little-bells', 4).fit === 'two-up', 'Little Bells card is two-up A5');
-assert(/Too much information for two readable/.test(api.sheetPlan('main', 40).text),
-  'main menu over capacity message steers staff to separate menus');
+assert(/Too much content to fit on one page/.test(api.sheetPlan('main', 40).text),
+  'main menu over capacity message asks to remove a dropped-in menu');
 assert(printJs.indexOf('fonts.googleapis.com/css2?family=Cinzel') !== -1, 'print loads Cinzel/Roboto/Crimson via stylesheet link');
 assert(printJs.indexOf('beforeprint') !== -1, 'fit runs again before print/PDF');
 assert(printJs.indexOf('document.fonts.ready') !== -1, 'print waits for webfonts before PDF');
@@ -554,8 +559,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow162') !== -1, 'menus page cache-bust is flow162');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow162') !== -1, 'hub menus link cache-bust is flow162');
+assert(page.indexOf('flow163') !== -1, 'menus page cache-bust is flow163');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow163') !== -1, 'hub menus link cache-bust is flow163');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;

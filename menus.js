@@ -1740,7 +1740,7 @@
     if (count <= 36) return { fit: 'two', text: 'Looks like two full A4 pages. Generate fills each page; never opens a third.' };
     return {
       fit: 'over',
-      text: 'Too much information for two readable A4 pages. Remove some sections or put Desserts / Little Bells / Sandwiches on their own menus, then try again.'
+      text: 'Too much content to fit on one page. Please remove a dropped-in menu (Sandwiches, Desserts, Little Bells or Specials), then Generate.'
     };
   }
 

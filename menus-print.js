@@ -1729,10 +1729,19 @@
       // Only move Sides off page 2 when Specials took the Sandwiches seat, or when
       // even the paired Sides|Sandwiches row still cannot fit. Never dump Sides
       // under Sharing just because units were double-counted as a stack.
+      var packedFront = !!(
+        bag.starters && bag.starters.dishes && bag.starters.dishes.length >= 5 &&
+        bag.sharing && bag.sharing.dishes && bag.sharing.dishes.length &&
+        (bag.nibbles || bag.boost)
+      );
+      var sideCountP1 = bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0;
+      // Dumping 4+ Sides under Sharing on a full starters page clips them (staff
+      // screenshot). Refuse that dump — Generate asks to remove a dropped-in menu.
+      var p1WouldClipSides = packedFront && sideCountP1 >= 4;
       var moveSidesToP1 = bag.sides && layout.p2.sidesOnP2 && p1left >= sideCostP1 + 4 && (
         sandPartner === 'specials' ||
         (sandPartner !== 'sides' && p2Load > CLIP)
-      );
+      ) && !p1WouldClipSides;
       if (moveSidesToP1) {
         layout.p1.sidesOnP1 = true;
         layout.p2.sidesOnP2 = false;
@@ -1742,6 +1751,10 @@
         p2used -= sideCostP1;
         p2Load -= sideCostP1;
         layout.fillers.push('Sides (page 1 leftover — keep food on the page)');
+      } else if (p1WouldClipSides && p2Load > CLIP) {
+        layout.fit = 'over';
+        layout.overflow = 'drop-in';
+        layout.fillers.push('Too much content — remove a dropped-in menu');
       }
       // Packed page: any Best-fit category with enough dishes can split across
       // two even columns (shorter than a single stack) so food stays on the page.
@@ -1820,7 +1833,10 @@
       layout.p1.footPromos = canFitFootPromos(p1left);
       layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
-      if (p1used > PAGE + 10 || p2used > PAGE + 14) layout.fit = 'over';
+      if (p1used > PAGE + 10 || p2used > PAGE + 14 || p2Load > CLIP + 8) {
+        layout.fit = 'over';
+        layout.overflow = layout.overflow || 'drop-in';
+      }
     } else {
       layout.pages = 1;
       layout.fit = 'one';
@@ -1836,7 +1852,7 @@
     layout.summary =
       (layout.fit === 'one' ? 'One A4 — food fits at minimum type, so type can open toward the maximum.' :
         layout.fit === 'two' ? 'Two A4 pages — would clip at minimum type on one page; same type on both pages, opening toward the maximum; never a third page.' :
-          'Too much for two readable pages. Remove sections or put Desserts / Little Bells / Sandwiches on separate card menus.') +
+          'Too much content to fit on one page. Please remove a dropped-in menu, then Generate.') +
       typeNote +
       ' Columns start and finish level (food first, then feature panels).' +
       (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
@@ -3422,14 +3438,14 @@
         'border-style:solid;border-color:transparent;border-width:12px;' +
         'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:12px;' +
         'overflow:hidden;max-width:100%}' +
-      // 45° chamfer corners; box = tight scallops, wide = looser wave.
-      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:14px;border-image-width:14px;border-image-slice:56 fill}' +
-      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:56 fill}' +
+      // Original Canva frames: box = tight scallop, wide = looser wave. Single line only.
+      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
+      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
       // Adjacent food scallops: matching frames pick the other wave on the neighbour.
       '.cols-balanced > .col:has(> .col-body > .scallop-box) + .col > .col-body > .scallop-box{' +
-        'border-image-source:url("' + asset('frame-wide.png') + '")}' +
+        'border-image-source:url("' + asset('frame-wide.png') + '");border-image-slice:42 fill}' +
       '.cols-balanced > .col:has(> .col-body > .scallop-wide) + .col > .col-body > .scallop-wide{' +
-        'border-image-source:url("' + asset('frame-box.png') + '")}' +
+        'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       '.scallop-pad{padding:6px 12px 10px;overflow:hidden;min-width:0}' +
       // Food frames stay content-sized — never stretch to fill the tall neighbour.
       '.cols-balanced .col-body > .scallop{height:fit-content;align-self:stretch;flex:0 0 auto}' +
