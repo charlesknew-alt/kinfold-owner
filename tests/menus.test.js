@@ -548,8 +548,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow152') !== -1, 'menus page cache-bust is flow152');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow152') !== -1, 'hub menus link cache-bust is flow152');
+assert(page.indexOf('flow153') !== -1, 'menus page cache-bust is flow153');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow153') !== -1, 'hub menus link cache-bust is flow153');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -901,7 +901,8 @@ assert(page.indexOf('layoutBook') !== -1 && page.indexOf('effectiveSectionLayout
   'menus UI keeps a Blocks book per menu');
 assert(page.indexOf('this menu only') !== -1 && page.indexOf('drops onto this sheet') !== -1 &&
   page.indexOf('Specials') !== -1 && page.indexOf('not centred like the card') !== -1 &&
-  page.indexOf('leftover space in a column') !== -1,
+  page.indexOf('leftover space in a column') !== -1 &&
+  page.indexOf('Drop-in wording sits in that section') !== -1,
   'Blocks step says every drop-in menu follows this sheet, not the card');
 var flatLegacy = api.normalizeSectionLayout({
   Desserts: { width: 'column', frame: true, note: 'legacy' },
@@ -1172,6 +1173,8 @@ assert(page.indexOf('data-layout-above-kind') !== -1 && page.indexOf('Type size'
   'each outside-text box has a type-size picker');
 assert(page.indexOf('this sheet') !== -1 && page.indexOf('card keeps its own') !== -1,
   'UI says host type sizes are independent of the card');
+assert(page.indexOf('inside this section') !== -1 && page.indexOf('frilly box when Frilly is Yes') !== -1,
+  'host Blocks says above/below wording prints inside the section box');
 assert(page.indexOf('not centred like the card') !== -1,
   'host Blocks copy says drop-in wording is left like the sheet');
 assert(page.indexOf("base['Little Bells'] = Object.assign") === -1,
@@ -2179,6 +2182,47 @@ var tipHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: 
 });
 assert(/Selection at the bar/.test(tipHtml), 'empty tip box prints sell wording');
 assert(/lunch hours/.test(tipHtml), 'empty tip box still shows note/hours');
+var tipBelowHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
+  rule: {
+    frame: true, tip: true, note: '(lunch hours)', sell: 'Selection at the bar',
+    below: 'Upgrade to Fries +£2', belowKind: 'paragraph'
+  }
+});
+assert(/scallop-pad[\s\S]*Selection at the bar[\s\S]*Upgrade to Fries/.test(tipBelowHtml),
+  'empty sandwiches below line sits inside the frilly tip box');
+var friesBlock = print.sandwichesBlock({
+  sandwiches: {
+    name: 'Sandwiches',
+    dishes: [api.dish('Sandwiches', 'BLT', 'fries', '10.95', '')]
+  }
+}, {
+  rule: {
+    frame: true,
+    above: 'Lunch only',
+    aboveKind: 'heading',
+    below: 'Upgrade to Fries +£2',
+    belowKind: 'paragraph',
+    tip: true
+  }
+});
+assert(/scallop-pad[\s\S]*Lunch only[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(friesBlock),
+  'sandwiches above, dishes and below all sit inside the frilly box');
+assert(friesBlock.indexOf('sec-stack') === -1,
+  'sandwiches below wording is not stacked outside the frame');
+var plainSand = print.sandwichesBlock({
+  sandwiches: {
+    name: 'Sandwiches',
+    dishes: [api.dish('Sandwiches', 'BLT', 'fries', '10.95', '')]
+  }
+}, {
+  rule: {
+    frame: false,
+    below: 'Upgrade to Fries +£2',
+    belowKind: 'paragraph'
+  }
+});
+assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
+  'unframed sandwiches below wording stays in the section box');
 
 // Card menus: text outside dishes comes from sectionLayout note/sell (not hard-coded only).
 var sandCardDishes = [
@@ -2261,6 +2305,8 @@ assert(printJs.indexOf('.sheet-blurb{text-align:center') === -1,
 var embedKidsRow = (embedKidsHtml.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
 assert(/col-little[\s\S]*sheet-blurb-below[\s\S]*col-desserts/.test(embedKidsRow),
   'Sunday roast line stays in the Little Bells column');
+assert(/col-little[\s\S]*sec-plain[\s\S]*Sunday roasts at half adult price[\s\S]*col-desserts/.test(embedKidsRow),
+  'Sunday roast line sits inside the Little Bells section box');
 assert(embedKidsRow.indexOf('Sunday roasts at half adult price') !== -1 &&
   !/col-desserts[\s\S]*Sunday roasts at half adult price/.test(embedKidsRow),
   'Sunday roast line does not run across the Desserts column');
@@ -2373,6 +2419,55 @@ assert(embedSandHtml.indexOf('class="card-blurb') === -1 && /sheet-blurb-heading
   'embedded sandwiches use this sheet’s type sizes, not the card’s');
 assert(/\.sheet-blurb\{text-align:left/.test(embedSandHtml) && /sheet-blurb-heading/.test(embedSandHtml),
   'embedded sandwiches wording is left-aligned like the parent sheet');
+function scallopPadAround(html, needle) {
+  var i = String(html || '').indexOf(needle);
+  if (i < 0) return '';
+  var openTok = '<div class="scallop-pad">';
+  var open = html.lastIndexOf(openTok, i);
+  if (open < 0) return '';
+  var pos = open + openTok.length;
+  var depth = 1;
+  var start = pos;
+  while (pos < html.length && depth > 0) {
+    var nextDiv = html.indexOf('<div', pos);
+    var nextEnd = html.indexOf('</div>', pos);
+    if (nextEnd < 0) return html.slice(start);
+    if (nextDiv !== -1 && nextDiv < nextEnd) {
+      depth += 1;
+      pos = nextDiv + 4;
+    } else {
+      depth -= 1;
+      if (depth === 0) return html.slice(start, nextEnd);
+      pos = nextEnd + 6;
+    }
+  }
+  return html.slice(start);
+}
+var sandPad = scallopPadAround(embedSandHtml, 'BLT');
+assert(sandPad.indexOf('Lunch only') !== -1 && /12\s*[–-]\s*2\.45/.test(sandPad),
+  'embedded sandwiches hours sit inside the frilly box with the fillings');
+var friesEmbedHtml = print.build(api.menuById('main'), [
+  api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+  api.dish('Sandwiches', 'BLT', 'fries', '10.95', ''),
+  api.dish('Sandwiches', 'Fish Finger', 'tartare', '11.95', '')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    Sandwiches: {
+      above: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with tortilla chips & salad.',
+      aboveKind: 'paragraph',
+      below: 'Upgrade to Fries +£2',
+      belowKind: 'paragraph',
+      frame: true,
+      width: 'column',
+      tip: true
+    }
+  })
+});
+var friesPad = scallopPadAround(friesEmbedHtml, 'Upgrade to Fries');
+assert(friesPad.indexOf('Upgrade to Fries +£2') !== -1 && friesPad.indexOf('BLT') !== -1,
+  'Upgrade to Fries prints inside the Sandwiches frilly box, not outside it');
+assert(friesPad.indexOf('Choose ciabatta') !== -1,
+  'Sandwiches hours/spiel also stays inside the same frilly box');
 var embedDessHtml = print.build(api.menuById('sunday'), [
   api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
   api.dish('Desserts', 'Sticky Toffee', 'custard', '7.95', 'v')
@@ -2394,6 +2489,9 @@ assert(/Ice cream \+1\.50/.test(embedDessHtml) && /sheet-blurb-text/.test(embedD
   'embedded desserts below line uses this sheet’s text size');
 assert(/\.sheet-blurb\{text-align:left/.test(embedDessHtml) && embedDessHtml.indexOf('class="card-blurb') === -1,
   'embedded desserts wording is left-aligned like the parent sheet');
+var dessPad = scallopPadAround(embedDessHtml, 'Sticky Toffee');
+assert(dessPad.indexOf('Save room for pudding') !== -1 && dessPad.indexOf('Ice cream +1.50') !== -1,
+  'embedded desserts above and below wording sit inside the frilly box');
 var embedSpecHtml = print.build(api.menuById('main'), [
   api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
   api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
