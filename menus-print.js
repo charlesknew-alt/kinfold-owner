@@ -1631,6 +1631,29 @@
         p2left = Math.max(0, p2left - (tightBack ? sandCost + 2 : sandCost));
         layout.fillers.push(sandDishCount ? 'Sandwiches (page 2)' : 'Sandwiches box (page 2)');
       }
+      // Column / Best-fit Specials sit opposite Sandwiches on page 2. A leftover
+      // Sides row under that pair clips into the allergy footer while page 1
+      // (Sharing|Burgers) still has a hole. Sit Sides on page 1 when they fit.
+      var specMainRulePlan = { width: 'full' };
+      if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+        specMainRulePlan = root.EBMenus.sectionLayoutFor('Special Mains', opts.sectionLayout) || specMainRulePlan;
+      } else if (opts.sectionLayout && opts.sectionLayout['Special Mains']) {
+        specMainRulePlan = opts.sectionLayout['Special Mains'];
+      }
+      if (bag.sides && layout.p2.sandwiches && layout.p2.sidesOnP2 &&
+          bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length &&
+          canSitInColumn(specMainRulePlan)) {
+        var sideCostP1 = sectionUnits(bag.sides, false);
+        if (p1left >= sideCostP1 + 8) {
+          layout.p1.sidesOnP1 = true;
+          layout.p2.sidesOnP2 = false;
+          p1left -= sideCostP1;
+          p2left += sideCostP1;
+          p1used += sideCostP1;
+          p2used -= sideCostP1;
+          layout.fillers.push('Sides (page 1 — Specials sit with Sandwiches)');
+        }
+      }
       if (wantPromoBox && !layout.p1.rooms) {
         // Prefer NOT stacking an extra promo beside sandwiches on a packed page 2 —
         // that is the type ceiling. Only add when page 2 still has generous room.
@@ -2206,6 +2229,13 @@
     // (Burgers/Classics missing) — do not leave quiz boxes in a food hole.
     var mainsPairedInCol = false;
     var specialsPairedInCol = false;
+    // Same food map as the planner: Column / Best-fit Specials take Sandwiches
+    // on page 2, so Sides must not start a clipped row under that pair.
+    if (p2opts && p2opts.sandwiches && p2opts.sidesOnP2 && !p1opts.sidesOnP1 &&
+        canPairSpecialsWithSandwiches(bag.specialMains && bag.specialMains.dishes, plan, true)) {
+      p1opts.sidesOnP1 = true;
+      p2opts.sidesOnP2 = false;
+    }
 
     var p1 = '<div class="page fill-page ' + fill1 + '">';
     p1 += trackerBar(ver, { hideDate: hideDate });

@@ -548,8 +548,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow156') !== -1, 'menus page cache-bust is flow156');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow156') !== -1, 'hub menus link cache-bust is flow156');
+assert(page.indexOf('flow157') !== -1, 'menus page cache-bust is flow157');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow157') !== -1, 'hub menus link cache-bust is flow157');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -2602,9 +2602,8 @@ assert(/column-solo-row[\s\S]*Pan Roasted Duck Breast/.test(colSpecA4) &&
   'Special Mains Column lock stays a half-column under Mains');
 assert(/column-solo-row[\s\S]*Pie of the day/.test(colSpecA4),
   'Item Boost Column lock stays a half-column, not a full-bleed box');
-assert(printJs.indexOf('specials-sand-row') !== -1 &&
-  printJs.indexOf('canPairSpecialsWithSandwiches') !== -1,
-  'Column / Best-fit Specials can sit opposite Sandwiches');
+assert(printJs.indexOf('Sides (page 1 — Specials sit with Sandwiches)') !== -1,
+  'planner moves Sides to page 1 when Specials take the Sandwiches column');
 var specialsCardHtml = print.build(api.menuById('specials'), [
   api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
 ], {
@@ -2858,9 +2857,17 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'Specials|Sandwiches row is marked Special Mains');
   assert(!/<section class="sec specials-beside"[\s\S]*Pan Roasted Duck Breast/.test(a4),
     'Column Specials do not print a full-bleed box above Sides|Sandwiches');
-  assert(!/sides-sand-row[\s\S]{0,4000}Quesadilla/.test(a4) &&
-    /Cheesy Garlic Bread/.test(a4),
-    'Sandwiches leave the Sides pair so fillings start higher on the page');
+  var plannedCol = print.planFluidLayout(mainMenu, dishes, { sectionLayout: colLayout });
+  assert(plannedCol.pages === 2 && plannedCol.p1.sidesOnP1 === true &&
+    plannedCol.p2 && plannedCol.p2.sidesOnP2 === false,
+    'Sides move to page 1 when Specials sit with Sandwiches on page 2');
+  var pageBits = a4.split('class="page fill-page');
+  var page1Html = pageBits[1] || '';
+  var page2Html = pageBits[2] || '';
+  assert(/Cheesy Garlic Bread/.test(page1Html),
+    'Sides print on page 1 in the leftover under Sharing|Burgers');
+  assert(!/Cheesy Garlic Bread/.test(page2Html),
+    'Sides do not start a clipped row under Specials|Sandwiches on page 2');
 })();
 (function specialsBestFitChoosesColumnBesideSandwiches() {
   var dishes = sidesSandDishes.concat([
