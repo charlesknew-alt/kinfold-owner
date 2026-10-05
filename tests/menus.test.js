@@ -554,8 +554,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow160') !== -1, 'menus page cache-bust is flow160');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow160') !== -1, 'hub menus link cache-bust is flow160');
+assert(page.indexOf('flow161') !== -1, 'menus page cache-bust is flow161');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow161') !== -1, 'hub menus link cache-bust is flow161');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;

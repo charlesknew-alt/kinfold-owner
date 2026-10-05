@@ -687,12 +687,18 @@
       di += 1;
     }
 
-    function stackForShort(side, panels, leftover) {
+    function stackForShort(side, panels, leftover, allowSmall) {
       var kind = side === 'left' ? leftKind : rightKind;
       var alt = kind === 'box' ? 'wide' : 'box';
       var n = Math.max(0, Math.min(2, parseInt(panels, 10) || 0));
       var hole = leftover != null ? leftover : Math.abs((rightFood || 0) - (leftFood || 0));
-      var fit = pickFittingPromos(pool, hole, n, !!opts.shortOnly);
+      // Unit holes often under-count half-column height. When leveling a real
+      // short side (force / shortOnly), allow one small evergreen panel anyway.
+      var fitHole = (allowSmall || opts.force) ? Math.max(hole, 8) : hole;
+      var fit = pickFittingPromos(pool, fitHole, n, !!opts.shortOnly);
+      if (!fit.length && (allowSmall || opts.force)) {
+        fit = pickFittingPromos(pool, 8, 1, false);
+      }
       if (!fit.length) {
         return { left: '', right: '', note: 'Leftover too small for a feature panel', usedTitles: [] };
       }
@@ -717,49 +723,24 @@
         return { left: '', right: '', note: 'No unused feature panels left', usedTitles: [] };
       }
       if (force.shorter === 'left' || force.shorter === 'right') {
-        return stackForShort(force.shorter, forcedPanels, hole);
+        return stackForShort(force.shorter, forcedPanels, hole, true);
       }
     }
 
     // Food pairs: only plug the shorter column. Never add a panel under both
     // when the stacks are already close — that inflates the taller puddings.
     if (opts.shortOnly) {
-      if (gap > 1.2) return stackForShort('left', gap > 9 ? 2 : 1, hole);
-      if (gap < -1.2) return stackForShort('right', -gap > 9 ? 2 : 1, hole);
+      if (gap > 1.2) return stackForShort('left', gap > 9 ? 2 : 1, hole, true);
+      if (gap < -1.2) return stackForShort('right', -gap > 9 ? 2 : 1, hole, true);
       return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
     }
-    if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1, hole);
-    if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1, hole);
-    if (pool.length >= 2 && Math.abs(gap) <= 2.5 && (leftFood + rightFood) < 28) {
-      var evenFit = pickFittingPromos(pool, 8, 2);
-      if (evenFit.length >= 2) {
-        return {
-          left: renderOnePromoBox([evenFit[0]], leftKind),
-          right: renderOnePromoBox([evenFit[1]], rightKind),
-          note: 'Paired feature panels (even columns)',
-          usedTitles: [evenFit[0].title, evenFit[1].title]
-        };
-      }
-    }
+    if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1, hole, true);
+    if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1, hole, true);
+    // Near-even opposite food columns: one panel under the slightly shorter
+    // side only. Pairing both would burn Stay a While + Gatherings before page 2
+    // solo columns (Desserts / Sides) can fill their empty half.
     if (pool.length && Math.abs(gap) <= 2.5) {
-      var one = pickFittingPromos(pool, 8, 1);
-      if (!one.length) {
-        return { left: '', right: '', note: 'No feature panels — leftover too small', usedTitles: [] };
-      }
-      if (gap >= 0) {
-        return {
-          left: renderOnePromoBox(one, leftKind),
-          right: '',
-          note: 'One panel on left',
-          usedTitles: [one[0].title]
-        };
-      }
-      return {
-        left: '',
-        right: renderOnePromoBox(one, rightKind),
-        note: 'One panel on right',
-        usedTitles: [one[0].title]
-      };
+      return stackForShort(gap >= 0 ? 'left' : 'right', 1, Math.max(hole, 8), true);
     }
     return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
   }
@@ -1017,6 +998,25 @@
       return base + Math.min(6, dishes.length) + hours;
     }
     return COST.sandwiches;
+  }
+
+  /**
+   * Visual height of Sandwiches for opposite-column leveling only.
+   * Pack cost above is intentionally heavy for page CLIP; using it for
+   * planPromoFill made Sides look shorter than Sandwiches and put Gatherings
+   * under the taller Sides stack (PDF preview bug).
+   */
+  function sandwichesLevelCost(bag, rule) {
+    var dishes = sandwichDishesOf(bag);
+    rule = rule || (root.EBMenus && root.EBMenus.sectionLayoutFor
+      ? root.EBMenus.sectionLayoutFor('Sandwiches')
+      : { note: '', frame: true });
+    if (!dishes.length) return COST.sandwiches;
+    return columnFillUnits(
+      { name: 'Sandwiches', dishes: dishes },
+      rule,
+      (rule && (rule.note || rule.above)) || ''
+    );
   }
 
   /**
@@ -2708,9 +2708,13 @@
       // feature panels stay little promotions under whatever is still short.
       var leftFoodU = 0;
       var rightFoodU = 0;
-      if (shareInLeft) leftFoodU += sectionUnits({ name: 'Sharing', dishes: shareDishes }, false);
-      if (burgerDishes.length) rightFoodU += sectionUnits({ name: 'Burgers', dishes: burgerDishes }, false);
-      if (classicDishes.length) rightFoodU += sectionUnits({ name: 'Pub Classics', dishes: classicDishes }, false);
+      // columnFillUnits includes wrapUnits so long Sharing descriptions beat a
+      // short Burgers stack — panels go under Burgers, not under Sharing.
+      if (shareInLeft) leftFoodU += columnFillUnits({ name: 'Sharing', dishes: shareDishes }, shareRule);
+      if (burgerDishes.length) rightFoodU += columnFillUnits({ name: 'Burgers', dishes: burgerDishes }, burgRule);
+      if (classicDishes.length) {
+        rightFoodU += columnFillUnits({ name: 'Pub Classics', dishes: classicDishes }, classRule);
+      }
 
       // Named fillings stay left beside Burgers. Tip/sell box goes to the SHORTER
       // column so we do not pile Burgers + Sandwiches + Sides on the right while
@@ -3099,9 +3103,19 @@
       // Blocks “Column” lock must stay half-width — never orphan to full-bleed.
       if ((sidesCol || p2opts.sandwiches || p2opts.rooms) && (sideList.length || p2opts.sandwiches || p2opts.rooms || bag.sauces)) {
         var sideU = 0;
-        if (sideList.length) sideU += sectionUnits({ name: 'Sides', dishes: sideList }, false);
-        if (p2opts.sidesOnP2 && bag.sauces) sideU += sectionUnits(bag.sauces, false);
-        var rightU = p2opts.sandwiches ? sandwichesPackCost(bag, sandRule) : 0;
+        if (sideList.length) {
+          sideU += columnFillUnits({ name: 'Sides', dishes: sideList }, sideRule);
+        }
+        if (p2opts.sidesOnP2 && bag.sauces) {
+          sideU += columnFillUnits(bag.sauces, { frame: false });
+        }
+        // Level with visual height — not the heavy pack cost used for page CLIP.
+        var rightU = p2opts.sandwiches ? sandwichesLevelCost(bag, sandRule) : 0;
+        // More Sides than sandwich fillings → Sandwiches are the short column.
+        if (sideList.length && p2opts.sandwiches &&
+            sideList.length > sandwichDishesOf(bag).length + 1) {
+          p2Force = p2Force || { shorter: 'right', panels: sideList.length >= 6 ? 2 : 1 };
+        }
         var sidesLockedColP2 = !!(sideList.length && lockedColumnWidth(sideRule));
         if (orphanColumnHole(sideU, rightU) && sideList.length && !p2opts.sandwiches && !sidesLockedColP2) {
           p2 += '<section class="sec">';
@@ -3859,8 +3873,12 @@
               'var tall=lh>rh?left:right;' +
               'var short=lh>rh?right:left;' +
               'var boxes=removableBoxes(tall).filter(function(b){return b.closest&&b.closest(".col-feature");});' +
+              // Only prune a SURPLUS second panel. Never strip the last feature from
+              // the tall side when the short side has none — that re-opens the hole
+              // under Burgers / Sandwiches that planPromoFill just filled.
+              'var shortBoxes=removableBoxes(short).filter(function(b){return b.closest&&b.closest(".col-feature");});' +
+              'if(boxes.length<2&&!shortBoxes.length)break;' +
               'if(!boxes.length)break;' +
-              // Oversized leftover panels must go — a quiet gap is better than overshooting.
               'var last=boxes[boxes.length-1];' +
               'last.parentNode.removeChild(last);' +
             '}' +
