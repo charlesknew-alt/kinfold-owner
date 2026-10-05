@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261005-flow153"></script>
-  <script src="menus-print.js?v=20261005-flow153"></script>
-  <script src="menus-ingest.js?v=20261005-flow153"></script>
+  <script src="menus.js?v=20261005-flow154"></script>
+  <script src="menus-print.js?v=20261005-flow154"></script>
+  <script src="menus-ingest.js?v=20261005-flow154"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1771,6 +1771,7 @@
       var kinds = (EBMenus.OUTSIDE_KINDS) || [
         { id: 'title', label: 'Title (large heading)' },
         { id: 'heading', label: 'Heading (between title & paragraph)' },
+        { id: 'subhead', label: 'Subheading (between heading & paragraph)' },
         { id: 'paragraph', label: 'Paragraph (body)' },
         { id: 'text', label: 'Text (smaller plain line)' }
       ];
@@ -1819,7 +1820,7 @@
           : 'Optional — prints under the dishes')) + '">' +
         escapeAttr(slots.below) + '</textarea>';
       html += '<p class="note" style="margin:6px 0 0">' + (hostSheet
-        ? 'Type size is for <strong>this sheet</strong> when ' + escapeAttr(sec) + ' is ticked on — Paragraph/Text stay that size (even for “All below £9.50”); Title/Heading make the £ line larger. Wording prints <strong>inside this section’s boxed area</strong> (in the frilly box when Frilly is Yes) and lines up with the dishes (not centred like the card). The ' + escapeAttr(sec) + ' card keeps its own wording and sizes.'
+        ? 'Type size is for <strong>this sheet</strong> when ' + escapeAttr(sec) + ' is ticked on — Subheading/Paragraph/Text stay that size (even for “All below £9.50”); Title/Heading make the £ line larger. Subheading sits between Heading and Paragraph so hours and callouts stand out from the dishes without the big heading. Wording prints <strong>inside this section’s boxed area</strong> (in the frilly box when Frilly is Yes) and lines up with the dishes (not centred like the card). The ' + escapeAttr(sec) + ' card keeps its own wording and sizes.'
         : 'Type size is for this <strong>card</strong> (centred, outside the dish box). Main, Sunday and other long sheets keep their own wording, sizes and left alignment when this menu is ticked on.') + '</p>';
       return html;
     }
@@ -2056,12 +2057,16 @@
     }
 
     function blurbKindSelect(id, value) {
-      var kinds = [
+      var kinds = (EBMenus.OUTSIDE_KINDS || [
         { id: 'title', label: 'Title (large heading)' },
         { id: 'heading', label: 'Heading (between title & paragraph)' },
-        { id: 'paragraph', label: 'Paragraph (centred body)' },
+        { id: 'subhead', label: 'Subheading (between heading & paragraph)' },
+        { id: 'paragraph', label: 'Paragraph (body)' },
         { id: 'text', label: 'Text (smaller plain line)' }
-      ];
+      ]).map(function (k) {
+        if (k.id === 'paragraph') return { id: k.id, label: 'Paragraph (centred body)' };
+        return k;
+      });
       var html = '<select id="' + id + '">';
       kinds.forEach(function (k) {
         html += '<option value="' + k.id + '"' + (value === k.id ? ' selected' : '') + '>' + escapeAttr(k.label) + '</option>';

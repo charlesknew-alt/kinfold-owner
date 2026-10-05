@@ -414,8 +414,8 @@
     var raw = String(text || '').trim();
     if (!raw) return '';
     kind = String(kind || 'paragraph').toLowerCase();
-    // Offer split only when Blocks type is Title/Heading — Paragraph/Text must
-    // honour the picker (staff pick Paragraph, print stays paragraph size).
+    // Offer split only when Blocks type is Title/Heading — Subheading/Paragraph/Text
+    // honour the picker (staff pick Subheading, print stays that size).
     if ((kind === 'title' || kind === 'heading') && /£\s*\d/.test(raw)) {
       var split = splitOfferHtml(raw);
       if (split) return split;
@@ -427,7 +427,7 @@
     var raw = String(text || '').trim();
     if (!raw) return '';
     kind = String(kind || 'paragraph').toLowerCase();
-    if (['title', 'heading', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
+    if (['title', 'heading', 'subhead', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
     place = place === 'above' ? 'above' : 'below';
     return '<div class="card-blurb card-blurb-' + kind + ' card-blurb-' + place +
       (place === 'above' && (kind === 'title' || kind === 'heading') ? ' card-offer' : '') +
@@ -435,12 +435,12 @@
       '">' + blurbInnerHtml(raw, kind) + '</div>';
   }
 
-  /** Long-sheet outside text: Title/Heading/Paragraph/Text at parent type, not card pt sizes. */
+  /** Long-sheet outside text: Title/Heading/Subheading/Paragraph/Text at parent type, not card pt sizes. */
   function sheetBlurbHtml(text, kind, place) {
     var raw = String(text || '').trim();
     if (!raw) return '';
     kind = String(kind || 'paragraph').toLowerCase();
-    if (['title', 'heading', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
+    if (['title', 'heading', 'subhead', 'paragraph', 'text'].indexOf(kind) === -1) kind = 'paragraph';
     place = place === 'above' ? 'above' : 'below';
     var inner = blurbInnerHtml(raw, kind);
     var offer = (place === 'above' && /lb-price-line/.test(inner)) ? ' sheet-offer' : '';
@@ -2819,6 +2819,7 @@
       '.card-blurb-below{margin:8px 4px 0}' +
       '.card-blurb-title{font-family:var(--serif);font-weight:700;font-size:16pt;line-height:1.25}' +
       '.card-blurb-heading{font-family:var(--serif);font-weight:600;font-size:13pt;line-height:1.35}' +
+      '.card-blurb-subhead{font-family:var(--serif);font-weight:600;font-size:12pt;line-height:1.35}' +
       '.card-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:11pt;line-height:1.4}' +
       '.card-blurb-text{font-family:var(--sans);font-weight:400;font-size:10pt;line-height:1.4;color:#3a342c}' +
       '.card-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 4px;text-transform:none}' +
@@ -2926,6 +2927,7 @@
       '.sheet-blurb-below{margin:8px 0 0}' +
       '.sheet-blurb-title{font-family:var(--serif);font-weight:700;font-size:clamp(16pt,var(--title),22pt);line-height:1.2}' +
       '.sheet-blurb-heading{font-family:var(--serif);font-weight:600;font-size:clamp(13.5pt,calc(var(--name) + 4pt),17pt);line-height:1.3}' +
+      '.sheet-blurb-subhead{font-family:var(--serif);font-weight:600;font-size:clamp(12pt,calc(var(--name) + 1.5pt),13.5pt);line-height:1.35}' +
       '.sheet-blurb-paragraph{font-family:var(--sans);font-weight:500;font-size:clamp(11pt,var(--name),12pt);line-height:1.4}' +
       '.sheet-blurb-text{font-family:var(--sans);font-weight:400;font-size:clamp(9.5pt,var(--desc),10.5pt);line-height:1.4;color:#3a342c}' +
       '.sheet-blurb .lb-price-line{font-family:var(--serif);font-weight:700;letter-spacing:.03em;margin:0 0 3px;text-transform:none}' +
@@ -3076,6 +3078,9 @@
     }
     if (kind === 'heading') {
       return '<div class="party-blurb-heading party-blurb-' + place + '">' + body + '</div>';
+    }
+    if (kind === 'subhead') {
+      return '<div class="party-blurb-subhead party-blurb-' + place + '">' + body + '</div>';
     }
     if (kind === 'text') {
       return '<div class="party-blurb-text party-blurb-' + place + '">' + body + '</div>';
@@ -4306,10 +4311,12 @@
       '.party-dish .desc{text-align:center;padding-right:0;font-style:normal;color:#444}' +
       '.party-notes{font-size:11px;color:#5a534a;margin:14px 12mm 6px;line-height:1.4}' +
       '.party-blurb-heading{font-family:var(--serif);font-size:13pt;font-weight:600;letter-spacing:.04em;line-height:1.35;color:#1e3d28;margin:12px 12mm 8px}' +
+      '.party-blurb-subhead{font-family:var(--serif);font-size:12pt;font-weight:600;letter-spacing:.03em;line-height:1.35;color:#1e3d28;margin:12px 12mm 8px}' +
       '.party-blurb-para{font-size:12px;line-height:1.45}' +
       '.party-blurb-text{font-family:var(--sans);font-size:10.5pt;color:#3a342c;margin:10px 14mm 8px;line-height:1.4;font-weight:400}' +
       '.party-blurb-bottom.party-title{font-size:16px;margin-top:14px}' +
       '.party-blurb-bottom.party-blurb-heading{margin-top:16px;font-size:12.5pt}' +
+      '.party-blurb-bottom.party-blurb-subhead{margin-top:16px;font-size:11.5pt}' +
       '.party-promos{margin:10px 10mm 4px;text-align:center}' +
       '.party-promo{margin:0 0 8px}' +
       '.party-promo .promo-title{font-size:var(--promo);margin:0 0 2px}' +
