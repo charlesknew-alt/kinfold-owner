@@ -554,8 +554,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow161') !== -1, 'menus page cache-bust is flow161');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow161') !== -1, 'hub menus link cache-bust is flow161');
+assert(page.indexOf('flow162') !== -1, 'menus page cache-bust is flow162');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow162') !== -1, 'hub menus link cache-bust is flow162');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -3160,11 +3160,14 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'page 2 pairs Sides beside Sandwiches so both columns start and finish together');
   assert(/Osso Bucco/i.test(pages[2]) && /Fish &amp; Chips|Fish & Chips/i.test(pages[2]),
     'all mains still print on page 2');
-  // Opposite-column holes (if any) must get feature panels — never a blank half.
+  var p1Cols = (pages[1].match(/classics-block[\s\S]*?<\/section>/) || [''])[0];
+  var p1Right = (p1Cols.match(/col col-food[\s\S]*$/) || [''])[0];
+  assert(/col-feature[\s\S]*(Stay a While|Gatherings)/i.test(p1Right),
+    'page 1 puts a feature panel under short Burgers (not under Sharing)');
   var p2Pair = (pages[2].match(/sides-sand-row[\s\S]*?<\/section>/) || [''])[0];
-  assert(/Stay a While|Gatherings|Pub Quiz|How are we doing/i.test(p2Pair) ||
-    (/Cheesy Garlic Bread/i.test(p2Pair) && /Quesadilla/i.test(p2Pair)),
-    'page 2 opposite columns have food on both sides or a feature panel in the hole');
+  var p2Left = (p2Pair.match(/col col-sides[\s\S]*?(?=<div class="col col-promo)/) || [''])[0];
+  assert(/col-feature[\s\S]*(Stay a While|Gatherings)/i.test(p2Left),
+    'page 2 puts a feature panel under shorter Sides when Sandwiches are the tall frilly stack');
 })();
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 

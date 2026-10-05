@@ -1012,11 +1012,15 @@
       ? root.EBMenus.sectionLayoutFor('Sandwiches')
       : { note: '', frame: true });
     if (!dishes.length) return COST.sandwiches;
-    return columnFillUnits(
+    // Frilly frame + hours note add real half-column height beyond dish rows.
+    var u = columnFillUnits(
       { name: 'Sandwiches', dishes: dishes },
       rule,
       (rule && (rule.note || rule.above)) || ''
     );
+    if (rule && rule.frame) u += 3.2;
+    u += noteUnits(rule && rule.below);
+    return u;
   }
 
   /**
@@ -3110,12 +3114,8 @@
           sideU += columnFillUnits(bag.sauces, { frame: false });
         }
         // Level with visual height — not the heavy pack cost used for page CLIP.
+        // Framed Sandwiches + hours often run taller than a longer plain Sides list.
         var rightU = p2opts.sandwiches ? sandwichesLevelCost(bag, sandRule) : 0;
-        // More Sides than sandwich fillings → Sandwiches are the short column.
-        if (sideList.length && p2opts.sandwiches &&
-            sideList.length > sandwichDishesOf(bag).length + 1) {
-          p2Force = p2Force || { shorter: 'right', panels: sideList.length >= 6 ? 2 : 1 };
-        }
         var sidesLockedColP2 = !!(sideList.length && lockedColumnWidth(sideRule));
         if (orphanColumnHole(sideU, rightU) && sideList.length && !p2opts.sandwiches && !sidesLockedColP2) {
           p2 += '<section class="sec">';
