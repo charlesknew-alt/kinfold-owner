@@ -1783,6 +1783,46 @@
       esc(sectionKey || 'Special Mains') + '">' + framedBlock(inner, rule, 'wide') + '</section>';
   }
 
+  /** Column / Best-fit Specials sit opposite Sandwiches so the fillings stay on the page. */
+  function canPairSpecialsWithSandwiches(dishes, plan, sandwichesOnPage) {
+    if (!sandwichesOnPage || !dishes || !dishes.length) return false;
+    return canSitInColumn(ruleFor('Special Mains', plan));
+  }
+
+  function specialsSandwichesPair(bag, plan, opts) {
+    opts = opts || {};
+    var rule = ruleFor('Special Mains', plan);
+    if (rule.frame == null) rule.frame = true;
+    var sandRule = opts.sandRule || ruleFor('Sandwiches', plan);
+    var specU = sectionUnits(bag.specialMains, !!(rule && rule.frame));
+    var sandU = sandwichesPackCost(bag, sandRule);
+    var specInner = sectionBlock('Specials', bag.specialMains.dishes, rule, 'box', { hideTitle: true });
+    var sandInner = sandwichesBlock(bag, {
+      rule: sandRule,
+      hideTitle: true,
+      frame: sandRule.frame ? 'box' : undefined
+    });
+    var pair = levelOppositeColumns(specInner, specU, sandInner, sandU, {
+      promos: opts.promos,
+      excludeTitles: opts.excludeTitles,
+      force: opts.force,
+      leftTitle: 'Specials',
+      rightTitle: 'Sandwiches',
+      secClass: 'specials-sand-row',
+      leftClass: 'col-specials',
+      rightClass: 'col-food',
+      leftFrame: 'box',
+      rightFrame: sandRule.frame ? 'box' : 'wide'
+    });
+    if (pair && pair.html) {
+      pair.html = pair.html.replace(
+        '<section class="sec specials-sand-row">',
+        '<section class="sec specials-sand-row" data-specials-course="Special Mains">'
+      );
+    }
+    return pair;
+  }
+
   function layoutMap(plan) {
     if (root.EBMenus && root.EBMenus.normalizeSectionLayout) {
       return root.EBMenus.normalizeSectionLayout(plan && plan.sectionLayout);
@@ -2165,6 +2205,7 @@
     // Best-fit / Column Mains sit opposite Sandwiches when that column is empty
     // (Burgers/Classics missing) — do not leave quiz boxes in a food hole.
     var mainsPairedInCol = false;
+    var specialsPairedInCol = false;
 
     var p1 = '<div class="page fill-page ' + fill1 + '">';
     p1 += trackerBar(ver, { hideDate: hideDate });
@@ -2494,7 +2535,25 @@
         usedPromoTitles = usedPromoTitles.concat(mainSolo1.usedPromoTitles || []);
         p1 += mainSolo1.html;
       }
-      if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
+      // Column / Best-fit Specials sit beside Sandwiches when fillings are still
+      // waiting (not already in the classics columns) so they do not fall off.
+      if (canPairSpecialsWithSandwiches(
+        bag.specialMains && bag.specialMains.dishes,
+        plan,
+        !!(p1opts.sandwiches && !showColBlock)
+      )) {
+        var pairSpec1 = specialsSandwichesPair(bag, plan, {
+          sandRule: sandRule,
+          promos: promos,
+          excludeTitles: usedPromoTitles
+        });
+        usedPromoTitles = usedPromoTitles.concat(pairSpec1.usedTitles || []);
+        p1 += pairSpec1.html || '';
+        specialsPairedInCol = true;
+        p1opts.sandwiches = false;
+      }
+      if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length &&
+          !specialsPairedInCol) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
       }
       // Food-first column pairing (Sides/Desserts when Blocks allow); else feature panels.
@@ -2555,8 +2614,12 @@
       ));
     if (bag.mains && !mainsPairedInCol && p2opts.sandwiches && canSitInColumn(mainRule) &&
         bag.mains.dishes && bag.mains.dishes.length &&
-        !(p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length)) {
-      // Column Mains sit opposite Sandwiches only when Sides are not also on page 2.
+        !(p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) &&
+        !canPairSpecialsWithSandwiches(
+          bag.specialMains && bag.specialMains.dishes, plan, true
+        )) {
+      // Column Mains sit opposite Sandwiches only when Sides are not also on page 2
+      // and Specials are not taking that column (Specials + Sandwiches saves a row).
       // Food map: Sides beside Sandwiches. Best-fit Mains may fill the hole if Sides are elsewhere.
       var sandU2 = sandwichesPackCost(bag, sandRule);
       var mainU2 = sectionUnits(bag.mains, false);
@@ -2593,7 +2656,26 @@
       usedPromoTitles = usedPromoTitles.concat(mainSolo2.usedPromoTitles || []);
       p2 += mainSolo2.html;
     }
-    if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
+    // Column / Best-fit Specials sit opposite Sandwiches instead of a full-bleed
+    // box above Sides|Sandwiches — that stack is what pushed fillings off the page.
+    if (canPairSpecialsWithSandwiches(
+      bag.specialMains && bag.specialMains.dishes,
+      plan,
+      !!p2opts.sandwiches
+    )) {
+      var pairSpec2 = specialsSandwichesPair(bag, plan, {
+        sandRule: sandRule,
+        promos: promos,
+        excludeTitles: usedPromoTitles,
+        force: littleFoodPartner ? null : p2Force
+      });
+      usedPromoTitles = usedPromoTitles.concat(pairSpec2.usedTitles || []);
+      p2 += pairSpec2.html || '';
+      specialsPairedInCol = true;
+      p2opts.sandwiches = false;
+    }
+    if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length &&
+        !specialsPairedInCol) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
     }
     // Food-first column pairing; feature panels fill any remaining short column.

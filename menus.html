@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261005-flow155"></script>
-  <script src="menus-print.js?v=20261005-flow155"></script>
-  <script src="menus-ingest.js?v=20261005-flow155"></script>
+  <script src="menus.js?v=20261005-flow156"></script>
+  <script src="menus-print.js?v=20261005-flow156"></script>
+  <script src="menus-ingest.js?v=20261005-flow156"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -578,8 +578,10 @@
       return layoutBook[key];
     }
     /**
-     * Layout used when printing a sheet: this menu’s Blocks, with Specials board
-     * notes taken from the Specials menu so one board note follows onto Main/Sunday.
+     * Layout used when printing a sheet: this menu’s Blocks width / frilly box.
+     * Specials-card board notes follow onto Main/Sunday; Column / Full / Best fit
+     * stay whatever this sheet set in Blocks (the card’s default Full must not
+     * wipe a Column lock and stretch Specials over Sandwiches).
      */
     function effectiveSectionLayout(id) {
       var key = id || menuId;
@@ -587,11 +589,17 @@
         ? EBMenus.normalizeSectionLayout(layoutFor(key))
         : layoutFor(key);
       if (key === 'specials') return base;
+      if (EBMenus.overlaySpecialsBoardNotes) {
+        return EBMenus.overlaySpecialsBoardNotes(base, layoutBook.specials);
+      }
       var specials = layoutBook.specials;
       if (specials && key !== 'specials') {
         var noteSecs = (EBMenus.SPECIALS_SECTIONS) || ['Special Starters', 'Special Mains', 'Special Desserts'];
         noteSecs.forEach(function (sec) {
-          if (specials[sec]) base[sec] = specials[sec];
+          if (!specials[sec] || !base[sec]) return;
+          base[sec] = Object.assign({}, base[sec], {
+            note: String(specials[sec].note != null ? specials[sec].note : (base[sec].note || ''))
+          });
         });
       }
       return base;

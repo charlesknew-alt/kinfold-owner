@@ -3054,6 +3054,24 @@
     return map[id] || defaultSectionLayout();
   }
 
+  /**
+   * When printing Main / Sunday, keep that sheet’s Blocks width and frilly
+   * box. Only the Specials-card board note follows on, so one “when it’s gone”
+   * line stays in sync without wiping Column / Best fit / Full.
+   */
+  function overlaySpecialsBoardNotes(hostLayout, specialsLayout) {
+    var base = normalizeSectionLayout(hostLayout);
+    if (!specialsLayout || typeof specialsLayout !== 'object') return base;
+    var specials = normalizeSectionLayout(specialsLayout);
+    SPECIALS_SECTIONS.forEach(function (sec) {
+      if (!base[sec] || !specials[sec]) return;
+      base[sec] = Object.assign({}, base[sec], {
+        note: String(specials[sec].note != null ? specials[sec].note : (base[sec].note || ''))
+      });
+    });
+    return base;
+  }
+
   function isColumnWidth(width) {
     return width === 'column' || width === 'both';
   }
@@ -3145,6 +3163,7 @@
     defaultSectionLayoutBook: defaultSectionLayoutBook,
     normalizeSectionLayoutBook: normalizeSectionLayoutBook,
     sectionLayoutForMenu: sectionLayoutForMenu,
+    overlaySpecialsBoardNotes: overlaySpecialsBoardNotes,
     sectionLayoutFor: sectionLayoutFor,
     littleBellsOutsideText: littleBellsOutsideText,
     splitCardOutsideText: splitCardOutsideText,
