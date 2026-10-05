@@ -2784,8 +2784,10 @@
   var WIDTH_OPTIONS = [
     { id: 'full', label: 'Full width' },
     { id: 'column', label: 'Column' },
-    { id: 'both', label: 'Best fit for this page (AI chooses)' }
+    { id: 'both', label: 'Best fit (AI: column, full, or two-column split)' }
   ];
+  // Best-fit AI may choose column, full, or split (one category across two even
+  // columns). Staff do not pick split directly — it is under Best fit only.
 
   /** Type size for wording around dishes — same five steps as party blurbs. */
   var OUTSIDE_KINDS = [
@@ -2906,7 +2908,9 @@
       var row = raw[s];
       if (!row || typeof row !== 'object') return;
       var width = String(row.width || base[s].width).toLowerCase();
-      if (width !== 'full' && width !== 'column' && width !== 'both') width = base[s].width;
+      if (width !== 'full' && width !== 'column' && width !== 'both' && width !== 'split') {
+        width = base[s].width;
+      }
       var note = row.note != null ? String(row.note) : base[s].note;
       // Old saves had no tip key — Sandwiches stayed on the sheet by default
       var tip;
@@ -3077,7 +3081,16 @@
   }
 
   function isFullWidth(width) {
-    return width === 'full' || width === 'both';
+    return width === 'full' || width === 'both' || width === 'split';
+  }
+
+  /** Best-fit choice: one category across two even columns (shorter than a single stack). */
+  function isSplitWidth(width) {
+    return width === 'split';
+  }
+
+  function isBestFitWidth(width) {
+    return width === 'both';
   }
 
   /** Blocks “Column” lock (not Best fit). Must stay a half-column — never full-bleed. */
@@ -3170,6 +3183,8 @@
     cardOutsideSlots: cardOutsideSlots,
     isColumnWidth: isColumnWidth,
     isFullWidth: isFullWidth,
+    isSplitWidth: isSplitWidth,
+    isBestFitWidth: isBestFitWidth,
     isLockedColumnWidth: isLockedColumnWidth,
     isLockedFullWidth: isLockedFullWidth,
     cleanDishName: cleanDishName,

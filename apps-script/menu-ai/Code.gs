@@ -424,7 +424,7 @@ function reviewLayoutWithGemini_(body) {
     '  "sidesOn": "page1"|"page2",\n' +
     '  "dropFootLogo": true|false,\n' +
     '  "okToPrint": true|false,\n' +
-    '  "sectionWidths": { "<section name>": "column"|"full" },\n' +
+    '  "sectionWidths": { "<section name>": "column"|"full"|"split" },\n' +
     '  "columnBalance": {\n' +
     '    "page1": { "shorter": "left"|"right"|"even", "panels": 0|1|2 },\n' +
     '    "page2": { "shorter": "left"|"right"|"even", "panels": 0|1|2 }\n' +
@@ -437,9 +437,11 @@ function reviewLayoutWithGemini_(body) {
     '- sidesOn is page2 so Sides sit with Sandwiches. Never sidesOn page1 when Sharing/Burgers already occupy page 1.\n' +
     '- sandwichesOn is page2 (quieter column). Never omit when sandwichesLocked is true.\n' +
     '- If sandwichesLocked is false, sandwichesOn should be omit.\n' +
-    'BEST-FIT WIDTHS: layout.bestFit lists sections staff set to “Best fit (AI chooses)”. ' +
-    'For those only, set sectionWidths to column or full. Prefer column so food fits. ' +
-    'Locked Column / Full in layout.sectionWidths must not change.\n' +
+    'BEST-FIT WIDTHS: layout.bestFit lists EVERY section staff set to “Best fit (AI chooses)”. ' +
+    'For those only, set sectionWidths to column, full, or split — any category may use any of the three. ' +
+    'column = half opposite another section; full = one full-bleed stack; ' +
+    'split = that one category across two even columns (shorter height — use when a single stack would clip or look sparse). ' +
+    'Prefer column or split so food fits. Locked Column / Full must not change.\n' +
     'SHARED TYPE SCALE:\n' +
     '- Same title/name/description size on both pages. Maximise that shared size.\n' +
     '- Prefer fewer feature panels on the packed page over shrinking type.\n' +
@@ -464,7 +466,7 @@ function reviewLayoutWithGemini_(body) {
     '6. Allergy footer must stay visible; lunch-club key stays in footer when ticked.\n' +
     '7. sandwichesOn page2; sidesOn page2 beside Sandwiches. Never omit locked sandwiches.\n' +
     '8. Respect party paper choice (A4 or 2×A5).\n' +
-    '9. SECTION WIDTH “both” / best-fit: YOU choose column or full in sectionWidths so this sheet fits.\n' +
+    '9. SECTION WIDTH “both” / best-fit: YOU choose column, full, or split in sectionWidths so this sheet fits.\n' +
     'Layout JSON follows:\n' + JSON.stringify(layout).slice(0, 7000);
 
   var called = callGemini_(key, [{ text: prompt }], {
@@ -512,7 +514,7 @@ function reviewLayoutWithGemini_(body) {
     var bestFit = Array.isArray(layout.bestFit) ? layout.bestFit : [];
     Object.keys(advice.sectionWidths).forEach(function (sec) {
       var w = String(advice.sectionWidths[sec] || '').toLowerCase();
-      if (w !== 'column' && w !== 'full') return;
+      if (w !== 'column' && w !== 'full' && w !== 'split') return;
       if (bestFit.length && bestFit.indexOf(sec) === -1) return;
       sectionWidths[sec] = w;
     });

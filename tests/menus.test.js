@@ -473,8 +473,10 @@ assert(api.sectionLayoutFor('Sharing Starters', {
 }).width === 'column',
   'Column lock on Sharing Plates applies to Sharing Starters');
 assert(api.WIDTH_OPTIONS.some(function (w) {
-  return w.id === 'both' && /best fit/i.test(w.label) && /AI chooses/i.test(w.label);
-}), 'width “both” is labelled best fit / AI chooses, not column-if-it-fits');
+  return w.id === 'both' && /best fit/i.test(w.label) && /split/i.test(w.label);
+}), 'width “both” is labelled best fit with column/full/split AI choice');
+assert(typeof api.isSplitWidth === 'function' && api.isSplitWidth('split') && !api.isSplitWidth('both'),
+  'split width helper: Best-fit AI may choose two even columns for any category');
 assert(api.WIDTH_OPTIONS.every(function (w) {
   return !/column if it fits/i.test(w.label || '');
 }), 'no width option says column if it fits');
@@ -546,12 +548,14 @@ assert(aiGs.indexOf('The JS planner has already placed the food') !== -1 && aiGs
   'Gemini reviews leftover only — JS already placed the food');
 assert(aiGs.indexOf('Do NOT put Sides or Sandwiches under Sharing') !== -1 && printJs.indexOf('sides-sand-row') !== -1,
   'Sides and Sandwiches stay off Sharing; JS executes the Sides|Sandwiches pair');
-assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Gemini must not rebuild') !== -1,
-  'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
+assert(page.indexOf('JS already placed the food map') !== -1 &&
+  (page.indexOf('Gemini may refine Best-fit widths') !== -1 || page.indexOf('column / full / split') !== -1) &&
+  page.indexOf('never dump Sides under Sharing') !== -1,
+  'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow158') !== -1, 'menus page cache-bust is flow158');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow158') !== -1, 'hub menus link cache-bust is flow158');
+assert(page.indexOf('flow159') !== -1, 'menus page cache-bust is flow159');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow159') !== -1, 'hub menus link cache-bust is flow159');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1067,8 +1071,9 @@ assert(/\.specials-beside\{[^}]*width:\s*100%/.test(printJs) &&
   /\.specials-beside[^}]*\.scallop\{[^}]*width:\s*100%/.test(printJs),
   'Full-width Specials beside-course box stretches like the course above');
 assert(printJs.indexOf('lockedColumnWidth(rule)') !== -1 &&
-  printJs.indexOf('columnSoloSection(\'Specials\'') !== -1,
-  'Specials Column lock uses a half-column, not full-bleed');
+  printJs.indexOf('columnSoloSection(title') !== -1 &&
+  printJs.indexOf('specialsPrintTitle') !== -1,
+  'Specials Column lock uses a half-column with the full course title');
 assert(/gone/i.test(api.sectionLayoutFor('Special Starters').note || '') &&
   /gone/i.test(api.sectionLayoutFor('Special Mains').note || ''),
   'Specials section default note is when-gone (editable in Blocks)');
@@ -1084,9 +1089,11 @@ var noNoteHtml = printApi.build(api.menuById('main'), api.composeDishes(api.seed
 });
 assert(!/When it's gone/i.test(noNoteHtml.split('</style>')[1] || noNoteHtml),
   'cleared Specials note does not print when-gone');
-assert(/function specialsBesideCourse[\s\S]*?specials-beside-title/.test(printJs) &&
-  !/function specialsBesideCourse[\s\S]*?specials-course/.test(printJs.split('function specialsBesideCourse')[1].split('function layoutMap')[0]),
-  'beside-course Specials box titles Specials only — no Starters/Mains course head');
+assert(printJs.indexOf('function specialsPrintTitle') !== -1 &&
+  printJs.indexOf("return 'Special Starters'") !== -1,
+  'Specials boxes print the full course name (Special Starters / Special Mains / …)');
+assert(/function specialsBesideCourse[\s\S]*?specialsPrintTitle/.test(printJs),
+  'beside-course Specials use specialsPrintTitle for the box heading');
 // Split boxes: starter specials under Starters; main specials under Mains — never one combined board
 var splitBook = api.seed();
 var splitDishes = api.composeDishes(splitBook, 'main', { specials: true });
@@ -1928,8 +1935,9 @@ assert(aiGs.indexOf('sidesOn') !== -1 && aiGs.indexOf('SHARED TYPE SCALE') !== -
   'Gemini layout review can move Sides between pages for shared type');
 assert(printJs.indexOf('sandwichesLocked') !== -1,
   'print locks sandwiches when staff ticked them or listed fillings');
-assert(page.indexOf('sandwichesLocked') !== -1 && page.indexOf('Gemini must not rebuild') !== -1,
-  'generate does not let Gemini drop or move locked sandwiches');
+assert(page.indexOf('sandwichesLocked') !== -1 &&
+  (page.indexOf('Gemini may refine Best-fit widths') !== -1 || page.indexOf('never dump Sides under Sharing') !== -1),
+  'generate keeps locked sandwiches; Gemini only refines Best-fit leftover widths');
 assert(aiGs.indexOf('sandwichesLocked') !== -1 && /never omit/i.test(aiGs),
   'Gemini must not omit ticked sandwiches');
 assert(printJs.indexOf('Do not dump Sides under Sharing') !== -1 || printJs.indexOf('never stacked under Sharing') !== -1 || page.indexOf('never under Sharing') !== -1,
@@ -2609,8 +2617,13 @@ assert(/column-solo-row[\s\S]*Pie of the day/.test(colSpecA4) ||
   /col-pair-row[\s\S]*Pie of the day/.test(colSpecA4),
   'Item Boost Column lock stays a column, not a full-bleed box');
 assert(printJs.indexOf('function pairColumnFood') !== -1 &&
-  printJs.indexOf('takeColumnPending') !== -1,
-  'consecutive Column / Best-fit sections share a row, titles level, panels fill the short side');
+  printJs.indexOf('takeColumnPending') !== -1 &&
+  printJs.indexOf('lockedColumnWidth(rule)') !== -1,
+  'Column locks can share a row; Best fit prefers full or split, not auto-columns');
+assert(printJs.indexOf('widthOverrides') !== -1 && printJs.indexOf("widthOverrides[secName] = 'split'") !== -1,
+  'Best-fit packing may split any long category across two even columns');
+assert(aiGs.indexOf('"column"|"full"|"split"') !== -1 || aiGs.indexOf('column, full, or split') !== -1,
+  'Gemini Best-fit widths include split for any category');
 (function consecutiveColumnSectionsShareARow() {
   var html = print.build(mainMenu, [
     api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
@@ -2630,9 +2643,71 @@ assert(printJs.indexOf('function pairColumnFood') !== -1 &&
     'Column Special Starters and Item Boost sit in one row, not two stacked full-bleed boxes');
   assert(!/<section class="sec specials-beside"[\s\S]*Mackerel Pate/.test(a4),
     'Column Special Starters are not a full-bleed box above Item Boost');
+  assert(/Special Starters/.test(a4), 'Special Starters prints the full course title');
   var pairRow = (a4.match(/col-pair-row[\s\S]*?<\/section>/) || [])[0] || '';
   assert(/scallop-box/.test(pairRow) && /scallop-wide/.test(pairRow),
     'adjacent frilly boxes use different wave / corner treatments');
+})();
+(function bestFitStaysFullWhenThereIsRoom() {
+  var html = print.build(mainMenu, [
+    api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+    api.dish('Special Starters', 'Mackerel Pate', 'salad & sourdough toast', '7.25', 'gf'),
+    api.dish('Item Boost', 'Pie of the day', 'mash vegetables gravy', '20.95', ''),
+    api.dish('Burgers', 'Brisket Burger', 'fries', '18.95', ''),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam', '16.95', 'v')
+  ], {
+    sectionLayout: api.normalizeSectionLayout({
+      'Special Starters': { width: 'both', frame: true, note: '' },
+      'Item Boost': { width: 'both', frame: true }
+    })
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  assert(/specials-beside[\s\S]*Mackerel Pate/.test(a4) || /Special Starters[\s\S]*Mackerel Pate/.test(a4),
+    'Best-fit Special Starters stay full-bleed when the page has room');
+  assert(!/col-pair-row[\s\S]*Mackerel Pate[\s\S]*Pie of the day/.test(a4),
+    'Best-fit does not force two columns just because two frilly sections are neighbours');
+})();
+(function anyCategoryCanSplitAcrossTwoColumns() {
+  var dishes = [];
+  ['Olives', 'Whitebait', 'Arancini', 'Bruschetta', 'Garlic Bread', 'Fries'].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  dishes.push(api.dish('Mains', 'Fish & Chips', 'peas', '17.95', ''));
+  var html = print.build(mainMenu, dishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      Sides: { width: 'both', frame: false },
+      Mains: { width: 'full', frame: false }
+    }),
+    widthOverrides: { Sides: 'split' },
+    layout: {
+      pages: 1,
+      p1: { sidesOnP1: false, sandwiches: false, rooms: false, footLogo: false },
+      widthOverrides: { Sides: 'split' }
+    }
+  });
+  var body = (html.split('mode-panel mode-a5')[0] || html).split('</style>')[1] || '';
+  assert(/sec-split[\s\S]*share-cols[\s\S]*Olives[\s\S]*Bruschetta/.test(body) ||
+    (/share-cols/.test(body) && /Olives/.test(body) && /Bruschetta/.test(body)),
+    'Best-fit split lays any category across two even columns');
+  var mainsSplit = print.build(mainMenu, [
+    api.dish('Mains', 'Fish & Chips', 'peas', '17.95', ''),
+    api.dish('Mains', 'Pie of the Day', 'mash', '16.95', ''),
+    api.dish('Mains', 'Lasagne', 'salad', '15.95', ''),
+    api.dish('Mains', 'Katsu Curry', 'rice', '16.95', ''),
+    api.dish('Mains', 'Burger', 'fries', '18.95', ''),
+    api.dish('Mains', 'Scampi', 'chips', '15.95', '')
+  ], {
+    sectionLayout: api.normalizeSectionLayout({ Mains: { width: 'both', frame: false } }),
+    widthOverrides: { Mains: 'split' },
+    layout: {
+      pages: 1,
+      p1: { sandwiches: false, rooms: false },
+      widthOverrides: { Mains: 'split' }
+    }
+  });
+  var mainsBody = (mainsSplit.split('mode-panel mode-a5')[0] || mainsSplit).split('</style>')[1] || '';
+  assert(/sec-split[\s\S]*share-cols[\s\S]*Fish[\s\S]*Katsu|share-cols[\s\S]*Fish[\s\S]*Burger/.test(mainsBody),
+    'Best-fit split works for Mains too — not a Sides-only rule');
 })();
 var specialsCardHtml = print.build(api.menuById('specials'), [
   api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
