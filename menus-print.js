@@ -1745,21 +1745,40 @@
   }
 
   /**
-   * Specials for one course on Main / Sunday — frilly Specials box that sits
-   * under the matching regular section. No “Starters/Mains” label (context is
-   * the parent course); just Specials + optional Blocks note + dishes.
+   * Specials for one course on Main / Sunday. Stays under the matching
+   * regular section. Blocks width is honoured: Column stays a half-column;
+   * Full width stays under the course as a full-bleed frilly box; Best fit
+   * may split. Compact “Specials” label (parent course is the cue).
    */
-  function specialsBesideCourse(dishes, plan, sectionKey) {
+  function specialsBesideCourse(dishes, plan, sectionKey, opts) {
     dishes = dishes || [];
     if (!dishes.length) return '';
+    opts = opts || {};
     var rule = ruleFor(sectionKey || 'Special Mains', plan);
     if (rule.frame == null) rule.frame = true;
-    // Small “Specials” label only — no Starters/Mains course head (parent section is the cue).
-    // Note comes from Blocks → Extra info (not hardwired).
+    // Column lock: never orphan to full-bleed. Best fit uses the unpaired helper.
+    if (lockedColumnWidth(rule)) {
+      return columnSoloSection('Specials', dishes, rule, {
+        promos: opts.promos,
+        excludeTitles: opts.excludeTitles,
+        skipPromos: opts.skipPromos,
+        dataSpecials: sectionKey
+      }).html;
+    }
+    if (canSitInColumn(rule) && !lockedFullWidth(rule)) {
+      return renderUnpairedSection('Specials', dishes, rule, {
+        promos: opts.promos,
+        excludeTitles: opts.excludeTitles
+      }).html;
+    }
+    // Full width — frilly box under the course, no “Starters/Mains” label.
     var inner = '<div class="sec-title specials-beside-title">Specials</div>';
+    var extras = sheetOutsideParts(rule);
     var note = String(rule.note || '').trim();
-    if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
+    if (extras.aboveHtml) inner += extras.aboveHtml;
+    else if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
     inner += listDishes(dishes);
+    if (extras.belowHtml) inner += extras.belowHtml;
     return '<section class="sec specials-beside" data-specials-course="' +
       esc(sectionKey || 'Special Mains') + '">' + framedBlock(inner, rule, 'wide') + '</section>';
   }
@@ -1932,18 +1951,27 @@
   function columnSoloSection(title, dishes, rule, opts) {
     opts = opts || {};
     if (!dishes || !dishes.length) return { html: '', usedPromoTitles: [] };
-    var inner = sectionBlock(title, dishes, rule, 'box');
+    var inner = sectionBlock(title, dishes, rule, 'box', { hideTitle: !!opts.hideTitle });
     var units = sectionUnits({ name: title, dishes: dishes }, !!(rule && rule.frame));
     var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
       skipPromos: opts.skipPromos !== false,
-      secClass: 'column-solo-row',
+      secClass: 'column-solo-row' + (opts.dataSpecials ? ' specials-col-row' : ''),
       colsClass: 'column-solo-cols',
-      leftClass: '',
-      rightClass: 'col-promo'
+      leftClass: opts.dataSpecials ? 'col-specials' : '',
+      rightClass: 'col-promo',
+      leftFrame: 'box'
     });
-    return { html: leveled.html, usedPromoTitles: leveled.usedTitles };
+    var html = leveled.html;
+    if (opts.dataSpecials && html) {
+      html = html.replace(
+        '<section class="sec column-solo-row specials-col-row">',
+        '<section class="sec column-solo-row specials-col-row" data-specials-course="' +
+          esc(opts.dataSpecials) + '">'
+      );
+    }
+    return { html: html, usedPromoTitles: leveled.usedTitles };
   }
 
   /** Drop-in / leftover section: Column lock stays a column; Best fit with
@@ -1956,7 +1984,10 @@
     }
     var twoCol = canSitInColumn(rule) && dishes.length >= 4;
     return {
-      html: '<section class="sec">' + sectionBlock(title, dishes, rule, 'wide', { twoCol: twoCol }) + '</section>',
+      html: '<section class="sec">' + sectionBlock(title, dishes, rule, 'wide', {
+        twoCol: twoCol,
+        hideTitle: !!opts.hideTitle
+      }) + '</section>',
       usedPromoTitles: []
     };
   }
@@ -2235,23 +2266,34 @@
         '</section>';
     }
     if (bag.boost) {
-      p1 += '<section class="sec">' +
-        sectionBlock(bag.boost.name, bag.boost.dishes, boostRule, 'wide', { hideTitle: true }) +
-        '</section>';
+      var boostOut = renderUnpairedSection(bag.boost.name, bag.boost.dishes, boostRule, {
+        hideTitle: true,
+        promos: promos,
+        excludeTitles: usedPromoTitles
+      });
+      usedPromoTitles = usedPromoTitles.concat(boostOut.usedPromoTitles || []);
+      p1 += boostOut.html;
     }
     bag.other.forEach(function (s) {
       if (!isMains(s.name) && !isSundayRoasts(s.name) && !isDessert(s.name) && !isSandwich(s.name) &&
           !isBurgers(s.name) && !isItemBoost(s.name) && !isSpecials(s.name) && !isLittleBells(s.name)) {
         var otherRule = ruleFor(s.name, plan);
-        p1 += '<section class="sec">' + sectionBlock(s.name, s.dishes, otherRule) + '</section>';
+        var otherOut = renderUnpairedSection(s.name, s.dishes, otherRule, {
+          promos: promos, excludeTitles: usedPromoTitles
+        });
+        usedPromoTitles = usedPromoTitles.concat(otherOut.usedPromoTitles || []);
+        p1 += otherOut.html;
       }
     });
 
     // Sunday Roasts on page 1 (after starters, before promo/classics footers) when balanced here.
     var roastsOnPage1 = !!(bag.sundayRoasts && (layout.pages === 1 || p1opts.sundayRoasts));
     if (roastsOnPage1) {
-      p1 += '<section class="sec">' +
-        sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
+      var roastOut1 = renderUnpairedSection(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule, {
+        promos: promos, excludeTitles: usedPromoTitles
+      });
+      usedPromoTitles = usedPromoTitles.concat(roastOut1.usedPromoTitles || []);
+      p1 += roastOut1.html;
     }
 
     if (showColBlock && classicsAsColumn) {
@@ -2445,7 +2487,13 @@
     }
 
     if (layout.pages === 1) {
-      if (bag.mains && !mainsPairedInCol) p1 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+      if (bag.mains && !mainsPairedInCol) {
+        var mainSolo1 = renderUnpairedSection(bag.mains.name, bag.mains.dishes, mainRule, {
+          promos: promos, excludeTitles: usedPromoTitles
+        });
+        usedPromoTitles = usedPromoTitles.concat(mainSolo1.usedPromoTitles || []);
+        p1 += mainSolo1.html;
+      }
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
         p1 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
       }
@@ -2493,8 +2541,11 @@
     p2 += trackerBar(ver, { hideDate: true });
     p2 += '<div class="page-body page-body-start">';
     if (bag.sundayRoasts && !p1opts.sundayRoasts) {
-      p2 += '<section class="sec">' +
-        sectionBlock(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule) + '</section>';
+      var roastOut2 = renderUnpairedSection(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule, {
+        promos: promos, excludeTitles: usedPromoTitles
+      });
+      usedPromoTitles = usedPromoTitles.concat(roastOut2.usedPromoTitles || []);
+      p2 += roastOut2.html;
     }
     var p2Force = (plan && plan.forceColumnFill && plan.forceColumnFill.page2) || null;
     var littleFoodPartner = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
@@ -2535,7 +2586,13 @@
       mainsPairedInCol = true;
       p2opts.sandwiches = false;
     }
-    if (bag.mains && !mainsPairedInCol) p2 += '<section class="sec">' + sectionBlock(bag.mains.name, bag.mains.dishes, mainRule) + '</section>';
+    if (bag.mains && !mainsPairedInCol) {
+      var mainSolo2 = renderUnpairedSection(bag.mains.name, bag.mains.dishes, mainRule, {
+        promos: promos, excludeTitles: usedPromoTitles
+      });
+      usedPromoTitles = usedPromoTitles.concat(mainSolo2.usedPromoTitles || []);
+      p2 += mainSolo2.html;
+    }
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length) {
       p2 += specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains');
     }
@@ -2834,7 +2891,8 @@
       '.specials-course{font-family:var(--serif);font-weight:700;font-size:10.5pt;letter-spacing:.1em;text-transform:uppercase;text-align:center;text-decoration:underline;text-underline-offset:2px;margin:8px 0 4px;line-height:1.2}' +
       '.specials-course:first-of-type{margin-top:4px}' +
       '.specials-course-left{text-align:left;text-decoration:none;font-size:10pt;letter-spacing:.08em;margin:6px 0 3px}' +
-      /* Main/Sunday: Specials frilly box under each course — full width like the course above */
+      /* Main/Sunday: Full-width Specials sit under the course. Column lock
+         uses column-solo instead (never stretch to 100%). */
       '.specials-beside{width:100%;max-width:100%;align-self:stretch;box-sizing:border-box;margin:0 0 10px}' +
       '.specials-beside > .scallop,.specials-beside .scallop{' +
         'width:100%!important;max-width:100%;box-sizing:border-box;display:block}' +

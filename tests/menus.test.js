@@ -548,8 +548,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 && page.indexOf('Ge
   'generate does not let Gemini move Sides/Sandwiches or rewrite Best-fit widths');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow154') !== -1, 'menus page cache-bust is flow154');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow154') !== -1, 'hub menus link cache-bust is flow154');
+assert(page.indexOf('flow155') !== -1, 'menus page cache-bust is flow155');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow155') !== -1, 'hub menus link cache-bust is flow155');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1042,7 +1042,10 @@ assert(/\.specials-course\{[^}]*text-align:center/.test(printJs) &&
   'Specials card still centres course heads and board notes');
 assert(/\.specials-beside\{[^}]*width:\s*100%/.test(printJs) &&
   /\.specials-beside[^}]*\.scallop\{[^}]*width:\s*100%/.test(printJs),
-  'Specials beside-course box is full width like the course above');
+  'Full-width Specials beside-course box stretches like the course above');
+assert(printJs.indexOf('lockedColumnWidth(rule)') !== -1 &&
+  printJs.indexOf('columnSoloSection(\'Specials\'') !== -1,
+  'Specials Column lock uses a half-column, not full-bleed');
 assert(/gone/i.test(api.sectionLayoutFor('Special Starters').note || '') &&
   /gone/i.test(api.sectionLayoutFor('Special Mains').note || ''),
   'Specials section default note is when-gone (editable in Blocks)');
@@ -2554,6 +2557,30 @@ assert(/specials-beside/.test(embedSpecA4) && /When it’s gone/.test(embedSpecA
   'ticked Specials print on Main under the parent course');
 assert(/\.specials-beside \.sec-note\{text-align:left/.test(embedSpecHtml),
   'Specials note on Main is left-aligned like the parent sheet');
+var colSpecHtml = print.build(api.menuById('main'), [
+  api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+  api.dish('Special Starters', 'Mackerel Pate', 'salad & sourdough toast', '7.25', 'gf'),
+  api.dish('Item Boost', 'Pie of the day', 'mash vegetables gravy', '20.95', ''),
+  api.dish('Mains', 'Fish & Chips', 'mushy peas', '18.95', ''),
+  api.dish('Special Mains', 'Pan Roasted Duck Breast', 'duck fat potatoes', '22.95', 'gf')
+], {
+  sectionLayout: api.normalizeSectionLayout({
+    'Special Starters': { width: 'column', frame: true, note: 'When it’s gone, it’s gone' },
+    'Special Mains': { width: 'column', frame: true, note: 'When it’s gone, it’s gone' },
+    'Item Boost': { width: 'column', frame: true }
+  })
+});
+var colSpecA4 = colSpecHtml.split('mode-panel mode-a5')[0] || colSpecHtml;
+assert(/column-solo-row[\s\S]*Mackerel Pate/.test(colSpecA4) &&
+  /data-specials-course="Special Starters"/.test(colSpecA4),
+  'Special Starters Column lock stays a half-column under Starters');
+assert(!/<section class="sec specials-beside"[\s\S]*Mackerel Pate/.test(colSpecA4),
+  'Column Specials are not stretched full-bleed under the course');
+assert(/column-solo-row[\s\S]*Pan Roasted Duck Breast/.test(colSpecA4) &&
+  /data-specials-course="Special Mains"/.test(colSpecA4),
+  'Special Mains Column lock stays a half-column under Mains');
+assert(/column-solo-row[\s\S]*Pie of the day/.test(colSpecA4),
+  'Item Boost Column lock stays a half-column, not a full-bleed box');
 var specialsCardHtml = print.build(api.menuById('specials'), [
   api.dish('Special Starters', 'Ham Hock Pot', '', '8.95', 'gf')
 ], {
