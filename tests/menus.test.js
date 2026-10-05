@@ -554,8 +554,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow159') !== -1, 'menus page cache-bust is flow159');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow159') !== -1, 'hub menus link cache-bust is flow159');
+assert(page.indexOf('flow160') !== -1, 'menus page cache-bust is flow160');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow160') !== -1, 'hub menus link cache-bust is flow160');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -3076,6 +3076,95 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'mains and desserts all print (nothing dropped off the page)');
   assert(!/mains-sand-row/.test(pages[2]),
     'Best-fit Mains stay full until Gemini chooses a column');
+})();
+// Menu_preview_c25a.pdf shape: Sharing|Burgers on p1, many Mains + Sandwiches on p2.
+// Sides must stay beside Sandwiches (not dump under Sharing), and any leftover
+// opposite-column hole gets Stay a While / Gatherings so columns finish level.
+(function pdfPreviewKeepsSidesBesideSandwiches() {
+  var layout = api.normalizeSectionLayout({
+    Nibbles: { width: 'full', frame: true },
+    Starters: { width: 'full', frame: false },
+    'Item Boost': { width: 'full', frame: true },
+    'Sharing Plates': { width: 'column', frame: false },
+    Burgers: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: {
+      width: 'column',
+      frame: true,
+      note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread.'
+    }
+  });
+  var dishes = [
+    api.dish('Nibbles', 'Nacho Cheese Triangles', '', '6.95', ''),
+    api.dish('Nibbles', 'Mini Bread Rolls', 'bacon jam smoked whipped butter', '5.95', 'vg'),
+    api.dish('Starters', 'Braised Lamb Neck', 'quinoa smoked tomatoes', '10.95', 'gf'),
+    api.dish('Starters', 'Buffalo Cauliflower Florets', 'rainbow slaw bang bang', '7.95', 'vg'),
+    api.dish('Starters', 'Pan Fried King Prawns', 'romesco rocket gremolata', '10.95', 'gf'),
+    api.dish('Starters', 'Whitebait', 'aioli micro parsley', '8.50', ''),
+    api.dish('Starters', 'Ham Hock Pot', 'charmer cheese sourdough', '8.95', 'gf'),
+    api.dish('Starters', 'Charred Leeks', 'blue ranch hazelnuts', '8.50', 'gf, v'),
+    api.dish('Item Boost', 'Pie of the day', 'mash vegetables gravy', '20.95', ''),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam sourdough', '16.95', 'v'),
+    api.dish('Sharing Plates', 'Beef Chilli Nachos', 'sour cream guacamole jalapenos', '15.95', 'gf'),
+    api.dish('Burgers', 'Brisket Burger', 'brioche bacon jam onion rings fries', '18.95', ''),
+    api.dish('Burgers', 'Sweet Potato & Halloumi Burger', 'chilli cheese onion rings fries', '16.95', 'v'),
+    api.dish('Mains', 'Osso Bucco', 'veal shank squash risotto', '23.95', 'gf'),
+    api.dish('Mains', 'Chilli Con Carne', 'wild rice tortilla', '17.95', 'gf'),
+    api.dish('Mains', 'Pan Fried Seabass', 'new potatoes cherry tomatoes', '22.95', 'gf'),
+    api.dish('Mains', 'Vegetarian Lasagne', 'garlic bread salad', '18.50', 'v'),
+    api.dish('Mains', 'Pork Wellington', 'baby potatoes tender stem', '22.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'rice noodles thai green', '18.95', 'vg'),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'parmesan burrata', '20.95', 'df'),
+    api.dish('Mains', 'Fish & Chips', 'mushy peas tartare', '18.95', 'gf, df'),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Seasonal Veg', '', '5.50', 'v'),
+    api.dish('Sides', 'Garlic Bread', '', '4.95', 'v'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v'),
+    api.dish('Sandwiches', 'Beef, Chilli & Cheddar Quesadilla', 'tortilla wrap salad', '10.95', ''),
+    api.dish('Sandwiches', 'Falafel & Guacamole', 'mixed salad', '8.95', 'vg'),
+    api.dish('Sandwiches', 'Cajun Chicken Wrap', 'coleslaw salad', '10.95', ''),
+    api.dish('Sandwiches', 'Tuna & Red Onion Melt', '', '9.95', '')
+  ];
+  var promos = [
+    { title: 'Stay a While', body: 'cosy en-suite rooms upstairs' },
+    { title: 'Gatherings', body: 'happy to host your event' }
+  ];
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    includes: { sandwiches: true },
+    promos: promos
+  });
+  assert(planned.pages === 2, 'PDF-shaped sheet uses two pages');
+  assert(planned.p2 && planned.p2.sidesOnP2 && !planned.p1.sidesOnP1,
+    'PDF-shaped sheet keeps Sides on page 2 beside Sandwiches (not under Sharing)');
+  assert(planned.p2.sandwiches && !planned.p1.sandwiches,
+    'PDF-shaped sheet keeps Sandwiches on page 2');
+  var html = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    layout: planned,
+    includes: { sandwiches: true },
+    promos: promos
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var pages = a4.split(/<div class="page /);
+  assert(pages.length >= 3, 'PDF-shaped print uses two A4 pages');
+  assert(/Camembert/i.test(pages[1]) && /Brisket/i.test(pages[1]),
+    'page 1 keeps Sharing opposite Burgers');
+  assert(!/Cheesy Garlic Bread/i.test(pages[1]),
+    'page 1 does not dump Sides under Sharing');
+  assert(/sides-sand-row/.test(pages[2]) && /Cheesy Garlic Bread/i.test(pages[2]) &&
+    /Quesadilla/i.test(pages[2]),
+    'page 2 pairs Sides beside Sandwiches so both columns start and finish together');
+  assert(/Osso Bucco/i.test(pages[2]) && /Fish &amp; Chips|Fish & Chips/i.test(pages[2]),
+    'all mains still print on page 2');
+  // Opposite-column holes (if any) must get feature panels — never a blank half.
+  var p2Pair = (pages[2].match(/sides-sand-row[\s\S]*?<\/section>/) || [''])[0];
+  assert(/Stay a While|Gatherings|Pub Quiz|How are we doing/i.test(p2Pair) ||
+    (/Cheesy Garlic Bread/i.test(p2Pair) && /Quesadilla/i.test(p2Pair)),
+    'page 2 opposite columns have food on both sides or a feature panel in the hole');
 })();
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
 

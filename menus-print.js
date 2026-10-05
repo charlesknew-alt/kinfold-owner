@@ -791,7 +791,11 @@
     }
     if (p1.sidesOnP1 && bag.sides) {
       var sideU1 = sectionUnits(bag.sides, false);
-      if (leftFood <= rightFood) leftFood += sideU1;
+      var gapL = Math.abs((leftFood + sideU1) - rightFood);
+      var gapR = Math.abs(leftFood - (rightFood + sideU1));
+      // Match buildLong: prefer not under Sharing when both gaps are similar.
+      if (shareDishes.length && Math.abs(gapL - gapR) <= 2.5) rightFood += sideU1;
+      else if (gapL <= gapR) leftFood += sideU1;
       else rightFood += sideU1;
     }
     var gap = rightFood - leftFood;
@@ -1709,13 +1713,21 @@
         p2Load = p2used - specCostP2 + Math.max(specCostP2, sandCost);
       } else if (sandPartner === 'mains') {
         p2Load = p2used - mainCostP2 + Math.max(mainCostP2, sandCost);
+      } else if (sandPartner === 'sides' && sideCostP2) {
+        // Sides|Sandwiches share a row — count the taller column, not a stack.
+        // (Previously sandCost was added on top of sides in p2used, which falsely
+        // overflowed CLIP and dumped Sides under Sharing on page 1.)
+        p2Load = p2used - sideCostP2 + Math.max(sideCostP2, sandCost);
       }
       layout.p2.specialsBesideSandwiches = sandPartner === 'specials';
       layout.widthOverrides = layout.widthOverrides || {};
       var sideCostP1 = sideCostP2;
+      // Only move Sides off page 2 when Specials took the Sandwiches seat, or when
+      // even the paired Sides|Sandwiches row still cannot fit. Never dump Sides
+      // under Sharing just because units were double-counted as a stack.
       var moveSidesToP1 = bag.sides && layout.p2.sidesOnP2 && p1left >= sideCostP1 + 4 && (
-        p2Load > CLIP ||
-        (sandPartner === 'specials')
+        sandPartner === 'specials' ||
+        (sandPartner !== 'sides' && p2Load > CLIP)
       );
       if (moveSidesToP1) {
         layout.p1.sidesOnP1 = true;
@@ -2719,12 +2731,21 @@
         }
       }
 
-      // Prefer Sides under the shorter food stack so columns finish level.
+      // Place Sides under whichever side finishes closer to level (system rule).
+      // Prefer not under Sharing when both placements are similar — that dump is
+      // what left Burgers short with no feature panel on the PDF example.
       var sidesOnLeftCol = false;
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule)) {
-        sidesOnLeftCol = leftFoodU <= rightFoodU;
-        if (sidesOnLeftCol) leftFoodU += sectionUnits(sidesPrint, false);
-        else rightFoodU += sectionUnits(sidesPrint, false);
+        var sideAddU = sectionUnits(sidesPrint, false);
+        var gapIfLeft = Math.abs((leftFoodU + sideAddU) - rightFoodU);
+        var gapIfRight = Math.abs(leftFoodU - (rightFoodU + sideAddU));
+        if (shareInLeft && Math.abs(gapIfLeft - gapIfRight) <= 2.5) {
+          sidesOnLeftCol = false;
+        } else {
+          sidesOnLeftCol = gapIfLeft <= gapIfRight;
+        }
+        if (sidesOnLeftCol) leftFoodU += sideAddU;
+        else rightFoodU += sideAddU;
       }
 
       var leftHasFood = !!(shareInLeft || sandOnLeftCol || (sidesOnLeftCol && sidesPrint));
@@ -2796,6 +2817,12 @@
       // Always fill a real opposite-column hole before the PDF opens.
       // Track usedTitles so page 2 never reprints the same event panel.
       var promoCols = planPromoFill(leftFoodU, rightFoodU, promos, promoFrameOpts);
+      var colGap = (rightFoodU || 0) - (leftFoodU || 0);
+      if (!promoCols.left && !promoCols.right && Math.abs(colGap) > 2.5) {
+        promoCols = planPromoFill(leftFoodU, rightFoodU, promos, Object.assign({}, promoFrameOpts, {
+          force: { shorter: colGap > 0 ? 'left' : 'right', panels: Math.abs(colGap) > 9 ? 2 : 1 }
+        }));
+      }
       usedPromoTitles = usedPromoTitles.concat(promoCols.usedTitles || []);
       var leftFeature = promoCols.left || '';
       var rightFeature = promoCols.right || '';
@@ -3103,11 +3130,16 @@
         var rightInner = p2opts.sandwiches
           ? sandwichesBlock(bag, { rule: sandRule, hideTitle: true })
           : '&nbsp;';
+        // Empty partner opposite Sandwiches (or Sides) must get feature panels so
+        // both columns start and finish level — never skipPromos on a food hole.
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
-          force: littleFoodPartner ? null : p2Force,
-          skipPromos: !!(p2opts.sandwiches && !sideList.length),
+          force: littleFoodPartner ? null : (p2Force || (
+            (!sideList.length && p2opts.sandwiches)
+              ? { shorter: 'left', panels: rightU > 12 ? 2 : 1 }
+              : null
+          )),
           leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
           rightTitle: p2opts.sandwiches ? 'Sandwiches' : '',
           secClass: 'sides-sand-row',
@@ -3895,16 +3927,18 @@
           'group.forEach(function(pg){if(dropJammedFootPromos(pg))changed=true;});' +
           'if(changed)fitGroup(group);' +
         '}' +
-        // NEVER clip food off the page. Drop leftover feature panels, then foot
-        // promos, then logos, until the sheet fits. Dishes stay.
+        // NEVER clip food off the page. Drop optional chrome first (foot promos,
+        // logos). Column-balance feature panels are last — opposite columns must
+        // stay as level as possible (golden rule).
         'function dropOverflowingChrome(page){' +
           'if(!overflows(page))return false;' +
-          'var feat=page.querySelector(".col-feature .scallop");' +
-          'if(feat&&feat.parentNode){feat.parentNode.removeChild(feat);return true;}' +
           'var foot=page.querySelector(".foot-promos,.foot-promos-one");' +
           'if(foot&&foot.parentNode){foot.parentNode.removeChild(foot);return true;}' +
           'var logo=page.querySelector(".foot-logo");' +
           'if(logo&&logo.style.display!=="none"){logo.style.display="none";return true;}' +
+          'var feats=page.querySelectorAll(".col-feature .scallop");' +
+          'if(feats.length>1){var last=feats[feats.length-1];if(last.parentNode){last.parentNode.removeChild(last);return true;}}' +
+          'if(feats.length===1){var one=feats[0];if(one.parentNode){one.parentNode.removeChild(one);return true;}}' +
           'return false;' +
         '}' +
         'function keepContentOnPage(group){' +
