@@ -977,7 +977,7 @@
       ? root.EBMenus.sectionLayoutFor('Sandwiches')
       : { note: '', frame: true });
     var framed = !!(rule && rule.frame);
-    var hours = noteUnits(rule && (rule.note || rule.above));
+    var hours = noteUnits(rule && (rule.note || rule.above)) + noteUnits(rule && rule.below);
     if (dishes.length) {
       // Frilly + hours line + multi-line descriptions run taller than unit math —
       // weight them so planPromoFill puts enough panels under a short Burgers stack,
@@ -992,6 +992,8 @@
    * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list.
    * With 0 fillings + Tip on: selling box (sell words, then optional note/hours).
    * Frilly box only when Blocks → Sandwiches → Frilly is Yes (not hard-coded).
+   * Host sheet: above + dishes + below all sit inside this section’s box
+   * (frilly when Yes). Card menus keep above/below outside via cardOutsideWrap.
    */
   function sandwichesBlock(bag, opts) {
     opts = opts || {};
@@ -1027,6 +1029,7 @@
       if (opts.hideTitle) {
         noteInner = noteInner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, '');
       }
+      noteInner += extras.belowHtml || '';
       if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
       if (opts.alignTitle && !opts.hideTitle) {
         return (
@@ -1044,19 +1047,15 @@
     if (!noteHtml && note && note !== sandSlots.below) {
       noteHtml = '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
     }
-    var body = noteHtml + listDishes(dishes);
-    var titled = sectionTitle('Sandwiches') + body;
     var afterHtml = extras.belowHtml;
-    function withAfter(block) {
-      return afterHtml ? ('<div class="sec-stack">' + block + afterHtml + '</div>') : block;
-    }
+    var body = noteHtml + listDishes(dishes) + afterHtml;
+    var titled = sectionTitle('Sandwiches') + body;
     if (opts.hideTitle) {
-      var hiddenInner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
-      return withAfter(hiddenInner);
+      return wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
     }
     if (opts.alignTitle) {
       var inner = wantFrame ? scallop(body, frameKind) : '<div class="sec-plain">' + body + '</div>';
-      return withAfter(
+      return (
         '<div class="sandwich-aligned">' +
           '<div class="promo-head pair-head">' +
             '<span class="sec-title soft-left">Sandwiches</span>' +
@@ -1065,8 +1064,8 @@
         '</div>'
       );
     }
-    if (!wantFrame) return withAfter('<div class="sec-plain">' + titled + '</div>');
-    return withAfter(scallop(titled, frameKind));
+    if (!wantFrame) return '<div class="sec-plain">' + titled + '</div>';
+    return scallop(titled, frameKind);
   }
 
   /** Prefer shared tidy from menus.js when available (priced desc orphans too). */
@@ -1740,9 +1739,9 @@
     } else {
       afterHtml = extras.belowHtml;
     }
-    var block = framedBlock(head + noteHtml + body, rule, kind || 'wide');
-    if (!afterHtml) return block;
-    return '<div class="sec-stack">' + block + afterHtml + '</div>';
+    // Host sheet: above + dishes + below all sit in this section’s format
+    // (inside the frilly box when Frilly is Yes). Cards keep outside via cardOutsideWrap.
+    return framedBlock(head + noteHtml + body + afterHtml, rule, kind || 'wide');
   }
 
   /**
@@ -1965,7 +1964,7 @@
   /**
    * Little Bells respects this host menu’s Blocks width.
    * Column stays a column; Full width stays full-bleed. Drop-in wording
-   * (offer / Sunday line) stays in the Little Bells area — never across Desserts.
+   * (offer / Sunday line) stays in the Little Bells box — never across Desserts.
    * Frilly Desserts keeps its title inside the frame; unframed Little Bells
    * keeps a pair-head, inset so the two headings share a line. A small feature
    * panel drops into leftover space under the shorter stack when it fits with a gap.
@@ -2918,6 +2917,9 @@
       '.sec-note-after{margin-top:8px}' +
       '.sec-stack{margin:0}' +
       '.scallop .sec-note{margin-top:0}' +
+      '.scallop-pad .sheet-blurb{text-align:left}' +
+      '.scallop-pad > .sheet-blurb-above{margin-top:0}' +
+      '.scallop-pad > .sheet-blurb-below{margin-bottom:0}' +
       // Drop-ins on Main/Sunday follow the sheet: left like dishes, not card-centred.
       '.sheet-blurb{text-align:left;text-transform:none;letter-spacing:normal;color:var(--ink);max-width:none;margin-left:0;margin-right:0}' +
       '.sheet-blurb-above{margin:0 0 8px}' +
