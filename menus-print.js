@@ -4646,7 +4646,12 @@
       });
     }).catch(function () {
       return localListOnly().then(function (rows) {
-        return { rows: rows || [], uploaded: 0, repaired: 0, orphansDropped: 0 };
+        var out = (rows || []).map(function (r) {
+          return Object.assign({}, r, { source: 'local', cloudUnreachable: true });
+        });
+        out.cloudOk = false;
+        out.cloudUnreachable = true;
+        return { rows: out, uploaded: 0, repaired: 0, orphansDropped: 0, cloudUnreachable: true };
       });
     });
   }
@@ -4870,6 +4875,11 @@
         source: source
       };
     }
+    /**
+     * Shared list = cloud rows with fetchable HTML.
+     * Upload any phone-only sheets first, then re-pull so owner and manager
+     * see the same days (never a silent local-only list that looks “shared”).
+     */
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
       var cloudItems = Array.isArray(data.items) ? data.items : [];
       var known = {};
@@ -4878,29 +4888,51 @@
       (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
         if (id) deleted[String(id)] = true;
       });
-      // Show immediately: cloud (server only lists sheets with HTML) + any
-      // local-only sheets not deleted elsewhere (pending upload).
-      // Do not wait on uploads (that made Print history feel broken/slow).
-      return localListOnly().then(function (localItems) {
-        var byId = {};
-        (localItems || []).forEach(function (r) {
-          if (r && r.id && !deleted[r.id]) byId[r.id] = asRow(r, 'local');
+      return purgeLocalDeleted(deleted).then(function () {
+        return migrateLocalToCloud(known, deleted);
+      }).then(function (stats) {
+        if (!(stats && stats.uploaded > 0)) return cloudItems;
+        // Re-pull after upload so the other device’s Sync sees the same index.
+        return historyCloudPost({ action: 'listPrintHistory' }).then(function (data2) {
+          cloudItems = Array.isArray(data2.items) ? data2.items : cloudItems;
+          deleted = {};
+          (Array.isArray(data2.deletedIds) ? data2.deletedIds : []).forEach(function (id) {
+            if (id) deleted[String(id)] = true;
+          });
+          return cloudItems;
+        }).catch(function () {
+          return cloudItems;
         });
-        cloudItems.forEach(function (r) {
-          if (r && r.id) byId[r.id] = asRow(r, 'cloud');
+      }).then(function (items) {
+        return localListOnly().then(function (localItems) {
+          var byId = {};
+          // Cloud first — this is the shared owner/manager list.
+          (items || []).forEach(function (r) {
+            if (r && r.id) byId[r.id] = asRow(r, 'cloud');
+          });
+          // Local-only leftovers (upload failed) — mark pending, never as cloud.
+          (localItems || []).forEach(function (r) {
+            if (!r || !r.id || deleted[r.id] || byId[r.id]) return;
+            byId[r.id] = asRow(r, 'local');
+          });
+          var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
+          rows.cloudOk = true;
+          hydratePrintVersionsFromHistory(rows);
+          return rows;
         });
-        Promise.resolve()
-          .then(function () { return purgeLocalDeleted(deleted); })
-          .then(function () { return migrateLocalToCloud(known, deleted); })
-          .catch(function () {});
-        var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
-        hydratePrintVersionsFromHistory(rows);
-        return rows;
       });
     }).catch(function () {
+      // Do not pretend phone drafts are the shared cloud list.
       return localListOnly().then(function (rows) {
-        hydratePrintVersionsFromHistory(rows || []);
-        return rows;
+        var out = (rows || []).map(function (r) {
+          var row = asRow(r, 'local');
+          row.cloudUnreachable = true;
+          return row;
+        });
+        out.cloudOk = false;
+        out.cloudUnreachable = true;
+        hydratePrintVersionsFromHistory(out);
+        return out;
       });
     });
   }

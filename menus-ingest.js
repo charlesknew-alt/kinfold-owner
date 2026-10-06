@@ -32,7 +32,7 @@
     return data;
   }
 
-  /** Fast GET path — works with Apps Script CORS. */
+  /** Fast GET path — works with Apps Script CORS. Retry once (Script can 302/flake). */
   function cloudGet(action, params) {
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
     if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
@@ -40,9 +40,17 @@
     if (!url || typeof fetch !== 'function') {
       return Promise.reject(new Error('no_cloud'));
     }
-    return fetch(url, { method: 'GET', credentials: 'omit' }).then(function (res) {
-      return res.text().then(parseCloudJson_);
-    });
+    function attempt_(n) {
+      return fetch(url, { method: 'GET', credentials: 'omit' }).then(function (res) {
+        return res.text().then(parseCloudJson_);
+      }).catch(function (err) {
+        if (n >= 2) throw err;
+        return new Promise(function (resolve) {
+          setTimeout(function () { resolve(attempt_(n + 1)); }, 450 * n);
+        });
+      });
+    }
+    return attempt_(1);
   }
 
   /**

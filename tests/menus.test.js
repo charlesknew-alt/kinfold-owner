@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow169') !== -1, 'menus page cache-bust is flow169');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow169') !== -1, 'hub menus link cache-bust is flow169');
+assert(page.indexOf('flow170') !== -1, 'menus page cache-bust is flow170');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow170') !== -1, 'hub menus link cache-bust is flow170');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -669,8 +669,19 @@ assert(aiGs.indexOf('historyHasHtml_') !== -1 &&
   'listPrintHistory only returns sheets with fetchable HTML');
 assert(printJs.indexOf('fetchCloudPrintHistory_') !== -1,
   'Print PDF retries cloud HTML fetch before giving up');
-assert(page.indexOf('Same shared list for owner and manager') !== -1,
+assert(page.indexOf('One shared cloud list for owner and manager') !== -1,
   'print history UI says owner and manager share one list');
+assert(printJs.indexOf('rows.cloudOk = true') !== -1 &&
+  printJs.indexOf('cloudUnreachable') !== -1,
+  'print history marks cloud ok vs unreachable so phone drafts are not the shared list');
+assert(page.indexOf('Loading shared print history') !== -1 &&
+  page.indexOf('syncPrintHistoryToCloud') !== -1,
+  'Print history always Syncs before listing so owner and manager match');
+assert(page.indexOf('on this phone only') !== -1 &&
+  page.indexOf('not shared yet') !== -1,
+  'local-only print sheets are labelled, not mixed into the shared cloud list');
+assert(ingestJs.indexOf('Retry once') !== -1 || ingestJs.indexOf('attempt_(n + 1)') !== -1,
+  'cloud GET retries once so listPrintHistory is less flaky');
 assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),
   'cloud history keeps 60 sheets so PC archive reaches the phone');
 assert(aiGs.indexOf('Could not store sheet HTML') !== -1 &&
