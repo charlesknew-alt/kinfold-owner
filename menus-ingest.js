@@ -217,6 +217,9 @@
     if (action === 'getMenusState' || action === 'listPrintHistory') {
       return cloudGet(action, body);
     }
+    if (action === 'pruneOrphanPrintHistory') {
+      return cloudGet(action, body);
+    }
     if (action === 'getPrintHistory' || action === 'deletePrintHistory') {
       return cloudGet(action, body);
     }

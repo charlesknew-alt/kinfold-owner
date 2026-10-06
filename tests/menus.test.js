@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow168') !== -1, 'menus page cache-bust is flow168');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow168') !== -1, 'hub menus link cache-bust is flow168');
+assert(page.indexOf('flow169') !== -1, 'menus page cache-bust is flow169');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow169') !== -1, 'hub menus link cache-bust is flow169');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -660,6 +660,17 @@ assert(printJs.indexOf('syncPrintHistoryToCloud') !== -1 && page.indexOf('syncPr
   'Sync now pushes local print history so phone and PC match');
 assert(printJs.indexOf('repairCloudHtmlGaps') !== -1,
   'Sync repairs cloud index rows that have no Drive HTML (phone download)');
+assert(printJs.indexOf('pruneOrphanCloudIndex') !== -1 &&
+  aiGs.indexOf('historyPruneOrphanIndex_') !== -1 &&
+  aiGs.indexOf('pruneOrphanPrintHistory_') !== -1,
+  'Sync/list drop cloud index rows whose HTML is gone (owner=manager shared list)');
+assert(aiGs.indexOf('historyHasHtml_') !== -1 &&
+  aiGs.indexOf('Never advertise sheets') !== -1,
+  'listPrintHistory only returns sheets with fetchable HTML');
+assert(printJs.indexOf('fetchCloudPrintHistory_') !== -1,
+  'Print PDF retries cloud HTML fetch before giving up');
+assert(page.indexOf('Same shared list for owner and manager') !== -1,
+  'print history UI says owner and manager share one list');
 assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),
   'cloud history keeps 60 sheets so PC archive reaches the phone');
 assert(aiGs.indexOf('Could not store sheet HTML') !== -1 &&
@@ -684,8 +695,10 @@ assert(ingestJs.indexOf('Never GET-by-id') !== -1 && ingestJs.indexOf("action ==
 assert(ingestJs.indexOf("action === 'savePrintHistory'") !== -1 &&
   ingestJs.indexOf('cloud_html_not_visible') !== -1,
   'savePrintHistory verifies Drive HTML is readable after write');
-assert(page.indexOf('not in the cloud yet') !== -1,
-  'phone download explains Sync-on-PC when cloud HTML is missing');
+assert(ingestJs.indexOf("action === 'pruneOrphanPrintHistory'") !== -1,
+  'client can call pruneOrphanPrintHistory over GET');
+assert(page.indexOf('missing from the shared cloud') !== -1,
+  'phone download explains Sync when cloud HTML is missing');
 assert(aiGs.indexOf('readPostBody_') !== -1 && aiGs.indexOf('parameter.payload') !== -1,
   'Menu AI accepts form field payload for iframe POSTs');
 assert(page.indexOf('data-add-section') !== -1 && page.indexOf('sectionAddFooter_') !== -1,

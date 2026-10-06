@@ -117,6 +117,9 @@ function doPost(e) {
     if (action === 'listPrintHistory') {
       return json_(listPrintHistory_());
     }
+    if (action === 'pruneOrphanPrintHistory') {
+      return json_(pruneOrphanPrintHistory_());
+    }
     if (action === 'savePrintHistory') {
       return json_(savePrintHistory_(body.entry || body));
     }
@@ -165,6 +168,7 @@ function doGet(e) {
   // GET reads (fast, CORS-friendly) — same actions as POST.
   var action = String(p.action || '');
   if (action === 'listPrintHistory') return json_(listPrintHistory_());
+  if (action === 'pruneOrphanPrintHistory') return json_(pruneOrphanPrintHistory_());
   if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
   if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
   if (action === 'getMenusState') return json_(getMenusState_());
@@ -183,7 +187,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'GET/POST actions: listPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
+    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
     mailQuota: (function () {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
@@ -198,6 +202,7 @@ function bridgeApi(action, body) {
   body = body && typeof body === 'object' ? body : {};
   try {
     if (action === 'listPrintHistory') return listPrintHistory_();
+    if (action === 'pruneOrphanPrintHistory') return pruneOrphanPrintHistory_();
     if (action === 'savePrintHistory') return savePrintHistory_(body.entry || body);
     if (action === 'getPrintHistory') return getPrintHistory_(body.id || (body.entry && body.entry.id));
     if (action === 'deletePrintHistory') return deletePrintHistory_(body.id);
@@ -699,6 +704,8 @@ function freeHistoryHtmlBlobs_() {
       try { props.deleteProperty(k); removed++; } catch (e) {}
     }
   });
+  // Props HTML gone — drop any index rows that Drive cannot serve either.
+  try { historyPruneOrphanIndex_(historyReadIndex_()); } catch (e2) {}
   return removed;
 }
 
@@ -801,11 +808,74 @@ function historyWriteHtmlDrive_(id, html) {
 /** Keep only the newest N Script-Properties HTML blobs (quota is ~500KB). */
 var HISTORY_PROPS_HTML_MAX_ = 3;
 
+/**
+ * True when this sheet’s HTML is fetchable (Drive preferred, then props).
+ * Index rows without HTML cause “not in the cloud yet” on phones/managers.
+ */
+function historyHasHtml_(id) {
+  id = historySafeId_(id);
+  if (!id) return false;
+  try {
+    if (historyReadHtmlDrive_(id)) return true;
+  } catch (e1) {}
+  try {
+    if (propRead_('HIST_' + id)) return true;
+  } catch (e2) {}
+  return false;
+}
+
+/**
+ * Drop Script-Properties HTML for older sheets, but only when Drive still has
+ * a copy — never leave HISTIDX rows that getPrintHistory cannot open.
+ * When Drive cannot take the blob, drop the sheet from the shared index too
+ * (props-only archive is capped; listing without HTML breaks manager phones).
+ */
 function historyPrunePropsHtml_(list) {
   var sorted = historySortNewest_(list || []);
+  var dropIds = {};
   sorted.slice(HISTORY_PROPS_HTML_MAX_).forEach(function (drop) {
-    if (drop && drop.id) propDelete_('HIST_' + historySafeId_(drop.id));
+    if (!drop || !drop.id) return;
+    var safe = historySafeId_(drop.id);
+    var onDrive = false;
+    try { onDrive = !!historyReadHtmlDrive_(safe); } catch (e) { onDrive = false; }
+    if (onDrive) {
+      propDelete_('HIST_' + safe);
+      return;
+    }
+    // No Drive backup — remove from the shared list instead of orphaning.
+    dropIds[safe] = true;
+    try { historyDeleteHtml_(safe); } catch (e2) {}
   });
+  if (Object.keys(dropIds).length) {
+    var kept = sorted.filter(function (r) {
+      return r && r.id && !dropIds[historySafeId_(r.id)];
+    });
+    try { historyWriteIndex_(kept); } catch (e3) {}
+  }
+}
+
+/**
+ * Remove index rows whose HTML is gone (props wipe / failed Drive write).
+ * Returns the kept list; writes HISTIDX when anything was dropped.
+ */
+function historyPruneOrphanIndex_(list) {
+  var src = list || historyReadIndex_();
+  var kept = [];
+  var dropped = 0;
+  src.forEach(function (row) {
+    if (!row || !row.id) return;
+    if (historyHasHtml_(row.id)) {
+      kept.push(row);
+      return;
+    }
+    dropped += 1;
+    // Clear any empty Drive stubs / leftover prop keys.
+    try { historyDeleteHtml_(row.id); } catch (e) {}
+  });
+  if (dropped > 0) {
+    try { historyWriteIndex_(kept); } catch (e2) {}
+  }
+  return { items: kept, dropped: dropped };
 }
 
 /** Ids that still have HIST_<id>_n HTML chunks in Script Properties. */
@@ -1032,8 +1102,29 @@ function rebuildPrintHistoryIndex_() {
 function listPrintHistory_() {
   var list = historyRebuildIndexIfEmpty_();
   list = historyPrune_(list);
+  // Never advertise sheets the phone/manager cannot download.
+  var pruned = historyPruneOrphanIndex_(list);
+  list = pruned.items || [];
   try { historyWriteIndex_(list); } catch (e) {}
-  return { ok: true, source: 'props', items: list, deletedIds: historyReadDeleted_() };
+  return {
+    ok: true,
+    source: 'props',
+    items: list,
+    deletedIds: historyReadDeleted_(),
+    orphansDropped: pruned.dropped || 0
+  };
+}
+
+/** Explicit Sync cleanup — same as list, but reports how many orphans went. */
+function pruneOrphanPrintHistory_() {
+  var pruned = historyPruneOrphanIndex_(historyReadIndex_());
+  return {
+    ok: true,
+    source: 'props',
+    dropped: pruned.dropped || 0,
+    items: pruned.items || [],
+    deletedIds: historyReadDeleted_()
+  };
 }
 
 function savePrintHistory_(raw) {
@@ -1123,7 +1214,13 @@ function getPrintHistory_(id) {
   // Prefer Drive; fall back to legacy Script Properties chunks.
   var html = historyReadHtmlDrive_(id) || propRead_('HIST_' + id);
   if (!html) {
-    return { ok: false, error: 'Sheet not found in cloud history' };
+    // Index lied — drop the orphan so owner/manager lists stay honest.
+    if (meta) {
+      try {
+        historyWriteIndex_(list.filter(function (r) { return r.id !== id; }));
+      } catch (e) {}
+    }
+    return { ok: false, error: 'Sheet not found in cloud history', orphanPruned: !!meta };
   }
   var entry = meta ? historyMetaOnly_(meta) : {
     id: id,

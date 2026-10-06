@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261006-flow168"></script>
-  <script src="menus-print.js?v=20261006-flow168"></script>
-  <script src="menus-ingest.js?v=20261006-flow168"></script>
+  <script src="menus.js?v=20261006-flow169"></script>
+  <script src="menus-print.js?v=20261006-flow169"></script>
+  <script src="menus-ingest.js?v=20261006-flow169"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -870,10 +870,16 @@
         }).then(function (hist) {
           var n = (hist && hist.uploaded) || 0;
           var repaired = (hist && hist.repaired) || 0;
+          var dropped = (hist && hist.orphansDropped) || 0;
           if (n > 0) {
             cloudSyncNote = 'Shared ' + n + ' print sheet' + (n === 1 ? '' : 's') +
-              (repaired ? ' (repaired ' + repaired + ' for phone download)' : '') +
-              ' — Sync now on the other device';
+              (repaired ? ' (repaired ' + repaired + ' for download)' : '') +
+              (dropped ? '; cleared ' + dropped + ' incomplete' : '') +
+              ' — same list on every device';
+          } else if (dropped > 0) {
+            cloudSyncNote = 'Print history cleaned (' + dropped +
+              ' incomplete sheet' + (dropped === 1 ? '' : 's') +
+              ' removed) — same list on every device';
           } else {
             cloudSyncNote = 'Menus and print history synced across devices';
           }
@@ -971,7 +977,7 @@
         html += '<div class="include-box" style="margin-bottom:14px">';
         html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
         html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com on click; Reply-To kinfoldinns), or Download. ' +
-          'Shared across phones and PCs. Newest days first. Tap <strong>Sync now</strong> on the device that has the sheets, then on the other.</p>';
+          'Same shared list for owner and manager on every phone and PC. Newest days first. Tap <strong>Sync now</strong> after Save if another device is still catching up.</p>';
         html += '<label class="field" style="margin-top:0">Show</label>';
         html += '<select id="historyFilter">';
         html += '<option value="all"' + (historyFilter === 'all' ? ' selected' : '') + '>All menus</option>';
@@ -1044,16 +1050,35 @@
       document.querySelectorAll('[data-history-open]').forEach(function (btn) {
         btn.onclick = function () {
           var id = btn.getAttribute('data-history-open');
+          function missingHtmlAlert_() {
+            alert('This sheet’s HTML is missing from the shared cloud. Tap Sync now (uploads from any device that still has it), then try again. Incomplete rows are cleared automatically.');
+          }
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
-              alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try again here.');
+              // One Sync pass then retry — uploads local HTML + prunes orphans.
+              if (EBMenuPrint.syncPrintHistoryToCloud) {
+                return EBMenuPrint.syncPrintHistoryToCloud().then(function () {
+                  return EBMenuPrint.getPrintHistory(id);
+                }).then(function (again) {
+                  if (!again || !again.html) {
+                    missingHtmlAlert_();
+                    renderHistory();
+                    return;
+                  }
+                  if (!EBMenuPrint.openPrintHtml(again.html)) {
+                    alert('Allow pop-ups to open the menu sheet, then choose Print / save as PDF.');
+                  }
+                });
+              }
+              missingHtmlAlert_();
               return;
             }
             if (!EBMenuPrint.openPrintHtml(entry.html)) {
               alert('Allow pop-ups to open the menu sheet, then choose Print / save as PDF.');
             }
           }).catch(function () {
-            alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try again here.');
+            missingHtmlAlert_();
+            if (viewMode === 'history') renderHistory();
           });
         };
       });
@@ -1066,7 +1091,7 @@
           btn.textContent = 'Sending…';
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
-              alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Email again.');
+              alert('This sheet’s HTML is missing from the shared cloud. Tap Sync now, then try Email again.');
               btn.disabled = false;
               btn.textContent = label || 'Email';
               return;
@@ -1090,7 +1115,7 @@
             btn.textContent = label || 'Email';
             var msg = (err && err.message) ? String(err.message) : '';
             if (/cloud_html_missing|Sheet not found|missing.?html|Missing sheet HTML/i.test(msg)) {
-              msg = 'This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Email again.';
+              msg = 'This sheet’s HTML is missing from the shared cloud. Tap Sync now, then try Email again.';
             }
             alert('Could not send email. ' + (msg || 'Try again in a moment.'));
           });
@@ -1101,14 +1126,14 @@
           var id = btn.getAttribute('data-history-download');
           EBMenuPrint.getPrintHistory(id).then(function (entry) {
             if (!entry || !entry.html) {
-              alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Download again.');
+              alert('This sheet’s HTML is missing from the shared cloud. Tap Sync now, then try Download again.');
               return;
             }
             if (!EBMenuPrint.downloadPrintHtml(entry)) {
               alert('Allow pop-ups to open the menu sheet, then Save / Print from there.');
             }
           }).catch(function () {
-            alert('This sheet’s HTML is not in the cloud yet. On the PC that Saved it, tap Sync now, then try Download again.');
+            alert('This sheet’s HTML is missing from the shared cloud. Tap Sync now, then try Download again.');
           });
         };
       });

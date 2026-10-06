@@ -4494,10 +4494,19 @@
 
   function uploadHistoryEntry_(full) {
     if (!full || !full.html || !full.id) return Promise.resolve(false);
-    return historyCloudPost({
-      action: 'savePrintHistory',
-      entry: full
-    }).then(function () { return true; }).catch(function () { return false; });
+    // Retry once — no-cors writes can race Drive visibility on first verify.
+    function attempt_(n) {
+      return historyCloudPost({
+        action: 'savePrintHistory',
+        entry: full
+      }).then(function () { return true; }).catch(function () {
+        if (n >= 2) return false;
+        return new Promise(function (resolve) {
+          setTimeout(function () { resolve(attempt_(n + 1)); }, 900);
+        });
+      });
+    }
+    return attempt_(1);
   }
 
   /**
@@ -4578,9 +4587,30 @@
     });
   }
 
+  /** Ask the cloud to drop index rows with no fetchable HTML. */
+  function pruneOrphanCloudIndex() {
+    return historyCloudPost({ action: 'pruneOrphanPrintHistory' }).then(function (data) {
+      return {
+        dropped: (data && data.dropped) || 0,
+        items: Array.isArray(data && data.items) ? data.items : []
+      };
+    }).catch(function () {
+      // Older Apps Script deploy — listPrintHistory now prunes itself.
+      return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
+        return {
+          dropped: (data && data.orphansDropped) || 0,
+          items: Array.isArray(data && data.items) ? data.items : []
+        };
+      }).catch(function () {
+        return { dropped: 0, items: [] };
+      });
+    });
+  }
+
   /**
    * Push every local-only print sheet to the shared cloud, then return the
    * shared list. Call from Sync now so phone ↔ PC print history matches.
+   * Order: repair gaps → upload local → prune orphans → pull shared list.
    */
   function syncPrintHistoryToCloud() {
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
@@ -4604,16 +4634,19 @@
         });
       });
     }).then(function (stats) {
-      return listPrintHistory().then(function (rows) {
-        return {
-          rows: rows,
-          uploaded: (stats && stats.uploaded) || 0,
-          repaired: (stats && stats.repaired) || 0
-        };
+      return pruneOrphanCloudIndex().then(function (prune) {
+        return listPrintHistory().then(function (rows) {
+          return {
+            rows: rows,
+            uploaded: (stats && stats.uploaded) || 0,
+            repaired: (stats && stats.repaired) || 0,
+            orphansDropped: (prune && prune.dropped) || 0
+          };
+        });
       });
     }).catch(function () {
       return localListOnly().then(function (rows) {
-        return { rows: rows || [], uploaded: 0, repaired: 0 };
+        return { rows: rows || [], uploaded: 0, repaired: 0, orphansDropped: 0 };
       });
     });
   }
@@ -4796,6 +4829,7 @@
   /**
    * Persist a generated sheet in shared cloud history (Drive via Menu AI Apps Script)
    * and cache a copy on this device for offline reopen.
+   * Cloud write is required for manager/owner phones — retry until HTML is readable.
    */
   function savePrintHistory(raw) {
     var incoming = raw || lastBuildMeta;
@@ -4808,13 +4842,13 @@
     if (!entry) return Promise.resolve(null);
     return localSaveOnly(entry).then(function (saved) {
       hydratePrintVersionsFromHistory((versionHistoryCache || []).concat([saved]));
-      return historyCloudPost({
-        action: 'savePrintHistory',
-        entry: saved
-      }).then(function () {
-        return saved;
-      }).catch(function () {
-        // Offline / script not redeployed — local cache still has it.
+      return uploadHistoryEntry_(saved).then(function (ok) {
+        if (ok) {
+          saved.cloudSynced = true;
+          return saved;
+        }
+        // Still local — Sync now on this device will finish the upload.
+        saved.cloudSynced = false;
         return saved;
       });
     });
@@ -4844,7 +4878,8 @@
       (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
         if (id) deleted[String(id)] = true;
       });
-      // Show immediately: cloud + any local-only sheets not deleted elsewhere.
+      // Show immediately: cloud (server only lists sheets with HTML) + any
+      // local-only sheets not deleted elsewhere (pending upload).
       // Do not wait on uploads (that made Print history feel broken/slow).
       return localListOnly().then(function (localItems) {
         var byId = {};
@@ -4870,22 +4905,54 @@
     });
   }
 
+  function fetchCloudPrintHistory_(id, attempt) {
+    attempt = attempt || 1;
+    return historyCloudPost({
+      action: 'getPrintHistory',
+      id: id
+    }).then(function (data) {
+      var entry = data.entry || null;
+      if (entry && entry.html) {
+        localSaveOnly(normalizeHistoryEntry(entry)).catch(function () {});
+        return entry;
+      }
+      if (attempt < 3) {
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            fetchCloudPrintHistory_(id, attempt + 1).then(resolve, reject);
+          }, 500 * attempt);
+        });
+      }
+      var err = new Error('cloud_html_missing');
+      err.code = 'cloud_html_missing';
+      throw err;
+    }).catch(function (err) {
+      if (err && err.code === 'cloud_html_missing') throw err;
+      if (attempt < 3) {
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            fetchCloudPrintHistory_(id, attempt + 1).then(resolve, reject);
+          }, 500 * attempt);
+        });
+      }
+      var miss = new Error('cloud_html_missing');
+      miss.code = 'cloud_html_missing';
+      throw miss;
+    });
+  }
+
   function getPrintHistory(id) {
     if (!id) return Promise.resolve(null);
-    // Local first (instant open), then cloud if this device does not have HTML.
+    // Local first (instant open), then cloud with retries.
     return localGetOnly(id).then(function (local) {
-      if (local && local.html) return local;
-      return historyCloudPost({
-        action: 'getPrintHistory',
-        id: id
-      }).then(function (data) {
-        var entry = data.entry || null;
-        if (entry && entry.html) {
-          localSaveOnly(normalizeHistoryEntry(entry)).catch(function () {});
-          return entry;
-        }
-        var err = new Error('cloud_html_missing');
-        err.code = 'cloud_html_missing';
+      if (local && local.html) {
+        // Opportunistically ensure cloud has the same HTML for other devices.
+        uploadHistoryEntry_(local).catch(function () {});
+        return local;
+      }
+      return fetchCloudPrintHistory_(id).catch(function (err) {
+        // Last chance: if this device somehow has a partial local row, fail cleanly.
+        // Orphan index rows are pruned server-side on get/list/Sync.
         throw err;
       });
     });
@@ -5305,6 +5372,7 @@
     savePrintHistory: savePrintHistory,
     listPrintHistory: listPrintHistory,
     syncPrintHistoryToCloud: syncPrintHistoryToCloud,
+    pruneOrphanCloudIndex: pruneOrphanCloudIndex,
     getPrintHistory: getPrintHistory,
     deletePrintHistory: deletePrintHistory,
     groupHistoryByDay: groupHistoryByDay,
