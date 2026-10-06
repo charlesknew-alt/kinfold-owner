@@ -5403,6 +5403,7 @@
     getLastBuild: getLastBuild,
     savePrintHistory: savePrintHistory,
     listPrintHistory: listPrintHistory,
+    listLocalPrintHistory: localListOnly,
     syncPrintHistoryToCloud: syncPrintHistoryToCloud,
     pruneOrphanCloudIndex: pruneOrphanCloudIndex,
     getPrintHistory: getPrintHistory,

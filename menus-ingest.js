@@ -32,6 +32,79 @@
     return data;
   }
 
+  function inIframe_() {
+    try {
+      return typeof window !== 'undefined' && window.parent && window.parent !== window;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  /**
+   * Ask the outer Varlo / manager page to GET Apps Script.
+   * iOS leaves fetches started inside the Menus iframe pending until the next
+   * tap; the outer page already has that gesture and can finish the read.
+   * Protocol: postMessage { type:'eb-cloud-get', id, url } →
+   *   { type:'eb-cloud-get-result', id, phase:'start' } then
+   *   { type:'eb-cloud-get-result', id, text } or { …, error }.
+   */
+  function cloudGetViaParent_(url) {
+    return new Promise(function (resolve, reject) {
+      if (!inIframe_() || typeof window === 'undefined' || typeof window.postMessage !== 'function') {
+        reject(new Error('no_parent'));
+        return;
+      }
+      var id = 'ebcg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+      var parentStarted = false;
+      var settled = false;
+      var fallbackTimer = setTimeout(function () {
+        if (settled || parentStarted) return;
+        settled = true;
+        cleanup_();
+        reject(new Error('parent_cloud_no_ack'));
+      }, 700);
+      var hardTimer = setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        cleanup_();
+        reject(new Error('parent_cloud_timeout'));
+      }, 25000);
+      function cleanup_() {
+        clearTimeout(fallbackTimer);
+        clearTimeout(hardTimer);
+        try { window.removeEventListener('message', onMsg_); } catch (e) {}
+      }
+      function onMsg_(e) {
+        if (!e || !e.data || e.data.type !== 'eb-cloud-get-result' || e.data.id !== id) return;
+        if (e.data.phase === 'start') {
+          parentStarted = true;
+          clearTimeout(fallbackTimer);
+          return;
+        }
+        if (settled) return;
+        settled = true;
+        cleanup_();
+        if (e.data.error) {
+          reject(new Error(String(e.data.error)));
+          return;
+        }
+        try {
+          resolve(parseCloudJson_(e.data.text));
+        } catch (err) {
+          reject(err);
+        }
+      }
+      window.addEventListener('message', onMsg_);
+      try {
+        window.parent.postMessage({ type: 'eb-cloud-get', id: id, url: url }, '*');
+      } catch (err) {
+        settled = true;
+        cleanup_();
+        reject(err);
+      }
+    });
+  }
+
   /** Fast GET path — works with Apps Script CORS. Retry once (Script can 302/flake). */
   function cloudGet(action, params) {
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
@@ -48,6 +121,12 @@
         return new Promise(function (resolve) {
           setTimeout(function () { resolve(attempt_(n + 1)); }, 450 * n);
         });
+      });
+    }
+    // Framed on iPhone: prefer outer-page relay; fall back to direct fetch.
+    if (inIframe_()) {
+      return cloudGetViaParent_(url).catch(function () {
+        return attempt_(1);
       });
     }
     return attempt_(1);

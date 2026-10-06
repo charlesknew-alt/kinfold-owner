@@ -604,7 +604,7 @@
       'giftcards-eightbells': 'https://www.eightbellsbolney.com/staff/vouchers',
       // Standalone Teya CSV reader (browser-only). Does not feed paperwork.
       'cardtakings-windmill': 'card-takings.html?venue=windmill',
-      'menus-eightbells': 'menus.html?v=20261006-flow171',
+      'menus-eightbells': 'menus.html?v=20261006-flow172',
       'rooms-windmill': 'https://rooms.windmilllittleworth.com',
       'payroll': 'https://owner.kinfoldinns.co.uk/payroll.html?v=20260901-xero-pull-timeout',
       'staffhub': 'https://script.google.com/macros/s/AKfycbwcE86RmdBYqgYESAjENcMmrBDW4UZjg9NnpSOnYxnSdwdc1IoRmJUgH900qnEp_ov7/exec'
@@ -1053,6 +1053,25 @@
 
     window.addEventListener('message', function(e) {
       if (!e.data || typeof e.data !== 'object') return;
+      // Menus (cross-origin iframe) asks us to GET Apps Script. iOS will not
+      // finish that fetch inside the iframe until the next tap — this outer
+      // page already has the gesture from opening Menus.
+      if (e.data.type === 'eb-cloud-get' && e.data.id && e.data.url && e.source) {
+        var cloudUrl = String(e.data.url);
+        if (cloudUrl.indexOf('https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec') === 0) {
+          var cloudId = e.data.id;
+          var cloudSource = e.source;
+          try { cloudSource.postMessage({ type: 'eb-cloud-get-result', id: cloudId, phase: 'start' }, '*'); } catch (err0) {}
+          fetch(cloudUrl, { method: 'GET', credentials: 'omit' }).then(function (res) {
+            return res.text();
+          }).then(function (text) {
+            cloudSource.postMessage({ type: 'eb-cloud-get-result', id: cloudId, text: text }, '*');
+          }, function (err) {
+            cloudSource.postMessage({ type: 'eb-cloud-get-result', id: cloudId, error: String(err && err.message || err) }, '*');
+          });
+        }
+        return;
+      }
       if (e.data.type === 'navigate' && e.data.url) {
         var nextUrl = e.data.url;
         if (sessionRole === 'owner') nextUrl = withOwnerShell(nextUrl);

@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow171') !== -1, 'menus page cache-bust is flow171');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow171') !== -1, 'hub menus link cache-bust is flow171');
+assert(page.indexOf('flow172') !== -1, 'menus page cache-bust is flow172');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow172') !== -1, 'hub menus link cache-bust is flow172');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -875,6 +875,25 @@ assert(ingestJs.indexOf('Do not use a per-device custom AI URL') !== -1,
 assert(ingestJs.indexOf("mode: 'no-cors'") !== -1 && ingestJs.indexOf('cloudWriteAndVerify_') !== -1,
   'cloud writes use no-cors POST then GET verify');
 assert(ingestJs.indexOf('cloudGet') !== -1, 'cloud reads use fast GET');
+assert(ingestJs.indexOf('eb-cloud-get') !== -1 && ingestJs.indexOf('cloudGetViaParent_') !== -1,
+  'framed cloud reads ask the outer page via postMessage (iOS iframe tap issue)');
+assert(ingestJs.indexOf('eb-cloud-get-result') !== -1 && ingestJs.indexOf("phase === 'start'") !== -1,
+  'cloud parent relay waits for start ack then text/error');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf("type === 'eb-cloud-get'") !== -1 &&
+  fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('eb-cloud-get-result') !== -1,
+  'owner Varlo shell relays Menus Apps Script GETs for the iframe');
+assert(page.indexOf('listLocalPrintHistory') !== -1 && page.indexOf('Updating shared list') !== -1,
+  'print history keeps a local list on screen while shared sync catches up');
+assert(page.indexOf('Show dishes already on this phone immediately') !== -1 ||
+  (page.indexOf("cloudSyncNote = 'Syncing shared menus…'") !== -1 &&
+    page.indexOf('render();') !== -1 &&
+    page.indexOf("edBoot.innerHTML = '<p class=\"note\">Syncing shared menus…</p>'") === -1),
+  'boot shows local dishes instead of a blank Syncing panel');
+assert(page.indexOf('Syncing shared menus and print history') === -1,
+  'Sync now does not blank the editor with a syncing placeholder');
+assert(printJs.indexOf('listLocalPrintHistory: localListOnly') !== -1 ||
+  printJs.indexOf('listLocalPrintHistory') !== -1,
+  'print module exposes local history for immediate paint');
 assert(aiGs.indexOf('cloudBridgeHtml_') !== -1 && aiGs.indexOf('bridgeApi') !== -1,
   'Menu AI still exposes bridgeApi for diagnostics');
 assert(printJs.indexOf('Upload any phone-only sheets first') !== -1 &&
