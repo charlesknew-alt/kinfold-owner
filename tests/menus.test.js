@@ -857,8 +857,9 @@ assert(ingestJs.indexOf("mode: 'no-cors'") !== -1 && ingestJs.indexOf('cloudWrit
 assert(ingestJs.indexOf('cloudGet') !== -1, 'cloud reads use fast GET');
 assert(aiGs.indexOf('cloudBridgeHtml_') !== -1 && aiGs.indexOf('bridgeApi') !== -1,
   'Menu AI still exposes bridgeApi for diagnostics');
-assert(printJs.indexOf('Do not wait on uploads') !== -1,
-  'print history renders before background migrate');
+assert(printJs.indexOf('Upload any phone-only sheets first') !== -1 &&
+  printJs.indexOf('migrateLocalToCloud(known, deleted)') !== -1,
+  'print history awaits upload then re-pulls cloud so owner and manager match');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,
