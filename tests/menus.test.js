@@ -565,8 +565,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow165') !== -1, 'menus page cache-bust is flow165');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow165') !== -1, 'hub menus link cache-bust is flow165');
+assert(page.indexOf('flow166') !== -1, 'menus page cache-bust is flow166');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow166') !== -1, 'hub menus link cache-bust is flow166');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1932,8 +1932,8 @@ assert(typeof printApi.promoUnits === 'function' && typeof printApi.planPromoFil
   });
   assert(hugeSip.usedTitles.indexOf('Sip & Paint') === -1 && hugeSip.usedTitles.length === 0,
     'dated Sip & Paint is never a leftover filler under kids even when the hole is large');
-  assert(printJs.indexOf('padding-top:18px') !== -1 && printJs.indexOf('FEATURE_GAP_UNITS') !== -1,
-    'feature boxes keep a decent gap after the category');
+  assert(printJs.indexOf('padding-top:10px') !== -1 && printJs.indexOf('FEATURE_GAP_UNITS') !== -1,
+    'feature boxes sit at the top of leftover, with a small gap after the food');
 })();
 assert(printJs.indexOf('shareLockedCol') !== -1,
   'Column Sharing is not orphaned to full-bleed when Burgers are missing');
@@ -1943,8 +1943,8 @@ assert(printJs.indexOf('Two scallops') !== -1 || printJs.indexOf('stackForShort'
   'large column holes stack two feature panels under the short side');
 assert(printJs.indexOf('measureOppositeColumns') !== -1,
   'print exports column measures for Gemini pre-release check');
-assert(printJs.indexOf('usedTitles') !== -1 && printJs.indexOf('excludeTitles') !== -1,
-  'feature panels track usedTitles so each event prints once per menu');
+assert(printJs.indexOf('ensureHolePool') !== -1 && printJs.indexOf('fillHole') !== -1,
+  'leftover column holes reuse evergreen panels when page 1 already spent Stay / Gatherings');
 assert(printJs.indexOf('filterUnusedPromos') !== -1,
   'page 2 skips promos already used on page 1');
 assert(aiGs.indexOf('ONLY ONCE') !== -1 || aiGs.indexOf('only once') !== -1,
@@ -3023,6 +3023,83 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'Sides print in page 1 leftover (food first, then feature panels)');
   assert(!/Cheesy Garlic Bread/.test(page2Html),
     'Sides do not clip off the bottom of page 2');
+})();
+(function specialsShorterThanSandwichesGetsLeftoverPanel() {
+  var dishes = [];
+  dishes.push(api.dish('Nibbles', 'Nachos', 'cheese', '6.95', ''));
+  dishes.push(api.dish('Item Boost', 'Pie of the day', 'mash vegetables gravy', '20.95', ''));
+  dishes.push(api.dish('Sharing Plates', 'Camembert share', 'bacon jam', '16.95', 'v'));
+  dishes.push(api.dish('Sharing Plates', 'Nachos share', 'guacamole', '15.95', ''));
+  ['Olives', 'Whitebait', 'Arancini', 'Bruschetta', 'Soup', 'Falafel'].forEach(function (n) {
+    dishes.push(api.dish('Starters', n, 'starter description for fill and wrap', '8.95', ''));
+  });
+  ['Wagyu Burger', 'Asian Burger', 'Cheese Burger'].forEach(function (n) {
+    dishes.push(api.dish('Burgers', n, 'bun fries salad onion rings', '18.95', ''));
+  });
+  ['Haddock & Chips', 'Pie of the Day', 'Liver', 'Fish Pie'].forEach(function (n) {
+    dishes.push(api.dish('Pub Classics', n, 'peas tartare mash gravy', '17.95', ''));
+  });
+  ['Seabass', 'Lasagne', 'Pork Wellington', 'Korean Chicken', 'Short Rib', 'Fish & Chips', 'Chicken Balls'].forEach(function (n) {
+    dishes.push(api.dish('Mains', n, 'long description of the dish with sides', '18.95', ''));
+  });
+  ['Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg', 'Garlic Bread', 'House Salad', 'Fries'].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  [
+    ['Beef, Chilli & Cheddar Quesadilla', 'beef chilli cheddar', '10.95'],
+    ['Falafel & Guacamole', 'mixed salad ciabatta', '8.95'],
+    ['Cajun Chicken Wrap', 'coleslaw', '10.95'],
+    ['Tuna & Red Onion Melt', 'melted cheddar', '9.95']
+  ].forEach(function (x) {
+    dishes.push(api.dish('Sandwiches', x[0], x[1], x[2], ''));
+  });
+  dishes.push(api.dish('Special Mains', 'Pan Roasted Duck Breast', 'duck fat potatoes parsnip puree roasted squash', '22.95', 'gf'));
+  dishes.push(api.dish('Special Mains', 'Loaded Fries', 'pulled pork or beef brisket bbq cheese', '10.95', ''));
+  dishes.push(api.dish('Special Mains', 'Mushroom Stroganoff', 'served with rice and garlic bread', '16.95', 'gf'));
+  var colLayout = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: 'When it’s gone, it’s gone' },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: {
+      width: 'column',
+      frame: true,
+      note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta'
+    }
+  });
+  var promos = [
+    { title: 'Stay a While', body: 'cosy en-suite rooms upstairs' },
+    { title: 'Gatherings', body: 'happy to host your event' }
+  ];
+  var planned = print.planFluidLayout(mainMenu, dishes, {
+    sectionLayout: colLayout,
+    promos: promos,
+    includes: { sandwiches: true }
+  });
+  assert(planned.pages === 2 && planned.p2 && planned.p2.specialsBesideSandwiches,
+    'screenshot-shaped Specials sit beside Sandwiches on page 2');
+  var html = print.build(mainMenu, dishes, {
+    sectionLayout: colLayout,
+    layout: planned,
+    promos: promos,
+    includes: { sandwiches: true }
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var specSand = (a4.match(/specials-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(specSand && /Pan Roasted Duck Breast/.test(specSand) && /Quesadilla|Falafel/.test(specSand),
+    'Specials|Sandwiches pair prints both stacks');
+  var specLeft = specSand.split(/col col-food/)[0] || specSand;
+  assert(/col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz)/i.test(specLeft),
+    'a Specials|Sandwiches pair with Specials shorter puts a feature panel in the leftover');
+  assert(/col-specials[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz)/i.test(specSand),
+    'the leftover panel sits under Specials, level with the taller Sandwiches box');
+  var pages = a4.split(/<div class="page /);
+  var page2Html = pages[2] || '';
+  assert(/Cheesy Garlic Bread/.test(page2Html),
+    'Sides stay on page 2 under the pair (food is not dumped into the Specials hole)');
+  var sidesRow = (page2Html.match(/sides-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+  if (sidesRow) {
+    assert(/col-promo[\s\S]*(Stay a While|Gatherings|Pub Quiz|col-feature)/i.test(sidesRow),
+      'empty partner beside Sides after Sandwiches are paired gets a feature panel, not a white hole');
+  }
 })();
 (function specialsBestFitChoosesColumnBesideSandwiches() {
   var dishes = sidesSandDishes.concat([
