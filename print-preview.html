@@ -14,26 +14,45 @@
     key = new URLSearchParams(window.location.search).get('k') || '';
   } catch (e0) {}
   if (key) {
+    // Keyed open: only this sheet. Do not fall back to shared EB_PRINT_PREVIEW_HTML —
+    // that slot is overwritten by the latest Generate and can stamp the wrong menu.
     try { html = localStorage.getItem(key) || ''; } catch (e1) {}
+    if (!html && window.opener) {
+      try { html = window.opener.__EB_PRINT_PREVIEW_HTML || ''; } catch (e2) {}
+    }
+  } else {
+    if (!html && window.opener) {
+      try { html = window.opener.__EB_PRINT_PREVIEW_HTML || ''; } catch (e3) {}
+    }
+    if (!html) {
+      try { html = sessionStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e4) {}
+    }
+    if (!html) {
+      try { html = localStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e5) {}
+    }
   }
-  if (!html && window.opener) {
-    try { html = window.opener.__EB_PRINT_PREVIEW_HTML || ''; } catch (e2) {}
+  function missing() {
+    document.body.style.fontFamily = 'system-ui,sans-serif';
+    document.body.style.padding = '24px';
+    document.body.textContent = 'Preview missing. Keep the Menus tab open and Generate again.';
   }
   if (!html) {
-    try { html = sessionStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e3) {}
-  }
-  if (!html) {
-    try { html = localStorage.getItem('EB_PRINT_PREVIEW_HTML') || ''; } catch (e4) {}
-  }
-  if (html) {
-    document.open();
-    document.write(html);
-    document.close();
+    missing();
     return;
   }
-  document.body.style.fontFamily = 'system-ui,sans-serif';
-  document.body.style.padding = '24px';
-  document.body.textContent = 'Preview missing. Keep the Menus tab open and Generate again.';
+  // document.write during parse APPENDS into the loader document (Chrome/Safari).
+  // That nests toolbar + sheet-stack on every Save/reopen → endless duplicate pages.
+  // Defer past parse so open/write/close fully replaces the document.
+  var payload = html;
+  setTimeout(function () {
+    try {
+      document.open();
+      document.write(payload);
+      document.close();
+    } catch (e6) {
+      missing();
+    }
+  }, 0);
 })();
 </script>
 </body>

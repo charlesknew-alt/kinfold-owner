@@ -4207,6 +4207,42 @@
           'document.querySelectorAll("[name=paper]").forEach(function(r){r.addEventListener("change",sync);});' +
           'bindPrintButton();' +
         '}' +
+        // Drop nested loader/sheet copies before stamping history (max 2 A4 pages).
+        'function sanitizeDomForSave(){' +
+          'document.body.classList.remove("is-printing");' +
+          'if(!document.body.classList.contains("paper-a4")&&!document.body.classList.contains("paper-a5")){' +
+            'document.body.className=(document.body.className+" paper-a4").replace(/^\\s+/,"");' +
+          '}' +
+          '[].forEach.call(document.querySelectorAll(".sheet-stack"),function(el){' +
+            'el.style.transform="";el.style.marginBottom="";el.style.transformOrigin="";' +
+          '});' +
+          'function keepFirst(sel){' +
+            'var nodes=document.querySelectorAll(sel);' +
+            'for(var i=1;i<nodes.length;i++){if(nodes[i].parentNode)nodes[i].parentNode.removeChild(nodes[i]);}' +
+            'return nodes[0]||null;' +
+          '}' +
+          'keepFirst(".toolbar");' +
+          'keepFirst(".preview-clip");' +
+          'keepFirst(".sheet-stack.mode-a4");' +
+          'keepFirst(".sheet-stack.mode-a5");' +
+          'var a4=document.querySelector(".sheet-stack.mode-a4");' +
+          'if(a4){' +
+            'var pages=[].filter.call(a4.children,function(ch){return ch.classList&&ch.classList.contains("page");});' +
+            'pages.slice(2).forEach(function(pg){if(pg.parentNode)pg.parentNode.removeChild(pg);});' +
+          '}' +
+          'var a5=document.querySelector(".sheet-stack.mode-a5");' +
+          'if(a5){' +
+            'var cuts=[].filter.call(a5.children,function(ch){return ch.classList&&ch.classList.contains("cut-sheet");});' +
+            'cuts.slice(2).forEach(function(pg){if(pg.parentNode)pg.parentNode.removeChild(pg);});' +
+          '}' +
+          '[].forEach.call(document.querySelectorAll("script"),function(sc){' +
+            'var t=String(sc.textContent||"");' +
+            'if(/SAVE_META/.test(t))return;' +
+            'if(/EB_PRINT_PREVIEW|print-preview\\.html|document\\.write\\s*\\(\\s*payload|document\\.write\\s*\\(\\s*html/.test(t)){' +
+              'if(sc.parentNode)sc.parentNode.removeChild(sc);' +
+            '}' +
+          '});' +
+        '}' +
         'var db=document.getElementById("discardPreview");' +
         'if(db){db.onclick=function(){window.close();};}' +
         // Stamp Roman, save into Print history, return parent to history, close preview.
@@ -4217,6 +4253,7 @@
           'var api=window.opener.EBMenuPrint;' +
           'sb.disabled=true;sb.textContent="Saving…";' +
           'var disc=document.getElementById("discardPreview");if(disc)disc.disabled=true;' +
+          // Always stamp THIS preview’s menu (SAVE_META), never opener.lastBuildMeta.
           'var ver=api.commitPrintVersion(SAVE_META.menuId);' +
           'if(SAVE_META.hideDate)ver.hideDate=true;' +
           '[].forEach.call(document.querySelectorAll(".tracker .roman"),function(el){el.textContent=ver.roman;});' +
@@ -4226,7 +4263,9 @@
           'fitPages();' +
           'switchToPrintToolbar(hintText);' +
           'fitPages();' +
+          'sanitizeDomForSave();' +
           'var html="<!DOCTYPE html>"+document.documentElement.outerHTML;' +
+          'if(api.sanitizePrintHtml){try{html=api.sanitizePrintHtml(html)||html;}catch(eSan){}}' +
           'api.savePrintHistory({' +
             'menuId:SAVE_META.menuId,menuName:SAVE_META.menuName,' +
             'roman:ver.roman,n:ver.n,week:ver.week||SAVE_META.week,weekKey:ver.weekKey||SAVE_META.weekKey,' +
@@ -4759,7 +4798,13 @@
    * and cache a copy on this device for offline reopen.
    */
   function savePrintHistory(raw) {
-    var entry = normalizeHistoryEntry(raw || lastBuildMeta);
+    var incoming = raw || lastBuildMeta;
+    if (incoming && incoming.html) {
+      incoming = Object.assign({}, incoming, {
+        html: sanitizePrintHtml(incoming.html) || incoming.html
+      });
+    }
+    var entry = normalizeHistoryEntry(incoming);
     if (!entry) return Promise.resolve(null);
     return localSaveOnly(entry).then(function (saved) {
       hydratePrintVersionsFromHistory((versionHistoryCache || []).concat([saved]));
@@ -4856,8 +4901,222 @@
     });
   }
 
+  /**
+   * Collapse nested print-preview copies (loader document.write append bug) and
+   * cap long menus at two A4 pages / two guillotine sheets.
+   */
+  function sanitizePrintHtmlText_(html) {
+    var out = String(html || '');
+    if (!out) return out;
+    // Strip nested print-preview loader scripts (keep SAVE_META / fitPages).
+    out = out.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, function (block) {
+      if (/SAVE_META/.test(block)) return block;
+      if (/EB_PRINT_PREVIEW|print-preview\.html|document\.write\s*\(\s*payload|document\.write\s*\(\s*html/.test(block)) {
+        return '';
+      }
+      return block;
+    });
+    function keepFirstBlock(source, openRe) {
+      var re = new RegExp(openRe, 'gi');
+      var match;
+      var first = null;
+      var ranges = [];
+      while ((match = re.exec(source))) {
+        var start = match.index;
+        var tagEnd = source.indexOf('>', start);
+        if (tagEnd < 0) break;
+        var depth = 1;
+        var i = tagEnd + 1;
+        var openTag = /^<([a-z0-9]+)/i.exec(match[0]);
+        var name = openTag ? openTag[1].toLowerCase() : 'div';
+        var finder = new RegExp('<\\/?' + name + '\\b[^>]*>', 'gi');
+        finder.lastIndex = i;
+        var m2;
+        var end = -1;
+        while ((m2 = finder.exec(source))) {
+          if (/^<\//.test(m2[0])) depth -= 1;
+          else depth += 1;
+          if (depth === 0) {
+            end = m2.index + m2[0].length;
+            break;
+          }
+        }
+        if (end < 0) break;
+        ranges.push({ start: start, end: end });
+        if (!first) first = source.slice(start, end);
+        re.lastIndex = end;
+      }
+      if (ranges.length <= 1) return source;
+      var rebuilt = source.slice(0, ranges[0].start) + first;
+      rebuilt += source.slice(ranges[ranges.length - 1].end);
+      // Actually need to remove all but first — rebuild carefully
+      rebuilt = '';
+      var cursor = 0;
+      ranges.forEach(function (r, idx) {
+        rebuilt += source.slice(cursor, r.start);
+        if (idx === 0) rebuilt += first;
+        cursor = r.end;
+      });
+      rebuilt += source.slice(cursor);
+      return rebuilt;
+    }
+    out = keepFirstBlock(out, '<div\\b[^>]*\\btoolbar\\b[^>]*>');
+    out = keepFirstBlock(out, '<div\\b[^>]*\\bpreview-clip\\b[^>]*>');
+    out = keepFirstBlock(out, '<div\\b[^>]*\\bsheet-stack\\b[^>]*\\bmode-a4\\b[^>]*>');
+    out = keepFirstBlock(out, '<div\\b[^>]*\\bmode-a4\\b[^>]*\\bsheet-stack\\b[^>]*>');
+    out = keepFirstBlock(out, '<div\\b[^>]*\\bsheet-stack\\b[^>]*\\bmode-a5\\b[^>]*>');
+    out = keepFirstBlock(out, '<div\\b[^>]*\\bmode-a5\\b[^>]*\\bsheet-stack\\b[^>]*>');
+    // Cap pages inside the surviving A4 stack.
+    out = out.replace(
+      /(<div\b[^>]*\bsheet-stack\b[^>]*\bmode-a4\b[^>]*>)([\s\S]*?)(<\/div>\s*(?=<div\b[^>]*\bsheet-stack\b|<script\b|<\/div>\s*<\/body>|$))/i,
+      function (_m, open, inner, close) {
+        var pages = [];
+        var rest = inner;
+        var pageRe = /<div\b[^>]*\bpage\b[^>]*>[\s\S]*?<\/div>/gi;
+        // Simpler: split on page opens and keep first two full page divs via depth walk
+        var kept = [];
+        var pageOpen = /<div\b[^>]*\bclass="[^"]*\bpage\b[^"]*"[^>]*>/gi;
+        var pm;
+        var positions = [];
+        while ((pm = pageOpen.exec(inner))) positions.push(pm.index);
+        if (positions.length <= 2) return open + inner + close;
+        function endOfDiv(src, start) {
+          var tagEnd = src.indexOf('>', start);
+          if (tagEnd < 0) return src.length;
+          var depth = 1;
+          var finder = /<\/?div\b[^>]*>/gi;
+          finder.lastIndex = tagEnd + 1;
+          var mm;
+          while ((mm = finder.exec(src))) {
+            if (/^<\//.test(mm[0])) depth -= 1;
+            else depth += 1;
+            if (depth === 0) return mm.index + mm[0].length;
+          }
+          return src.length;
+        }
+        var slice = '';
+        var lastEnd = 0;
+        positions.slice(0, 2).forEach(function (pos) {
+          if (pos > lastEnd) slice += inner.slice(lastEnd, pos);
+          var end = endOfDiv(inner, pos);
+          slice += inner.slice(pos, end);
+          lastEnd = end;
+        });
+        // Drop trailing extras; keep non-page tail after last kept page? usually none.
+        return open + slice + close;
+      }
+    );
+    out = out.replace(
+      /(<div\b[^>]*\bsheet-stack\b[^>]*\bmode-a5\b[^>]*>)([\s\S]*?)(<\/div>\s*(?=<script\b|<\/div>\s*<\/body>|$))/i,
+      function (_m, open, inner, close) {
+        var cutOpen = /<div\b[^>]*\bclass="[^"]*\bcut-sheet\b[^"]*"[^>]*>/gi;
+        var positions = [];
+        var pm;
+        while ((pm = cutOpen.exec(inner))) positions.push(pm.index);
+        if (positions.length <= 2) return open + inner + close;
+        function endOfDiv(src, start) {
+          var tagEnd = src.indexOf('>', start);
+          if (tagEnd < 0) return src.length;
+          var depth = 1;
+          var finder = /<\/?div\b[^>]*>/gi;
+          finder.lastIndex = tagEnd + 1;
+          var mm;
+          while ((mm = finder.exec(src))) {
+            if (/^<\//.test(mm[0])) depth -= 1;
+            else depth += 1;
+            if (depth === 0) return mm.index + mm[0].length;
+          }
+          return src.length;
+        }
+        var slice = '';
+        var lastEnd = 0;
+        positions.slice(0, 2).forEach(function (pos) {
+          if (pos > lastEnd) slice += inner.slice(lastEnd, pos);
+          var end = endOfDiv(inner, pos);
+          slice += inner.slice(pos, end);
+          lastEnd = end;
+        });
+        return open + slice + close;
+      }
+    );
+    out = out.replace(/\sclass="([^"]*)"/g, function (m, cls) {
+      // ensure paper class survives on body — handled separately
+      return m;
+    });
+    if (!/\bclass="[^"]*\bpaper-a[45]\b/.test(out)) {
+      out = out.replace(/<body\b([^>]*)>/i, function (m, attrs) {
+        if (/\bclass="/i.test(attrs)) {
+          return '<body' + attrs.replace(/\bclass="/i, 'class="paper-a4 ') + '>';
+        }
+        return '<body class="paper-a4"' + attrs + '>';
+      });
+    }
+    return out;
+  }
+
+  function sanitizePrintHtml(raw) {
+    var html = String(raw || '');
+    if (!html) return html;
+    if (typeof DOMParser !== 'undefined') {
+      try {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        if (!doc || !doc.body) return sanitizePrintHtmlText_(html);
+        doc.body.classList.remove('is-printing');
+        if (!doc.body.classList.contains('paper-a4') && !doc.body.classList.contains('paper-a5')) {
+          doc.body.classList.add('paper-a4');
+        }
+        [].forEach.call(doc.querySelectorAll('.sheet-stack'), function (el) {
+          el.style.transform = '';
+          el.style.marginBottom = '';
+          el.style.transformOrigin = '';
+        });
+        function keepFirst(sel) {
+          var nodes = doc.querySelectorAll(sel);
+          for (var i = 1; i < nodes.length; i++) {
+            if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+          }
+          return nodes[0] || null;
+        }
+        keepFirst('.toolbar');
+        keepFirst('.preview-clip');
+        keepFirst('.sheet-stack.mode-a4');
+        keepFirst('.sheet-stack.mode-a5');
+        var a4 = doc.querySelector('.sheet-stack.mode-a4');
+        if (a4) {
+          var pages = [].filter.call(a4.children, function (ch) {
+            return ch.classList && ch.classList.contains('page');
+          });
+          pages.slice(2).forEach(function (pg) {
+            if (pg.parentNode) pg.parentNode.removeChild(pg);
+          });
+        }
+        var a5 = doc.querySelector('.sheet-stack.mode-a5');
+        if (a5) {
+          var cuts = [].filter.call(a5.children, function (ch) {
+            return ch.classList && ch.classList.contains('cut-sheet');
+          });
+          cuts.slice(2).forEach(function (pg) {
+            if (pg.parentNode) pg.parentNode.removeChild(pg);
+          });
+        }
+        [].forEach.call(doc.querySelectorAll('script'), function (sc) {
+          var t = String(sc.textContent || '');
+          if (/SAVE_META/.test(t)) return;
+          if (/EB_PRINT_PREVIEW|print-preview\.html|document\.write\s*\(\s*payload|document\.write\s*\(\s*html/.test(t)) {
+            if (sc.parentNode) sc.parentNode.removeChild(sc);
+          }
+        });
+        return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+      } catch (e) {
+        return sanitizePrintHtmlText_(html);
+      }
+    }
+    return sanitizePrintHtmlText_(html);
+  }
+
   function openPrintHtml(html) {
     if (!html) return false;
+    html = sanitizePrintHtml(html) || html;
     // Phone Chrome in the Varlo iframe often opens a tab that stays about:blank
     // (blob: and opener/sessionStorage both fail). Store HTML under a key and
     // open same-origin print-preview.html?k=… so the new tab can read it.
@@ -4878,16 +5137,9 @@
     } catch (e2) {
       previewUrl = 'print-preview.html?t=' + Date.now() + '&k=' + encodeURIComponent(key);
     }
-    // <a target=_blank> is more reliable from iframes than window.open alone.
-    try {
-      var a = document.createElement('a');
-      a.href = previewUrl;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      if (a.parentNode) a.parentNode.removeChild(a);
-    } catch (e3) {}
+    // Open exactly one tab and keep window.opener (Save needs EBMenuPrint).
+    // Do not click <a rel=noopener> AND window.open — that left Sunday/Main
+    // previews stacked and looked like Save opened the wrong PDF.
     var w = null;
     try { w = window.open(previewUrl, '_blank'); } catch (e4) {}
     if (w) {
@@ -4899,6 +5151,17 @@
       } catch (e5) {}
       return true;
     }
+    // Iframe popup blockers: one <a target=_blank> with opener preserved.
+    try {
+      var a = document.createElement('a');
+      a.href = previewUrl;
+      a.target = '_blank';
+      a.rel = 'opener';
+      document.body.appendChild(a);
+      a.click();
+      if (a.parentNode) a.parentNode.removeChild(a);
+      return true;
+    } catch (e3) {}
     var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     w = window.open(url, '_blank');
@@ -4932,7 +5195,7 @@
     var a = document.createElement('a');
     a.href = url;
     a.download = name;
-    a.rel = 'noopener';
+    a.rel = 'opener';
     a.target = '_blank';
     document.body.appendChild(a);
     a.click();
@@ -5048,6 +5311,7 @@
     dayLabelFromMs: dayLabelFromMs,
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
+    sanitizePrintHtml: sanitizePrintHtml,
     downloadPrintHtml: downloadPrintHtml,
     emailPrintHtml: emailPrintHtml,
     historyCloudUrl: historyCloudUrl,

@@ -155,6 +155,30 @@ assert(printJs.indexOf('localStorage.setItem(key') !== -1 && printJs.indexOf('se
 assert(fs.existsSync(path.join(root, 'print-preview.html')), 'print-preview.html exists for GitHub Pages');
 assert(fs.readFileSync(path.join(root, 'print-preview.html'), 'utf8').indexOf('localStorage.getItem(key') !== -1,
   'print-preview.html reads the keyed HTML from localStorage');
+(function printPreviewNestAndKeyGuards() {
+  var preview = fs.readFileSync(path.join(root, 'print-preview.html'), 'utf8');
+  assert(preview.indexOf('setTimeout(function') !== -1 && preview.indexOf('document.write(payload)') !== -1,
+    'print-preview defers document.write so it replaces the loader instead of nesting sheets');
+  assert(preview.indexOf('Do not fall back to shared EB_PRINT_PREVIEW_HTML') !== -1 ||
+    (preview.indexOf('if (key)') !== -1 && preview.indexOf("localStorage.getItem('EB_PRINT_PREVIEW_HTML')") !== -1 &&
+      preview.indexOf('if (key)') < preview.lastIndexOf("localStorage.getItem('EB_PRINT_PREVIEW_HTML')")),
+    'keyed preview does not fall back to shared storage (wrong-menu Save guard)');
+  // Keyed path must not read shared EB_PRINT_PREVIEW_HTML
+  var keyBlock = preview.split('if (key)')[1] || '';
+  var elseBlock = keyBlock.split('} else {')[0] || keyBlock;
+  assert(elseBlock.indexOf("localStorage.getItem('EB_PRINT_PREVIEW_HTML')") === -1,
+    'when ?k= is set, missing key does not load another menu from EB_PRINT_PREVIEW_HTML');
+})();
+assert(printJs.indexOf('sanitizePrintHtml') !== -1 && printJs.indexOf('sanitizeDomForSave') !== -1,
+  'Save/open sanitize nested sheet-stacks before stamping history');
+assert(printJs.indexOf("a.rel = 'opener'") !== -1,
+  'print preview keeps window.opener so Save can stamp the current menu');
+assert(printJs.indexOf("a.rel = 'noopener'") === -1,
+  'print preview does not open with noopener (that broke Save + double tabs)');
+assert(!/a\.click\(\)[\s\S]{0,200}window\.open\(previewUrl/.test(printJs),
+  'openPrintHtml does not both <a.click> and window.open (wrong-menu leftover tabs)');
+assert(printJs.indexOf('pages.slice(2)') !== -1 && printJs.indexOf('cuts.slice(2)') !== -1,
+  'sanitize caps A4 pages and A5 cut-sheets at two');
 assert(page.indexOf('EBMenuPrint.openPrintHtml') !== -1 && page.indexOf("window.open('', '_blank')") === -1,
   'Generate opens print-preview.html instead of writing into about:blank');
 assert(page.indexOf('layoutSource') !== -1 && printJs.indexOf('Layout: Gemini') !== -1,
@@ -191,6 +215,45 @@ assert(printJs.indexOf('sheet-offer') !== -1, 'Sunday £9.50 offer has a larger 
 require(path.join(root, 'menus-print.js'));
 var printApi = global.EBMenuPrint;
 assert(typeof printApi.build === 'function', 'EBMenuPrint.build exported');
+assert(typeof printApi.sanitizePrintHtml === 'function', 'sanitizePrintHtml exported for Save/history reopen');
+(function sanitizeNestAndWrongMenuGuards() {
+  var nested =
+    '<!DOCTYPE html><html><head><title>Main menu</title></head><body class="paper-a4">' +
+    '<script>var html="x";document.write(html);<\/script>' +
+    '<div class="toolbar" id="previewToolbar">TB1</div>' +
+    '<div class="preview-clip">' +
+      '<div class="sheet-stack mode-panel mode-a4">' +
+        '<div class="page">P1-A</div><div class="page">P2-A</div>' +
+        '<div class="page">P3-extra</div><div class="page">P4-extra</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="toolbar">TB2-dup</div>' +
+    '<div class="preview-clip">' +
+      '<div class="sheet-stack mode-panel mode-a4">' +
+        '<div class="page">P1-B-Sunday</div><div class="page">P2-B</div>' +
+      '</div>' +
+      '<div class="sheet-stack mode-panel mode-a5">' +
+        '<div class="cut-sheet">C1</div><div class="cut-sheet">C2</div>' +
+        '<div class="cut-sheet">C3-extra</div>' +
+      '</div>' +
+    '</div>' +
+    '<script>var SAVE_META={"menuId":"main"};<\/script>' +
+    '</body></html>';
+  var cleaned = printApi.sanitizePrintHtml(nested);
+  assert(cleaned.indexOf('TB2-dup') === -1, 'sanitize drops duplicate toolbars from nested Save HTML');
+  assert(cleaned.indexOf('P1-B-Sunday') === -1, 'sanitize keeps first sheet-stack only (no crossed Sunday copy)');
+  assert(cleaned.indexOf('P3-extra') === -1 && cleaned.indexOf('P4-extra') === -1,
+    'sanitize caps A4 sheet-stack at two pages');
+  assert(cleaned.indexOf('C3-extra') === -1, 'sanitize caps A5 cut-sheets at two');
+  assert((cleaned.match(/class="toolbar"/g) || []).length === 1, 'sanitize leaves exactly one toolbar');
+  assert((cleaned.match(/sheet-stack mode-panel mode-a4/g) || []).length === 1,
+    'sanitize leaves exactly one A4 sheet-stack');
+  assert(cleaned.indexOf('SAVE_META') !== -1, 'sanitize keeps the Save script with SAVE_META');
+  assert(cleaned.indexOf('document.write') === -1, 'sanitize strips nested print-preview loader scripts');
+  assert(printJs.indexOf('commitPrintVersion(SAVE_META.menuId)') !== -1 &&
+    printJs.indexOf('menuId:SAVE_META.menuId,menuName:SAVE_META.menuName') !== -1,
+    'Save stamps SAVE_META menuId from this preview, not opener lastBuildMeta');
+})();
 assert(printApi.typeRange && printApi.typeRange.name.max === 11.5 && printApi.typeRange.title.max === 22,
   'TYPE_RANGE exported for dish name and section title max');
 assert(printApi.typeRange.desc.max === 10 && printApi.typeRange.desc.min === 10,
@@ -565,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow167') !== -1, 'menus page cache-bust is flow167');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow167') !== -1, 'hub menus link cache-bust is flow167');
+assert(page.indexOf('flow168') !== -1, 'menus page cache-bust is flow168');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow168') !== -1, 'hub menus link cache-bust is flow168');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
