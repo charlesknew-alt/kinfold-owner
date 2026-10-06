@@ -565,8 +565,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow164') !== -1, 'menus page cache-bust is flow164');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow164') !== -1, 'hub menus link cache-bust is flow164');
+assert(page.indexOf('flow165') !== -1, 'menus page cache-bust is flow165');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow165') !== -1, 'hub menus link cache-bust is flow165');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1769,8 +1769,26 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
     sectionLayout: api.defaultSectionLayout(),
     promos: []
   });
+  assert(layout.fit !== 'over',
+    'packed Sunday with Little Bells and Desserts still generates at min type');
+})();
+(function mainSpecialsFitAtMinType() {
+  var dishes = api.composeDishes(api.seed(), 'main', { specials: true });
+  var layout = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: api.defaultSectionLayout()
+  });
+  assert(layout.fit !== 'over',
+    'Main with Specials dropped in still generates at min type');
+})();
+(function allDropInsOnMainOverflow() {
+  var dishes = api.composeDishes(api.seed(), 'main', {
+    desserts: true, sandwiches: true, 'little-bells': true, specials: true
+  });
+  var layout = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: api.defaultSectionLayout()
+  });
   assert(layout.fit === 'over' && layout.overflow === 'drop-in',
-    'packed Sunday with Little Bells and Desserts asks to untick a drop-in');
+    'Main with every sub-menu ticked still asks to untick when it will not fit at min type');
 })();
 (function sundaySharingMustNotKeepRoastsOffPage1() {
   var dishes = [

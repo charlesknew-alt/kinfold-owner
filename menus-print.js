@@ -1470,9 +1470,10 @@
 
   /**
    * Every long host (Main, Sunday, upcoming, custom) that can drop in other
-   * menus: never print a clipped sheet. Unit math misses framed kids wording
-   * and dessert wrap, so those extras add a breath tax. Spare leftover on the
-   * tighter page is tagged so Generate can offer an unused sub-menu.
+   * menus. Count only height the unit tally missed (outside above/below/note).
+   * Do not add wrap or penalty taxes — those rejected Specials that already
+   * fitted at minimum type. Overflow only when food + those notes still will
+   * not sit on the page at min type. Spare leftover tags a drop-in offer.
    */
   function applyDropInCapacity_(layout, bag, load) {
     load = load || {};
@@ -1482,39 +1483,32 @@
     var p2Load = load.p2Load != null ? load.p2Load : 0;
     var p1left = load.p1left != null ? load.p1left : (layout.leftover && layout.leftover.p1) || 0;
     var p2left = load.p2left != null ? load.p2left : (layout.leftover && layout.leftover.p2) || 0;
-    var taxP1 = 0;
-    var taxP2 = 0;
-    function addTax(sec, name, alreadyScalloped, ontoP1, base) {
+    var extraP1 = 0;
+    var extraP2 = 0;
+    function addOutside(sec, name, ontoP1) {
       if (!sec) return;
-      var rule = layoutRule_(name, sl);
-      var extra = (base || 0) + outsideUnits_(rule) + wrapUnits(sec);
-      if (rule && rule.frame && !alreadyScalloped) extra += COST.nibblesBox + 2;
-      else if (rule && rule.frame) extra += 3;
-      if (ontoP1) taxP1 += extra;
-      else taxP2 += extra;
+      var extra = outsideUnits_(layoutRule_(name, sl));
+      if (ontoP1) extraP1 += extra;
+      else extraP2 += extra;
     }
     var onePage = layout.pages === 1;
-    var sandOnP1 = !!(layout.p1 && layout.p1.sandwiches);
-    var sandOnP2 = !!(layout.p2 && layout.p2.sandwiches);
-    addTax(bag.littleBells, 'Little Bells', true, onePage, 6);
-    addTax(bag.desserts, 'Desserts', false, onePage, 4);
-    addTax(bag.specialMains, 'Special Mains', true, onePage, 3);
-    addTax(bag.specialDesserts, 'Special Desserts', true, onePage, 3);
-    var hasDropIn = !!(bag.littleBells || bag.desserts || bag.specialMains ||
-      bag.specialDesserts || sandOnP1 || sandOnP2);
-    var breath = 8;
-    var p1Food = p1used + taxP1;
-    var p2Food = p2Load + taxP2;
-    var spareP1 = Math.max(0, p1left - taxP1);
-    var spareP2 = onePage ? spareP1 : Math.max(0, p2left - taxP2);
-    var spare = onePage ? spareP1 : Math.min(spareP1, spareP2);
-    var packedDropIn = hasDropIn && spare < 6;
+    var roastsOnP1 = !!(layout.p1 && layout.p1.sundayRoasts);
+    addOutside(bag.littleBells, 'Little Bells', onePage);
+    addOutside(bag.desserts, 'Desserts', onePage);
+    addOutside(bag.specialMains, 'Special Mains', onePage);
+    addOutside(bag.specialDesserts, 'Special Desserts', onePage);
+    addOutside(bag.specialStarters, 'Special Starters', true);
+    addOutside(bag.sundayRoasts, 'Sunday Roasts', onePage || roastsOnP1);
+    var p1Food = p1used + extraP1;
+    var p2Food = p2Load + extraP2;
+    // Min-type page is PAGE units. Allow anything that still sits on the sheet
+    // at that floor — no breath margin, no “packed leftover” penalty.
     if (onePage) {
-      if (hasDropIn && (p1Food > PAGE - breath || packedDropIn)) {
+      if (p1Food > PAGE) {
         layout.fit = 'over';
         layout.overflow = 'drop-in';
       }
-    } else if (hasDropIn && (p1Food > PAGE - breath || p2Food > PAGE - breath || packedDropIn)) {
+    } else if (p1Food > PAGE || p2Food > PAGE) {
       layout.fit = 'over';
       layout.overflow = 'drop-in';
     }
@@ -1838,7 +1832,7 @@
         p2used -= sideCostP1;
         p2Load -= sideCostP1;
         layout.fillers.push('Sides (page 1 leftover — keep food on the page)');
-      } else if (p1WouldClipSides && p2Load > CLIP) {
+      } else if (p1WouldClipSides && p2Load > PAGE) {
         layout.fit = 'over';
         layout.overflow = 'drop-in';
         layout.fillers.push('Too much content — remove a dropped-in menu');
@@ -1920,7 +1914,7 @@
       layout.p1.footPromos = canFitFootPromos(p1left);
       layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
-      if (p1used > PAGE + 10 || p2used > PAGE + 14 || p2Load > CLIP + 8) {
+      if (p1used > PAGE + 10 || p2used > PAGE + 14 || p2Load > PAGE) {
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
       }
