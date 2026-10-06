@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261005-flow163"></script>
-  <script src="menus-print.js?v=20261005-flow163"></script>
-  <script src="menus-ingest.js?v=20261005-flow163"></script>
+  <script src="menus.js?v=20261005-flow164"></script>
+  <script src="menus-print.js?v=20261005-flow164"></script>
+  <script src="menus-ingest.js?v=20261005-flow164"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -3800,7 +3800,7 @@
 
       html += '<div class="plan-meta">';
       if (plan.fit === 'over') {
-        html += '<p style="color:#5a2a2a"><strong>Too much content to fit on one page.</strong> Please remove a dropped-in menu, then Generate. Untick Sandwiches, Desserts, Little Bells or Specials under Dishes.</p>';
+        html += '<p style="color:#5a2a2a"><strong>Too much content to fit on this sheet.</strong> Please remove a dropped-in menu, then Generate. Untick Sandwiches, Desserts, Little Bells or Specials under Dishes — Main, Sunday and any long sheet with drop-ins.</p>';
       } else {
         html += '<p>Generate fills each page top to bottom (one page if it fits, otherwise two). Card menus print as two A5 copies on landscape A4.</p>';
       }
@@ -3880,6 +3880,19 @@
       return extras.filter(function (m) { return !!ticks[m.id]; });
     }
 
+    function unusedDropIns_() {
+      var extras = EBMenus.includableMenus(menuId) || [];
+      var ticks = hostIncludes() || {};
+      return extras.filter(function (m) {
+        if (ticks[m.id]) return false;
+        return (book[m.id] || []).length > 0;
+      });
+    }
+
+    function dropInLabel_(m) {
+      return m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
+    }
+
     function showOverflowGate_(result) {
       var btn = document.getElementById('doGenerate');
       var hint = document.getElementById('doPrintHint');
@@ -3895,16 +3908,15 @@
       card.setAttribute('style',
         'background:#fffaf4;color:#1c1610;max-width:520px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25)');
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
-      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Too much content to fit on one page</div>';
-      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Please remove a dropped-in menu, then Generate. Untick one of the extras below (Sandwiches, Desserts, Little Bells or Specials) so every dish — including Sides — can print.</p>';
+      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Too much content to fit on this sheet</div>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Please remove a dropped-in menu, then Generate. Untick one of the extras below (Sandwiches, Desserts, Little Bells or Specials) so every dish can print — this applies to Main, Sunday and any long sheet that can drop menus in.</p>';
       var ticked = tickedDropIns_();
       if (ticked.length) {
         html += '<div class="include-box" style="margin:0 0 14px"><h3 style="margin-top:0">Dropped-in menus on this sheet</h3>';
         html += '<div class="include-row">';
         ticked.forEach(function (m) {
-          var label = m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
           html += '<label><input type="checkbox" data-overflow-include="' + m.id + '" checked> ' +
-            escapeAttr(label) + '</label>';
+            escapeAttr(dropInLabel_(m)) + '</label>';
         });
         html += '</div></div>';
       } else {
@@ -3932,10 +3944,110 @@
       };
     }
 
+    function showDropInOfferGate_(result, thenGenerate) {
+      var unused = unusedDropIns_();
+      if (!unused.length) {
+        thenGenerate();
+        return;
+      }
+      var btn = document.getElementById('doGenerate');
+      var hint = document.getElementById('doPrintHint');
+      if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+      if (hint) hint.disabled = false;
+      var existing = document.getElementById('dropInOfferOverlay');
+      if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+      var overlay = document.createElement('div');
+      overlay.id = 'dropInOfferOverlay';
+      overlay.setAttribute('style',
+        'position:fixed;inset:0;z-index:45;background:rgba(28,22,16,.55);display:flex;align-items:center;justify-content:center;padding:24px');
+      var card = document.createElement('div');
+      card.setAttribute('style',
+        'background:#fffaf4;color:#1c1610;max-width:520px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25)');
+      var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
+      html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">There is space on the sheet</div>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Do you want to drop in a sub-menu? Tick one below and we will try it. If that block is too big, we will ask you to untick it and try a different one.</p>';
+      html += '<div class="include-box" style="margin:0 0 10px"><h3 style="margin-top:0">Available to drop in</h3>';
+      html += '<div class="include-row">';
+      unused.forEach(function (m) {
+        html += '<label><input type="checkbox" data-dropin-offer="' + m.id + '"> ' +
+          escapeAttr(dropInLabel_(m)) + '</label>';
+      });
+      html += '</div></div>';
+      html += '<p id="dropInOfferNote" style="font-family:system-ui,sans-serif;font-size:13px;color:#5a2a2a;margin:0 0 12px;min-height:1.2em"></p>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+      html += '<button type="button" id="dropInTry" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Try drop-in</button>';
+      html += '<button type="button" id="dropInSkip" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Generate without extras</button>';
+      html += '</div>';
+      card.innerHTML = html;
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      function closeGate() {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }
+      overlay.querySelectorAll('[data-dropin-offer]').forEach(function (box) {
+        box.addEventListener('change', function () {
+          if (!box.checked) return;
+          overlay.querySelectorAll('[data-dropin-offer]').forEach(function (other) {
+            if (other !== box) other.checked = false;
+          });
+        });
+      });
+      document.getElementById('dropInSkip').onclick = function () {
+        closeGate();
+        thenGenerate();
+      };
+      document.getElementById('dropInTry').onclick = function () {
+        var picked = overlay.querySelector('[data-dropin-offer]:checked');
+        var note = document.getElementById('dropInOfferNote');
+        if (!picked) {
+          if (note) note.textContent = 'Tick one sub-menu to try, or generate without extras.';
+          return;
+        }
+        var extraId = picked.getAttribute('data-dropin-offer');
+        var extra = unused.filter(function (m) { return m.id === extraId; })[0];
+        var trialTicks = hostIncludes();
+        trialTicks[extraId] = true;
+        var trialDishes = EBMenus.composeDishes(book, menuId, trialTicks);
+        var trialLayout = (typeof EBMenuPrint !== 'undefined' && EBMenuPrint.planFluidLayout)
+          ? EBMenuPrint.planFluidLayout(EBMenus.menuById(menuId), trialDishes, {
+            promos: pickedPromosForSheet(),
+            sectionLayout: effectiveSectionLayout(menuId),
+            includes: trialTicks
+          })
+          : null;
+        var trialOver = trialLayout
+          ? trialLayout.fit === 'over'
+          : (EBMenus.sheetPlanFor(book, menuId, trialTicks).plan.fit === 'over');
+        if (trialOver) {
+          picked.checked = false;
+          if (note) {
+            note.textContent = (extra ? dropInLabel_(extra) : 'That menu') +
+              ' is too big to fit. Please untick it and try a different one, or generate without extras.';
+          }
+          return;
+        }
+        if (!includes[menuId]) includes[menuId] = {};
+        includes[menuId][extraId] = true;
+        save();
+        closeGate();
+        thenGenerate();
+      };
+    }
+
     function generateMenu() {
       var result = composed();
       if (result.plan.fit === 'over') {
         showOverflowGate_(result);
+        return;
+      }
+      var layout = result.plan.layout;
+      var menu = EBMenus.menuById(menuId);
+      if (menu.kind === 'long' && layout && layout.canOfferDropIn && unusedDropIns_().length) {
+        showDropInOfferGate_(result, function () {
+          spellCheckThenGenerate_(function () {
+            generateMenuAfterSpell_();
+          });
+        });
         return;
       }
       spellCheckThenGenerate_(function () {

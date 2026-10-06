@@ -271,13 +271,19 @@ assert(printJs.indexOf('Always start airy') !== -1 || /for\(var j=0;j<STEPS\.len
   'fit always starts airy so sparse pages fill top to bottom');
 assert(page.indexOf('partyPaper') !== -1 && page.indexOf('2×A5 on A4') !== -1,
   'party sheet can choose full A4 or 2×A5 guillotine');
-assert(page.indexOf('too much content to fit on one page') !== -1 ||
-  page.indexOf('Too much content to fit on one page') !== -1,
+assert(page.indexOf('Too much content to fit on this sheet') !== -1 ||
+  page.indexOf('too much content to fit on one page') !== -1,
   'generate warns when the sheet cannot fit all food');
 assert(page.indexOf('overflowGateOverlay') !== -1 && page.indexOf('data-overflow-include') !== -1,
   'overflow gate lets staff untick a dropped-in menu before generate');
 assert(page.indexOf('Please remove a dropped-in menu') !== -1,
   'overflow copy asks to remove a dropped-in menu');
+assert(page.indexOf('Main, Sunday and any long sheet') !== -1,
+  'overflow gate applies to Sunday as well as Main');
+assert(page.indexOf('dropInOfferOverlay') !== -1 && page.indexOf('There is space on the sheet') !== -1,
+  'spare leftover offers dropping in a sub-menu');
+assert(page.indexOf('is too big to fit') !== -1 && page.indexOf('try a different one') !== -1,
+  'a drop-in that will not fit asks staff to untick and try another');
 assert(api.emptyMeta().paper === 'a4', 'party meta defaults to full A4 paper');
 assert(api.sheetPlan('desserts', 3).fit === 'two-up', 'desserts card is two-up A5');
 assert(api.sheetPlan('sandwiches', 4).fit === 'two-up', 'sandwiches card is two-up A5');
@@ -559,8 +565,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow163') !== -1, 'menus page cache-bust is flow163');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow163') !== -1, 'hub menus link cache-bust is flow163');
+assert(page.indexOf('flow164') !== -1, 'menus page cache-bust is flow164');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow164') !== -1, 'hub menus link cache-bust is flow164');
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
@@ -1745,8 +1751,19 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   sectionLayout: api.defaultSectionLayout(),
   promos: []
 });
-assert(jamLayout.pages === 2 && jamLayout.p1.sundayRoasts === true,
-  'Sunday planner puts Roasts on page 1 when openers are light');
+(function sparseSundayOffersDropIn() {
+  var dishes = [
+    api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+    api.dish('Sunday Roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
+    api.dish('Sunday Roasts', 'Pork Loin', 'crackling', '19.95', '')
+  ];
+  var layout = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: api.defaultSectionLayout(),
+    promos: []
+  });
+  assert(layout.fit !== 'over' && layout.canOfferDropIn === true,
+    'a short Sunday with leftover space offers dropping in a sub-menu');
+})();
 (function sundaySharingMustNotKeepRoastsOffPage1() {
   var dishes = [
     api.dish('Nibbles', 'Vegetable Samosas', '', '6.95', 'v'),

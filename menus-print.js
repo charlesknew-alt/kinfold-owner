@@ -1453,6 +1453,47 @@
   }
 
   /**
+   * Every long host (Main, Sunday, upcoming, custom) that can drop in other
+   * menus: never print a clipped sheet. Unit math is optimistic vs real type,
+   * so framed kids/desserts/roasts add a breath tax. Spare leftover is tagged
+   * so Generate can offer an unused sub-menu.
+   */
+  function applyDropInCapacity_(layout, bag, load) {
+    load = load || {};
+    var p1used = load.p1used != null ? load.p1used : 0;
+    var p2Load = load.p2Load != null ? load.p2Load : 0;
+    var p1left = load.p1left != null ? load.p1left : (layout.leftover && layout.leftover.p1) || 0;
+    var p2left = load.p2left != null ? load.p2left : (layout.leftover && layout.leftover.p2) || 0;
+    var tax = 0;
+    if (bag && bag.littleBells) tax += 8;
+    if (bag && bag.desserts) tax += 6;
+    if (bag && bag.sundayRoasts && !(layout.p1 && layout.p1.sundayRoasts)) tax += 6;
+    if (bag && bag.specialMains) tax += 4;
+    var breath = 8;
+    var p2Food = p2Load + tax;
+    var p1Food = p1used + ((bag && bag.sundayRoasts && layout.p1 && layout.p1.sundayRoasts) ? 4 : 0);
+    if (layout.pages === 1) {
+      if (p1Food > PAGE - breath) {
+        layout.fit = 'over';
+        layout.overflow = 'drop-in';
+      }
+    } else {
+      if (p1Food > PAGE - breath || p2Food > PAGE - breath) {
+        layout.fit = 'over';
+        layout.overflow = 'drop-in';
+      }
+    }
+    var spare = layout.pages === 1 ? p1left : Math.max(p1left, p2left);
+    layout.spareRoom = Math.max(0, spare);
+    layout.canOfferDropIn = layout.fit !== 'over' && layout.spareRoom >= 24;
+    if (layout.fit === 'over' && layout.fillers &&
+        layout.fillers.indexOf('Too much content — remove a dropped-in menu') === -1) {
+      layout.fillers.push('Too much content — remove a dropped-in menu');
+    }
+    return layout;
+  }
+
+  /**
    * Decide page split + which optional chrome (logo / feature panels) fits.
    * Sandwiches follow the Dishes include tick (or named fillings already on the
    * sheet) — they are never dropped because of space. Promo never forces an extra page.
@@ -1629,6 +1670,12 @@
       // Foot feature pairs only with real spare room — never jam at min type.
       layout.p1.footPromos = canFitFootPromos(layout.leftover.p1);
       layout.p1.classicsSplit = (bag.burgers || (bag.classics && bag.classics.dishes)) ? 1 : 0;
+      applyDropInCapacity_(layout, bag, {
+        p1used: foodNeed,
+        p2Load: 0,
+        p1left: layout.leftover.p1,
+        p2left: 0
+      });
     } else if (hasBackContent || foodNeed > ONE_PAGE_AT_MIN || preferTwo) {
       // —— Two pages (Jul/Nov column use) ——
       layout.pages = 2;
@@ -1735,9 +1782,14 @@
         (bag.nibbles || bag.boost)
       );
       var sideCountP1 = bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0;
-      // Dumping 4+ Sides under Sharing on a full starters page clips them (staff
-      // screenshot). Refuse that dump — Generate asks to remove a dropped-in menu.
-      var p1WouldClipSides = packedFront && sideCountP1 >= 4;
+      // Dumping 4+ Sides onto an already-full page 1 clips them. Any long host
+      // (Main or Sunday): refuse that dump — Generate asks to remove a drop-in.
+      var p1WouldClipSides = sideCountP1 >= 4 && (
+        packedFront ||
+        (bag.starters && bag.starters.dishes && bag.starters.dishes.length >= 4 &&
+          bag.sundayRoasts && layout.p1.sundayRoasts) ||
+        p1left < sideCostP1 + 14
+      );
       var moveSidesToP1 = bag.sides && layout.p2.sidesOnP2 && p1left >= sideCostP1 + 4 && (
         sandPartner === 'specials' ||
         (sandPartner !== 'sides' && p2Load > CLIP)
@@ -1837,6 +1889,12 @@
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
       }
+      applyDropInCapacity_(layout, bag, {
+        p1used: p1used,
+        p2Load: p2Load,
+        p1left: p1left,
+        p2left: p2left
+      });
     } else {
       layout.pages = 1;
       layout.fit = 'one';
@@ -4937,6 +4995,7 @@
     typeRange: TYPE_RANGE,
     sandwichesBlock: sandwichesBlock,
     partyOccasion: partyOccasion,
+    applyDropInCapacity: applyDropInCapacity_,
     orderDishesForPrint: orderDishesForPrint,
     toRoman: toRoman,
     weekLabel: weekLabel,
