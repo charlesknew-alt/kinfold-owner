@@ -16,6 +16,10 @@ Cursor cannot push to that repo from this environment — paste/push from your P
 
 ### Menus tile
 
-Update the Menus URL cache-bust when Menus ships a new flow:
+Point the Menus iframe at the **stable** staff entry on owner (no flow pin):
 
-`https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20261006-flow170`
+`https://owner.kinfoldinns.co.uk/menus-staff.html`
+
+That page reads the current `flowNNN` from `menus.html` and opens staff mode.
+After this one manager change, future Menus ships only need **kinfold-owner** —
+manager auto-follows. Do not bump `?v=flow…` in eightbells-manager again.

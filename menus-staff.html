@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Stable staff entry for manager.eightbellsbolney.com — never pin a flow here.
+       This page resolves the current cache-bust from menus.html, then opens staff mode. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>Menus</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 15px/1.4 Georgia, "Times New Roman", serif;
+      color: #1c2a22;
+      background: #f3f0e8;
+    }
+    p { margin: 0; opacity: 0.75; }
+  </style>
+</head>
+<body>
+  <p id="status">Loading Menus…</p>
+  <script>
+    (function () {
+      var statusEl = document.getElementById('status');
+      function fail(msg) {
+        if (statusEl) statusEl.textContent = msg;
+      }
+      function openStaff(bust) {
+        var q = 'mode=staff';
+        if (bust) q += '&v=' + encodeURIComponent(bust);
+        location.replace('menus.html?' + q);
+      }
+      // Always re-read menus.html so phones pick up the latest flowNNN without
+      // bumping this stable URL on the manager portal.
+      fetch('menus.html?_=' + Date.now(), { cache: 'no-store' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('menus.html ' + res.status);
+          return res.text();
+        })
+        .then(function (html) {
+          var m = String(html || '').match(/menus\.js\?v=([^"'&\s]+)/i);
+          openStaff(m ? m[1] : '');
+        })
+        .catch(function () {
+          fail('Could not load Menus. Opening staff view…');
+          setTimeout(function () { openStaff(String(Date.now())); }, 400);
+        });
+    })();
+  </script>
+</body>
+</html>

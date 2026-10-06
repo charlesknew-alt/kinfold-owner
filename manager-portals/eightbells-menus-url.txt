@@ -1,8 +1,10 @@
 # Manager portal (manager.eightbellsbolney.com)
 # Source of truth: github.com/charlesknew-alt/eightbells-manager
 #
-# Menus tile URL (update there when bumping cache-bust):
-https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=20261006-flow170
+# Menus tile URL — STABLE staff entry on owner. Do not pin flowNNN here.
+# After this one URL is live on eightbells-manager, future Menus ships only
+# need kinfold-owner (flow bump on menus.html); manager auto-follows.
+https://owner.kinfoldinns.co.uk/menus-staff.html
 #
 # Gift cards tile:
 https://www.eightbellsbolney.com/staff/vouchers

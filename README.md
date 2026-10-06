@@ -63,7 +63,9 @@ Owner tile → **Card Takings** opens `card-takings.html`. Export from Teya with
 
 ### Eight Bells Menus
 
-Owner tile **Menus**, and the Menus button on the Eight Bells manager sign-in, open `menus.html`.
+Owner tile **Menus** opens `menus.html` (flow cache-bust). The Eight Bells manager
+Menus tile should use the stable staff entry `menus-staff.html`, which always
+loads the latest staff UI from owner without a per-release flow pin on manager.
 
 - **Show complete menu** — tick lunch club, gf, v, vg (and “as option”) on each dish.
 - On Main or Sunday, tick **Also put on this sheet** (Sandwiches, Desserts, Little Bells) to see if they still fit.

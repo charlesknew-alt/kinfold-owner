@@ -628,8 +628,28 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow170') !== -1, 'menus page cache-bust is flow170');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow170') !== -1, 'hub menus link cache-bust is flow170');
+assert(page.indexOf('flow171') !== -1, 'menus page cache-bust is flow171');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow171') !== -1, 'hub menus link cache-bust is flow171');
+(function checkMenusStaffStableEntry() {
+  var staffPath = path.join(root, 'menus-staff.html');
+  assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
+  var staff = fs.readFileSync(staffPath, 'utf8');
+  assert(staff.indexOf('mode=staff') !== -1, 'menus-staff opens staff mode');
+  assert(staff.indexOf('menus') !== -1 && staff.indexOf('.js') !== -1 && staff.indexOf('match') !== -1,
+    'menus-staff parses menus.js?v= from menus.html');
+  assert(staff.indexOf("fetch('menus.html") !== -1 || staff.indexOf('fetch("menus.html') !== -1,
+    'menus-staff fetches menus.html for current flow');
+  assert(staff.indexOf('location.replace') !== -1, 'menus-staff redirects into menus.html');
+  assert(staff.indexOf('cache: \'no-store\'') !== -1 || staff.indexOf('cache:"no-store"') !== -1 ||
+    staff.indexOf("cache: 'no-store'") !== -1,
+    'menus-staff bypasses stale menus.html cache when resolving flow');
+  var portal = fs.readFileSync(path.join(root, 'manager-portals/eightbells/index.html'), 'utf8');
+  assert(portal.indexOf('menus-staff.html') !== -1 && portal.indexOf('mode=staff&v=') === -1,
+    'manager portal Menus tile uses stable menus-staff.html (no flow pin)');
+  var urlTxt = fs.readFileSync(path.join(root, 'manager-portals/eightbells-menus-url.txt'), 'utf8');
+  assert(urlTxt.indexOf('https://owner.kinfoldinns.co.uk/menus-staff.html') !== -1,
+    'eightbells-menus-url.txt points at stable staff URL');
+})();
 (function checkMenusHtmlInlineScripts() {
   var html = fs.readFileSync(path.join(root, 'menus.html'), 'utf8');
   var re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;

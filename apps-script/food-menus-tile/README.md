@@ -4,8 +4,9 @@ Adds a **Menus** card under **Records** on the Eight Bells manager hub
 (`manager.eightbellsbolney.com`). Hidden on Windmill (no `FOOD_MENUS_URL`).
 
 ## What it opens
-`https://owner.kinfoldinns.co.uk/menus.html?mode=staff` — simplified floor UI
-(Dishes → Generate) on the same cloud menu book as the owner Menus tool.
+`https://owner.kinfoldinns.co.uk/menus-staff.html` — stable staff entry that
+opens simplified floor UI (Dishes → Generate) on the same cloud menu book as
+the owner Menus tool. No per-release `flowNNN` pin on the manager side.
 
 ## Shipped in
 - **PubSystemLib** v87 (`FOOD_MENUS_URL` / `__FOOD_MENUS_DISPLAY__` tokens;
@@ -15,5 +16,5 @@ Adds a **Menus** card under **Records** on the Eight Bells manager hub
 
 ## Venue config
 ```js
-FOOD_MENUS_URL: 'https://owner.kinfoldinns.co.uk/menus.html?mode=staff&v=…'
+FOOD_MENUS_URL: 'https://owner.kinfoldinns.co.uk/menus-staff.html'
 ```
