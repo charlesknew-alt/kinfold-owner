@@ -1764,6 +1764,14 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   assert(layout.fit !== 'over' && layout.canOfferDropIn === true,
     'a short Sunday with leftover space offers dropping in a sub-menu');
 })();
+(function packedSundayDropInsOverflow() {
+  var layout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
+    sectionLayout: api.defaultSectionLayout(),
+    promos: []
+  });
+  assert(layout.fit === 'over' && layout.overflow === 'drop-in',
+    'packed Sunday with Little Bells and Desserts asks to untick a drop-in');
+})();
 (function sundaySharingMustNotKeepRoastsOffPage1() {
   var dishes = [
     api.dish('Nibbles', 'Vegetable Samosas', '', '6.95', 'v'),

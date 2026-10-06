@@ -1452,39 +1452,73 @@
     return { ok: false, left: leftover };
   }
 
+  function layoutRule_(name, sl) {
+    if (root.EBMenus && typeof root.EBMenus.sectionLayoutFor === 'function') {
+      return root.EBMenus.sectionLayoutFor(name, sl) || {};
+    }
+    return (sl && sl[name]) || {};
+  }
+
+  /** Above/below boxes (Little Bells on Sunday) or a single Blocks note. */
+  function outsideUnits_(rule) {
+    if (!rule) return 0;
+    var above = String(rule.above || '').trim();
+    var below = String(rule.below || '').trim();
+    if (above || below) return noteUnits(above) + noteUnits(below);
+    return noteUnits(rule.note);
+  }
+
   /**
    * Every long host (Main, Sunday, upcoming, custom) that can drop in other
-   * menus: never print a clipped sheet. Unit math is optimistic vs real type,
-   * so framed kids/desserts/roasts add a breath tax. Spare leftover is tagged
-   * so Generate can offer an unused sub-menu.
+   * menus: never print a clipped sheet. Unit math misses framed kids wording
+   * and dessert wrap, so those extras add a breath tax. Spare leftover on the
+   * tighter page is tagged so Generate can offer an unused sub-menu.
    */
   function applyDropInCapacity_(layout, bag, load) {
     load = load || {};
+    bag = bag || {};
+    var sl = load.sectionLayout;
     var p1used = load.p1used != null ? load.p1used : 0;
     var p2Load = load.p2Load != null ? load.p2Load : 0;
     var p1left = load.p1left != null ? load.p1left : (layout.leftover && layout.leftover.p1) || 0;
     var p2left = load.p2left != null ? load.p2left : (layout.leftover && layout.leftover.p2) || 0;
-    var tax = 0;
-    if (bag && bag.littleBells) tax += 8;
-    if (bag && bag.desserts) tax += 6;
-    if (bag && bag.sundayRoasts && !(layout.p1 && layout.p1.sundayRoasts)) tax += 6;
-    if (bag && bag.specialMains) tax += 4;
-    var breath = 8;
-    var p2Food = p2Load + tax;
-    var p1Food = p1used + ((bag && bag.sundayRoasts && layout.p1 && layout.p1.sundayRoasts) ? 4 : 0);
-    if (layout.pages === 1) {
-      if (p1Food > PAGE - breath) {
-        layout.fit = 'over';
-        layout.overflow = 'drop-in';
-      }
-    } else {
-      if (p1Food > PAGE - breath || p2Food > PAGE - breath) {
-        layout.fit = 'over';
-        layout.overflow = 'drop-in';
-      }
+    var taxP1 = 0;
+    var taxP2 = 0;
+    function addTax(sec, name, alreadyScalloped, ontoP1, base) {
+      if (!sec) return;
+      var rule = layoutRule_(name, sl);
+      var extra = (base || 0) + outsideUnits_(rule) + wrapUnits(sec);
+      if (rule && rule.frame && !alreadyScalloped) extra += COST.nibblesBox + 2;
+      else if (rule && rule.frame) extra += 3;
+      if (ontoP1) taxP1 += extra;
+      else taxP2 += extra;
     }
-    var spare = layout.pages === 1 ? p1left : Math.max(p1left, p2left);
-    layout.spareRoom = Math.max(0, spare);
+    var onePage = layout.pages === 1;
+    var sandOnP1 = !!(layout.p1 && layout.p1.sandwiches);
+    var sandOnP2 = !!(layout.p2 && layout.p2.sandwiches);
+    addTax(bag.littleBells, 'Little Bells', true, onePage, 6);
+    addTax(bag.desserts, 'Desserts', false, onePage, 4);
+    addTax(bag.specialMains, 'Special Mains', true, onePage, 3);
+    addTax(bag.specialDesserts, 'Special Desserts', true, onePage, 3);
+    var hasDropIn = !!(bag.littleBells || bag.desserts || bag.specialMains ||
+      bag.specialDesserts || sandOnP1 || sandOnP2);
+    var breath = 8;
+    var p1Food = p1used + taxP1;
+    var p2Food = p2Load + taxP2;
+    var spareP1 = Math.max(0, p1left - taxP1);
+    var spareP2 = onePage ? spareP1 : Math.max(0, p2left - taxP2);
+    var spare = onePage ? spareP1 : Math.min(spareP1, spareP2);
+    var packedDropIn = hasDropIn && spare < 6;
+    if (onePage) {
+      if (hasDropIn && (p1Food > PAGE - breath || packedDropIn)) {
+        layout.fit = 'over';
+        layout.overflow = 'drop-in';
+      }
+    } else if (hasDropIn && (p1Food > PAGE - breath || p2Food > PAGE - breath || packedDropIn)) {
+      layout.fit = 'over';
+      layout.overflow = 'drop-in';
+    }
+    layout.spareRoom = Math.max(0, onePage ? p1left : Math.min(p1left, p2left));
     layout.canOfferDropIn = layout.fit !== 'over' && layout.spareRoom >= 24;
     if (layout.fit === 'over' && layout.fillers &&
         layout.fillers.indexOf('Too much content — remove a dropped-in menu') === -1) {
@@ -1674,7 +1708,8 @@
         p1used: foodNeed,
         p2Load: 0,
         p1left: layout.leftover.p1,
-        p2left: 0
+        p2left: 0,
+        sectionLayout: opts.sectionLayout
       });
     } else if (hasBackContent || foodNeed > ONE_PAGE_AT_MIN || preferTwo) {
       // —— Two pages (Jul/Nov column use) ——
@@ -1893,7 +1928,8 @@
         p1used: p1used,
         p2Load: p2Load,
         p1left: p1left,
-        p2left: p2left
+        p2left: p2left,
+        sectionLayout: opts.sectionLayout
       });
     } else {
       layout.pages = 1;
