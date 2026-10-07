@@ -1237,12 +1237,22 @@ function rebuildPrintHistoryIndex_() {
  * When Drive is unavailable, only list rows that still have props HTML.
  * Cheap (prop key read) — stops zombie “shared” rows with no downloadable sheet.
  * When Drive works, trust the index (Sync / getPrintHistory prune orphans).
+ * Does not call createFolder on every list (that 403’d and slowed phones).
  */
+function historyDriveLikelyAvailable_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = String(props.getProperty('HIST_FOLDER_ID') || '');
+  if (!id) return false;
+  try {
+    return !!DriveApp.getFolderById(id);
+  } catch (e) {
+    return false;
+  }
+}
+
 function historyFilterListed_(list) {
   var src = list || [];
-  var folder = null;
-  try { folder = historyHtmlFolder_(); } catch (e0) { folder = null; }
-  if (folder) return src;
+  if (historyDriveLikelyAvailable_()) return src;
   var kept = [];
   var dropped = 0;
   src.forEach(function (row) {
