@@ -1024,16 +1024,25 @@ function historyDiscoverStoredIds_() {
 /**
  * Recover original Save time from history id (`p` + Date.now().toString(36)).
  * Never invent "now" — that is what stamped every row 14:19 after HISTIDX wipe.
+ * Round-trip + recent-window checks block handmade ids like `pmainvi…`.
  */
 function historyStampFromId_(id) {
   var s = String(id || '');
-  var m = s.match(/^p([0-9a-z]+)/i);
+  var m = s.match(/^p([0-9a-z]+)$/i);
   if (!m) return 0;
-  var body = m[1];
+  var body = m[1].toLowerCase();
+  var now = Date.now();
+  var oldest = now - 400 * 24 * 60 * 60 * 1000; // ~13 months of menu history
   // Date.now().toString(36) is ~8 chars in 2024–2030; id may append a random tail.
-  for (var len = Math.min(body.length, 11); len >= 7; len--) {
-    var n = parseInt(body.slice(0, len), 36);
-    if (isFinite(n) && n > 1.4e12 && n < 2.2e12) return n;
+  for (var len = Math.min(body.length, 10); len >= 8; len--) {
+    var prefix = body.slice(0, len);
+    var n = parseInt(prefix, 36);
+    if (!isFinite(n) || n < oldest || n > now + 86400000) continue;
+    if (n.toString(36) !== prefix) continue;
+    // Remainder (if any) is a short random suffix from Generate, not more timestamp digits.
+    var rest = body.slice(len);
+    if (rest.length > 6) continue;
+    return n;
   }
   return 0;
 }
