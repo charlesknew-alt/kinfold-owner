@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261007-flow176"></script>
-  <script src="menus-print.js?v=20261007-flow176"></script>
-  <script src="menus-ingest.js?v=20261007-flow176"></script>
+  <script src="menus.js?v=20261007-flow177"></script>
+  <script src="menus-print.js?v=20261007-flow177"></script>
+  <script src="menus-ingest.js?v=20261007-flow177"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1013,8 +1013,11 @@
       if (historyFilter && historyFilter !== 'all') {
         filtered = historyCache.filter(function (r) { return r.menuId === historyFilter; });
       }
-      var shared = filtered.filter(function (r) { return r && r.source !== 'local'; });
-      var pending = filtered.filter(function (r) { return r && r.source === 'local'; });
+      // Only source === 'cloud' is the shared owner/manager list.
+      // 'cache' / 'local' used to paint as shared and left Charles on a zombie
+      // “Still uploading…” banner with sheets manager never saw.
+      var shared = filtered.filter(function (r) { return r && r.source === 'cloud'; });
+      var pending = filtered.filter(function (r) { return r && r.source !== 'cloud'; });
       // While catching up, keep whatever is already known on screen.
       // When cloud is up, the shared list is cloud-only (pending shown separately).
       if (!updating && cloudOk) filtered = shared;
@@ -1092,7 +1095,8 @@
       }
       if (display.length) renderDayGroups_(display, false);
       if (!updating && cloudOk && displayPending.length) {
-        html += '<p class="note" style="margin:16px 0 8px">Still uploading to the shared list (will retry automatically):</p>';
+        html += '<p class="note" style="margin:16px 0 8px">Still uploading to the shared list (will retry automatically). ' +
+          'If this never clears, open Apps Script → Run <strong>AUTHORIZE_DRIVE_PRINT_HISTORY</strong> → Allow, then tap Sync now:</p>';
         renderDayGroups_(displayPending, true);
         if (EBMenuPrint && typeof EBMenuPrint.schedulePendingPrintUploads === 'function') {
           EBMenuPrint.schedulePendingPrintUploads();
@@ -1115,7 +1119,8 @@
         if (historyCache && historyCache.length) {
           var cached = historyCache.map(function (r) {
             return Object.assign({}, r, {
-              source: r.source === 'local' ? 'local' : (r.source || 'cache')
+              // Keep true cloud rows; everything else is pending until list says so.
+              source: r.source === 'cloud' ? 'cloud' : 'local'
             });
           });
           paintHistoryRows_(cached, { cloudOk: true, updating: true });
@@ -1135,7 +1140,7 @@
                 hideDate: r.hideDate,
                 generatedAt: r.generatedAt,
                 dayKey: r.dayKey,
-                source: 'cache'
+                source: 'local'
               };
             });
             if (rows.length) paintHistoryRows_(rows, { cloudOk: true, updating: true });

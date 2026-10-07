@@ -312,8 +312,9 @@ assert(page.indexOf('sync on every phone and PC') !== -1 || page.indexOf('Menus 
   'UI mentions menus stay in sync across devices');
 assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('cloudPost') !== -1,
   'ingest exposes shared cloud POST helper');
-assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1,
-  'Menu AI Apps Script stores print HTML in Drive (not Script Properties)');
+assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1 &&
+  aiGs.indexOf('historyWriteHtmlPropsGzip_') !== -1,
+  'Menu AI Apps Script stores print HTML in Drive (gzip props fallback)');
 assert(aiGs.indexOf('getMenusState_') !== -1 && aiGs.indexOf("propRead_('MENUS')") !== -1,
   'Menu AI Apps Script stores live menus state in Script Properties');
 assert(aiGs.indexOf('drive.file') !== -1 || fs.readFileSync(path.join(root, 'apps-script/menu-ai/appsscript.json'), 'utf8').indexOf('drive.file') !== -1,
@@ -628,8 +629,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow176') !== -1, 'menus page cache-bust is flow176');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow176') !== -1, 'hub menus link cache-bust is flow176');
+assert(page.indexOf('flow177') !== -1, 'menus page cache-bust is flow177');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow177') !== -1, 'hub menus link cache-bust is flow177');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -704,8 +705,8 @@ assert(printJs.indexOf('function pullPrintHistoryFromCloud') !== -1 &&
 assert(page.indexOf('on this phone only') !== -1 &&
   page.indexOf('not shared yet') !== -1,
   'local-only print sheets are labelled, not mixed into the shared cloud list');
-assert(page.indexOf("source: 'cache'") !== -1 && page.indexOf('· cached') !== -1,
-  'local-first paint uses cache label, not phone-only, while cloud catches up');
+assert(page.indexOf("source: 'local'") !== -1 && page.indexOf("source === 'cloud'") !== -1,
+  'local-first paint keeps non-cloud rows local until list confirms shared');
 assert(page.indexOf('pullSharedCloud_') !== -1 &&
   page.indexOf('scheduleSharedCloudPull_') !== -1,
   'menus pulls shared cloud on open/return (debounced), not a live poll');
@@ -754,8 +755,21 @@ assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf(
 assert(ingestJs.indexOf('Never GET-by-id') !== -1 && ingestJs.indexOf("action === 'emailPrintHistory'") !== -1,
   'email POSTs sheet HTML — never GET-by-id');
 assert(ingestJs.indexOf("action === 'savePrintHistory'") !== -1 &&
-  ingestJs.indexOf('cloud_html_not_visible') !== -1,
-  'savePrintHistory verifies Drive HTML is readable after write');
+  ingestJs.indexOf('cloud_html_not_visible') !== -1 &&
+  ingestJs.indexOf('data.exists === true') !== -1,
+  'savePrintHistory verifies hasPrintHistory.exists (not list-only false positive)');
+assert(aiGs.indexOf('historyFilterListed_') !== -1 && aiGs.indexOf('historyDriveStatus_') !== -1,
+  'Apps Script filters zombie props rows and exposes driveStatus');
+assert(aiGs.indexOf("prefix === 'HISTIDX'") !== -1 &&
+  aiGs.indexOf('never free HTML blobs when writing HISTIDX') !== -1,
+  'HISTIDX write must not wipe print HTML blobs');
+assert(aiGs.indexOf('historyWriteHtmlPropsGzip_') !== -1 && aiGs.indexOf('props-gzip') !== -1,
+  'large sheets fall back to gzip Script Properties when Drive is unauth');
+assert(printJs.indexOf('Sunday\\s+Sun') !== -1 || printJs.indexOf('Sunday Sun') !== -1,
+  'printSheetLabel strips Sunday Sun duplicate week bits');
+assert(page.indexOf("source === 'cloud'") !== -1 &&
+  page.indexOf('AUTHORIZE_DRIVE_PRINT_HISTORY') !== -1,
+  'Print history shared list is cloud-only; pending explains Drive auth');
 assert(ingestJs.indexOf("action === 'pruneOrphanPrintHistory'") !== -1,
   'client can call pruneOrphanPrintHistory over GET');
 assert(page.indexOf('missing from the shared cloud') !== -1,
@@ -936,8 +950,9 @@ assert(page.indexOf('try one last tiny list GET') !== -1 &&
   page.indexOf("action: 'listPrintHistory'") !== -1,
   'Print history hangWatch last-chances a list GET before red banner');
 assert(aiGs.indexOf('Light GET: return the index fast') !== -1 &&
-  aiGs.indexOf('Orphan cleanup stays') !== -1,
-  'Apps Script listPrintHistory stays light (orphan prune on Sync)');
+  aiGs.indexOf('historyFilterListed_') !== -1 &&
+  aiGs.indexOf('pruneOrphanPrintHistory_') !== -1,
+  'Apps Script listPrintHistory stays light; full Drive orphan prune on Sync');
 assert(ingestJs.indexOf("url += '&_='") !== -1,
   'cloud GET adds cache-buster for WebView 302 caches');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
@@ -1549,6 +1564,10 @@ assert(print.printSheetLabel('Main menu', {
   week: 'Week of 21st September 2026',
   roman: 'LXIII'
 }) === 'Main menu Wk 21st Sep — LXIII', 'print sheet label includes menu, Wk date and version');
+assert(print.printSheetLabel('Sunday', {
+  week: 'Sunday Sun 4th Oct',
+  roman: 'I'
+}) === 'Sunday 4th Oct — I', 'Sunday label does not double Sunday/Sun');
 assert(print.printFileName('Main menu', {
   week: 'Week of 21st September 2026',
   roman: 'LXIII'

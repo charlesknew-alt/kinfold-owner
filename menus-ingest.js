@@ -294,23 +294,14 @@
         var id = body.entry && body.entry.id;
         if (!id) return { ok: true, via: 'no-cors' };
         function verifyHtml_(attempt) {
-          // Tiny hasPrintHistory — never pull full HTML through the iOS relay.
+          // Tiny hasPrintHistory — never pull full HTML; never trust list-only.
           return cloudGet('hasPrintHistory', { id: id }).then(function (data) {
-            if (data && data.exists) {
+            if (data && data.exists === true) {
               return { ok: true, via: 'form', id: id };
             }
-            if (!data || typeof data.exists !== 'boolean') {
-              return cloudGet('listPrintHistory').then(function (listData) {
-                var items = Array.isArray(listData && listData.items) ? listData.items : [];
-                if (items.some(function (r) { return r && r.id === id; })) {
-                  return { ok: true, via: 'form', id: id };
-                }
-                throw new Error('cloud_html_not_visible');
-              });
-            }
-            if (attempt < 3) {
+            if (attempt < 4) {
               return new Promise(function (resolve) {
-                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 700 * attempt);
+                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 500 * attempt);
               });
             }
             throw new Error('cloud_html_not_visible');
@@ -358,44 +349,25 @@
       });
     }
     // Print HTML — no-cors in browser (form POST navigates Menus to JSON).
+    // Verify ONLY via hasPrintHistory.exists — “id in list” was a false positive
+    // when Script Properties wiped HTML but left a zombie HISTIDX row.
     if (action === 'savePrintHistory') {
       if (!(body.entry && body.entry.html)) {
         return Promise.reject(new Error('missing_html'));
       }
       var histId = body.entry.id;
       return cloudWrite_(body).then(function () {
-        function verifyViaList_(attempt) {
-          return cloudGet('listPrintHistory').then(function (listData) {
-            var items = Array.isArray(listData && listData.items) ? listData.items : [];
-            if (items.some(function (r) { return r && r.id === histId; })) {
-              return { ok: true, via: 'no-cors', id: histId };
-            }
-            if (attempt < 5) {
-              return new Promise(function (resolve) {
-                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 500 * attempt);
-              });
-            }
-            throw new Error('cloud_html_not_visible');
-          });
-        }
         function verifyHtml_(attempt) {
-          // Tiny hasPrintHistory — never pull full HTML through the iOS relay.
           return cloudGet('hasPrintHistory', { id: histId }).then(function (data) {
-            if (data && data.exists) {
+            if (data && data.exists === true) {
               return { ok: true, via: 'no-cors', id: histId };
             }
-            // Older deploy (no exists field) — confirm via shared index instead.
-            if (!data || typeof data.exists !== 'boolean') {
-              return verifyViaList_(attempt);
-            }
-            if (attempt < 5) {
+            if (attempt < 6) {
               return new Promise(function (resolve) {
-                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 500 * attempt);
+                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 400 * attempt);
               });
             }
             throw new Error('cloud_html_not_visible');
-          }).catch(function () {
-            return verifyViaList_(attempt);
           });
         }
         return verifyHtml_(1);

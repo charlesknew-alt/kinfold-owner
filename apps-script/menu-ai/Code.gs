@@ -175,6 +175,7 @@ function doGet(e) {
   if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
   if (action === 'hasPrintHistory') return json_(hasPrintHistory_(p.id));
   if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
+  if (action === 'driveStatus') return json_(historyDriveStatus_());
   if (action === 'getMenusState') return json_(getMenusState_());
   // Email by id — HTML is in Drive / legacy props.
   if (action === 'emailPrintHistory') {
@@ -706,7 +707,8 @@ function freeHistoryHtmlBlobs_() {
   Object.keys(all).forEach(function (k) {
     if (k === 'HIST_FOLDER_ID') return;
     if (k.indexOf('HISTIDX') === 0 || k.indexOf('HISTDEL') === 0) return;
-    if (/^HIST_/i.test(k)) {
+    // Plain HIST_* and gzip HISTGZ_* blobs — never the index/tombstones.
+    if (/^HISTGZ_/i.test(k) || /^HIST_/i.test(k)) {
       try { props.deleteProperty(k); removed++; } catch (e) {}
     }
   });
@@ -729,7 +731,30 @@ function propWrite_(prefix, text) {
     props.setProperties(batch, false);
   } catch (err) {
     if (!isQuotaError_(err)) throw err;
-    // Drop HTML blobs only — keep HISTIDX / HISTDEL so devices still list sheets.
+    // CRITICAL: never free HTML blobs when writing HISTIDX / HISTDEL.
+    // That race created zombie Print history rows (id in list, HTML gone) —
+    // owner saw “shared” sheets manager could not open, and Save verify
+    // false-passed on list membership alone.
+    if (prefix === 'HISTIDX' || prefix === 'HISTDEL') {
+      if (prefix === 'HISTIDX') {
+        try {
+          var parsed = JSON.parse(text || '[]');
+          if (Array.isArray(parsed) && parsed.length > HISTORY_PROPS_HTML_MAX_) {
+            text = JSON.stringify(parsed.slice(0, HISTORY_PROPS_HTML_MAX_));
+            n = Math.ceil(text.length / PROP_CHUNK_) || 1;
+            propDeletePrefix_(props, prefix);
+            batch = {};
+            batch[prefix + '_n'] = String(n);
+            for (var j = 0; j < n; j++) {
+              batch[prefix + '_' + j] = text.substring(j * PROP_CHUNK_, (j + 1) * PROP_CHUNK_);
+            }
+          }
+        } catch (eTrim) {}
+      }
+      props.setProperties(batch, false);
+      return;
+    }
+    // HTML blob write — drop older blobs only, then retry this sheet.
     freeHistoryHtmlBlobs_();
     props.setProperties(batch, false);
   }
@@ -781,15 +806,74 @@ function historyHtmlFolder_() {
   var props = PropertiesService.getScriptProperties();
   var id = String(props.getProperty('HIST_FOLDER_ID') || '');
   if (id) {
-    try { return DriveApp.getFolderById(id); } catch (e) {}
+    try { return DriveApp.getFolderById(id); } catch (e) {
+      // Stale / trashed folder id — clear and recreate below.
+      try { props.deleteProperty('HIST_FOLDER_ID'); } catch (e0) {}
+    }
   }
   try {
+    var existing = DriveApp.getFoldersByName('Eight Bells Menu Print History');
+    if (existing.hasNext()) {
+      var found = existing.next();
+      try { props.setProperty('HIST_FOLDER_ID', found.getId()); } catch (e1) {}
+      return found;
+    }
     var folder = DriveApp.createFolder('Eight Bells Menu Print History');
     try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
     return folder;
   } catch (e3) {
     return null;
   }
+}
+
+/** Diagnose Drive for print HTML (curl ?action=driveStatus). */
+function historyDriveStatus_() {
+  var props = PropertiesService.getScriptProperties();
+  var storedId = String(props.getProperty('HIST_FOLDER_ID') || '');
+  var out = {
+    ok: true,
+    storedFolderId: storedId || '',
+    folderId: '',
+    folderName: '',
+    canWrite: false,
+    error: '',
+    createError: '',
+    getError: ''
+  };
+  if (storedId) {
+    try {
+      var byId = DriveApp.getFolderById(storedId);
+      out.folderId = byId.getId();
+      out.folderName = byId.getName();
+    } catch (eGet) {
+      out.getError = String(eGet && eGet.message ? eGet.message : eGet);
+    }
+  }
+  try {
+    var folder = historyHtmlFolder_();
+    if (!folder) {
+      out.ok = false;
+      // Probe the raw create error so we know if this is auth vs quota.
+      try {
+        DriveApp.createFolder('Eight Bells Menu Print History');
+      } catch (eCreate) {
+        out.createError = String(eCreate && eCreate.message ? eCreate.message : eCreate);
+      }
+      out.error = out.createError || out.getError ||
+        'DriveApp could not open or create the print-history folder — run AUTHORIZE_DRIVE_PRINT_HISTORY';
+      return out;
+    }
+    out.folderId = folder.getId();
+    out.folderName = folder.getName();
+    var probeName = '_varlo_drive_status_probe.txt';
+    var file = folder.createFile(probeName, 'ok ' + new Date().toISOString(), MimeType.PLAIN_TEXT);
+    out.canWrite = !!(file && file.getId());
+    try { file.setTrashed(true); } catch (e1) {}
+  } catch (err) {
+    out.ok = false;
+    out.error = String(err && err.message ? err.message : err);
+  }
+  return out;
 }
 
 function historyWriteHtmlDrive_(id, html) {
@@ -812,10 +896,37 @@ function historyWriteHtmlDrive_(id, html) {
 }
 
 /** Keep only the newest N Script-Properties HTML blobs (quota is ~500KB). */
-var HISTORY_PROPS_HTML_MAX_ = 3;
+var HISTORY_PROPS_HTML_MAX_ = 8;
+
+/** Gzip+base64 into Script Properties — fits real menu sheets when Drive auth is missing. */
+function historyWriteHtmlPropsGzip_(id, html) {
+  var safe = historySafeId_(id);
+  if (!safe) throw new Error('Bad history id');
+  var gz = Utilities.gzip(Utilities.newBlob(String(html || ''), 'text/html', safe + '.html'));
+  var b64 = Utilities.base64Encode(gz.getBytes());
+  propDelete_('HIST_' + safe);
+  propWrite_('HISTGZ_' + safe, b64);
+  if (!propRead_('HISTGZ_' + safe)) throw new Error('gzip props write not readable');
+  return b64.length;
+}
+
+function historyReadHtmlPropsGzip_(id) {
+  var safe = historySafeId_(id);
+  if (!safe) return '';
+  var b64 = '';
+  try { b64 = propRead_('HISTGZ_' + safe) || ''; } catch (e0) { b64 = ''; }
+  if (!b64) return '';
+  try {
+    var bytes = Utilities.base64Decode(b64);
+    var blob = Utilities.newBlob(bytes, 'application/x-gzip');
+    return Utilities.ungzip(blob).getDataAsString() || '';
+  } catch (e1) {
+    return '';
+  }
+}
 
 /**
- * True when this sheet’s HTML is fetchable (Drive preferred, then props).
+ * True when this sheet’s HTML is fetchable (Drive preferred, then gzip/props).
  * Index rows without HTML cause “not in the cloud yet” on phones/managers.
  */
 function historyHasHtml_(id) {
@@ -823,7 +934,7 @@ function historyHasHtml_(id) {
   if (!id) return false;
   // Props first — cheap; Drive next (can be slow / auth-flake on list).
   try {
-    if (propRead_('HIST_' + id)) return true;
+    if (propRead_('HISTGZ_' + id) || propRead_('HIST_' + id)) return true;
   } catch (e2) {}
   try {
     if (historyReadHtmlDrive_(id)) return true;
@@ -885,13 +996,13 @@ function historyPruneOrphanIndex_(list) {
   return { items: kept, dropped: dropped };
 }
 
-/** Ids that still have HIST_<id>_n HTML chunks in Script Properties. */
+/** Ids that still have HIST_/HISTGZ_ HTML chunks in Script Properties. */
 function historyDiscoverStoredIds_() {
   var props = PropertiesService.getScriptProperties();
   var all = props.getProperties() || {};
   var ids = {};
   Object.keys(all).forEach(function (k) {
-    var m = String(k).match(/^HIST_([a-zA-Z0-9_-]+)_n$/);
+    var m = String(k).match(/^HIST(?:GZ)?_([a-zA-Z0-9_-]+)_n$/);
     if (m && m[1]) ids[m[1]] = true;
   });
   // Also pick up HTML files already in the Drive print-history folder.
@@ -919,7 +1030,7 @@ function historyMetaFromHtmlTitle_(id, html) {
   if (rm) roman = rm[1];
   var menuId = 'main';
   var menuName = 'Menu';
-  if (/sunday/i.test(title)) {
+  if (/\bsunday\b/i.test(title)) {
     menuId = 'sunday';
     menuName = 'Sunday';
   } else if (/dessert/i.test(title)) {
@@ -931,12 +1042,24 @@ function historyMetaFromHtmlTitle_(id, html) {
   } else if (/special/i.test(title)) {
     menuId = 'specials';
     menuName = 'Specials';
+  } else if (/sandwich/i.test(title)) {
+    menuId = 'sandwiches';
+    menuName = 'Sandwiches';
   } else if (title) {
-    menuName = title.replace(/\s+—\s*[IVXLCDM]+\s*$/, '').replace(/\s+Wk\b.*$/i, '').trim() || menuName;
+    menuName = title.replace(/\s+—\s*[IVXLCDM]+\s*$/, '').replace(/\s+(?:Wk|Sun)\b.*$/i, '').trim() || menuName;
   }
+  // Prefer "Sunday 4th October" / "Week of …" — never "Sunday Sun 4th Oct"
+  // (that doubled into "Sunday Sunday Sun …" in the UI label).
   var week = '';
-  var wm = title.match(/\b((?:Sunday|Week of)\s+[^—]+)/i);
-  if (wm) week = wm[1].replace(/\s+/g, ' ').trim();
+  var wm = title.match(/\b(Week of\s+\d{1,2}(?:st|nd|rd|th)\s+[A-Za-z]+(?:\s+\d{4})?)/i);
+  if (wm) {
+    week = wm[1].replace(/\s+/g, ' ').trim();
+  } else {
+    var sm = title.match(/\bSun(?:day)?\s+(\d{1,2}(?:st|nd|rd|th))\s+([A-Za-z]+)(?:\s+(\d{4}))?/i);
+    if (sm) {
+      week = 'Sunday ' + sm[1] + ' ' + sm[2] + (sm[3] ? ' ' + sm[3] : '');
+    }
+  }
   return {
     id: id,
     menuId: menuId,
@@ -963,7 +1086,7 @@ function historyRebuildIndexIfEmpty_() {
   var rebuilt = [];
   historyDiscoverStoredIds_().forEach(function (id) {
     if (deleted[id]) return;
-    var html = propRead_('HIST_' + id) || historyReadHtmlDrive_(id);
+    var html = historyReadHtmlDrive_(id) || historyReadHtmlPropsGzip_(id) || propRead_('HIST_' + id);
     if (!html) return;
     rebuilt.push(historyMetaFromHtmlTitle_(id, html));
   });
@@ -1002,7 +1125,8 @@ function historyDeleteHtmlDrive_(id) {
 function historyDeleteHtml_(id) {
   var safe = historySafeId_(id);
   if (!safe) return;
-  // Clear legacy Script Properties chunks + Drive file.
+  // Clear gzip + legacy Script Properties chunks + Drive file.
+  propDelete_('HISTGZ_' + safe);
   propDelete_('HIST_' + safe);
   historyDeleteHtmlDrive_(safe);
 }
@@ -1088,6 +1212,9 @@ function rebuildPrintHistoryIndex_() {
     var html = '';
     try { html = historyReadHtmlDrive_(id) || ''; } catch (e1) { html = ''; }
     if (!html) {
+      try { html = historyReadHtmlPropsGzip_(id) || ''; } catch (eGz) { html = ''; }
+    }
+    if (!html) {
       try { html = propRead_('HIST_' + id) || ''; } catch (e2) { html = ''; }
     }
     if (!html) return;
@@ -1106,13 +1233,44 @@ function rebuildPrintHistoryIndex_() {
   };
 }
 
+/**
+ * When Drive is unavailable, only list rows that still have props HTML.
+ * Cheap (prop key read) — stops zombie “shared” rows with no downloadable sheet.
+ * When Drive works, trust the index (Sync / getPrintHistory prune orphans).
+ */
+function historyFilterListed_(list) {
+  var src = list || [];
+  var folder = null;
+  try { folder = historyHtmlFolder_(); } catch (e0) { folder = null; }
+  if (folder) return src;
+  var kept = [];
+  var dropped = 0;
+  src.forEach(function (row) {
+    if (!row || !row.id) return;
+    var safe = historySafeId_(row.id);
+    var has = false;
+    try {
+      has = !!(propRead_('HISTGZ_' + safe) || propRead_('HIST_' + safe));
+    } catch (e1) { has = false; }
+    if (has) {
+      kept.push(row);
+      return;
+    }
+    dropped += 1;
+  });
+  if (dropped > 0) {
+    try { historyWriteIndex_(kept); } catch (e2) {}
+  }
+  return kept;
+}
+
 function listPrintHistory_() {
   var list = historyRebuildIndexIfEmpty_();
   list = historyPrune_(list);
+  list = historyFilterListed_(list);
   try { historyWriteIndex_(list); } catch (e) {}
-  // Light GET: return the index fast. Drive existence checks for every row made
-  // listPrintHistory hang (phones hit the UI 12s timeout). Orphan cleanup stays
-  // on pruneOrphanPrintHistory_ / Sync now.
+  // Light GET: return the index fast. Full Drive-per-row checks stay on
+  // pruneOrphanPrintHistory_ / Sync now (those hung phones past 12s).
   return {
     ok: true,
     source: 'props',
@@ -1147,8 +1305,7 @@ function savePrintHistory_(raw) {
   meta.id = safe;
   // Explicit save from a device re-adds the sheet (clears a prior delete tombstone).
   historyUnmarkDeleted_(safe);
-  // Prefer Drive for HTML; fall back to Script Properties so phone can still
-  // download when Drive OAuth has not been granted yet.
+  // Prefer Drive for HTML; small props fallback only when Drive is unavailable.
   propDelete_('HIST_' + safe);
   var htmlText = String(raw.html);
   var source = '';
@@ -1161,12 +1318,31 @@ function savePrintHistory_(raw) {
     driveErr = String(e && e.message ? e.message : e);
   }
   if (!source) {
+    // Drive missing — store gzip’d HTML in Script Properties (menus compress well).
+    // Plain uncompressed props cannot hold real sheets and caused zombie index rows.
+    try {
+      historyWriteHtmlPropsGzip_(safe, htmlText);
+      if (historyReadHtmlPropsGzip_(safe)) source = 'props-gzip';
+    } catch (eGz) {
+      driveErr = (driveErr ? driveErr + '; ' : '') +
+        'gzip-props: ' + String(eGz && eGz.message ? eGz.message : eGz);
+      if (isQuotaError_(eGz) || /quota|exceeded/i.test(String(eGz))) {
+        try {
+          historyPrunePropsHtml_(historyReadIndex_());
+          historyWriteHtmlPropsGzip_(safe, htmlText);
+          if (historyReadHtmlPropsGzip_(safe)) source = 'props-gzip';
+        } catch (eGz2) {
+          driveErr += '; retry: ' + String(eGz2 && eGz2.message ? eGz2.message : eGz2);
+        }
+      }
+    }
+  }
+  if (!source && htmlText.length <= 28000) {
     try {
       propWrite_('HIST_' + safe, htmlText);
       if (propRead_('HIST_' + safe)) source = 'props';
     } catch (eProp) {
       if (isQuotaError_(eProp)) {
-        // Drop older prop HTML and retry once.
         historyPrunePropsHtml_(historyReadIndex_());
         try {
           propWrite_('HIST_' + safe, htmlText);
@@ -1186,23 +1362,40 @@ function savePrintHistory_(raw) {
   var list = historyReadIndex_().filter(function (r) { return r.id !== meta.id; });
   list.unshift(meta);
   list = historyPrune_(list);
-  if (source === 'props') historyPrunePropsHtml_(list);
+  if (source === 'props' || source === 'props-gzip') historyPrunePropsHtml_(list);
   try {
     historyWriteIndex_(list);
   } catch (e2) {
     if (isQuotaError_(e2)) {
-      freeHistoryHtmlBlobs_();
-      historyWriteIndex_(list.slice(0, Math.min(HISTORY_MAX_, HISTORY_PROPS_HTML_MAX_)));
+      // Do NOT freeHistoryHtmlBlobs_ here — that deleted the sheet we just saved.
+      try {
+        historyWriteIndex_(list.slice(0, Math.min(list.length, HISTORY_PROPS_HTML_MAX_)));
+      } catch (e3) {
+        return {
+          ok: false,
+          error: 'Could not update shared index (Script Properties full). Run AUTHORIZE_DRIVE_PRINT_HISTORY.'
+        };
+      }
     } else {
       throw e2;
     }
+  }
+  // Honesty check: HTML must still be fetchable after index write.
+  if (!historyHasHtml_(safe)) {
+    try {
+      historyWriteIndex_(historyReadIndex_().filter(function (r) { return r.id !== safe; }));
+    } catch (e4) {}
+    return {
+      ok: false,
+      error: 'Sheet HTML vanished after save (quota/Drive). Run AUTHORIZE_DRIVE_PRINT_HISTORY, then Save again.'
+    };
   }
   return {
     ok: true,
     source: source,
     entry: meta,
-    warning: source === 'props'
-      ? 'Stored in Script Properties (Drive not authorised yet — re-auth Apps Script for full archive)'
+    warning: (source === 'props' || source === 'props-gzip')
+      ? 'Stored in Script Properties (Drive not authorised yet — run AUTHORIZE_DRIVE_PRINT_HISTORY for full archive)'
       : ''
   };
 }
@@ -1228,8 +1421,8 @@ function getPrintHistory_(id) {
       break;
     }
   }
-  // Prefer Drive; fall back to legacy Script Properties chunks.
-  var html = historyReadHtmlDrive_(id) || propRead_('HIST_' + id);
+  // Prefer Drive; fall back to gzip props, then legacy plain props.
+  var html = historyReadHtmlDrive_(id) || historyReadHtmlPropsGzip_(id) || propRead_('HIST_' + id);
   if (!html) {
     // Index lied — drop the orphan so owner/manager lists stay honest.
     if (meta) {

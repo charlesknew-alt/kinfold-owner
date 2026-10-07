@@ -94,17 +94,28 @@
    */
   function printSheetLabel(menuName, ver) {
     var name = String(menuName || 'Menu').replace(/\s+/g, ' ').trim() || 'Menu';
+    // Avoid "Sunday Sunday …" when menuName already says Sunday.
+    name = name.replace(/^(Sunday)(?:\s+Sunday)+\b/i, '$1');
     ver = ver || {};
     var roman = String(ver.roman || '').trim();
     var weekBit = '';
     if (!ver.hideDate && ver.week) {
-      var m = String(ver.week).match(/^(Week of|Sunday)\s+(\d{1,2}(?:st|nd|rd|th))\s+([A-Za-z]+)/i);
+      var weekRaw = String(ver.week).replace(/\s+/g, ' ').trim();
+      var m = weekRaw.match(/^(Week of|Sunday)\s+(\d{1,2}(?:st|nd|rd|th))\s+([A-Za-z]+)/i);
       if (m) {
         var mon = m[3].slice(0, 3);
         weekBit = (/^sunday/i.test(m[1]) ? 'Sun ' : 'Wk ') + m[2] + ' ' + mon;
       } else {
-        weekBit = String(ver.week).replace(/^Week of\s+/i, 'Wk ');
+        // Rebuilt index sometimes stored "Sunday Sun 4th Oct" — strip the dupe.
+        weekBit = weekRaw
+          .replace(/^Week of\s+/i, 'Wk ')
+          .replace(/^Sunday\s+Sun\s+/i, 'Sun ')
+          .replace(/^Sunday\s+/i, 'Sun ');
       }
+    }
+    // If the menu is already named Sunday, don't prefix another Sunday/Sun token.
+    if (/^sunday\b/i.test(name) && /^sun(day)?\b/i.test(weekBit)) {
+      weekBit = weekBit.replace(/^sun(?:day)?\s+/i, '');
     }
     var parts = [name];
     if (weekBit) parts.push(weekBit);
@@ -5178,15 +5189,19 @@
     }
     var entry = normalizeHistoryEntry(incoming);
     if (!entry) return Promise.resolve(null);
+    // Local cache first (instant reopen), then shared cloud. UI only treats the
+    // row as shared after hasPrintHistory confirms HTML is fetchable.
     return localSaveOnly(entry).then(function (saved) {
       hydratePrintVersionsFromHistory((versionHistoryCache || []).concat([saved]));
       return uploadHistoryEntry_(saved).then(function (ok) {
         if (ok) {
           saved.cloudSynced = true;
+          saved.source = 'cloud';
           return saved;
         }
-        // Still local — keep auto-retrying until the shared cloud has it.
+        // Still local — background retry; never pretend it is on the shared list.
         saved.cloudSynced = false;
+        saved.source = 'local';
         schedulePendingPrintUploads();
         return saved;
       });
