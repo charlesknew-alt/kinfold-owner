@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow174') !== -1, 'menus page cache-bust is flow174');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow174') !== -1, 'hub menus link cache-bust is flow174');
+assert(page.indexOf('flow175') !== -1, 'menus page cache-bust is flow175');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow175') !== -1, 'hub menus link cache-bust is flow175');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2101,8 +2101,68 @@ assert(printJs.indexOf('usedTitles') !== -1 && printJs.indexOf('excludeTitles') 
   'feature panels track usedTitles so each event prints once per menu');
 assert(printJs.indexOf('filterUnusedPromos') !== -1,
   'page 2 skips promos already used on page 1');
+assert(printJs.indexOf('uniqueFeaturePanelsHtml') !== -1 &&
+  printJs.indexOf('featurePanelTitlesFromHtml') !== -1,
+  'printed sheets strip duplicate feature-panel titles/bodies');
 assert(aiGs.indexOf('ONLY ONCE') !== -1 || aiGs.indexOf('only once') !== -1,
   'Gemini layout review forbids reprinting the same feature panel');
+assert(page.indexOf('today and yesterday') !== -1 && page.indexOf('Show archive') !== -1,
+  'print history defaults to today + yesterday with a Show archive control');
+assert(printJs.indexOf('function splitHistoryWindow') !== -1 &&
+  printJs.indexOf('venueDayKeyFromMs') !== -1,
+  'history window uses venue-local today and yesterday');
+(function noDuplicateFeaturePanelsOnBuild() {
+  var dishes = [
+    api.dish('Starters', 'Whitebait', 'aioli', '7.95', ''),
+    api.dish('Special Starters', 'Ham Hock Pot', 'charmer cheese sourdough baguette', '8.95', 'gf'),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam baguette', '16.95', 'v'),
+    api.dish('Sharing Plates', 'Beef Chilli Nachos', 'sour cream guacamole', '15.95', 'gf'),
+    api.dish('Burgers', 'Brisket Burger', 'brioche bacon jam fries', '18.95', ''),
+    api.dish('Burgers', 'Sweet Potato & Halloumi Burger', 'chilli cheese fries', '16.95', 'v'),
+    api.dish('Burgers', 'Buttermilk Chicken Burger', 'slaw bacon buffalo', '18.95', '')
+  ];
+  var tips = { title: 'ALL TIPS GO TO STAFF WORKING TODAY!', body: 'thank you' };
+  var html = printApi.build(api.menuById('main'), dishes, {
+    sectionLayout: api.normalizeSectionLayout({
+      Starters: { width: 'full', frame: false },
+      'Special Starters': { width: 'column', frame: true },
+      'Sharing Plates': { width: 'column', frame: false },
+      Burgers: { width: 'column', frame: false }
+    }),
+    promos: [tips, tips]
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var titles = printApi.featurePanelTitlesFromHtml(a4).map(function (t) {
+    return t.toLowerCase();
+  });
+  var tipsHits = titles.filter(function (t) {
+    return t.indexOf('all tips go to staff') !== -1;
+  });
+  assert(tipsHits.length <= 1,
+    'ALL TIPS feature panel prints at most once per menu');
+  var seen = {};
+  var dup = titles.some(function (t) {
+    if (seen[t]) return true;
+    seen[t] = true;
+    return false;
+  });
+  assert(!dup, 'no duplicate feature-panel titles in a build');
+})();
+(function historyDefaultWindowTodayYesterday() {
+  var now = Date.parse('2026-10-07T12:00:00+01:00');
+  var split = printApi.splitHistoryWindow([
+    { id: 'today', generatedAt: now, dayKey: '2026-10-07' },
+    { id: 'yest', generatedAt: now - 24 * 60 * 60 * 1000, dayKey: '2026-10-06' },
+    { id: 'old', generatedAt: now - 3 * 24 * 60 * 60 * 1000, dayKey: '2026-10-04' }
+  ], now);
+  assert(split.recent.map(function (r) { return r.id; }).join(',') === 'today,yest',
+    'history default window is today and yesterday');
+  assert(split.archive.length === 1 && split.archive[0].id === 'old',
+    'older sheets stay in the archive split');
+  assert(printApi.isRecentHistoryRow({ generatedAt: now }, now) &&
+    !printApi.isRecentHistoryRow({ generatedAt: now - 5 * 24 * 60 * 60 * 1000 }, now),
+    'isRecentHistoryRow is true only for today/yesterday');
+})();
 assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFill') !== -1,
   'generate applies AI columnBalance as forceColumnFill');
 assert(page.indexOf('localColumnBalanceFallback') !== -1,
@@ -3177,6 +3237,64 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'Sides print in page 1 leftover (food first, then feature panels)');
   assert(!/Cheesy Garlic Bread/.test(page2Html),
     'Sides do not clip off the bottom of page 2');
+})();
+(function shortSpecialsNestsSidesNotDuplicatePanel() {
+  var dishes = [
+    api.dish('Nibbles', 'Olives', 'oil', '4.95', ''),
+    api.dish('Starters', 'Whitebait', 'aioli long starter description text', '7.95', ''),
+    api.dish('Starters', 'Buffalo Cauliflower', 'slaw bang bang long', '7.95', 'vg'),
+    api.dish('Starters', 'King Prawns', 'romesco rocket', '10.95', 'gf'),
+    api.dish('Starters', 'Charred Leeks', 'blue ranch hazelnuts', '8.50', 'gf, v'),
+    api.dish('Starters', 'Braised Lamb Neck', 'quinoa smoked tomatoes', '10.95', 'gf'),
+    api.dish('Item Boost', 'Pie of the day', 'mash vegetables gravy', '20.95', ''),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam', '16.95', 'v'),
+    api.dish('Sharing Plates', 'Beef Chilli Nachos', 'guacamole jalapenos', '15.95', 'gf'),
+    api.dish('Burgers', 'Brisket Burger', 'brioche fries onion rings', '18.95', ''),
+    api.dish('Burgers', 'Halloumi Burger', 'chilli cheese fries', '16.95', 'v'),
+    api.dish('Mains', 'Pie of the day', 'mash vegetables gravy', '20.95', ''),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'parmesan burrata basil', '20.95', 'df'),
+    api.dish('Mains', 'Fish & Chips', 'mushy peas tartare', '18.95', 'gf'),
+    api.dish('Mains', 'Osso Bucco', 'veal shank risotto', '23.95', 'gf'),
+    api.dish('Special Mains', 'Loaded Fries', 'pulled pork or beef brisket bbq cheese', '10.95', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Seasonal Veg', '', '5.50', 'v'),
+    api.dish('Sides', 'Garlic Bread', '', '4.95', 'v'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v'),
+    api.dish('Sandwiches', 'Beef, Chilli & Cheddar Quesadilla', 'wrap salad', '10.95', ''),
+    api.dish('Sandwiches', 'Falafel & Guacamole', 'mixed salad', '8.95', 'vg'),
+    api.dish('Sandwiches', 'Cajun Chicken Wrap', 'coleslaw salad', '10.95', ''),
+    api.dish('Sandwiches', 'Tuna & Red Onion Melt', '', '9.95', '')
+  ];
+  var layout = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: { width: 'column', frame: true }
+  });
+  var html = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    includes: { sandwiches: true },
+    promos: [
+      { title: 'ALL TIPS GO TO STAFF WORKING TODAY!', body: 'thank you' },
+      { title: 'Stay a While', body: 'rooms upstairs' },
+      { title: 'Gatherings', body: 'host your event' }
+    ]
+  });
+  var a4 = html.split('mode-panel mode-a5')[0] || html;
+  var specSand = (a4.match(/specials-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+  if (specSand) {
+    assert(/Loaded Fries/.test(specSand) && /Quesadilla|Falafel/.test(specSand),
+      'short Specials still sit beside Sandwiches');
+    var sidesInPair = /Cheesy Garlic Bread/.test(specSand);
+    var titles = print.featurePanelTitlesFromHtml(a4);
+    var tipsHits = titles.filter(function (t) {
+      return /all tips go to staff/i.test(t);
+    });
+    assert(tipsHits.length <= 1, 'filling the Specials hole does not reprint ALL TIPS');
+    assert(sidesInPair,
+      'Sides nest under short Specials beside Sandwiches instead of leaving a white void');
+  }
 })();
 (function specialsBestFitChoosesColumnBesideSandwiches() {
   var dishes = sidesSandDishes.concat([

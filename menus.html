@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261007-flow174"></script>
-  <script src="menus-print.js?v=20261007-flow174"></script>
-  <script src="menus-ingest.js?v=20261007-flow174"></script>
+  <script src="menus.js?v=20261007-flow175"></script>
+  <script src="menus-print.js?v=20261007-flow175"></script>
+  <script src="menus-ingest.js?v=20261007-flow175"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -466,6 +466,8 @@
     var viewMode = 'edit'; // edit | panels | catalogue | history
     var historyFilter = 'all';
     var historyCache = [];
+    var historyShowArchive = false;
+    var lastHistoryPaintOpts = { cloudOk: true, updating: false };
     var catalogueQuery = '';
     var catalogueSection = 'all';
     var catalogueAddMenuId = '';
@@ -978,6 +980,7 @@
       historyCache = Array.isArray(rows) ? rows : [];
       var cloudOk = opts.cloudOk !== false && !(rows && rows.cloudUnreachable);
       var updating = !!opts.updating;
+      lastHistoryPaintOpts = { cloudOk: cloudOk, updating: updating };
       var filtered = historyCache;
       if (historyFilter && historyFilter !== 'all') {
         filtered = historyCache.filter(function (r) { return r.menuId === historyFilter; });
@@ -987,11 +990,20 @@
       // While catching up, keep whatever is already known on screen.
       // When cloud is up, the shared list is cloud-only (pending shown separately).
       if (!updating && cloudOk) filtered = shared;
+      var win = (EBMenuPrint && EBMenuPrint.splitHistoryWindow)
+        ? EBMenuPrint.splitHistoryWindow(filtered)
+        : { recent: filtered, archive: [] };
+      var pendingWin = (EBMenuPrint && EBMenuPrint.splitHistoryWindow)
+        ? EBMenuPrint.splitHistoryWindow(pending)
+        : { recent: pending, archive: [] };
+      var archiveCount = (win.archive || []).length + (pendingWin.archive || []).length;
+      var display = historyShowArchive ? filtered : (win.recent || []);
+      var displayPending = historyShowArchive ? pending : (pendingWin.recent || []);
       var html = '';
       html += '<div class="include-box" style="margin-bottom:14px">';
       html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
       html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com on click; Reply-To kinfoldinns), or Download. ' +
-        'One shared cloud list for owner and manager on every phone and PC. Newest days first. Saves upload automatically; this list refreshes when you open it or return to the tab.</p>';
+        'One shared cloud list for owner and manager on every phone and PC. Default list is today and yesterday (venue date). Older sheets stay stored — open the archive when you want them. Saves upload automatically; this list refreshes when you open it or return to the tab.</p>';
       if (updating) {
         html += '<p class="note" style="margin:0 0 10px">Updating shared list…</p>';
       } else if (!cloudOk) {
@@ -1004,11 +1016,21 @@
         html += '<option value="' + escapeAttr(m.id) + '"' + (historyFilter === m.id ? ' selected' : '') + '>' +
           escapeAttr(m.name) + '</option>';
       });
-      html += '</select></div>';
-      if (!filtered.length && !pending.length) {
+      html += '</select>';
+      if (archiveCount) {
+        html += '<p class="note" style="margin:10px 0 0"><button type="button" class="soft" id="historyShowArchive">' +
+          (historyShowArchive ? 'Hide older sheets' : 'Show archive') +
+          '</button>' +
+          (historyShowArchive ? '' : ' — older sheets stay stored until you ask.') +
+          '</p>';
+      }
+      html += '</div>';
+      if (!display.length && !displayPending.length) {
         html += updating
           ? '<p class="note">Loading shared print history…</p>'
-          : '<p class="note">No saved sheets in the shared history yet. Generate a menu and click <strong>Save</strong> on the preview — it uploads to the shared list automatically.</p>';
+          : (archiveCount && !historyShowArchive
+            ? '<p class="note">No sheets from today or yesterday. Tap <strong>Show archive</strong> for older saves.</p>'
+            : '<p class="note">No saved sheets in the shared history yet. Generate a menu and click <strong>Save</strong> on the preview — it uploads to the shared list automatically.</p>');
         el.innerHTML = html;
         bindHistory();
         return;
@@ -1040,15 +1062,15 @@
           html += '</div>';
         });
       }
-      if (filtered.length) renderDayGroups_(filtered, false);
-      if (!updating && cloudOk && pending.length) {
+      if (display.length) renderDayGroups_(display, false);
+      if (!updating && cloudOk && displayPending.length) {
         html += '<p class="note" style="margin:16px 0 8px">Still uploading to the shared list (will retry automatically):</p>';
-        renderDayGroups_(pending, true);
+        renderDayGroups_(displayPending, true);
         if (EBMenuPrint && typeof EBMenuPrint.schedulePendingPrintUploads === 'function') {
           EBMenuPrint.schedulePendingPrintUploads();
         }
-      } else if (!updating && !cloudOk && pending.length) {
-        renderDayGroups_(pending, true);
+      } else if (!updating && !cloudOk && displayPending.length) {
+        renderDayGroups_(displayPending, true);
       }
       el.innerHTML = html;
       bindHistory();
@@ -1167,7 +1189,14 @@
       if (filt) {
         filt.onchange = function () {
           historyFilter = filt.value || 'all';
-          renderHistory();
+          paintHistoryRows_(historyCache, lastHistoryPaintOpts);
+        };
+      }
+      var arch = document.getElementById('historyShowArchive');
+      if (arch) {
+        arch.onclick = function () {
+          historyShowArchive = !historyShowArchive;
+          paintHistoryRows_(historyCache, lastHistoryPaintOpts);
         };
       }
       document.querySelectorAll('[data-history-open]').forEach(function (btn) {

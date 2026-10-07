@@ -462,7 +462,8 @@ function reviewLayoutWithGemini_(body) {
     '- A solo food column stays half-width; do not fill the empty half with Gatherings / Large Functions.\n' +
     '- Small leftover under a shorter FOOD stack: panels 1 only if it fits with a gap. panels 2 only for a huge leftover after food.\n' +
     '- panels:0 only when shorter is "even". Put panels ONLY under the shorter side.\n' +
-    '- Each event title only once per menu.\n' +
+    '- Each feature-panel title AND body only once per printed menu (both pages). Never reprint ALL TIPS / Stay a While / Gatherings to fill leftover — pick a different unused bank panel or leave empty.\n' +
+    '- Short Specials beside tall Sandwiches: nest unused Sides into that leftover when they share the page. Do not duplicate a panel to fill the hole. Do not mark fit=over to force a panel.\n' +
     'OTHER GOLDEN RULES:\n' +
     '1. COLUMNS start on the same top baseline and finish at the same bottom point. ' +
     'Category titles line up across columns: a frilly section (Desserts / Sandwiches) puts its title INSIDE the frame; the unframed neighbour (Little Bells / Sides) sits as pair-head on the same baseline. ' +
