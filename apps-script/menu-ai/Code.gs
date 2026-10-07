@@ -1060,6 +1060,10 @@ function historyMetaFromHtmlTitle_(id, html) {
       week = 'Sunday ' + sm[1] + ' ' + sm[2] + (sm[3] ? ' ' + sm[3] : '');
     }
   }
+  // Last resort when HISTIDX was wiped — no original Save stamp available.
+  // A later re-upload with the real (older) generatedAt wins via
+  // historyPreserveGeneratedAt_.
+  var stamp = Date.now();
   return {
     id: id,
     menuId: menuId,
@@ -1069,7 +1073,8 @@ function historyMetaFromHtmlTitle_(id, html) {
     week: week,
     weekKey: '',
     hideDate: false,
-    generatedAt: Date.now(),
+    generatedAt: stamp,
+    createdAt: stamp,
     dayKey: ''
   };
 }
@@ -1144,6 +1149,9 @@ function historyPrune_(list) {
 }
 
 function historyMetaOnly_(entry) {
+  entry = entry || {};
+  var generatedAt = Number(entry.generatedAt || entry.createdAt || 0) || Date.now();
+  var createdAt = Number(entry.createdAt || entry.generatedAt || 0) || generatedAt;
   return {
     id: String(entry.id || ''),
     menuId: String(entry.menuId || 'main'),
@@ -1153,9 +1161,33 @@ function historyMetaOnly_(entry) {
     week: String(entry.week || ''),
     weekKey: String(entry.weekKey || ''),
     hideDate: !!entry.hideDate,
-    generatedAt: entry.generatedAt || Date.now(),
+    generatedAt: generatedAt,
+    createdAt: createdAt,
     dayKey: String(entry.dayKey || '')
   };
+}
+
+/**
+ * Print history timestamp = original Save only.
+ * Retries / re-uploads / index rebuilds must never replace an older
+ * generatedAt with a newer "now" from the client.
+ */
+function historyPreserveGeneratedAt_(existing, incoming) {
+  var meta = historyMetaOnly_(incoming || {});
+  if (!existing) {
+    meta.createdAt = Number((incoming && incoming.createdAt) || meta.generatedAt);
+    return meta;
+  }
+  var oldTs = Number(existing.generatedAt || existing.createdAt || 0) || 0;
+  var newTs = Number(meta.generatedAt || 0) || 0;
+  if (oldTs && (!newTs || newTs > oldTs)) {
+    meta.generatedAt = oldTs;
+    if (existing.dayKey) meta.dayKey = existing.dayKey;
+  } else if (!meta.generatedAt && oldTs) {
+    meta.generatedAt = oldTs;
+  }
+  meta.createdAt = Number(existing.createdAt || oldTs || meta.generatedAt);
+  return meta;
 }
 
 function historyReadDeleted_() {
@@ -1313,6 +1345,17 @@ function savePrintHistory_(raw) {
   var safe = historySafeId_(meta.id);
   if (!safe) return { ok: false, error: 'Bad history id' };
   meta.id = safe;
+  // Keep the original Save time when re-pushing HTML/index for the same id.
+  var existing = null;
+  var priorList = historyReadIndex_();
+  for (var pi = 0; pi < priorList.length; pi++) {
+    if (priorList[pi] && priorList[pi].id === safe) {
+      existing = priorList[pi];
+      break;
+    }
+  }
+  meta = historyPreserveGeneratedAt_(existing, meta);
+  meta.id = safe;
   // Explicit save from a device re-adds the sheet (clears a prior delete tombstone).
   historyUnmarkDeleted_(safe);
   // Prefer Drive for HTML; small props fallback only when Drive is unavailable.
@@ -1452,6 +1495,7 @@ function getPrintHistory_(id) {
     weekKey: '',
     hideDate: false,
     generatedAt: Date.now(),
+    createdAt: Date.now(),
     dayKey: ''
   };
   entry.html = html;

@@ -629,8 +629,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow177') !== -1, 'menus page cache-bust is flow177');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow177') !== -1, 'hub menus link cache-bust is flow177');
+assert(page.indexOf('flow178') !== -1, 'menus page cache-bust is flow178');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow178') !== -1, 'hub menus link cache-bust is flow178');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2205,6 +2205,38 @@ assert(printJs.indexOf('function splitHistoryWindow') !== -1 &&
   ]);
   assert(sorted.map(function (r) { return r.id; }).join(',') === 'c,a,b',
     'history sort is generatedAt desc then id asc (stable, not random)');
+})();
+(function historyPreserveGeneratedAtOnRetry() {
+  assert(typeof printApi.preserveHistoryGeneratedAt === 'function',
+    'preserveHistoryGeneratedAt exported for Save-time freeze');
+  var original = 1791377925346; // Main VI original Save
+  var retryNow = original + 60 * 60 * 1000;
+  var kept = printApi.preserveHistoryGeneratedAt(
+    { id: 'pmainvi', generatedAt: original, createdAt: original, dayKey: '2026-10-07' },
+    { id: 'pmainvi', generatedAt: retryNow, createdAt: retryNow, dayKey: '2026-10-07', html: '<html></html>' }
+  );
+  assert(kept.generatedAt === original,
+    'retry with newer generatedAt keeps the original Save time');
+  assert(kept.createdAt === original,
+    'createdAt stays at original Save on retry');
+  var cloudNewer = printApi.preserveHistoryGeneratedAt(
+    { id: 'x', generatedAt: original },
+    { id: 'x', generatedAt: retryNow, source: 'cloud' }
+  );
+  assert(cloudNewer.generatedAt === original,
+    'cloud merge does not replace older generatedAt with retry time');
+  var first = printApi.preserveHistoryGeneratedAt(
+    null,
+    { id: 'new', generatedAt: original }
+  );
+  assert(first.generatedAt === original && first.createdAt === original,
+    'first Save keeps the stamped generatedAt/createdAt');
+  assert(printJs.indexOf('preserveHistoryGeneratedAt') !== -1 &&
+    printJs.indexOf('moment of original Save only') !== -1,
+    'client documents original-Save timestamp freeze');
+  assert(aiGs.indexOf('historyPreserveGeneratedAt_') !== -1 &&
+    aiGs.indexOf('Keep the original Save time when re-pushing') !== -1,
+    'Apps Script preserves generatedAt on savePrintHistory retry');
 })();
 assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFill') !== -1,
   'generate applies AI columnBalance as forceColumnFill');

@@ -4558,41 +4558,73 @@
   }
 
   function localSaveOnly(entry) {
+    if (!entry) return Promise.resolve(null);
+    // Freeze original Save time when re-writing the same id (retry / migrate).
+    function withFrozen_(prior) {
+      var next = prior ? preserveHistoryGeneratedAt(prior, entry) : Object.assign({}, entry);
+      if (!next.createdAt) next.createdAt = next.generatedAt;
+      return next;
+    }
+    function putFrozen_(frozen) {
+      if (!idbAvailable()) {
+        lsSavePrint(frozen);
+        return Promise.resolve(frozen);
+      }
+      return openHistoryDb().then(function (db) {
+        return new Promise(function (resolve) {
+          var tx = db.transaction(HISTORY_STORE, 'readwrite');
+          var store = tx.objectStore(HISTORY_STORE);
+          store.put(frozen);
+          tx.oncomplete = function () {
+            var tx2 = db.transaction(HISTORY_STORE, 'readwrite');
+            var st2 = tx2.objectStore(HISTORY_STORE);
+            var all = [];
+            st2.openCursor(null, 'prev').onsuccess = function (ev) {
+              var cursor = ev.target.result;
+              if (!cursor) {
+                if (all.length > HISTORY_MAX) {
+                  all.slice(HISTORY_MAX).forEach(function (row) { st2.delete(row.id); });
+                }
+                return;
+              }
+              all.push(cursor.value);
+              cursor.continue();
+            };
+            tx2.oncomplete = function () { resolve(frozen); };
+            tx2.onerror = function () { resolve(frozen); };
+          };
+          tx.onerror = function () {
+            try { lsSavePrint(frozen); } catch (e) {}
+            resolve(frozen);
+          };
+        });
+      }).catch(function () {
+        lsSavePrint(frozen);
+        return frozen;
+      });
+    }
     if (!idbAvailable()) {
-      lsSavePrint(entry);
-      return Promise.resolve(entry);
+      return putFrozen_(withFrozen_(lsGetPrint(entry.id)));
     }
     return openHistoryDb().then(function (db) {
-      return new Promise(function (resolve, reject) {
-        var tx = db.transaction(HISTORY_STORE, 'readwrite');
-        var store = tx.objectStore(HISTORY_STORE);
-        store.put(entry);
-        tx.oncomplete = function () {
-          var tx2 = db.transaction(HISTORY_STORE, 'readwrite');
-          var st2 = tx2.objectStore(HISTORY_STORE);
-          var all = [];
-          st2.openCursor(null, 'prev').onsuccess = function (ev) {
-            var cursor = ev.target.result;
-            if (!cursor) {
-              if (all.length > HISTORY_MAX) {
-                all.slice(HISTORY_MAX).forEach(function (row) { st2.delete(row.id); });
-              }
-              return;
-            }
-            all.push(cursor.value);
-            cursor.continue();
-          };
-          tx2.oncomplete = function () { resolve(entry); };
-          tx2.onerror = function () { resolve(entry); };
+      return new Promise(function (resolve) {
+        var tx0 = db.transaction(HISTORY_STORE, 'readonly');
+        var getReq = tx0.objectStore(HISTORY_STORE).get(entry.id);
+        getReq.onsuccess = function () {
+          putFrozen_(withFrozen_(getReq.result || lsGetPrint(entry.id))).then(resolve, function () {
+            resolve(withFrozen_(lsGetPrint(entry.id)));
+          });
         };
-        tx.onerror = function () {
-          try { lsSavePrint(entry); } catch (e) {}
-          reject(tx.error || new Error('idb_put'));
+        getReq.onerror = function () {
+          putFrozen_(withFrozen_(lsGetPrint(entry.id))).then(resolve, function () {
+            resolve(withFrozen_(lsGetPrint(entry.id)));
+          });
         };
       });
     }).catch(function () {
-      lsSavePrint(entry);
-      return entry;
+      var frozen = withFrozen_(lsGetPrint(entry.id));
+      lsSavePrint(frozen);
+      return frozen;
     });
   }
 
@@ -4701,11 +4733,16 @@
 
   function uploadHistoryEntry_(full) {
     if (!full || !full.html || !full.id) return Promise.resolve(false);
+    // Always send the frozen original Save time — never stamp Date.now() here.
+    var payload = Object.assign({}, full, {
+      generatedAt: full.generatedAt,
+      createdAt: full.createdAt || full.generatedAt
+    });
     // Retry — no-cors writes can race Drive visibility on first verify.
     function attempt_(n) {
       return historyCloudPost({
         action: 'savePrintHistory',
-        entry: full
+        entry: payload
       }).then(function () { return true; }).catch(function () {
         if (n >= 5) return false;
         return new Promise(function (resolve) {
@@ -5023,6 +5060,28 @@
     return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
   }
 
+  /**
+   * Print history timestamp = moment of original Save only.
+   * Retries, re-uploads, Soft refresh, list pull, and migrate must never
+   * advance generatedAt/createdAt to "now". Prefer the older stamp.
+   */
+  function preserveHistoryGeneratedAt(existing, incoming) {
+    var out = incoming ? Object.assign({}, incoming) : {};
+    var oldTs = Number((existing && (existing.generatedAt || existing.createdAt)) || 0) || 0;
+    var newTs = Number(out.generatedAt || out.createdAt || 0) || 0;
+    var created = Number((existing && existing.createdAt) || 0) || 0;
+    if (oldTs && newTs) {
+      out.generatedAt = Math.min(oldTs, newTs);
+    } else {
+      out.generatedAt = oldTs || newTs || Date.now();
+    }
+    out.createdAt = created || oldTs || out.generatedAt;
+    if (existing && existing.dayKey && Number(out.generatedAt) === oldTs) {
+      out.dayKey = existing.dayKey;
+    }
+    return out;
+  }
+
   /** Newest first; id tie-break so a single refresh never reshuffles equals. */
   function sortHistoryNewest(list) {
     return (list || []).slice().sort(function (a, b) {
@@ -5090,18 +5149,25 @@
   }
 
   function lsSavePrint(entry) {
+    var prior = null;
+    try {
+      lsLoadIndex().forEach(function (r) { if (r && r.id === entry.id) prior = r; });
+    } catch (ePrior) {}
+    var frozen = prior ? preserveHistoryGeneratedAt(prior, entry) : entry;
     var meta = {
-      id: entry.id,
-      menuId: entry.menuId,
-      menuName: entry.menuName,
-      roman: entry.roman,
-      n: entry.n,
-      week: entry.week,
-      weekKey: entry.weekKey,
-      hideDate: !!entry.hideDate,
-      generatedAt: entry.generatedAt,
-      dayKey: entry.dayKey || venueDayKeyFromMs(entry.generatedAt)
+      id: frozen.id,
+      menuId: frozen.menuId,
+      menuName: frozen.menuName,
+      roman: frozen.roman,
+      n: frozen.n,
+      week: frozen.week,
+      weekKey: frozen.weekKey,
+      hideDate: !!frozen.hideDate,
+      generatedAt: frozen.generatedAt,
+      createdAt: frozen.createdAt || frozen.generatedAt,
+      dayKey: frozen.dayKey || venueDayKeyFromMs(frozen.generatedAt)
     };
+    entry = frozen;
     try {
       localStorage.setItem(HISTORY_LS_HTML + entry.id, entry.html || '');
     } catch (e) {
@@ -5159,7 +5225,9 @@
 
   function normalizeHistoryEntry(raw) {
     if (!raw || !raw.html) return null;
-    var generatedAt = raw.generatedAt || Date.now();
+    // First Save stamps now; retries must pass the original generatedAt through.
+    var generatedAt = Number(raw.generatedAt || raw.createdAt || 0) || Date.now();
+    var createdAt = Number(raw.createdAt || raw.generatedAt || 0) || generatedAt;
     return {
       id: raw.id || ('p' + generatedAt.toString(36)),
       menuId: String(raw.menuId || 'main'),
@@ -5170,6 +5238,7 @@
       weekKey: String(raw.weekKey || ''),
       hideDate: !!raw.hideDate,
       generatedAt: generatedAt,
+      createdAt: createdAt,
       dayKey: raw.dayKey || venueDayKeyFromMs(generatedAt),
       html: String(raw.html)
     };
@@ -5179,6 +5248,7 @@
    * Persist a generated sheet in shared cloud history (Drive via Menu AI Apps Script)
    * and cache a copy on this device for offline reopen.
    * Cloud write is required for manager/owner phones — retry until HTML is readable.
+   * generatedAt is set only on first Save into history — never on retry/re-upload.
    */
   function savePrintHistory(raw) {
     var incoming = raw || lastBuildMeta;
@@ -5191,6 +5261,7 @@
     if (!entry) return Promise.resolve(null);
     // Local cache first (instant reopen), then shared cloud. UI only treats the
     // row as shared after hasPrintHistory confirms HTML is fetchable.
+    // localSaveOnly freezes generatedAt if this id was already Saved.
     return localSaveOnly(entry).then(function (saved) {
       hydratePrintVersionsFromHistory((versionHistoryCache || []).concat([saved]));
       return uploadHistoryEntry_(saved).then(function (ok) {
@@ -5220,6 +5291,7 @@
         weekKey: r.weekKey,
         hideDate: r.hideDate,
         generatedAt: r.generatedAt,
+        createdAt: r.createdAt || r.generatedAt,
         dayKey: r.dayKey,
         source: source
       };
@@ -5250,8 +5322,14 @@
           if (r && r.id) byId[r.id] = asRow(r, 'cloud');
         });
         // Local-only leftovers — mark pending, never as cloud; upload async.
+        // Same id on both: keep the older generatedAt (original Save), still cloud.
         (localItems || []).forEach(function (r) {
-          if (!r || !r.id || deleted[r.id] || byId[r.id]) return;
+          if (!r || !r.id || deleted[r.id]) return;
+          if (byId[r.id]) {
+            var merged = preserveHistoryGeneratedAt(r, byId[r.id]);
+            byId[r.id] = asRow(merged, 'cloud');
+            return;
+          }
           pendingLocal = true;
           byId[r.id] = asRow(r, 'local');
         });
@@ -5760,6 +5838,7 @@
     deletePrintHistory: deletePrintHistory,
     groupHistoryByDay: groupHistoryByDay,
     sortHistoryNewest: sortHistoryNewest,
+    preserveHistoryGeneratedAt: preserveHistoryGeneratedAt,
     dayLabelFromMs: dayLabelFromMs,
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
