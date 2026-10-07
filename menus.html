@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261006-flow172"></script>
-  <script src="menus-print.js?v=20261006-flow172"></script>
-  <script src="menus-ingest.js?v=20261006-flow172"></script>
+  <script src="menus.js?v=20261007-flow173"></script>
+  <script src="menus-print.js?v=20261007-flow173"></script>
+  <script src="menus-ingest.js?v=20261007-flow173"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -991,11 +991,11 @@
       html += '<div class="include-box" style="margin-bottom:14px">';
       html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:20px;margin:0 0 8px">Print history</h3>';
       html += '<p class="note" style="margin:0 0 10px">Saved sheets only — Print PDF, Email (attaches a printable PDF to pub@eightbellsbolney.com on click; Reply-To kinfoldinns), or Download. ' +
-        'One shared cloud list for owner and manager on every phone and PC. Newest days first. Tap <strong>Sync now</strong> after Save if another device is still catching up.</p>';
+        'One shared cloud list for owner and manager on every phone and PC. Newest days first. Saves upload automatically; this list refreshes when you open it or return to the tab.</p>';
       if (updating) {
         html += '<p class="note" style="margin:0 0 10px">Updating shared list…</p>';
       } else if (!cloudOk) {
-        html += '<p class="note" style="margin:0 0 10px;color:#8a2b2b">Could not reach the shared cloud list on this load — drafts below are only on this phone. Tap <strong>Sync now</strong>, then open Print history again.</p>';
+        html += '<p class="note" style="margin:0 0 10px;color:#8a2b2b">Could not reach the shared cloud list on this load — drafts below are only on this phone. It will retry automatically; or tap <strong>Sync now</strong>.</p>';
       }
       html += '<label class="field" style="margin-top:0">Show</label>';
       html += '<select id="historyFilter">';
@@ -1008,7 +1008,7 @@
       if (!filtered.length && !pending.length) {
         html += updating
           ? '<p class="note">Loading shared print history…</p>'
-          : '<p class="note">No saved sheets in the shared history yet. Tap <strong>Sync now</strong> (pulls from the cloud), or generate a menu and click <strong>Save</strong> on the preview.</p>';
+          : '<p class="note">No saved sheets in the shared history yet. Generate a menu and click <strong>Save</strong> on the preview — it uploads to the shared list automatically.</p>';
         el.innerHTML = html;
         bindHistory();
         return;
@@ -1028,7 +1028,8 @@
             html += '<div class="history-row" data-history-id="' + escapeAttr(row.id) + '">';
             html += '<div><div class="who">' + escapeAttr(sheetName) + '</div>';
             html += '<div class="meta">generated ' + escapeAttr(when) +
-              (row.source === 'local' ? ' · on this phone only' : '') + '</div></div>';
+              (row.source === 'local' ? ' · on this phone only' : '') +
+              (row.source === 'cache' ? ' · cached' : '') + '</div></div>';
             html += '<div class="actions">';
             html += '<button type="button" class="go" data-history-open="' + escapeAttr(row.id) + '">Print PDF</button>';
             html += '<button type="button" class="soft" data-history-email="' + escapeAttr(row.id) + '">Email</button>';
@@ -1041,8 +1042,11 @@
       }
       if (filtered.length) renderDayGroups_(filtered, false);
       if (!updating && cloudOk && pending.length) {
-        html += '<p class="note" style="margin:16px 0 8px">Still on this phone (upload did not finish) — tap <strong>Sync now</strong>:</p>';
+        html += '<p class="note" style="margin:16px 0 8px">Still uploading to the shared list (will retry automatically):</p>';
         renderDayGroups_(pending, true);
+        if (EBMenuPrint && typeof EBMenuPrint.schedulePendingPrintUploads === 'function') {
+          EBMenuPrint.schedulePendingPrintUploads();
+        }
       } else if (!updating && !cloudOk && pending.length) {
         renderDayGroups_(pending, true);
       }
@@ -1052,11 +1056,17 @@
 
     function renderHistory() {
       var el = document.getElementById('editor');
-      // Keep any list already on screen while the shared cloud list catches up
-      // (iOS may not finish the iframe Apps Script read until the next tap).
+      var settled = false;
+      // Keep any list already on screen while the shared cloud list catches up.
+      // Mark as cache (not “on this phone only”) until we know an upload failed.
       function showLocalFirst_() {
         if (historyCache && historyCache.length) {
-          paintHistoryRows_(historyCache, { cloudOk: true, updating: true });
+          var cached = historyCache.map(function (r) {
+            return Object.assign({}, r, {
+              source: r.source === 'local' ? 'local' : (r.source || 'cache')
+            });
+          });
+          paintHistoryRows_(cached, { cloudOk: true, updating: true });
           return Promise.resolve();
         }
         if (EBMenuPrint && typeof EBMenuPrint.listLocalPrintHistory === 'function') {
@@ -1073,10 +1083,10 @@
                 hideDate: r.hideDate,
                 generatedAt: r.generatedAt,
                 dayKey: r.dayKey,
-                source: 'local'
+                source: 'cache'
               };
             });
-            if (rows.length) paintHistoryRows_(rows, { cloudOk: false, updating: true });
+            if (rows.length) paintHistoryRows_(rows, { cloudOk: true, updating: true });
             else if (el) el.innerHTML = '<p class="note">Loading shared print history…</p>';
           }).catch(function () {
             if (el) el.innerHTML = '<p class="note">Loading shared print history…</p>';
@@ -1085,23 +1095,41 @@
         if (el) el.innerHTML = '<p class="note">Loading shared print history…</p>';
         return Promise.resolve();
       }
-      // Always Sync first — upload phone drafts, then pull the one cloud list
-      // so owner and manager never show different “top of list” days.
-      var load = (EBMenuPrint.syncPrintHistoryToCloud
-        ? EBMenuPrint.syncPrintHistoryToCloud()
-        : EBMenuPrint.listPrintHistory().then(function (rows) { return { rows: rows }; }));
-      showLocalFirst_().then(function () {
-        return load;
-      }).then(function (res) {
+      function finish_(res) {
+        if (settled) return;
+        settled = true;
         var rows = (res && res.rows) || [];
         var cloudOk = !(res && res.cloudUnreachable) && !(rows && rows.cloudUnreachable);
         paintHistoryRows_(rows, { cloudOk: cloudOk, updating: false });
-      }).catch(function () {
+      }
+      // Light pull (cloud list + upload pending) — not the heavy Sync repair path.
+      var load = (EBMenuPrint.pullPrintHistoryFromCloud
+        ? EBMenuPrint.pullPrintHistoryFromCloud()
+        : (EBMenuPrint.syncPrintHistoryToCloud
+          ? EBMenuPrint.syncPrintHistoryToCloud()
+          : EBMenuPrint.listPrintHistory().then(function (rows) { return { rows: rows }; })));
+      // Never leave “Updating shared list…” on screen forever (iOS iframe hangs).
+      var hangWatch = setTimeout(function () {
+        if (settled) return;
         if (historyCache && historyCache.length) {
-          paintHistoryRows_(historyCache, { cloudOk: false, updating: false });
+          finish_({ rows: historyCache, cloudUnreachable: true });
+        } else {
+          finish_({ rows: [], cloudUnreachable: true });
+        }
+      }, 12000);
+      showLocalFirst_().then(function () {
+        return load;
+      }).then(function (res) {
+        clearTimeout(hangWatch);
+        finish_(res);
+      }).catch(function () {
+        clearTimeout(hangWatch);
+        if (historyCache && historyCache.length) {
+          finish_({ rows: historyCache, cloudUnreachable: true });
           return;
         }
-        if (el) el.innerHTML = '<p class="note">Could not load print history on this device. Tap <strong>Sync now</strong> and try again.</p>';
+        settled = true;
+        if (el) el.innerHTML = '<p class="note">Could not load print history on this device. It will retry when you return to this tab, or tap <strong>Sync now</strong>.</p>';
       });
     }
 
@@ -4565,18 +4593,36 @@
       // inside the Menus iframe until the next tap) — never blank the editor.
       cloudSyncNote = 'Syncing shared menus…';
       render();
-      pullMenusFromCloud().then(function () {
-        if (EBMenuPrint && typeof EBMenuPrint.listPrintHistory === 'function') {
-          return EBMenuPrint.listPrintHistory().catch(function () {});
-        }
-      }).then(function () { render(); }, function () { render(); });
-      // When switching back to this tab/app, reload shared state.
+      function pullSharedCloud_() {
+        return pullMenusFromCloud().then(function () {
+          if (EBMenuPrint && typeof EBMenuPrint.pullPrintHistoryFromCloud === 'function') {
+            return EBMenuPrint.pullPrintHistoryFromCloud().then(function (hist) {
+              if (viewMode === 'history' && hist && hist.rows) {
+                paintHistoryRows_(hist.rows, {
+                  cloudOk: !hist.cloudUnreachable,
+                  updating: false
+                });
+              }
+              return hist;
+            }).catch(function () {});
+          }
+          if (EBMenuPrint && typeof EBMenuPrint.listPrintHistory === 'function') {
+            return EBMenuPrint.listPrintHistory().catch(function () {});
+          }
+        });
+      }
+      pullSharedCloud_().then(function () { render(); }, function () { render(); });
+      // Auto-pull so owner sees pub Saves (and vice versa) without Sync now.
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') pullMenusFromCloud();
+        if (document.visibilityState === 'visible') pullSharedCloud_();
       });
       window.addEventListener('focus', function () {
-        pullMenusFromCloud();
+        pullSharedCloud_();
       });
+      setInterval(function () {
+        if (document.visibilityState && document.visibilityState !== 'visible') return;
+        pullSharedCloud_();
+      }, 45000);
     } catch (bootErr) {
       var ed = document.getElementById('editor');
       if (ed) {

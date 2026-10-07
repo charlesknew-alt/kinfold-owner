@@ -518,11 +518,21 @@
           var cloudId = e.data.id;
           var cloudSource = e.source;
           try { cloudSource.postMessage({ type: 'eb-cloud-get-result', id: cloudId, phase: 'start' }, '*'); } catch (err0) {}
-          fetch(cloudUrl, { method: 'GET', credentials: 'omit' }).then(function (res) {
+          var cloudCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          var cloudTimer = setTimeout(function () {
+            try { if (cloudCtrl) cloudCtrl.abort(); } catch (errAbort) {}
+          }, 16000);
+          fetch(cloudUrl, {
+            method: 'GET',
+            credentials: 'omit',
+            signal: cloudCtrl ? cloudCtrl.signal : undefined
+          }).then(function (res) {
             return res.text();
           }).then(function (text) {
+            clearTimeout(cloudTimer);
             cloudSource.postMessage({ type: 'eb-cloud-get-result', id: cloudId, text: text }, '*');
           }, function (err) {
+            clearTimeout(cloudTimer);
             cloudSource.postMessage({ type: 'eb-cloud-get-result', id: cloudId, error: String(err && err.message || err) }, '*');
           });
         }

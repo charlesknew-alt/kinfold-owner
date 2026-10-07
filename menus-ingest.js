@@ -68,7 +68,7 @@
         settled = true;
         cleanup_();
         reject(new Error('parent_cloud_timeout'));
-      }, 25000);
+      }, 18000);
       function cleanup_() {
         clearTimeout(fallbackTimer);
         clearTimeout(hardTimer);
@@ -105,14 +105,7 @@
     });
   }
 
-  /** Fast GET path — works with Apps Script CORS. Retry once (Script can 302/flake). */
-  function cloudGet(action, params) {
-    var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
-    if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
-    if (params && params.to) url += '&to=' + encodeURIComponent(params.to);
-    if (!url || typeof fetch !== 'function') {
-      return Promise.reject(new Error('no_cloud'));
-    }
+  function cloudGetDirect_(url) {
     function attempt_(n) {
       return fetch(url, { method: 'GET', credentials: 'omit' }).then(function (res) {
         return res.text().then(parseCloudJson_);
@@ -123,13 +116,42 @@
         });
       });
     }
-    // Framed on iPhone: prefer outer-page relay; fall back to direct fetch.
+    return attempt_(1);
+  }
+
+  /** Fast GET path — works with Apps Script CORS. Retry once (Script can 302/flake). */
+  function cloudGet(action, params) {
+    var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
+    if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
+    if (params && params.to) url += '&to=' + encodeURIComponent(params.to);
+    if (!url || typeof fetch !== 'function') {
+      return Promise.reject(new Error('no_cloud'));
+    }
+    // Framed on iPhone: race outer-page relay with direct fetch. Whichever
+    // finishes first wins — relay usually wins on iOS; direct wins on desktop
+    // iframes when the outer page is slow or missing the handler.
     if (inIframe_()) {
-      return cloudGetViaParent_(url).catch(function () {
-        return attempt_(1);
+      return new Promise(function (resolve, reject) {
+        var settled = false;
+        var lastErr = null;
+        var pending = 2;
+        function win_(data) {
+          if (settled) return;
+          settled = true;
+          resolve(data);
+        }
+        function lose_(err) {
+          lastErr = err || lastErr;
+          pending -= 1;
+          if (!settled && pending <= 0) {
+            reject(lastErr || new Error('cloud_get_fail'));
+          }
+        }
+        cloudGetViaParent_(url).then(win_, lose_);
+        cloudGetDirect_(url).then(win_, lose_);
       });
     }
-    return attempt_(1);
+    return cloudGetDirect_(url);
   }
 
   /**
@@ -270,9 +292,19 @@
         var id = body.entry && body.entry.id;
         if (!id) return { ok: true, via: 'no-cors' };
         function verifyHtml_(attempt) {
-          return cloudGet('getPrintHistory', { id: id }).then(function (data) {
-            if (data && data.entry && data.entry.html) {
+          // Tiny hasPrintHistory — never pull full HTML through the iOS relay.
+          return cloudGet('hasPrintHistory', { id: id }).then(function (data) {
+            if (data && data.exists) {
               return { ok: true, via: 'form', id: id };
+            }
+            if (!data || typeof data.exists !== 'boolean') {
+              return cloudGet('listPrintHistory').then(function (listData) {
+                var items = Array.isArray(listData && listData.items) ? listData.items : [];
+                if (items.some(function (r) { return r && r.id === id; })) {
+                  return { ok: true, via: 'form', id: id };
+                }
+                throw new Error('cloud_html_not_visible');
+              });
             }
             if (attempt < 3) {
               return new Promise(function (resolve) {
@@ -307,6 +339,9 @@
     if (action === 'pruneOrphanPrintHistory') {
       return cloudGet(action, body);
     }
+    if (action === 'hasPrintHistory') {
+      return cloudGet(action, body);
+    }
     if (action === 'getPrintHistory' || action === 'deletePrintHistory') {
       return cloudGet(action, body);
     }
@@ -327,17 +362,38 @@
       }
       var histId = body.entry.id;
       return cloudWrite_(body).then(function () {
-        function verifyHtml_(attempt) {
-          return cloudGet('getPrintHistory', { id: histId }).then(function (data) {
-            if (data && data.entry && data.entry.html) {
+        function verifyViaList_(attempt) {
+          return cloudGet('listPrintHistory').then(function (listData) {
+            var items = Array.isArray(listData && listData.items) ? listData.items : [];
+            if (items.some(function (r) { return r && r.id === histId; })) {
               return { ok: true, via: 'no-cors', id: histId };
             }
-            if (attempt < 4) {
+            if (attempt < 5) {
               return new Promise(function (resolve) {
-                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 600 * attempt);
+                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 500 * attempt);
               });
             }
             throw new Error('cloud_html_not_visible');
+          });
+        }
+        function verifyHtml_(attempt) {
+          // Tiny hasPrintHistory — never pull full HTML through the iOS relay.
+          return cloudGet('hasPrintHistory', { id: histId }).then(function (data) {
+            if (data && data.exists) {
+              return { ok: true, via: 'no-cors', id: histId };
+            }
+            // Older deploy (no exists field) — confirm via shared index instead.
+            if (!data || typeof data.exists !== 'boolean') {
+              return verifyViaList_(attempt);
+            }
+            if (attempt < 5) {
+              return new Promise(function (resolve) {
+                setTimeout(function () { resolve(verifyHtml_(attempt + 1)); }, 500 * attempt);
+              });
+            }
+            throw new Error('cloud_html_not_visible');
+          }).catch(function () {
+            return verifyViaList_(attempt);
           });
         }
         return verifyHtml_(1);

@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow172') !== -1, 'menus page cache-bust is flow172');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow172') !== -1, 'hub menus link cache-bust is flow172');
+assert(page.indexOf('flow173') !== -1, 'menus page cache-bust is flow173');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow173') !== -1, 'hub menus link cache-bust is flow173');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -695,11 +695,26 @@ assert(printJs.indexOf('rows.cloudOk = true') !== -1 &&
   printJs.indexOf('cloudUnreachable') !== -1,
   'print history marks cloud ok vs unreachable so phone drafts are not the shared list');
 assert(page.indexOf('Loading shared print history') !== -1 &&
-  page.indexOf('syncPrintHistoryToCloud') !== -1,
-  'Print history always Syncs before listing so owner and manager match');
+  page.indexOf('pullPrintHistoryFromCloud') !== -1,
+  'Print history uses light cloud pull so owner and manager match without heavy Sync');
+assert(printJs.indexOf('function pullPrintHistoryFromCloud') !== -1 &&
+  printJs.indexOf('pullPrintHistoryFromCloud: pullPrintHistoryFromCloud') !== -1,
+  'print module exposes pullPrintHistoryFromCloud for auto-sync');
 assert(page.indexOf('on this phone only') !== -1 &&
   page.indexOf('not shared yet') !== -1,
   'local-only print sheets are labelled, not mixed into the shared cloud list');
+assert(page.indexOf("source: 'cache'") !== -1 && page.indexOf('· cached') !== -1,
+  'local-first paint uses cache label, not phone-only, while cloud catches up');
+assert(page.indexOf('pullSharedCloud_') !== -1 && page.indexOf("setInterval(function ()") !== -1,
+  'menus auto-pull shared cloud on an interval');
+assert(page.indexOf("document.visibilityState === 'visible'") !== -1 &&
+  page.indexOf('pullSharedCloud_') !== -1,
+  'menus auto-pull on tab visibility');
+assert(ingestJs.indexOf("action === 'hasPrintHistory'") !== -1 &&
+  aiGs.indexOf('hasPrintHistory_') !== -1,
+  'Save verify uses tiny hasPrintHistory instead of full HTML GET');
+assert(ingestJs.indexOf('cloudGetDirect_') !== -1 && ingestJs.indexOf('race outer-page relay') !== -1,
+  'framed cloud GET races parent relay with direct fetch');
 assert(ingestJs.indexOf('Retry once') !== -1 || ingestJs.indexOf('attempt_(n + 1)') !== -1,
   'cloud GET retries once so listPrintHistory is less flaky');
 assert(/HISTORY_MAX_\s*=\s*60/.test(aiGs),

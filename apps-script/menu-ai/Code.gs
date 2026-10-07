@@ -126,6 +126,9 @@ function doPost(e) {
     if (action === 'getPrintHistory') {
       return json_(getPrintHistory_(body.id || (body.entry && body.entry.id)));
     }
+    if (action === 'hasPrintHistory') {
+      return json_(hasPrintHistory_(body.id || (body.entry && body.entry.id)));
+    }
     if (action === 'deletePrintHistory') {
       return json_(deletePrintHistory_(body.id));
     }
@@ -170,6 +173,7 @@ function doGet(e) {
   if (action === 'listPrintHistory') return json_(listPrintHistory_());
   if (action === 'pruneOrphanPrintHistory') return json_(pruneOrphanPrintHistory_());
   if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
+  if (action === 'hasPrintHistory') return json_(hasPrintHistory_(p.id));
   if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
   if (action === 'getMenusState') return json_(getMenusState_());
   // Email by id — HTML is in Drive / legacy props.
@@ -187,7 +191,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
+    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, hasPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
     mailQuota: (function () {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
@@ -205,6 +209,7 @@ function bridgeApi(action, body) {
     if (action === 'pruneOrphanPrintHistory') return pruneOrphanPrintHistory_();
     if (action === 'savePrintHistory') return savePrintHistory_(body.entry || body);
     if (action === 'getPrintHistory') return getPrintHistory_(body.id || (body.entry && body.entry.id));
+    if (action === 'hasPrintHistory') return hasPrintHistory_(body.id || (body.entry && body.entry.id));
     if (action === 'deletePrintHistory') return deletePrintHistory_(body.id);
     if (action === 'emailPrintHistory') return emailPrintHistory_(body);
     if (action === 'getMenusState') return getMenusState_();
@@ -1198,6 +1203,16 @@ function savePrintHistory_(raw) {
       ? 'Stored in Script Properties (Drive not authorised yet — re-auth Apps Script for full archive)'
       : ''
   };
+}
+
+/**
+ * Tiny existence check for Save verify — avoids shipping full sheet HTML through
+ * the iOS iframe → outer-page postMessage relay (that path hung Print history).
+ */
+function hasPrintHistory_(id) {
+  id = historySafeId_(id);
+  if (!id) return { ok: false, error: 'Missing id' };
+  return { ok: true, exists: historyHasHtml_(id), id: id };
 }
 
 function getPrintHistory_(id) {
