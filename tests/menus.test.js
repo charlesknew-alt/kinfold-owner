@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow173') !== -1, 'menus page cache-bust is flow173');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow173') !== -1, 'hub menus link cache-bust is flow173');
+assert(page.indexOf('flow174') !== -1, 'menus page cache-bust is flow174');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow174') !== -1, 'hub menus link cache-bust is flow174');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -685,8 +685,9 @@ assert(printJs.indexOf('pruneOrphanCloudIndex') !== -1 &&
   aiGs.indexOf('pruneOrphanPrintHistory_') !== -1,
   'Sync/list drop cloud index rows whose HTML is gone (owner=manager shared list)');
 assert(aiGs.indexOf('historyHasHtml_') !== -1 &&
-  aiGs.indexOf('Never advertise sheets') !== -1,
-  'listPrintHistory only returns sheets with fetchable HTML');
+  aiGs.indexOf('Light GET: return the index fast') !== -1 &&
+  aiGs.indexOf('pruneOrphanPrintHistory_') !== -1,
+  'listPrintHistory is a light index GET; orphan HTML prune stays on Sync');
 assert(printJs.indexOf('fetchCloudPrintHistory_') !== -1,
   'Print PDF retries cloud HTML fetch before giving up');
 assert(page.indexOf('One shared cloud list for owner and manager') !== -1,
@@ -911,9 +912,20 @@ assert(printJs.indexOf('listLocalPrintHistory: localListOnly') !== -1 ||
   'print module exposes local history for immediate paint');
 assert(aiGs.indexOf('cloudBridgeHtml_') !== -1 && aiGs.indexOf('bridgeApi') !== -1,
   'Menu AI still exposes bridgeApi for diagnostics');
-assert(printJs.indexOf('Upload any phone-only sheets first') !== -1 &&
-  printJs.indexOf('migrateLocalToCloud(known, deleted)') !== -1,
-  'print history awaits upload then re-pulls cloud so owner and manager match');
+assert(printJs.indexOf('never block shared-list paint on uploads') !== -1 &&
+  printJs.indexOf('schedulePendingPrintUploads') !== -1 &&
+  printJs.indexOf('flushPendingPrintUploads_') !== -1,
+  'print history paints cloud list immediately; uploads run in background');
+assert(printJs.indexOf('blew past the Print history 12s hangWatch') !== -1,
+  'listPrintHistory documents why migrate must not block paint');
+assert(page.indexOf('try one last tiny list GET') !== -1 &&
+  page.indexOf("action: 'listPrintHistory'") !== -1,
+  'Print history hangWatch last-chances a list GET before red banner');
+assert(aiGs.indexOf('Light GET: return the index fast') !== -1 &&
+  aiGs.indexOf('Orphan cleanup stays') !== -1,
+  'Apps Script listPrintHistory stays light (orphan prune on Sync)');
+assert(ingestJs.indexOf("url += '&_='") !== -1,
+  'cloud GET adds cache-buster for WebView 302 caches');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 || printJs.indexOf('emailPrintHistory') !== -1,
   'Email sends via Apps Script MailApp (no mailto popup)');
 assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEmail') !== -1,

@@ -820,12 +820,13 @@ var HISTORY_PROPS_HTML_MAX_ = 3;
 function historyHasHtml_(id) {
   id = historySafeId_(id);
   if (!id) return false;
-  try {
-    if (historyReadHtmlDrive_(id)) return true;
-  } catch (e1) {}
+  // Props first — cheap; Drive next (can be slow / auth-flake on list).
   try {
     if (propRead_('HIST_' + id)) return true;
   } catch (e2) {}
+  try {
+    if (historyReadHtmlDrive_(id)) return true;
+  } catch (e1) {}
   return false;
 }
 
@@ -1107,16 +1108,16 @@ function rebuildPrintHistoryIndex_() {
 function listPrintHistory_() {
   var list = historyRebuildIndexIfEmpty_();
   list = historyPrune_(list);
-  // Never advertise sheets the phone/manager cannot download.
-  var pruned = historyPruneOrphanIndex_(list);
-  list = pruned.items || [];
   try { historyWriteIndex_(list); } catch (e) {}
+  // Light GET: return the index fast. Drive existence checks for every row made
+  // listPrintHistory hang (phones hit the UI 12s timeout). Orphan cleanup stays
+  // on pruneOrphanPrintHistory_ / Sync now.
   return {
     ok: true,
     source: 'props',
     items: list,
     deletedIds: historyReadDeleted_(),
-    orphansDropped: pruned.dropped || 0
+    orphansDropped: 0
   };
 }
 

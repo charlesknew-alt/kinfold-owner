@@ -4510,13 +4510,48 @@
   }
 
   var pendingUploadTimer_ = null;
+  var pendingUploadBusy_ = false;
+
+  /**
+   * Upload phone-only sheets using a fresh cloud index. Does not re-enter
+   * listPrintHistory (that used to block paint past the 12s hangWatch).
+   */
+  function flushPendingPrintUploads_() {
+    if (pendingUploadBusy_) return Promise.resolve({ uploaded: 0, attempted: 0 });
+    pendingUploadBusy_ = true;
+    return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
+      var known = {};
+      var deleted = {};
+      (Array.isArray(data.items) ? data.items : []).forEach(function (r) {
+        if (r && r.id) known[r.id] = true;
+      });
+      (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
+        if (id) deleted[String(id)] = true;
+      });
+      return purgeLocalDeleted(deleted).then(function () {
+        return migrateLocalToCloud(known, deleted);
+      });
+    }).then(function (stats) {
+      pendingUploadBusy_ = false;
+      return stats || { uploaded: 0, attempted: 0 };
+    }, function (err) {
+      pendingUploadBusy_ = false;
+      throw err;
+    });
+  }
+
   /** Keep retrying phone-only sheets until they land in the shared cloud. */
   function schedulePendingPrintUploads() {
-    if (pendingUploadTimer_) return;
+    if (pendingUploadTimer_ || pendingUploadBusy_) return;
     pendingUploadTimer_ = setTimeout(function () {
       pendingUploadTimer_ = null;
-      pullPrintHistoryFromCloud().catch(function () {});
-    }, 8000);
+      flushPendingPrintUploads_().then(function (stats) {
+        // Still have leftovers — try again later.
+        if (stats && stats.attempted > stats.uploaded) schedulePendingPrintUploads();
+      }).catch(function () {
+        schedulePendingPrintUploads();
+      });
+    }, 2500);
   }
 
   /**
@@ -4619,8 +4654,9 @@
   }
 
   /**
-   * Everyday pull: cloud index is source of truth, upload any phone-only
-   * leftovers, drop tombstoned ids. No per-row HTML repair (that hung iOS).
+   * Everyday pull: cloud index is source of truth. Paint that list immediately;
+   * phone-only leftovers upload in the background (never block past hangWatch).
+   * No per-row HTML repair here (that hung iOS — Sync now still repairs).
    */
   function pullPrintHistoryFromCloud() {
     return listPrintHistory().then(function (rows) {
@@ -4926,9 +4962,11 @@
       };
     }
     /**
-     * Shared list = cloud rows with fetchable HTML.
-     * Upload any phone-only sheets first, then re-pull so owner and manager
-     * see the same days (never a silent local-only list that looks “shared”).
+     * Shared list = cloud index (GET listPrintHistory).
+     * Must return as soon as that GET succeeds — awaiting migrateLocalToCloud
+     * (up to 40 uploads × verify) blew past the Print history 12s hangWatch and
+     * showed “Could not reach the shared cloud list” even when Apps Script was up.
+     * Phone-only leftovers upload in the background via schedulePendingPrintUploads.
      */
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
       var cloudItems = Array.isArray(data.items) ? data.items : [];
@@ -4938,38 +4976,27 @@
       (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
         if (id) deleted[String(id)] = true;
       });
+      // Background only — never block shared-list paint on uploads.
+      var pendingLocal = false;
       return purgeLocalDeleted(deleted).then(function () {
-        return migrateLocalToCloud(known, deleted);
-      }).then(function (stats) {
-        if (!(stats && stats.uploaded > 0)) return cloudItems;
-        // Re-pull after upload so the other device’s Sync sees the same index.
-        return historyCloudPost({ action: 'listPrintHistory' }).then(function (data2) {
-          cloudItems = Array.isArray(data2.items) ? data2.items : cloudItems;
-          deleted = {};
-          (Array.isArray(data2.deletedIds) ? data2.deletedIds : []).forEach(function (id) {
-            if (id) deleted[String(id)] = true;
-          });
-          return cloudItems;
-        }).catch(function () {
-          return cloudItems;
+        return localListOnly();
+      }).then(function (localItems) {
+        var byId = {};
+        // Cloud first — this is the shared owner/manager list.
+        (cloudItems || []).forEach(function (r) {
+          if (r && r.id) byId[r.id] = asRow(r, 'cloud');
         });
-      }).then(function (items) {
-        return localListOnly().then(function (localItems) {
-          var byId = {};
-          // Cloud first — this is the shared owner/manager list.
-          (items || []).forEach(function (r) {
-            if (r && r.id) byId[r.id] = asRow(r, 'cloud');
-          });
-          // Local-only leftovers (upload failed) — mark pending, never as cloud.
-          (localItems || []).forEach(function (r) {
-            if (!r || !r.id || deleted[r.id] || byId[r.id]) return;
-            byId[r.id] = asRow(r, 'local');
-          });
-          var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
-          rows.cloudOk = true;
-          hydratePrintVersionsFromHistory(rows);
-          return rows;
+        // Local-only leftovers — mark pending, never as cloud; upload async.
+        (localItems || []).forEach(function (r) {
+          if (!r || !r.id || deleted[r.id] || byId[r.id]) return;
+          pendingLocal = true;
+          byId[r.id] = asRow(r, 'local');
         });
+        if (pendingLocal) schedulePendingPrintUploads();
+        var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
+        rows.cloudOk = true;
+        hydratePrintVersionsFromHistory(rows);
+        return rows;
       });
     }).catch(function () {
       // Do not pretend phone drafts are the shared cloud list.

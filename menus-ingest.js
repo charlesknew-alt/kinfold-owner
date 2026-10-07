@@ -124,12 +124,14 @@
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
     if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
     if (params && params.to) url += '&to=' + encodeURIComponent(params.to);
+    // Bust intermediaries; Apps Script already no-stores, but some WebViews cache 302.
+    url += '&_=' + Date.now().toString(36);
     if (!url || typeof fetch !== 'function') {
       return Promise.reject(new Error('no_cloud'));
     }
-    // Framed on iPhone: race outer-page relay with direct fetch. Whichever
-    // finishes first wins — relay usually wins on iOS; direct wins on desktop
-    // iframes when the outer page is slow or missing the handler.
+    // Always race outer-page relay when framed (desktop side-by-side AND iOS).
+    // Relay usually wins on iOS (iframe fetch stays pending until tap); direct
+    // wins on desktop when the outer page is slow or missing the handler.
     if (inIframe_()) {
       return new Promise(function (resolve, reject) {
         var settled = false;

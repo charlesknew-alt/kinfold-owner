@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261007-flow173"></script>
-  <script src="menus-print.js?v=20261007-flow173"></script>
-  <script src="menus-ingest.js?v=20261007-flow173"></script>
+  <script src="menus.js?v=20261007-flow174"></script>
+  <script src="menus-print.js?v=20261007-flow174"></script>
+  <script src="menus-ingest.js?v=20261007-flow174"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1102,20 +1102,49 @@
         var cloudOk = !(res && res.cloudUnreachable) && !(rows && rows.cloudUnreachable);
         paintHistoryRows_(rows, { cloudOk: cloudOk, updating: false });
       }
-      // Light pull (cloud list + upload pending) — not the heavy Sync repair path.
+      // Light pull (cloud list only; pending uploads are background) — not heavy Sync.
       var load = (EBMenuPrint.pullPrintHistoryFromCloud
         ? EBMenuPrint.pullPrintHistoryFromCloud()
         : (EBMenuPrint.syncPrintHistoryToCloud
           ? EBMenuPrint.syncPrintHistoryToCloud()
           : EBMenuPrint.listPrintHistory().then(function (rows) { return { rows: rows }; })));
-      // Never leave “Updating shared list…” on screen forever (iOS iframe hangs).
+      // Never leave “Updating shared list…” forever. Before declaring unreachable,
+      // try one last tiny list GET — flow173 falsely red-bannered when migrate hung.
       var hangWatch = setTimeout(function () {
         if (settled) return;
-        if (historyCache && historyCache.length) {
-          finish_({ rows: historyCache, cloudUnreachable: true });
-        } else {
-          finish_({ rows: [], cloudUnreachable: true });
+        function failLocal_() {
+          if (settled) return;
+          if (historyCache && historyCache.length) {
+            finish_({ rows: historyCache, cloudUnreachable: true });
+          } else {
+            finish_({ rows: [], cloudUnreachable: true });
+          }
         }
+        var ingest = window.EBMenuIngest;
+        if (ingest && typeof ingest.cloudPost === 'function') {
+          ingest.cloudPost({ action: 'listPrintHistory' }).then(function (data) {
+            if (settled) return;
+            var items = Array.isArray(data && data.items) ? data.items : [];
+            var rows = items.map(function (r) {
+              return {
+                id: r.id,
+                menuId: r.menuId,
+                menuName: r.menuName,
+                roman: r.roman,
+                n: r.n,
+                week: r.week,
+                weekKey: r.weekKey,
+                hideDate: r.hideDate,
+                generatedAt: r.generatedAt,
+                dayKey: r.dayKey,
+                source: 'cloud'
+              };
+            });
+            finish_({ rows: rows, cloudUnreachable: false });
+          }, failLocal_);
+          return;
+        }
+        failLocal_();
       }, 12000);
       showLocalFirst_().then(function () {
         return load;
