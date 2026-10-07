@@ -1021,6 +1021,109 @@ function historyDiscoverStoredIds_() {
   return Object.keys(ids);
 }
 
+/**
+ * Recover original Save time from history id (`p` + Date.now().toString(36)).
+ * Never invent "now" — that is what stamped every row 14:19 after HISTIDX wipe.
+ */
+function historyStampFromId_(id) {
+  var s = String(id || '');
+  var m = s.match(/^p([0-9a-z]+)/i);
+  if (!m) return 0;
+  var body = m[1];
+  // Date.now().toString(36) is ~8 chars in 2024–2030; id may append a random tail.
+  for (var len = Math.min(body.length, 11); len >= 7; len--) {
+    var n = parseInt(body.slice(0, len), 36);
+    if (isFinite(n) && n > 1.4e12 && n < 2.2e12) return n;
+  }
+  return 0;
+}
+
+/** Prefer <meta name="eb-generated-at"> (or SAVE_META.generatedAt) baked into HTML. */
+function historyStampFromHtml_(html) {
+  var s = String(html || '');
+  var m = s.match(/name=["']eb-generated-at["'][^>]*content=["'](\d{13})["']/i) ||
+    s.match(/content=["'](\d{13})["'][^>]*name=["']eb-generated-at["']/i) ||
+    s.match(/data-eb-generated-at=["'](\d{13})["']/i);
+  if (m) {
+    var n = Number(m[1]);
+    if (n > 1.4e12 && n < 2.2e12) return n;
+  }
+  var sm = s.match(/SAVE_META\s*=\s*(\{[\s\S]*?\});/);
+  if (sm) {
+    try {
+      var obj = JSON.parse(sm[1]);
+      var g = Number(obj && (obj.generatedAt || obj.createdAt) || 0);
+      if (g > 1.4e12 && g < 2.2e12) return g;
+    } catch (e) {}
+  }
+  return 0;
+}
+
+function historyStampFromDriveFile_(id) {
+  try {
+    var safe = historySafeId_(id);
+    if (!safe) return 0;
+    var folder = historyHtmlFolder_();
+    if (!folder) return 0;
+    var files = folder.getFilesByName(safe + '.html');
+    if (!files.hasNext()) return 0;
+    var created = files.next().getDateCreated();
+    if (created) return created.getTime();
+  } catch (e) {}
+  return 0;
+}
+
+/** Best original Save stamp for a stored sheet — never Date.now(). */
+function historyRecoverStamp_(id, html) {
+  return historyStampFromHtml_(html) ||
+    historyStampFromId_(id) ||
+    historyStampFromDriveFile_(id) ||
+    0;
+}
+
+/**
+ * When HISTIDX was rebuilt with Date.now(), many rows share one minute.
+ * Re-derive each stamp from HTML / id / Drive created time (min with existing).
+ */
+function historyRepairBulkNowStamps_(list) {
+  var src = list || [];
+  if (src.length < 3) return src;
+  var byMinute = {};
+  src.forEach(function (r) {
+    var ts = Number(r && (r.generatedAt || r.createdAt) || 0) || 0;
+    if (!ts) return;
+    var key = String(Math.floor(ts / 60000));
+    byMinute[key] = (byMinute[key] || 0) + 1;
+  });
+  var polluted = null;
+  Object.keys(byMinute).forEach(function (k) {
+    if (byMinute[k] >= 3) polluted = Number(k);
+  });
+  if (polluted == null) return src;
+  var changed = false;
+  var out = src.map(function (r) {
+    if (!r || !r.id) return r;
+    var ts = Number(r.generatedAt || r.createdAt || 0) || 0;
+    if (!ts || Math.floor(ts / 60000) !== polluted) return r;
+    var html = '';
+    try {
+      html = historyReadHtmlDrive_(r.id) || historyReadHtmlPropsGzip_(r.id) || propRead_('HIST_' + r.id) || '';
+    } catch (e) { html = ''; }
+    var recovered = historyRecoverStamp_(r.id, html);
+    if (!recovered || recovered >= ts) return r;
+    changed = true;
+    var created = Number(r.createdAt || 0) || 0;
+    return Object.assign({}, r, {
+      generatedAt: recovered,
+      createdAt: created && created < recovered ? created : recovered
+    });
+  });
+  if (changed) {
+    try { historyWriteIndex_(out); } catch (e2) {}
+  }
+  return out;
+}
+
 function historyMetaFromHtmlTitle_(id, html) {
   var title = '';
   var m = String(html || '').match(/<title>([^<]*)<\/title>/i);
@@ -1060,10 +1163,9 @@ function historyMetaFromHtmlTitle_(id, html) {
       week = 'Sunday ' + sm[1] + ' ' + sm[2] + (sm[3] ? ' ' + sm[3] : '');
     }
   }
-  // Last resort when HISTIDX was wiped — no original Save stamp available.
-  // A later re-upload with the real (older) generatedAt wins via
-  // historyPreserveGeneratedAt_.
-  var stamp = Date.now();
+  // Never Date.now() on rebuild — that rewrote every stamp to 14:19 (flow178 hole).
+  var stamp = historyRecoverStamp_(id, html);
+  if (!stamp) stamp = 1; // sort-stable placeholder; client repair / next save can improve
   return {
     id: id,
     menuId: menuId,
@@ -1170,7 +1272,8 @@ function historyMetaOnly_(entry) {
 /**
  * Print history timestamp = original Save only.
  * Retries / re-uploads / index rebuilds must never replace an older
- * generatedAt with a newer "now" from the client.
+ * generatedAt with a newer "now". Always keep min(existing, incoming).
+ * Brand-new id (no existing row) keeps the incoming stamp as-is.
  */
 function historyPreserveGeneratedAt_(existing, incoming) {
   var meta = historyMetaOnly_(incoming || {});
@@ -1179,14 +1282,22 @@ function historyPreserveGeneratedAt_(existing, incoming) {
     return meta;
   }
   var oldTs = Number(existing.generatedAt || existing.createdAt || 0) || 0;
-  var newTs = Number(meta.generatedAt || 0) || 0;
-  if (oldTs && (!newTs || newTs > oldTs)) {
-    meta.generatedAt = oldTs;
-    if (existing.dayKey) meta.dayKey = existing.dayKey;
-  } else if (!meta.generatedAt && oldTs) {
-    meta.generatedAt = oldTs;
+  var newTs = Number(meta.generatedAt || meta.createdAt || 0) || 0;
+  if (oldTs && newTs) {
+    meta.generatedAt = Math.min(oldTs, newTs);
+  } else {
+    meta.generatedAt = oldTs || newTs || meta.generatedAt;
   }
-  meta.createdAt = Number(existing.createdAt || oldTs || meta.generatedAt);
+  var oldCreated = Number(existing.createdAt || oldTs || 0) || 0;
+  var newCreated = Number((incoming && incoming.createdAt) || newTs || 0) || 0;
+  if (oldCreated && newCreated) {
+    meta.createdAt = Math.min(oldCreated, newCreated);
+  } else {
+    meta.createdAt = oldCreated || newCreated || meta.generatedAt;
+  }
+  if (existing.dayKey && Number(meta.generatedAt) === oldTs) {
+    meta.dayKey = existing.dayKey;
+  }
   return meta;
 }
 
@@ -1308,6 +1419,8 @@ function historyFilterListed_(list) {
 
 function listPrintHistory_() {
   var list = historyRebuildIndexIfEmpty_();
+  // One-time fix for flow178 hole: HISTIDX rebuild stamped Date.now() on every row.
+  list = historyRepairBulkNowStamps_(list);
   list = historyPrune_(list);
   list = historyFilterListed_(list);
   try { historyWriteIndex_(list); } catch (e) {}
@@ -1361,6 +1474,14 @@ function savePrintHistory_(raw) {
   // Prefer Drive for HTML; small props fallback only when Drive is unavailable.
   propDelete_('HIST_' + safe);
   var htmlText = String(raw.html);
+  // Prefer stamp baked into HTML / encoded in id over a polluted "now".
+  var recovered = historyRecoverStamp_(safe, htmlText);
+  if (recovered && (!meta.generatedAt || Number(meta.generatedAt) > recovered)) {
+    meta.generatedAt = recovered;
+    if (!meta.createdAt || Number(meta.createdAt) > recovered) {
+      meta.createdAt = recovered;
+    }
+  }
   var source = '';
   var driveErr = '';
   try {
@@ -1485,19 +1606,18 @@ function getPrintHistory_(id) {
     }
     return { ok: false, error: 'Sheet not found in cloud history', orphanPruned: !!meta };
   }
-  var entry = meta ? historyMetaOnly_(meta) : {
-    id: id,
-    menuId: 'main',
-    menuName: 'Menu',
-    roman: '',
-    n: 0,
-    week: '',
-    weekKey: '',
-    hideDate: false,
-    generatedAt: Date.now(),
-    createdAt: Date.now(),
-    dayKey: ''
-  };
+  var entry = meta ? historyMetaOnly_(meta) : historyMetaFromHtmlTitle_(id, html);
+  // Never invent "now" when serving a stored sheet — recover if meta was polluted.
+  var recovered = historyRecoverStamp_(id, html);
+  if (recovered) {
+    var cur = Number(entry.generatedAt || entry.createdAt || 0) || 0;
+    if (!cur || cur > recovered) {
+      entry.generatedAt = recovered;
+      entry.createdAt = Number(entry.createdAt || 0) && Number(entry.createdAt) < recovered
+        ? Number(entry.createdAt)
+        : recovered;
+    }
+  }
   entry.html = html;
   return { ok: true, source: 'props', entry: entry };
 }

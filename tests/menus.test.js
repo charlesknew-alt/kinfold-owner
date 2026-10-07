@@ -629,8 +629,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow178') !== -1, 'menus page cache-bust is flow178');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow178') !== -1, 'hub menus link cache-bust is flow178');
+assert(page.indexOf('flow179') !== -1, 'menus page cache-bust is flow179');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow179') !== -1, 'hub menus link cache-bust is flow179');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2209,8 +2209,9 @@ assert(printJs.indexOf('function splitHistoryWindow') !== -1 &&
 (function historyPreserveGeneratedAtOnRetry() {
   assert(typeof printApi.preserveHistoryGeneratedAt === 'function',
     'preserveHistoryGeneratedAt exported for Save-time freeze');
-  var original = 1791377925346; // Main VI original Save
-  var retryNow = original + 60 * 60 * 1000;
+  var original = 1791377925346; // Main VI original Save (13:46)
+  var retryNow = Date.parse('2026-10-07T14:19:00+01:00'); // polluted sync "now"
+  assert(retryNow > original, 'retry fixture is after original Save');
   var kept = printApi.preserveHistoryGeneratedAt(
     { id: 'pmainvi', generatedAt: original, createdAt: original, dayKey: '2026-10-07' },
     { id: 'pmainvi', generatedAt: retryNow, createdAt: retryNow, dayKey: '2026-10-07', html: '<html></html>' }
@@ -2219,12 +2220,28 @@ assert(printJs.indexOf('function splitHistoryWindow') !== -1 &&
     'retry with newer generatedAt keeps the original Save time');
   assert(kept.createdAt === original,
     'createdAt stays at original Save on retry');
+  // Simulate Soft refresh / migrate re-save that invents Date.now() for an existing id.
+  var pollutedRetry = printApi.preserveHistoryGeneratedAt(
+    { id: 'pmainvi', generatedAt: original, createdAt: original },
+    { id: 'pmainvi', generatedAt: Date.now(), createdAt: Date.now(), html: '<html>retry</html>' }
+  );
+  assert(pollutedRetry.generatedAt === original,
+    'retry save with new Date() must not advance the stamp');
+  assert(pollutedRetry.createdAt === original,
+    'retry save with new Date() must not advance createdAt');
   var cloudNewer = printApi.preserveHistoryGeneratedAt(
     { id: 'x', generatedAt: original },
     { id: 'x', generatedAt: retryNow, source: 'cloud' }
   );
   assert(cloudNewer.generatedAt === original,
     'cloud merge does not replace older generatedAt with retry time');
+  // Repair direction: polluted cloud + older local → keep older (push back to cloud).
+  var repaired = printApi.preserveHistoryGeneratedAt(
+    { id: 'y', generatedAt: original },
+    { id: 'y', generatedAt: retryNow, source: 'cloud' }
+  );
+  assert(repaired.generatedAt === original,
+    'local older stamp wins over polluted cloud 14:19');
   var first = printApi.preserveHistoryGeneratedAt(
     null,
     { id: 'new', generatedAt: original }
@@ -2234,9 +2251,31 @@ assert(printJs.indexOf('function splitHistoryWindow') !== -1 &&
   assert(printJs.indexOf('preserveHistoryGeneratedAt') !== -1 &&
     printJs.indexOf('moment of original Save only') !== -1,
     'client documents original-Save timestamp freeze');
+  assert(printJs.indexOf('embedHistoryStamp_') !== -1 &&
+    printJs.indexOf('eb-generated-at') !== -1,
+    'client bakes generatedAt into HTML for rebuild recovery');
+  assert(printJs.indexOf('stampRepair') !== -1 &&
+    printJs.indexOf('stampRepaired') !== -1,
+    'migrate pushes older local stamps back to polluted cloud');
+  assert(printJs.indexOf('var saveAt=Date.now()') !== -1 &&
+    printJs.indexOf('id:saveId,generatedAt:saveAt,createdAt:saveAt') !== -1,
+    'Save click stamps id+generatedAt once (retries reuse them)');
   assert(aiGs.indexOf('historyPreserveGeneratedAt_') !== -1 &&
     aiGs.indexOf('Keep the original Save time when re-pushing') !== -1,
     'Apps Script preserves generatedAt on savePrintHistory retry');
+  assert(aiGs.indexOf('historyRepairBulkNowStamps_') !== -1 &&
+    aiGs.indexOf('historyRecoverStamp_') !== -1 &&
+    aiGs.indexOf('Never Date.now() on rebuild') !== -1,
+    'Apps Script recovers stamps from id/HTML/Drive — never Date.now on rebuild');
+  assert(aiGs.indexOf('Math.min(oldTs, newTs)') !== -1,
+    'Apps Script upsert keeps min(existing, incoming) stamp');
+  // Display uses stored clock time only (no relative "just now").
+  assert(page.indexOf('timeLabelFromMs(row.generatedAt)') !== -1 &&
+    printJs.indexOf('function timeLabelFromMs') !== -1,
+    'Print history shows clock time from generatedAt');
+  assert(!/generated[^\\n]{0,40}just now/i.test(page) &&
+    !/timeAgo|relativeTime|fromNow/.test(printJs),
+    'Print history does not use relative "just now" labels');
 })();
 assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFill') !== -1,
   'generate applies AI columnBalance as forceColumnFill');

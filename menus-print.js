@@ -4473,7 +4473,11 @@
           'sanitizeDomForSave();' +
           'var html="<!DOCTYPE html>"+document.documentElement.outerHTML;' +
           'if(api.sanitizePrintHtml){try{html=api.sanitizePrintHtml(html)||html;}catch(eSan){}}' +
+          // Stamp once at Save click — retries must reuse this id + generatedAt.
+          'var saveAt=Date.now();' +
+          'var saveId="p"+saveAt.toString(36);' +
           'api.savePrintHistory({' +
+            'id:saveId,generatedAt:saveAt,createdAt:saveAt,' +
             'menuId:SAVE_META.menuId,menuName:SAVE_META.menuName,' +
             'roman:ver.roman,n:ver.n,week:ver.week||SAVE_META.week,weekKey:ver.weekKey||SAVE_META.weekKey,' +
             'hideDate:!!ver.hideDate,html:html' +
@@ -4766,14 +4770,15 @@
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
       var known = {};
       var deleted = {};
-      (Array.isArray(data.items) ? data.items : []).forEach(function (r) {
+      var items = Array.isArray(data.items) ? data.items : [];
+      items.forEach(function (r) {
         if (r && r.id) known[r.id] = true;
       });
       (Array.isArray(data.deletedIds) ? data.deletedIds : []).forEach(function (id) {
         if (id) deleted[String(id)] = true;
       });
       return purgeLocalDeleted(deleted).then(function () {
-        return migrateLocalToCloud(known, deleted);
+        return migrateLocalToCloud(known, deleted, items);
       });
     }).then(function (stats) {
       pendingUploadBusy_ = false;
@@ -4802,38 +4807,64 @@
    * Upload device-only sheets that were never deleted in the cloud
    * (e.g. Kate saved on the pub PC while the network blipped).
    * Skip tombstoned ids so deletes stay deleted everywhere.
+   * Also re-push rows whose local generatedAt is older than cloud (stamp repair).
    */
-  function migrateLocalToCloud(cloudIds, deletedIds) {
+  function migrateLocalToCloud(cloudIds, deletedIds, cloudItems) {
     var known = cloudIds || {};
     var gone = deletedIds || {};
+    var cloudById = {};
+    (cloudItems || []).forEach(function (r) {
+      if (r && r.id) cloudById[r.id] = r;
+    });
     return localListOnly().then(function (rows) {
       var missing = (rows || []).filter(function (r) {
         return r && r.id && !known[r.id] && !gone[r.id];
       });
-      if (!missing.length) return { uploaded: 0, attempted: 0 };
-      // Newest first so the sheet just made (Sunday 11:16) uploads before older ones.
-      missing.sort(function (a, b) {
+      // Same id on cloud with a newer (polluted) stamp — push the older local time.
+      var stampRepair = (rows || []).filter(function (r) {
+        if (!r || !r.id || gone[r.id] || !known[r.id]) return false;
+        var cloud = cloudById[r.id];
+        if (!cloud) return false;
+        var localTs = Number(r.generatedAt || r.createdAt || 0) || 0;
+        var cloudTs = Number(cloud.generatedAt || cloud.createdAt || 0) || 0;
+        return localTs > 0 && cloudTs > 0 && localTs < cloudTs;
+      });
+      var queue = missing.concat(stampRepair);
+      if (!queue.length) return { uploaded: 0, attempted: 0, stampRepaired: 0 };
+      // Newest first so the sheet just made uploads before older ones.
+      queue.sort(function (a, b) {
         return (b.generatedAt || 0) - (a.generatedAt || 0);
       });
       var attempted = 0;
       var uploaded = 0;
+      var stampRepaired = 0;
+      var seen = {};
       var chain = Promise.resolve();
-      missing.slice(0, 40).forEach(function (meta) {
+      queue.slice(0, 40).forEach(function (meta) {
+        if (!meta || !meta.id || seen[meta.id]) return;
+        seen[meta.id] = true;
+        var isRepair = !!cloudById[meta.id];
         chain = chain.then(function () {
           return localGetOnly(meta.id).then(function (full) {
             if (!full || !full.html) return;
+            // Freeze the older local Save time on the payload.
+            var frozen = preserveHistoryGeneratedAt(meta, full);
+            frozen.html = embedHistoryStamp_(frozen.html, frozen.generatedAt);
             attempted += 1;
-            return uploadHistoryEntry_(full).then(function (ok) {
-              if (ok) uploaded += 1;
+            return uploadHistoryEntry_(frozen).then(function (ok) {
+              if (ok) {
+                uploaded += 1;
+                if (isRepair) stampRepaired += 1;
+              }
             });
           });
         });
       });
       return chain.then(function () {
-        return { uploaded: uploaded, attempted: attempted };
+        return { uploaded: uploaded, attempted: attempted, stampRepaired: stampRepaired };
       });
     }).catch(function () {
-      return { uploaded: 0, attempted: 0 };
+      return { uploaded: 0, attempted: 0, stampRepaired: 0 };
     });
   }
 
@@ -4936,10 +4967,11 @@
         // Cap repair — full HTML GETs through the iOS relay are expensive.
         return repairCloudHtmlGaps((items || []).slice(0, 8));
       }).then(function (repair) {
-        return migrateLocalToCloud(known, deleted).then(function (stats) {
+        return migrateLocalToCloud(known, deleted, items).then(function (stats) {
           return {
             uploaded: ((stats && stats.uploaded) || 0) + ((repair && repair.repaired) || 0),
-            repaired: (repair && repair.repaired) || 0
+            repaired: (repair && repair.repaired) || 0,
+            stampRepaired: (stats && stats.stampRepaired) || 0
           };
         });
       });
@@ -5063,23 +5095,47 @@
   /**
    * Print history timestamp = moment of original Save only.
    * Retries, re-uploads, Soft refresh, list pull, and migrate must never
-   * advance generatedAt/createdAt to "now". Prefer the older stamp.
+   * advance generatedAt/createdAt to "now". Prefer the older stamp (min).
+   * Brand-new id (no existing) keeps the incoming stamp.
    */
   function preserveHistoryGeneratedAt(existing, incoming) {
     var out = incoming ? Object.assign({}, incoming) : {};
     var oldTs = Number((existing && (existing.generatedAt || existing.createdAt)) || 0) || 0;
     var newTs = Number(out.generatedAt || out.createdAt || 0) || 0;
-    var created = Number((existing && existing.createdAt) || 0) || 0;
+    var oldCreated = Number((existing && (existing.createdAt || existing.generatedAt)) || 0) || 0;
+    var newCreated = Number(out.createdAt || out.generatedAt || 0) || 0;
     if (oldTs && newTs) {
       out.generatedAt = Math.min(oldTs, newTs);
     } else {
       out.generatedAt = oldTs || newTs || Date.now();
     }
-    out.createdAt = created || oldTs || out.generatedAt;
+    if (oldCreated && newCreated) {
+      out.createdAt = Math.min(oldCreated, newCreated);
+    } else {
+      out.createdAt = oldCreated || newCreated || out.generatedAt;
+    }
     if (existing && existing.dayKey && Number(out.generatedAt) === oldTs) {
       out.dayKey = existing.dayKey;
     }
     return out;
+  }
+
+  /** Bake original Save ms into HTML so HISTIDX rebuild never needs Date.now(). */
+  function embedHistoryStamp_(html, generatedAt) {
+    var ms = Number(generatedAt || 0) || 0;
+    var src = String(html || '');
+    if (!ms || !src) return src;
+    var meta = '<meta name="eb-generated-at" content="' + ms + '">';
+    if (/name=["']eb-generated-at["']/i.test(src)) {
+      return src.replace(
+        /<meta\s+[^>]*name=["']eb-generated-at["'][^>]*>/i,
+        meta
+      );
+    }
+    if (/<\/head>/i.test(src)) {
+      return src.replace(/<\/head>/i, meta + '</head>');
+    }
+    return meta + src;
   }
 
   /** Newest first; id tie-break so a single refresh never reshuffles equals. */
@@ -5228,6 +5284,7 @@
     // First Save stamps now; retries must pass the original generatedAt through.
     var generatedAt = Number(raw.generatedAt || raw.createdAt || 0) || Date.now();
     var createdAt = Number(raw.createdAt || raw.generatedAt || 0) || generatedAt;
+    var html = embedHistoryStamp_(String(raw.html), generatedAt);
     return {
       id: raw.id || ('p' + generatedAt.toString(36)),
       menuId: String(raw.menuId || 'main'),
@@ -5240,7 +5297,7 @@
       generatedAt: generatedAt,
       createdAt: createdAt,
       dayKey: raw.dayKey || venueDayKeyFromMs(generatedAt),
-      html: String(raw.html)
+      html: html
     };
   }
 
@@ -5317,23 +5374,29 @@
         return localListOnly();
       }).then(function (localItems) {
         var byId = {};
+        var needsStampRepair = false;
         // Cloud first — this is the shared owner/manager list.
         (cloudItems || []).forEach(function (r) {
           if (r && r.id) byId[r.id] = asRow(r, 'cloud');
         });
         // Local-only leftovers — mark pending, never as cloud; upload async.
         // Same id on both: keep the older generatedAt (original Save), still cloud.
+        // If local is older than cloud, push that stamp back (repair polluted 14:19).
         (localItems || []).forEach(function (r) {
           if (!r || !r.id || deleted[r.id]) return;
           if (byId[r.id]) {
-            var merged = preserveHistoryGeneratedAt(r, byId[r.id]);
+            var cloudRow = byId[r.id];
+            var merged = preserveHistoryGeneratedAt(r, cloudRow);
+            if (Number(merged.generatedAt || 0) < Number(cloudRow.generatedAt || 0)) {
+              needsStampRepair = true;
+            }
             byId[r.id] = asRow(merged, 'cloud');
             return;
           }
           pendingLocal = true;
           byId[r.id] = asRow(r, 'local');
         });
-        if (pendingLocal) schedulePendingPrintUploads();
+        if (pendingLocal || needsStampRepair) schedulePendingPrintUploads();
         var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
         rows.cloudOk = true;
         hydratePrintVersionsFromHistory(rows);

@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261007-flow178"></script>
-  <script src="menus-print.js?v=20261007-flow178"></script>
-  <script src="menus-ingest.js?v=20261007-flow178"></script>
+  <script src="menus.js?v=20261007-flow179"></script>
+  <script src="menus-print.js?v=20261007-flow179"></script>
+  <script src="menus-ingest.js?v=20261007-flow179"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -1182,8 +1182,10 @@
           ingest.cloudPost({ action: 'listPrintHistory' }).then(function (data) {
             if (settled) return;
             var items = Array.isArray(data && data.items) ? data.items : [];
-            var rows = items.map(function (r) {
-              return {
+            var byId = {};
+            items.forEach(function (r) {
+              if (!r || !r.id) return;
+              byId[r.id] = {
                 id: r.id,
                 menuId: r.menuId,
                 menuName: r.menuName,
@@ -1193,10 +1195,24 @@
                 weekKey: r.weekKey,
                 hideDate: r.hideDate,
                 generatedAt: r.generatedAt,
+                createdAt: r.createdAt || r.generatedAt,
                 dayKey: r.dayKey,
                 source: 'cloud'
               };
             });
+            // Merge cached/local older Save stamps so hangWatch never paints polluted "now".
+            (historyCache || []).forEach(function (r) {
+              if (!r || !r.id || !byId[r.id]) return;
+              if (EBMenuPrint && typeof EBMenuPrint.preserveHistoryGeneratedAt === 'function') {
+                var merged = EBMenuPrint.preserveHistoryGeneratedAt(r, byId[r.id]);
+                byId[r.id] = Object.assign({}, byId[r.id], {
+                  generatedAt: merged.generatedAt,
+                  createdAt: merged.createdAt || merged.generatedAt,
+                  dayKey: merged.dayKey || byId[r.id].dayKey
+                });
+              }
+            });
+            var rows = Object.keys(byId).map(function (k) { return byId[k]; });
             finish_({ rows: rows, cloudUnreachable: false });
           }, failLocal_);
           return;
