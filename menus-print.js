@@ -5012,9 +5012,12 @@
     return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
   }
 
+  /** Newest first; id tie-break so a single refresh never reshuffles equals. */
   function sortHistoryNewest(list) {
     return (list || []).slice().sort(function (a, b) {
-      return (b.generatedAt || 0) - (a.generatedAt || 0);
+      var dg = (b.generatedAt || 0) - (a.generatedAt || 0);
+      if (dg) return dg;
+      return String(a.id || '').localeCompare(String(b.id || ''));
     });
   }
 
@@ -5741,6 +5744,7 @@
     getPrintHistory: getPrintHistory,
     deletePrintHistory: deletePrintHistory,
     groupHistoryByDay: groupHistoryByDay,
+    sortHistoryNewest: sortHistoryNewest,
     dayLabelFromMs: dayLabelFromMs,
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,

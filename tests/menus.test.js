@@ -628,8 +628,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow175') !== -1, 'menus page cache-bust is flow175');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow175') !== -1, 'hub menus link cache-bust is flow175');
+assert(page.indexOf('flow176') !== -1, 'menus page cache-bust is flow176');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow176') !== -1, 'hub menus link cache-bust is flow176');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -706,11 +706,25 @@ assert(page.indexOf('on this phone only') !== -1 &&
   'local-only print sheets are labelled, not mixed into the shared cloud list');
 assert(page.indexOf("source: 'cache'") !== -1 && page.indexOf('· cached') !== -1,
   'local-first paint uses cache label, not phone-only, while cloud catches up');
-assert(page.indexOf('pullSharedCloud_') !== -1 && page.indexOf("setInterval(function ()") !== -1,
-  'menus auto-pull shared cloud on an interval');
+assert(page.indexOf('pullSharedCloud_') !== -1 &&
+  page.indexOf('scheduleSharedCloudPull_') !== -1,
+  'menus pulls shared cloud on open/return (debounced), not a live poll');
+assert(page.indexOf("setInterval(function ()") === -1 ||
+  page.indexOf('45000') === -1,
+  'menus does not poll shared cloud every ~45s while on Print history');
 assert(page.indexOf("document.visibilityState === 'visible'") !== -1 &&
-  page.indexOf('pullSharedCloud_') !== -1,
-  'menus auto-pull on tab visibility');
+  page.indexOf('scheduleSharedCloudPull_') !== -1 &&
+  page.indexOf("addEventListener('focus'") !== -1,
+  'menus refreshes shared cloud when the tab becomes visible or focused');
+assert(page.indexOf("if (next === 'history') renderHistory()") !== -1 &&
+  page.indexOf("lastHistoryPaintKey_ = ''") !== -1,
+  'Print history refreshes on open / re-click into the view');
+assert(page.indexOf('historyOrderedIdKey_') !== -1 &&
+  page.indexOf('paintKey === lastHistoryPaintKey_') !== -1,
+  'Print history skips DOM repaint when the ordered id list is unchanged');
+assert(printJs.indexOf('id tie-break') !== -1 &&
+  printJs.indexOf('sortHistoryNewest: sortHistoryNewest') !== -1,
+  'history sort is generatedAt desc then id for stable paint order');
 assert(ingestJs.indexOf("action === 'hasPrintHistory'") !== -1 &&
   aiGs.indexOf('hasPrintHistory_') !== -1,
   'Save verify uses tiny hasPrintHistory instead of full HTML GET');
@@ -2162,6 +2176,16 @@ assert(printJs.indexOf('function splitHistoryWindow') !== -1 &&
   assert(printApi.isRecentHistoryRow({ generatedAt: now }, now) &&
     !printApi.isRecentHistoryRow({ generatedAt: now - 5 * 24 * 60 * 60 * 1000 }, now),
     'isRecentHistoryRow is true only for today/yesterday');
+})();
+(function historySortStableByGeneratedAtThenId() {
+  var t = Date.parse('2026-10-07T12:00:00+01:00');
+  var sorted = printApi.sortHistoryNewest([
+    { id: 'b', generatedAt: t },
+    { id: 'a', generatedAt: t },
+    { id: 'c', generatedAt: t + 1000 }
+  ]);
+  assert(sorted.map(function (r) { return r.id; }).join(',') === 'c,a,b',
+    'history sort is generatedAt desc then id asc (stable, not random)');
 })();
 assert(printJs.indexOf('forceColumnFill') !== -1 || page.indexOf('forceColumnFill') !== -1,
   'generate applies AI columnBalance as forceColumnFill');

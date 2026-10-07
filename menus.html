@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261007-flow175"></script>
-  <script src="menus-print.js?v=20261007-flow175"></script>
-  <script src="menus-ingest.js?v=20261007-flow175"></script>
+  <script src="menus.js?v=20261007-flow176"></script>
+  <script src="menus-print.js?v=20261007-flow176"></script>
+  <script src="menus-ingest.js?v=20261007-flow176"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -480,8 +480,10 @@
     var cloudPullDone = false;
 
     // Preview Save → stamp history, then jump here so staff can Print PDF / Email.
+    // One history refresh for the saver; other devices pick it up on next open/return.
     window.EBMenusOnPrintSaved = function () {
       viewMode = 'history';
+      lastHistoryPaintKey_ = '';
       try { window.focus(); } catch (e) {}
       render();
     };
@@ -972,15 +974,41 @@
     }
 
     var historyPushBusy_ = false;
+    var lastHistoryPaintKey_ = '';
+
+    function historyOrderedIdKey_(rows) {
+      var list = Array.isArray(rows) ? rows : [];
+      var sorted = (EBMenuPrint && typeof EBMenuPrint.sortHistoryNewest === 'function')
+        ? EBMenuPrint.sortHistoryNewest(list)
+        : list.slice().sort(function (a, b) {
+            var dg = (b.generatedAt || 0) - (a.generatedAt || 0);
+            if (dg) return dg;
+            return String(a.id || '').localeCompare(String(b.id || ''));
+          });
+      return sorted.map(function (r) { return r && r.id ? String(r.id) : ''; })
+        .filter(Boolean).join('|');
+    }
 
     function paintHistoryRows_(rows, opts) {
       opts = opts || {};
       var el = document.getElementById('editor');
       if (!el) return;
-      historyCache = Array.isArray(rows) ? rows : [];
+      var sorted = Array.isArray(rows)
+        ? ((EBMenuPrint && typeof EBMenuPrint.sortHistoryNewest === 'function')
+          ? EBMenuPrint.sortHistoryNewest(rows)
+          : rows.slice())
+        : [];
+      historyCache = sorted;
       var cloudOk = opts.cloudOk !== false && !(rows && rows.cloudUnreachable);
       var updating = !!opts.updating;
       lastHistoryPaintOpts = { cloudOk: cloudOk, updating: updating };
+      var paintKey = historyOrderedIdKey_(historyCache) + '::' + cloudOk + '::' + updating +
+        '::' + (historyFilter || 'all') + '::' + (!!historyShowArchive);
+      // Same ordered ids + same chrome → leave the DOM alone (no reshuffle flash).
+      if (paintKey === lastHistoryPaintKey_ && el.querySelector('.include-box, .history-day, .history-row')) {
+        return;
+      }
+      lastHistoryPaintKey_ = paintKey;
       var filtered = historyCache;
       if (historyFilter && historyFilter !== 'all') {
         filtered = historyCache.filter(function (r) { return r.menuId === historyFilter; });
@@ -1079,6 +1107,8 @@
     function renderHistory() {
       var el = document.getElementById('editor');
       var settled = false;
+      // Opening / clicking into Print history always does one cloud check.
+      lastHistoryPaintKey_ = '';
       // Keep any list already on screen while the shared cloud list catches up.
       // Mark as cache (not “on this phone only”) until we know an upload failed.
       function showLocalFirst_() {
@@ -4627,7 +4657,12 @@
     document.querySelectorAll('#viewToggle [data-view]').forEach(function (b) {
       b.onclick = function () {
         var next = b.getAttribute('data-view');
-        if (!next || next === viewMode) return;
+        if (!next) return;
+        // Re-clicking Print history still does one cloud check (open/refresh).
+        if (next === viewMode) {
+          if (next === 'history') renderHistory();
+          return;
+        }
         viewMode = next;
         render();
       };
@@ -4670,17 +4705,22 @@
         });
       }
       pullSharedCloud_().then(function () { render(); }, function () { render(); });
-      // Auto-pull so owner sees pub Saves (and vice versa) without Sync now.
+      // Refresh shared menus/history when returning to the tab — not on a timer
+      // while idle on Print history (that reshuffled Main/Sandwiches every ~45s).
+      var sharedPullTimer_ = null;
+      function scheduleSharedCloudPull_() {
+        if (sharedPullTimer_) clearTimeout(sharedPullTimer_);
+        sharedPullTimer_ = setTimeout(function () {
+          sharedPullTimer_ = null;
+          pullSharedCloud_();
+        }, 150);
+      }
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') pullSharedCloud_();
+        if (document.visibilityState === 'visible') scheduleSharedCloudPull_();
       });
       window.addEventListener('focus', function () {
-        pullSharedCloud_();
+        scheduleSharedCloudPull_();
       });
-      setInterval(function () {
-        if (document.visibilityState && document.visibilityState !== 'visible') return;
-        pullSharedCloud_();
-      }, 45000);
     } catch (bootErr) {
       var ed = document.getElementById('editor');
       if (ed) {
