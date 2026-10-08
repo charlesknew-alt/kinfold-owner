@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261007-flow179"></script>
-  <script src="menus-print.js?v=20261007-flow179"></script>
-  <script src="menus-ingest.js?v=20261007-flow179"></script>
+  <script src="menus.js?v=20261008-flow180"></script>
+  <script src="menus-print.js?v=20261008-flow180"></script>
+  <script src="menus-ingest.js?v=20261008-flow180"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4292,43 +4292,52 @@
         ([].concat(a || [], b || []));
     }
 
+    /** Dishes that will print — host sheet plus any ticked drop-ins (e.g. Specials on Main). */
+    function spellCheckDishes_() {
+      var result = composed();
+      var list = (result && result.dishes && result.dishes.length) ? result.dishes : dishes();
+      return list || [];
+    }
+
     function spellCheckThenGenerate_(done) {
-      var list = dishes();
+      var list = spellCheckDishes_();
       if (!list.length || !EBMenus.scanMenuSpelling) {
         done();
         return;
       }
+      // Local food-typo map always runs (cards and long sheets). AI is optional extra.
       var local = EBMenus.scanMenuSpelling(list, { extra: catalogueSpellExtra_() });
       var aiFn = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewSpelling)
         ? EBMenuIngest.reviewSpelling
         : null;
       var btn = document.getElementById('doGenerate');
       if (btn) { btn.disabled = true; btn.textContent = 'Checking spelling…'; }
-      var aiP = aiFn ? aiFn(list) : Promise.resolve(null);
-      aiP.then(function (ai) {
-        var aiFixes = (ai && ai.spellingFixes) ? ai.spellingFixes : [];
-        var fixes = EBMenus.enrichSpellingFixes
-          ? EBMenus.enrichSpellingFixes(list, mergeSpellingFixes_(local, aiFixes))
-          : mergeSpellingFixes_(local, aiFixes);
+      var finish = function (fixes, aiOk) {
         if (!fixes.length) {
           if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
           done();
           return;
         }
-        showSpellingGate_(fixes, done);
+        showSpellingGate_(fixes, done, { aiOk: !!aiOk });
+      };
+      var aiP = aiFn ? aiFn(list) : Promise.resolve(null);
+      aiP.then(function (ai) {
+        var aiFixes = (ai && ai.spellingFixes) ? ai.spellingFixes : [];
+        var merged = mergeSpellingFixes_(local, aiFixes);
+        var fixes = EBMenus.enrichSpellingFixes
+          ? EBMenus.enrichSpellingFixes(list, merged)
+          : merged;
+        // AI null/timeout/empty still keeps local hits — never block forever.
+        finish(fixes, !!(ai && ai.ok !== false && ai));
       }, function () {
-        if (!local.length) {
-          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
-          done();
-          return;
-        }
-        showSpellingGate_(local, done);
+        finish(local, false);
       });
     }
 
-    function showSpellingGate_(fixes, done) {
+    function showSpellingGate_(fixes, done, opts) {
+      opts = opts || {};
       var btn = document.getElementById('doGenerate');
-      var list = dishes();
+      var list = spellCheckDishes_();
       if (EBMenus.enrichSpellingFixes) fixes = EBMenus.enrichSpellingFixes(list, fixes);
       var existing = document.getElementById('spellGateOverlay');
       if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
@@ -4341,7 +4350,12 @@
         'background:#fffaf4;color:#1c1610;max-width:560px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25);max-height:80vh;overflow:auto');
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
       html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Spelling check</div>';
-      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">AI has read each dish line. Tick <strong>Change</strong> or <strong>Correct as typed</strong> on every suggestion, then generate.</p>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">';
+      html += opts.aiOk
+        ? 'We checked each dish line (local food-typo list + AI). '
+        : 'We checked each dish line with the local food-typo list';
+      if (!opts.aiOk) html += ' (AI spelling was unavailable — local hits still show). ';
+      html += 'Tick <strong>Change</strong> or <strong>Correct as typed</strong> on every suggestion, then generate.</p>';
       html += '<ul class="spell-gate-list">';
       fixes.forEach(function (f, i) {
         var snippet = f.snippet || f.dishName || '';
@@ -4403,9 +4417,13 @@
           if (note) note.textContent = 'Tick Change or Correct on each line (' + missing + ' still open).';
           return;
         }
-        if (chosen.length && EBMenus.applySpellingFixesToDishes) {
-          book[menuId] = EBMenus.applySpellingFixesToDishes(dishes(), chosen);
-          if (EBMenus.sortDishesBySection) book[menuId] = EBMenus.sortDishesBySection(book[menuId]);
+        if (chosen.length) {
+          if (EBMenus.applySpellingFixesToBook) {
+            book = EBMenus.applySpellingFixesToBook(book, chosen, menuId);
+          } else if (EBMenus.applySpellingFixesToDishes) {
+            book[menuId] = EBMenus.applySpellingFixesToDishes(dishes(), chosen);
+            if (EBMenus.sortDishesBySection) book[menuId] = EBMenus.sortDishesBySection(book[menuId]);
+          }
           save();
         }
         closeGate();

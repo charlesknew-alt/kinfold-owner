@@ -76,6 +76,63 @@ assert(api.autoCorrectSpelling('Seperate tomatos with mayonaise').text === 'Sepa
   'common food typos auto-correct on save');
 assert(api.scanMenuSpelling([{ id: 'd1', name: 'Calimari', description: 'bruscetta, mozarella' }]).length >= 2,
   'menu scan finds spelling mistakes before generate');
+(function () {
+  var specialsHits = api.scanMenuSpelling([
+    {
+      id: 's1',
+      name: 'Pasta Carbonaro',
+      description: 'linguine with smoked pancetta topped with a chilli pangratto'
+    },
+    {
+      id: 's2',
+      name: 'Mackerel Pate',
+      description: 'salad & soughdough baguette'
+    },
+    {
+      id: 's3',
+      name: 'Beef Short Rib Genovese Rigatoni',
+      description: 'until its melt in the mouth & jammy'
+    }
+  ]);
+  var tos = specialsHits.map(function (f) { return String(f.to).toLowerCase(); });
+  assert(tos.indexOf('carbonara') !== -1, 'local dict flags Carbonaro → Carbonara');
+  assert(tos.indexOf('pangrattato') !== -1, 'local dict flags pangratto → pangrattato');
+  assert(tos.indexOf('sourdough') !== -1, 'local dict flags soughdough → sourdough');
+  assert(tos.some(function (t) { return t.indexOf('it melts') !== -1; }),
+    'local phrase list flags its melt → it melts');
+})();
+assert(typeof api.applySpellingFixesToBook === 'function',
+  'applySpellingFixesToBook writes drop-in fixes to source menus');
+(function () {
+  var book = {
+    main: [api.dish('Mains', 'House Burger', 'brioche bun', '14.95', '')],
+    specials: [{
+      id: 'carb-1',
+      section: 'Special Mains',
+      name: 'Pasta Carbonaro',
+      description: 'chilli pangratto',
+      price: '16.95',
+      tags: '',
+      lunchClub: false
+    }]
+  };
+  var composed = api.composeDishes(book, 'main', { specials: true });
+  var hits = api.scanMenuSpelling(composed);
+  assert(hits.some(function (f) {
+    return String(f.from).toLowerCase() === 'carbonaro' && f.fromMenu === 'specials';
+  }), 'Main generate scan includes Specials drop-in typos');
+  var next = api.applySpellingFixesToBook(book, hits.filter(function (f) {
+    return String(f.to).toLowerCase() === 'carbonara' ||
+      String(f.to).toLowerCase() === 'pangrattato';
+  }), 'main');
+  assert(next.specials[0].name === 'Pasta Carbonara',
+    'accepted drop-in name fix lands on Specials book');
+  assert(next.specials[0].description.indexOf('pangrattato') !== -1,
+    'accepted drop-in description fix lands on Specials book');
+})();
+assert(page.indexOf('spellCheckDishes_') !== -1 &&
+  page.indexOf('local food-typo list') !== -1,
+  'Generate spelling gate scans composed dishes and keeps local hits if AI fails');
 assert(api.scanMenuSpelling([{
   id: 'd2',
   name: 'Korean Chicken Balls',
@@ -629,8 +686,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow179') !== -1, 'menus page cache-bust is flow179');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow179') !== -1, 'hub menus link cache-bust is flow179');
+assert(page.indexOf('flow180') !== -1, 'menus page cache-bust is flow180');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow180') !== -1, 'hub menus link cache-bust is flow180');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');

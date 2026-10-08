@@ -1963,6 +1963,10 @@
     gerkin: 'gherkin',
     gerkins: 'gherkins',
     sourdow: 'sourdough',
+    soughdough: 'sourdough',
+    soughdogh: 'sourdough',
+    sourdouqh: 'sourdough',
+    sourddough: 'sourdough',
     bagget: 'baguette',
     bagett: 'baguette',
     natchos: 'nachos',
@@ -2054,12 +2058,43 @@
     creme: 'crème',
     fricasee: 'fricassee',
     pangratato: 'pangrattato',
+    pangratto: 'pangrattato',
+    pangrattatto: 'pangrattato',
+    pangratatto: 'pangrattato',
+    pangrattato: 'pangrattato',
+    carbonaro: 'carbonara',
+    carbonarra: 'carbonara',
+    carbonarraa: 'carbonara',
+    carbanara: 'carbonara',
+    carbornara: 'carbonara',
     yorksire: 'yorkshire',
     dumplin: 'dumpling',
     musturd: 'mustard',
     streakey: 'streaky',
     smokey: 'smoky',
-    icecream: 'ice cream'
+    icecream: 'ice cream',
+    genoveve: 'genovese',
+    genovse: 'genovese',
+    burratta: 'burrata',
+    buratta: 'burrata',
+    mascapone: 'mascarpone',
+    mascarponee: 'mascarpone',
+    pancettae: 'pancetta',
+    panceta: 'pancetta',
+    linguinni: 'linguine',
+    rigatonni: 'rigatoni',
+    rigatoni: 'rigatoni'
+  };
+
+  /**
+   * High-confidence multi-word food / grammar typos. Always surface in the
+   * Generate spelling gate (local), even when Gemini misses them.
+   */
+  var SPELL_PHRASES = {
+    'its melt': 'it melts',
+    "it's melt": 'it melts',
+    'it melt in': 'it melts in',
+    'melt in it\'s': 'melt in its'
   };
 
   var SPELL_SKIP = {
@@ -2115,10 +2150,21 @@
     return t;
   }
 
+  function spellMatchCasePhrase_(sample, to) {
+    var s = String(sample || '');
+    var t = String(to || '');
+    if (!s || !t) return t;
+    if (s.toUpperCase() === s) return t.toUpperCase();
+    if (s.charAt(0) === s.charAt(0).toUpperCase()) {
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+    return t;
+  }
+
   function spellReplaceToken_(text, from, to) {
     var re = new RegExp('\\b' + String(from).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
     return String(text || '').replace(re, function (m) {
-      return spellMatchCase_(m, to);
+      return (/\s/.test(m) ? spellMatchCasePhrase_(m, to) : spellMatchCase_(m, to));
     });
   }
 
@@ -2181,6 +2227,22 @@
     known.forEach(function (w) { knownSet[w] = true; });
     var seen = {};
     var out = [];
+    Object.keys(SPELL_PHRASES).forEach(function (phrase) {
+      var mapped = SPELL_PHRASES[phrase];
+      if (!mapped || mapped === phrase) return;
+      var re = new RegExp('\\b' + phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      var m = raw.match(re);
+      if (!m) return;
+      var key = phrase.toLowerCase() + '>' + mapped.toLowerCase();
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push({
+        from: m[0],
+        to: spellMatchCasePhrase_(m[0], mapped),
+        where: opts.where || '',
+        phrase: true
+      });
+    });
     spellTokenize_(raw).forEach(function (tok) {
       var lower = tok.toLowerCase();
       if (SPELL_SKIP[lower] || SPELL_KEEP[lower] || lower.length < 3) return;
@@ -2238,8 +2300,8 @@
     var raw = [];
     (dishes || []).forEach(function (d) {
       if (!d) return;
-      // Exact typo map only — fuzzy word swaps (onions→onion, malted→salted)
-      // need the full sentence, which Gemini does on Generate.
+      // Exact typo map + phrase list only — fuzzy word swaps (onions→onion,
+      // malted→salted) need the full sentence, which Gemini does on Generate.
       suggestSpellingForText(d.name, { known: known, where: 'name', typosOnly: true }).forEach(function (f) {
         raw.push({
           from: f.from,
@@ -2248,7 +2310,9 @@
           dishId: d.id || '',
           dishName: d.name || '',
           snippet: d.name || '',
-          fuzzy: !!f.fuzzy
+          fromMenu: d.fromMenu || '',
+          fuzzy: !!f.fuzzy,
+          phrase: !!f.phrase
         });
       });
       suggestSpellingForText(d.description, { known: known, where: 'description', typosOnly: true }).forEach(function (f) {
@@ -2259,7 +2323,9 @@
           dishId: d.id || '',
           dishName: d.name || '',
           snippet: d.description || '',
-          fuzzy: !!f.fuzzy
+          fromMenu: d.fromMenu || '',
+          fuzzy: !!f.fuzzy,
+          phrase: !!f.phrase
         });
       });
     });
@@ -2295,7 +2361,9 @@
         dishName: f.dishName || d.name || '',
         snippet: snippet,
         preview: spellReplaceToken_(snippet, f.from, f.to),
-        fuzzy: !!f.fuzzy
+        fromMenu: f.fromMenu || d.fromMenu || '',
+        fuzzy: !!f.fuzzy,
+        phrase: !!f.phrase
       };
     });
   }
@@ -2323,6 +2391,42 @@
     return list;
   }
 
+  /**
+   * Apply accepted spelling fixes across the dish book — including drop-ins
+   * (Specials on Main) whose composed id ends with "-on-<hostId>".
+   */
+  function applySpellingFixesToBook(book, fixes, hostId) {
+    var next = book || {};
+    var byMenu = {};
+    var suffix = hostId ? ('-on-' + hostId) : '';
+    (fixes || []).forEach(function (fix) {
+      if (!fix || !fix.from || !fix.to) return;
+      var dishId = String(fix.dishId || '');
+      var mid = String(fix.fromMenu || hostId || '').trim();
+      if (suffix && dishId.length > suffix.length &&
+          dishId.slice(-suffix.length) === suffix) {
+        dishId = dishId.slice(0, -suffix.length);
+        if (!mid) mid = hostId;
+      }
+      if (!mid) mid = hostId || '';
+      if (!mid) return;
+      var copy = {
+        from: fix.from,
+        to: fix.to,
+        where: fix.where,
+        dishId: dishId,
+        dishName: fix.dishName,
+        snippet: fix.snippet
+      };
+      (byMenu[mid] = byMenu[mid] || []).push(copy);
+    });
+    Object.keys(byMenu).forEach(function (mid) {
+      var list = applySpellingFixesToDishes(next[mid] || [], byMenu[mid]);
+      next[mid] = sortDishesBySection ? sortDishesBySection(list) : list;
+    });
+    return next;
+  }
+
   /** Normalise Gemini spellingFixes for the review gate. */
   function normalizeSpellingFixes(raw) {
     if (!Array.isArray(raw)) return [];
@@ -2335,7 +2439,8 @@
       if (!from || !to || from === to) return;
       var where = String(fix.where || fix.field || '').trim();
       var dishId = String(fix.dishId || '').trim();
-      var key = from.toLowerCase() + '\0' + to.toLowerCase() + '\0' + dishId;
+      var fromMenu = String(fix.fromMenu || '').trim();
+      var key = from.toLowerCase() + '\0' + to.toLowerCase() + '\0' + dishId + '\0' + fromMenu;
       if (seen[key]) return;
       seen[key] = true;
       out.push({
@@ -2346,7 +2451,9 @@
         dishName: String(fix.dishName || '').trim(),
         snippet: String(fix.snippet || '').trim(),
         preview: String(fix.preview || '').trim(),
-        fuzzy: !!fix.fuzzy
+        fromMenu: fromMenu,
+        fuzzy: !!fix.fuzzy,
+        phrase: !!fix.phrase
       });
     });
     return out;
@@ -3147,6 +3254,7 @@
     autoCorrectSpelling: autoCorrectSpelling,
     scanMenuSpelling: scanMenuSpelling,
     applySpellingFixesToDishes: applySpellingFixesToDishes,
+    applySpellingFixesToBook: applySpellingFixesToBook,
     isJunkDishName: isJunkDishName,
     promoItem: promoItem,
     seedPromoBank: seedPromoBank,
