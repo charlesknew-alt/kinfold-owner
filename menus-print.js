@@ -4543,12 +4543,13 @@
         'margin:0 auto 6px;border-style:none!important;border-width:0!important;' +
         'border-image:none!important;border-image-source:none!important;' +
         'border-image-width:0!important;border-image-slice:0!important;' +
-        'border-radius:50%;' +
-        'background-color:#fff;' +
+        /* No border-radius — the PNG is already a fine-scallop oval; radius clips bumps. */
+        'border-radius:0;' +
+        'background-color:transparent;' +
         'background-image:url("' + asset('frame-platter.png') + '");' +
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
-        /* Content-sized true ellipse: hug sell line; flex centres the pad in the oval. */
-        'aspect-ratio:auto;width:fit-content;max-width:100%;min-width:0;min-height:0;height:auto;' +
+        /* Keep platter PNG aspect (1600×480) so fine scallops are not stretched into lobes. */
+        'aspect-ratio:10/3;width:fit-content;max-width:100%;min-width:min(100%,220px);min-height:0;height:auto;' +
         'display:flex!important;align-items:center;justify-content:center;' +
         'align-self:center!important;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
@@ -4564,7 +4565,7 @@
         'padding:14px 28px!important;display:flex;flex-direction:column;' +
         'align-items:center;justify-content:center;' +
         'box-sizing:border-box;min-height:0;width:max-content;max-width:100%;margin:0}' +
-      /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
+      /* Stacked tip + feature panel: tip keeps the fine-scallop oval; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
         'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
@@ -4590,7 +4591,7 @@
       '.fill-compact .scallop-platter,.fill-dense .scallop-platter,' +
         '.fill-compact .scallop:has(.sandwich-tip-only),.fill-dense .scallop:has(.sandwich-tip-only){' +
         'border-width:0!important;border-image:none!important;border-image-source:none!important;' +
-        'border-radius:50%;margin:0 auto 6px;aspect-ratio:auto;min-height:0;' +
+        'border-radius:0;margin:0 auto 6px;aspect-ratio:10/3;min-height:0;' +
         'width:fit-content;max-width:100%;align-self:center}' +
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
@@ -4604,7 +4605,7 @@
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{' +
         'padding:12px 24px!important}' +
       '.fill-dense .scallop-platter,.fill-compact .scallop-platter{' +
-        'min-height:0;border-width:0!important;border-image:none!important;border-radius:50%;' +
+        'min-height:0;border-width:0!important;border-image:none!important;border-radius:0;' +
         'width:fit-content;max-width:100%;display:flex!important;align-items:center;justify-content:center}' +
       '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-dense .scallop-box .scallop-pad:has(.sheet-blurb-below),' +
