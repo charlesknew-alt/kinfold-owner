@@ -1436,6 +1436,10 @@
   function isLittleBells(name) {
     return /little\s*bells|kids?\s*menu|children.?s/i.test(String(name || '').trim());
   }
+  /** Sides / Sauces / Little Bells — compact stack, not classical 13px dish breath. */
+  function isTightListSection(name) {
+    return isSides(name) || isSauce(name) || isLittleBells(name);
+  }
   function isStarters(name) {
     return /starter/i.test(name || '') && !isSharing(name) && !isSpecialStarters(name);
   }
@@ -1541,10 +1545,10 @@
 
   /**
    * Extra page units for the classical dish-gap floor vs the 8px model the
-   * tally was tuned for. Counts mains + sandwiches pack + specials + sides so
-   * Specials|Sandwiches with Sides nested under cannot look under PAGE while
-   * print clips into the allergy footer. Not a wrap/penalty tax — only the
-   * real min-gap delta (TYPE_RANGE.dishGapPx.min − 8).
+   * tally was tuned for. Counts mains / sandwiches / specials that keep the
+   * 13px breathe — not Sides, Sauces or Little Bells (compact stacks).
+   * Not a wrap/penalty tax — only the real min-gap delta
+   * (TYPE_RANGE.dishGapPx.min − 8) on classical dishes.
    */
   function classicalGapUnits_(dishCount) {
     var n = Math.max(0, Number(dishCount) || 0);
@@ -2188,29 +2192,31 @@
       layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
 
-      // Classical breath: headroom for the hard dish-gap floor (13px).
-      // Count every food line on page 2 — including Sandwiches — so the gate
-      // matches print. Specials that already fitted still pass (no wrap taxes).
+      // Classical breath: headroom for the hard dish-gap floor (13px) on
+      // mains / starters / desserts / sandwiches / specials. Sides, Sauces and
+      // Little Bells use compact stacks — do not tax them at mains-level gaps.
       var p2SandN = layout.p2.sandwiches ? sandDishCount : 0;
       var p2DishN = mainsN + dessertN + p2SandN +
-        (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0) +
         (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
         (bag.specialDesserts && bag.specialDesserts.dishes ? bag.specialDesserts.dishes.length : 0) +
-        (bag.littleBells && bag.littleBells.dishes ? bag.littleBells.dishes.length : 0) +
         (bag.sundayRoasts && !roastsOnP1 && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0);
       var gapBreath = Math.min(8, p2DishN * Math.max(0, TYPE_RANGE.dishGapPx.min - 8) * 0.07);
       // Nesting Sides under short Specials (or under a tip oval) looks free in
-      // unit math (max() stays on the tall column) but classical gaps make the
-      // stack meet the footer under a full mains list — flow182 clipped here
-      // with no overflow gate.
+      // unit math (max() stays on the tall column). Tax only classical dishes in
+      // that stack — compact Sides must not refuse Specials while panels still fit.
       if (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip) {
-        var nestDishN = mainsN + p2SandN +
-          (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
-          (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0);
-        gapBreath += classicalGapUnits_(nestDishN);
+        var nestClassicalN = mainsN + p2SandN +
+          (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0);
+        gapBreath += classicalGapUnits_(nestClassicalN);
+        // Named sandwich fillings + Specials nest is taller than a tip oval —
+        // keep a small floor so a full mains wall still overflows. Tip-only
+        // (0 fillings) must not pick up this tax.
+        if (!sandwichTipOnly && sandDishCount >= 3) {
+          gapBreath += 2.4;
+        }
       }
-      // Little Bells|Sides (Sunday packed): above/below notes were missing from
-      // the back tally, so leftover looked free and Gatherings clipped.
+      // Little Bells|Sides (Sunday packed): both are tight lists — no 13px nest
+      // tax. Above/below notes still pack leftover so Gatherings is omitted.
       var littleRulePlan = { width: 'column', frame: true };
       if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
         littleRulePlan = root.EBMenus.sectionLayoutFor('Little Bells', opts.sectionLayout) || littleRulePlan;
@@ -2220,11 +2226,6 @@
       var kidsSidesPair = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
         layout.p2.sidesOnP2 && bag.sides && bag.sides.dishes && bag.sides.dishes.length &&
         wantsColumn(littleRulePlan) && wantsColumn(sideRulePlan));
-      if (kidsSidesPair) {
-        gapBreath += classicalGapUnits_(
-          (bag.littleBells.dishes.length || 0) + (bag.sides.dishes.length || 0)
-        );
-      }
       var noteTaxP2 = 0;
       if (bag.littleBells) noteTaxP2 += outsideUnits_(layoutRule_('Little Bells', opts.sectionLayout));
       if (bag.desserts) noteTaxP2 += outsideUnits_(layoutRule_('Desserts', opts.sectionLayout));
@@ -2235,6 +2236,8 @@
       }
       // Full mains + desserts + Sandwiches on one back page reads as a busy wall —
       // refuse and ask to untick Sandwiches (or another drop-in) rather than pack.
+      // Food before feature panels: drop rooms / foot / column chrome first, then
+      // gate overflow only when food + tip + classical min gaps still will not fit.
       var foodLoadP2 = p2Load + gapBreath + noteTaxP2;
       var foodBreathP2 = p2Load + gapBreath;
       var sandwichCrowdsMains = !!(layout.p2.sandwiches && bag.mains && bag.desserts &&
@@ -2244,20 +2247,10 @@
       // Main + Specials (XIV) is not refused when tip+sides leave real room.
       var foodOverPage = foodLoadP2 > PAGE &&
         !(foodBreathP2 <= PAGE && noteTaxP2 > 0 && (foodLoadP2 - PAGE) <= noteTaxP2 + 0.05);
-      if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 ||
-          foodOverPage) {
-        layout.fit = 'over';
-        layout.overflow = layout.overflow || 'drop-in';
-        if ((sandwichCrowdsMains || (foodOverPage &&
-            (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip || kidsSidesPair))) &&
-            layout.fillers.indexOf(
-            'Too much content — remove a dropped-in menu') === -1) {
-          layout.fillers.push('Too much content — remove a dropped-in menu');
-        }
-      }
       p2left = Math.max(0, p2left - gapBreath - noteTaxP2);
       // Optional chrome decided before note/gap tax — drop it when the sheet
       // is now packed (logo / Gatherings must not fall off after kids notes).
+      // Prefer omitting feature panels over refusing Specials / other food drop-ins.
       if (layout.p2.footLogo && p2left < COST.footLogo + 4) {
         layout.p2.footLogo = false;
         p2left += COST.footLogo;
@@ -2267,15 +2260,33 @@
           layout.fillers.push('No page-2 logo (keep food on the page)');
         }
       }
-      if (layout.p2.rooms && p2left < promoCost + 4) {
+      if (layout.p2.rooms && (p2left < promoCost + 4 || foodOverPage || sandwichCrowdsMains)) {
         layout.p2.rooms = false;
+        if ((foodOverPage || sandwichCrowdsMains) &&
+            layout.fillers.indexOf('Feature panels omitted (keep food on the page)') === -1) {
+          layout.fillers.push('Feature panels omitted (keep food on the page)');
+        }
       }
       layout.leftover.p2 = p2left;
       // Foot / column feature panels ONLY after gap breath + section notes —
       // never place Gatherings under Little Bells when leftover is already tight.
-      layout.p1.footPromos = canFitFootPromos(p1left);
-      layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
-      layout.p2.columnPromos = canFitColumnPromos(p2left);
+      // When food is over, force-omit panels so Specials are not refused while
+      // Sip & Paint / tip chrome still claim the column.
+      layout.p1.footPromos = canFitFootPromos(p1left) && !foodOverPage && !sandwichCrowdsMains;
+      layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16) &&
+        !foodOverPage && !sandwichCrowdsMains;
+      layout.p2.columnPromos = canFitColumnPromos(p2left) && !foodOverPage && !sandwichCrowdsMains;
+      // Overflow only after panels are dropped. Named Sandwiches still crowd
+      // mains+desserts; food drop-ins (Specials + tip) print if they sit at min type.
+      if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 || foodOverPage) {
+        layout.fit = 'over';
+        layout.overflow = layout.overflow || 'drop-in';
+        if ((sandwichCrowdsMains || foodOverPage) &&
+            layout.fillers.indexOf(
+            'Too much content — remove a dropped-in menu') === -1) {
+          layout.fillers.push('Too much content — remove a dropped-in menu');
+        }
+      }
       // applyDropInCapacity_ adds outside notes itself — pass load without noteTax.
       applyDropInCapacity_(layout, bag, {
         p1used: p1used,
@@ -2302,6 +2313,8 @@
           'Too much content to fit on one page. Please remove a dropped-in menu, then Generate.') +
       typeNote +
       ' Columns start and finish level (food first, then feature panels).' +
+      ' When capacity is tight, omit or relocate foot/column feature panels so food drop-ins (Specials, etc.) can print — overflow only if food + tip + min gaps still will not fit.' +
+      ' Sides, Sauces and Little Bells use compact item gaps; mains keep the classical dish breathe.' +
       (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
       ' Layout from ' + bag.count + ' dishes.' + bits;
 
@@ -2310,27 +2323,34 @@
     return layout;
   }
 
-  function listDishes(list) {
-    return (list || []).map(function (d) { return dishRow(d); }).join('');
+  function wrapTightDishList(html, name) {
+    if (!html || !isTightListSection(name)) return html;
+    return '<div class="dish-list-tight">' + html + '</div>';
+  }
+
+  function listDishes(list, name) {
+    var html = (list || []).map(function (d) { return dishRow(d); }).join('');
+    return wrapTightDishList(html, name);
   }
 
   /** Split a section across two columns when it has enough dishes to look sparse full-width. */
-  function listDishesCols(list) {
+  function listDishesCols(list, name) {
     list = list || [];
-    if (list.length < 2) return listDishes(list);
+    if (list.length < 2) return listDishes(list, name);
     var mid = Math.ceil(list.length / 2);
-    return (
+    return wrapTightDishList(
       '<div class="cols share-cols">' +
         '<div class="col">' + listDishes(list.slice(0, mid)) + '</div>' +
         '<div class="col">' + listDishes(list.slice(mid)) + '</div>' +
-      '</div>'
+      '</div>',
+      name
     );
   }
 
   function sectionBlock(title, dishes, rule, kind, opts) {
     if (!dishes || !dishes.length) return '';
     opts = opts || {};
-    var body = opts.twoCol ? listDishesCols(dishes) : listDishes(dishes);
+    var body = opts.twoCol ? listDishesCols(dishes, title) : listDishes(dishes, title);
     // Item Boost is a staff filing bucket — print the dish in the frilly box, not the label
     var head = opts.hideTitle ? '' : sectionTitle(title);
     var extras = sheetOutsideParts(rule);
@@ -2480,7 +2500,7 @@
       var saucesU = 0;
       if (opts.nestSauces && opts.nestSauces.dishes && opts.nestSauces.dishes.length) {
         saucesHtml = '<div class="sec-title soft-left">' + esc(opts.nestSauces.name) + '</div>' +
-          listDishes(opts.nestSauces.dishes);
+          listDishes(opts.nestSauces.dishes, opts.nestSauces.name || 'Sauces');
         saucesU = sectionUnits(opts.nestSauces, false);
       }
       if (nestUnderTip) {
@@ -2515,6 +2535,8 @@
         excludeTitles: opts.excludeTitles,
         force: opts.force,
         shortOnly: true,
+        skipPromos: !!opts.skipPromos,
+        pageLeftover: opts.pageLeftover,
         secClass: 'specials-sand-row',
         dataSpecials: 'Special Mains'
       }
@@ -2549,6 +2571,8 @@
       excludeTitles: opts.excludeTitles,
       force: opts.force,
       shortOnly: !!opts.shortOnly,
+      skipPromos: !!opts.skipPromos,
+      pageLeftover: opts.pageLeftover,
       leftTitle: left.hideTitle ? '' : (left.title || ''),
       rightTitle: right.hideTitle ? '' : (right.title || ''),
       secClass: opts.secClass || 'col-pair-row',
@@ -2697,6 +2721,10 @@
     // Page leftover gate: never plant Gatherings / Stay under a food pair when
     // the sheet is already packed (Sunday kids|sides + notes → allergy clip).
     var skipForLeftover = opts.pageLeftover != null && !canFitColumnPromos(opts.pageLeftover);
+    // Empty partner opposite food is the leftover column itself — still fill it.
+    if (skipForLeftover && (isBlankFoodInner(leftInner) || isBlankFoodInner(rightInner))) {
+      skipForLeftover = false;
+    }
     if (!opts.skipPromos && !skipForLeftover) {
       var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
       var fillOpts = {
@@ -3352,7 +3380,7 @@
           p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'wide' : undefined, rule: sandRule });
         }
         if (p1opts.sidesOnP1 && sidesPrint) {
-          p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+          p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes, sidesPrint.name), sideRule);
         }
         if (burgerDishes.length) {
           p1 += framedBlock(sectionTitle('Burgers') + listDishes(burgerDishes), burgRule);
@@ -3413,7 +3441,7 @@
         });
       }
       if (sidesOnLeftCol && sidesPrint) {
-        p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+        p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes, sidesPrint.name), sideRule);
       }
       if (!shareInLeft && !sandOnLeftCol && !sidesOnLeftCol && !leftFeature) {
         p1 += '&nbsp;';
@@ -3444,7 +3472,7 @@
         });
       }
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule) && !sidesOnLeftCol) {
-        p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
+        p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes, sidesPrint.name), sideRule);
       }
       if (!burgerDishes.length && !classicDishes.length && !mainsInRightCol && !rightFeature &&
           !sandOnRightCol &&
@@ -3566,7 +3594,7 @@
         usedPromoTitles = usedPromoTitles.concat(sideSolo1.usedPromoTitles || []);
         p1 += sideSolo1.html;
       }
-      if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
+      if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes, bag.sauces.name || 'Sauces') + '</section>';
       if (p1opts.sandwiches && !showColBlock) {
         p1 += renderFiller('sandwiches', bag, promos, { rule: sandRule });
       }
@@ -3669,7 +3697,9 @@
         force: littleFoodPartner ? null : p2Force,
         nestSides: nest2,
         nestUnderTip: nestUnderTip2,
-        nestSauces: nestSauces2
+        nestSauces: nestSauces2,
+        skipPromos: p2opts.columnPromos === false,
+        pageLeftover: layout.leftover && layout.leftover.p2
       });
       usedPromoTitles = usedPromoTitles.concat(pairSpec2.usedTitles || []);
       p2 += pairSpec2.html || '';
@@ -3727,10 +3757,10 @@
       if (sidesSplit && sideList.length && !p2opts.sandwiches) {
         p2 += '<section class="sec sec-split">';
         p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-        p2 += listDishesCols(sideList);
+        p2 += listDishesCols(sideList, (sidesPrint && sidesPrint.name) || 'Sides');
         if (p2opts.sidesOnP2 && bag.sauces) {
           p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
-          p2 += listDishes(bag.sauces.dishes);
+          p2 += listDishes(bag.sauces.dishes, bag.sauces.name || 'Sauces');
         }
         p2 += '</section>';
         if (p2opts.footPromos && canFitFootPromos(layout.leftover && layout.leftover.p2)) {
@@ -3758,10 +3788,10 @@
         if (orphanColumnHole(sideU, rightU) && sideList.length && !p2opts.sandwiches && !sidesLockedColP2) {
           p2 += '<section class="sec">';
           p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-          p2 += listDishes(sideList);
+          p2 += listDishes(sideList, (sidesPrint && sidesPrint.name) || 'Sides');
           if (p2opts.sidesOnP2 && bag.sauces) {
             p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
-            p2 += listDishes(bag.sauces.dishes);
+            p2 += listDishes(bag.sauces.dishes, bag.sauces.name || 'Sauces');
           }
           p2 += '</section>';
           // Packed page 2 (mains + desserts + sides): omit foot panels if jammed.
@@ -3773,10 +3803,10 @@
           }
         } else {
         var leftInner = '';
-        if (sideList.length) leftInner += listDishes(sideList);
+        if (sideList.length) leftInner += listDishes(sideList, (sidesPrint && sidesPrint.name) || 'Sides');
         if (p2opts.sidesOnP2 && bag.sauces) {
           leftInner += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
-          leftInner += listDishes(bag.sauces.dishes);
+          leftInner += listDishes(bag.sauces.dishes, bag.sauces.name || 'Sauces');
         }
         if (!leftInner) leftInner = '&nbsp;';
         var rightInner = p2opts.sandwiches
@@ -3785,11 +3815,17 @@
         // Empty partner opposite Sandwiches (or Sides) must get feature panels so
         // both columns start and finish level — never skipPromos on a food hole.
         // Tip-only: no SANDWICHES pair title — compact oval already carries the sell.
+        // Empty partner opposite Sides still needs a leftover panel (column body).
+        // Only skip feature panels when both columns already have food and the
+        // planner marked the sheet too tight for chrome.
+        var bothColsHaveFood = !!(sideList.length && p2opts.sandwiches);
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
+          skipPromos: p2opts.columnPromos === false && bothColsHaveFood,
+          pageLeftover: bothColsHaveFood ? (layout.leftover && layout.leftover.p2) : null,
           force: littleFoodPartner ? null : (p2Force || (
-            (!sideList.length && p2opts.sandwiches)
+            (!sideList.length && p2opts.sandwiches && p2opts.columnPromos !== false)
               ? { shorter: 'left', panels: rightU > 12 ? 2 : 1 }
               : null
           )),
@@ -4067,7 +4103,7 @@
       // Adjacent food scallops: matching frames pick the other wave on the neighbour.
       '.cols-balanced > .col:has(> .col-body > .scallop-box) + .col > .col-body > .scallop-box{' +
         'border-image-source:url("' + asset('frame-wide.png') + '");border-image-slice:42 fill}' +
-      '.cols-balanced > .col:has(> .col-body > .scallop-wide) + .col > .col-body > .scallop-wide{' +
+      '.cols-balanced > .col:has(> .col-body > .scallop-wide:not(.scallop-platter)) + .col > .col-body > .scallop-wide:not(.scallop-platter){' +
         'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       // Bottom pad clears dashed/scallop border so below-box notes (Little Bells
       // Sunday roast line) never crop against their own frame.
@@ -4081,6 +4117,10 @@
         '.scallop-box .scallop-pad:has(.sheet-blurb-below),' +
         '.scallop-wide .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
       '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +
+      /* Tight lists: Sides / Sauces / Little Bells — compact stack, not 13px mains breathe. */
+      '.dish-list-tight{--dish-gap:1px;--dish-gap-min:0px}' +
+      '.dish-list-tight .dish,.dish-list-tight .dish-c{margin:0 0 1px}' +
+      '.dish-list-tight .dish:last-child,.dish-list-tight .dish-c:last-child{margin-bottom:0}' +
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
       '.dish-line{display:flex;flex-wrap:nowrap;align-items:center;min-width:0;max-width:100%;gap:0;line-height:1.28}' +
@@ -4183,17 +4223,25 @@
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
       /* Tip-only sell oval: compact platter silhouette (full frame-wide.png), not a
-         short rectangle with border-image waves. Centre the sell line; pad wide. */
+         short rectangle with border-image waves. Centre the sell line; pad wide.
+         Higher specificity than .scallop / adjacent-column flip so print never
+         falls back to a dashed/notched rect. */
       '.sandwich-tip-only{text-align:center}' +
       '.sandwich-tip-only .note-line{text-align:center;margin:4px 2px;font-weight:500;line-height:1.35}' +
-      '.scallop-platter,.scallop:has(.sandwich-tip-only){' +
+      '.page .scallop.scallop-wide.scallop-platter,' +
+      '.page .scallop.scallop-platter,' +
+      '.scallop.scallop-wide.scallop-platter,' +
+      '.scallop-platter,' +
+      '.scallop:has(.sandwich-tip-only){' +
         'margin-bottom:6px;border-style:none;border-width:0;border-image:none;' +
         'background:#fff url("' + asset('frame-wide.png') + '") center / 100% 100% no-repeat;' +
-        'overflow:visible}' +
-      '.scallop-platter .scallop-pad,.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:12px 28px 14px}' +
+        'min-height:58px;height:auto;align-self:stretch;overflow:visible;' +
+        '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
+      '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
+        'padding:16px 32px 18px}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
-      '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide{' +
+      '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
         'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
@@ -4222,6 +4270,10 @@
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
+      '.fill-dense .scallop-platter .scallop-pad,.fill-compact .scallop-platter .scallop-pad,' +
+        '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad,' +
+        '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{padding:14px 28px 16px}' +
+      '.fill-dense .scallop-platter,.fill-compact .scallop-platter{min-height:54px;border-width:0;border-image:none}' +
       '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-dense .scallop-box .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-compact .scallop-box .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
@@ -6292,6 +6344,7 @@
     planNestInPairLeftover: planNestInPairLeftover,
     canFitFootPromos: canFitFootPromos,
     canFitColumnPromos: canFitColumnPromos,
+    isTightListSection: isTightListSection,
     promoUnits: promoUnits,
     filterUnusedPromos: filterUnusedPromos,
     uniqueFeaturePanelsHtml: uniqueFeaturePanelsHtml,

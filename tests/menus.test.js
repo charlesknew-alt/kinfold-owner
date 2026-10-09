@@ -733,8 +733,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow192') !== -1, 'menus page cache-bust is flow192');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow192') !== -1, 'hub menus link cache-bust is flow192');
+assert(page.indexOf('flow193') !== -1, 'menus page cache-bust is flow193');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow193') !== -1, 'hub menus link cache-bust is flow193');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3890,6 +3890,109 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'platter CSS disables border-image so the oval silhouette can show');
   assert(/:has\(\.sandwich-tip-only\)\s*>\s*\.col-feature\s*>\s*\.scallop-wide/.test(sheet),
     'stacked tip + feature panel flips the panel wave for contrast');
+  assert(/scallop\.scallop-wide\.scallop-platter/.test(sheet) && /print-color-adjust:\s*exact/.test(sheet),
+    'platter CSS is print-specific so the oval silhouette survives PDF');
+  assert(/:not\(\.scallop-platter\)/.test(sheet),
+    'adjacent-column frame flip never restyles the tip platter as a rect box');
+})();
+
+// flow193: tight Sides / Sauces / Little Bells lists (not mains 13px breathe)
+(function tightListSectionsCssAndHtml() {
+  assert(typeof print.isTightListSection === 'function', 'isTightListSection is exported');
+  assert(print.isTightListSection('Sides') && print.isTightListSection('Sauces') &&
+    print.isTightListSection('Little Bells'),
+    'Sides, Sauces and Little Bells are tight-list sections');
+  assert(!print.isTightListSection('Mains') && !print.isTightListSection('Starters'),
+    'Mains and Starters keep classical dish breathe');
+  assert(/dish-list-tight\{--dish-gap:1px;--dish-gap-min:0px\}/.test(printJs),
+    'tight-list CSS zeros extra dish gap vs mains 13px floor');
+  var sidesSheet = print.build(api.menuById('main'), [
+    api.dish('Mains', 'Fish & Chips', 'peas', '18.95', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'v')
+  ], {
+    sectionLayout: api.normalizeSectionLayout({
+      Sides: { width: 'column', frame: false },
+      Mains: { width: 'full', frame: false }
+    }),
+    includes: { sandwiches: false },
+    promos: []
+  });
+  var sidesBody = sidesSheet.replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(/dish-list-tight[\s\S]{0,80}Cheesy Garlic Bread/.test(sidesBody) ||
+    /dish-list-tight/.test(sidesBody),
+    'Sides print inside dish-list-tight');
+  assert(/SIDES|Sides/.test(sidesBody), 'Sides section still prints');
+})();
+
+// flow193: Specials fit when feature panels are omitted (food before Sip & Paint)
+(function specialsFitWhenPanelsOmitted() {
+  var sell = 'A selection of sandwiches is available — ask the team.';
+  var gone = "When it's gone, it's gone";
+  var dishes = [
+    api.dish('Starters', 'Braised Lamb Shank', 'quinoa chimichurri', '10.95', 'gf'),
+    api.dish('Starters', 'Buffalo Cauliflower', 'bang bang', '7.95', 'vg'),
+    api.dish('Starters', 'King Prawns', 'romesco', '10.95', 'gf'),
+    api.dish('Starters', 'Whitebait', 'aioli', '8.50', ''),
+    api.dish('Sharing Plates', 'Baked Camembert', 'baguette', '16.95', 'v'),
+    api.dish('Sharing Plates', 'Beef Chilli Nachos', 'jalapenos', '15.95', 'gf'),
+    api.dish('Burgers', 'Brisket Burger', 'brioche fries', '18.95', ''),
+    api.dish('Burgers', 'Halloumi Burger', 'onion rings', '16.95', 'v'),
+    api.dish('Mains', 'Osso Bucco', 'risotto', '23.95', 'gf'),
+    api.dish('Mains', 'Chilli Con Carne', 'rice', '17.95', 'gf'),
+    api.dish('Mains', 'Pan Fried Seabass', 'caper butter', '22.95', 'gf'),
+    api.dish('Mains', 'Vegetarian Lasagne', 'garlic bread', '18.50', 'v'),
+    api.dish('Mains', 'Pork Wellington', 'beurre blanc', '22.95', ''),
+    api.dish('Mains', 'Fish & Chips', 'tartare', '18.95', 'gf, df'),
+    api.dish('Mains', 'Pie of the day', 'mash gravy', '20.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'noodles', '18.95', ''),
+    api.dish('Mains', 'Beef Short Rib Rigatoni', 'burrata', '20.95', ''),
+    api.dish('Desserts', 'Sticky Toffee', 'ice cream', '7.95', 'v'),
+    api.dish('Desserts', 'Brownie', 'cream', '7.50', 'v'),
+    api.dish('Desserts', 'Cheesecake', 'berry', '7.50', 'v'),
+    api.dish('Desserts', 'Ice Cream', 'scoops', '6.50', 'v'),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Seasonal Veg', '', '5.50', 'v'),
+    api.dish('Sides', 'Garlic Bread', '', '4.95', 'v'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v'),
+    api.dish('Special Mains', 'Pan-Roasted Cod Loin', 'samphire lemon', '22.95', 'gf'),
+    api.dish('Special Mains', 'Slow-Cooked Blade', 'red wine jus', '21.95', ''),
+    api.dish('Special Mains', 'Wild Mushroom Stroganoff', 'paprika rice', '18.95', 'v')
+  ];
+  var layoutMap = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: gone },
+    Sandwiches: { tip: true, frame: true, width: 'column', sell: sell },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    promos: api.seedPromoBank()
+  });
+  assert(planned.fit !== 'over',
+    'Specials generate when feature panels can be omitted');
+  assert(planned.p2 && planned.p2.specialsBesideSandwiches === true,
+    'Specials pair beside tip-only rather than refuse');
+  assert(planned.p2.footPromos === false && planned.p2.columnPromos === false,
+    'foot/column feature panels omitted so Specials can print');
+  var sheet = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    layout: planned,
+    promos: api.seedPromoBank()
+  });
+  var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(/Pan-Roasted Cod Loin|Slow-Cooked Blade|Wild Mushroom/.test(a4),
+    'Specials dishes print when panels are dropped');
+  assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(a4),
+    'tip-only still uses platter/oval classes with Specials');
+  var p2Html = a4.split(/class="page fill-page/)[2] || a4;
+  assert(!/Sip\s*&amp;\s*Paint|SIP &amp; PAINT/i.test(p2Html),
+    'Sip & Paint is not auto-added on packed page 2 ahead of Specials');
 })();
 
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
