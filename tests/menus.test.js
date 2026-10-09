@@ -163,6 +163,43 @@ assert(api.applySpellingFixesToDishes(
 )[0].name === 'Calamari', 'apply spelling fixes rewrites the dish');
 assert(page.indexOf('spellCheckThenGenerate_') !== -1 && page.indexOf('spellHintsName') !== -1,
   'spelling suggests as you type and gates Generate');
+(function assertGenerateAlwaysRoutesThroughSpell() {
+  var genMatch = page.match(/function generateMenu\(\) \{[\s\S]*?\n    \}/);
+  assert(genMatch, 'generateMenu function is present');
+  var genBody = genMatch[0];
+  assert(genBody.indexOf('spellCheckThenGenerate_') !== -1,
+    'generateMenu always routes through spellCheckThenGenerate_');
+  assert(genBody.indexOf('generateMenuAfterSpell_') !== -1,
+    'generateMenu reaches arrange only via after-spell callback');
+  // No kind may open print / arrange without the spelling gate.
+  assert(!/menu\.kind\s*===\s*['"]card['"][\s\S]{0,120}generateMenuAfterSpell_/.test(genBody),
+    'card Generate does not call generateMenuAfterSpell_ outside the spell gate');
+  assert(!/menu\.kind\s*===\s*['"]party['"][\s\S]{0,120}generateMenuAfterSpell_/.test(genBody),
+    'party Generate does not call generateMenuAfterSpell_ outside the spell gate');
+  assert(!/menu\.kind\s*===\s*['"]long['"][\s\S]{0,200}generateMenuAfterSpell_\(\)/.test(genBody) ||
+    genBody.indexOf('spellCheckThenGenerate_(generateMenuAfterSpell_)') !== -1,
+    'long Generate still funnels arrange through spellCheckThenGenerate_');
+  assert(genBody.indexOf('EBMenuPrint.build') === -1 && genBody.indexOf('openPrintHtml') === -1 &&
+    genBody.indexOf("window.open") === -1,
+    'generateMenu itself never builds/opens print (spell gate first)');
+  assert(page.indexOf('doGen.onclick = generateMenu') !== -1 &&
+    page.indexOf('doHint.onclick = generateMenu') !== -1,
+    'doGenerate and Print/PDF hint both call generateMenu (spell-gated)');
+  assert(page.indexOf('spellGatePassed_') !== -1 &&
+    page.indexOf('if (!spellGatePassed_)') !== -1,
+    'generateMenuAfterSpell_ hard-refuses calls that skipped the spelling gate');
+  assert(page.indexOf('afterPreGates_') !== -1 &&
+    page.indexOf('spellCheckThenGenerate_(generateMenuAfterSpell_)') !== -1,
+    'single afterPreGates_ funnel: spell then arrange for every kind');
+  // Built-in menu kinds that use Generate — long, card, party — share one button path.
+  var byKind = { long: 0, card: 0, party: 0 };
+  (api.MENUS || []).forEach(function (m) {
+    if (m && byKind[m.kind] !== undefined) byKind[m.kind] += 1;
+  });
+  assert(byKind.long >= 1, 'Generate spell gate covers long menus (Main/Sunday/upcoming)');
+  assert(byKind.card >= 1, 'Generate spell gate covers card menus (Specials/Sandwiches/…)');
+  assert(byKind.party >= 1, 'Generate spell gate covers party menus');
+})();
 assert(page.indexOf('dearest dish first') !== -1,
   'generate plan explains selling mix inside each category');
 assert(ingestJs.indexOf('reviewSpelling') !== -1 && aiGs.indexOf('reviewSpellingWithGemini_') !== -1,
@@ -686,8 +723,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow180') !== -1, 'menus page cache-bust is flow180');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow180') !== -1, 'hub menus link cache-bust is flow180');
+assert(page.indexOf('flow181') !== -1, 'menus page cache-bust is flow181');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow181') !== -1, 'hub menus link cache-bust is flow181');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');

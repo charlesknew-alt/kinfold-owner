@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261008-flow180"></script>
-  <script src="menus-print.js?v=20261008-flow180"></script>
-  <script src="menus-ingest.js?v=20261008-flow180"></script>
+  <script src="menus.js?v=20261009-flow181"></script>
+  <script src="menus-print.js?v=20261009-flow181"></script>
+  <script src="menus-ingest.js?v=20261009-flow181"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4262,25 +4262,31 @@
       };
     }
 
+    /**
+     * One-shot clearance from spellCheckThenGenerate_. generateMenuAfterSpell_
+     * refuses to open arrange/print without this — no menu.kind may bypass.
+     */
+    var spellGatePassed_ = false;
+
     function generateMenu() {
       var result = composed();
+      // Overflow cannot print — spell runs on the next successful Generate.
       if (result.plan.fit === 'over') {
         showOverflowGate_(result);
         return;
       }
       var layout = result.plan.layout;
       var menu = EBMenus.menuById(menuId);
+      // Single funnel for every kind (long / card / party / custom):
+      // optional drop-in offer → spelling gate → arrange → print preview.
+      function afterPreGates_() {
+        spellCheckThenGenerate_(generateMenuAfterSpell_);
+      }
       if (menu.kind === 'long' && layout && layout.canOfferDropIn && unusedDropIns_().length) {
-        showDropInOfferGate_(result, function () {
-          spellCheckThenGenerate_(function () {
-            generateMenuAfterSpell_();
-          });
-        });
+        showDropInOfferGate_(result, afterPreGates_);
         return;
       }
-      spellCheckThenGenerate_(function () {
-        generateMenuAfterSpell_();
-      });
+      afterPreGates_();
     }
 
     function catalogueSpellExtra_() {
@@ -4299,27 +4305,37 @@
       return list || [];
     }
 
+    /**
+     * Mandatory spelling gate before print for every Generate path.
+     * Local food-typo map always runs (long, card, party). AI is optional extra —
+     * if AI times out, local hits still show; if no hits, proceed.
+     */
     function spellCheckThenGenerate_(done) {
+      spellGatePassed_ = false;
       var list = spellCheckDishes_();
+      var btn = document.getElementById('doGenerate');
+      if (btn) { btn.disabled = true; btn.textContent = 'Checking spelling…'; }
+      var finish = function (fixes, aiOk) {
+        var pass = function () {
+          spellGatePassed_ = true;
+          done();
+        };
+        if (!fixes.length) {
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+          pass();
+          return;
+        }
+        showSpellingGate_(fixes, pass, { aiOk: !!aiOk });
+      };
+      // Empty sheet: still clear the gate (no words to check) — never skip the funnel.
       if (!list.length || !EBMenus.scanMenuSpelling) {
-        done();
+        finish([], false);
         return;
       }
-      // Local food-typo map always runs (cards and long sheets). AI is optional extra.
       var local = EBMenus.scanMenuSpelling(list, { extra: catalogueSpellExtra_() });
       var aiFn = (typeof EBMenuIngest !== 'undefined' && EBMenuIngest.reviewSpelling)
         ? EBMenuIngest.reviewSpelling
         : null;
-      var btn = document.getElementById('doGenerate');
-      if (btn) { btn.disabled = true; btn.textContent = 'Checking spelling…'; }
-      var finish = function (fixes, aiOk) {
-        if (!fixes.length) {
-          if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
-          done();
-          return;
-        }
-        showSpellingGate_(fixes, done, { aiOk: !!aiOk });
-      };
       var aiP = aiFn ? aiFn(list) : Promise.resolve(null);
       aiP.then(function (ai) {
         var aiFixes = (ai && ai.spellingFixes) ? ai.spellingFixes : [];
@@ -4436,6 +4452,12 @@
     }
 
     function generateMenuAfterSpell_() {
+      // Hard refuse any early call that skipped the spelling gate (any menu.kind).
+      if (!spellGatePassed_) {
+        spellCheckThenGenerate_(generateMenuAfterSpell_);
+        return;
+      }
+      spellGatePassed_ = false;
       var result = composed();
       if (result.plan.fit === 'over') {
         showOverflowGate_(result);
