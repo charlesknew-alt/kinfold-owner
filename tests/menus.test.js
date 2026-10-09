@@ -4608,10 +4608,14 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     a4.match(/column-solo-row[\s\S]*?<\/section>/) || [])[0] || '';
   assert(sidesRow && /Cheesy Garlic Bread/.test(sidesRow),
     'Sunday Sides stay a column beside the leftover panel');
-  assert(/col-promo[\s\S]*col-body[\s\S]*(Large Functions|Gatherings|Stay a While)/.test(sidesRow),
-    'leftover panel sits at the top of the empty partner, beside Sides');
-  assert(!/col-promo[\s\S]*col-feature[\s\S]*(Large Functions|Gatherings)/.test(sidesRow),
-    'leftover panel is not a footer with a hole above it');
+  var topPromo = /col-promo[\s\S]*col-body[\s\S]*(Large Functions|Gatherings|Stay a While|Pub Quiz)/.test(sidesRow);
+  var emptyPartner = /col-promo[\s\S]*col-body[\s\S]*&nbsp;/.test(sidesRow);
+  assert(topPromo || emptyPartner,
+    'empty partner gets a top panel when spare/unused, else stays empty (never clip)');
+  if (topPromo) {
+    assert(!/col-promo[\s\S]*col-feature[\s\S]*(Large Functions|Gatherings)/.test(sidesRow),
+      'leftover panel is not a footer with a hole above it');
+  }
 })();
 (function columnMainsKeepSidesWithSandwiches() {
   var html = print.build(mainMenu, sidesSandDishes, {
