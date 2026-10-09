@@ -730,8 +730,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow190') !== -1, 'menus page cache-bust is flow190');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow190') !== -1, 'hub menus link cache-bust is flow190');
+assert(page.indexOf('flow191') !== -1, 'menus page cache-bust is flow191');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow191') !== -1, 'hub menus link cache-bust is flow191');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3785,7 +3785,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'tip-only sell oval still prints with Specials');
 })();
 
-// flow190: Sunday packed Little Bells|Sides — omit Gatherings rather than clip
+// flow191: Sunday packed Little Bells|Sides — omit Gatherings rather than clip
 // into the allergy footer; kids below-note stays inside its frilly box.
 (function sundayPackedKidsSidesOmitsGatherings() {
   assert(typeof print.canFitColumnPromos === 'function', 'canFitColumnPromos is exported');

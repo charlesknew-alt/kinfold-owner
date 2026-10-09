@@ -2236,9 +2236,14 @@
       // Full mains + desserts + Sandwiches on one back page reads as a busy wall —
       // refuse and ask to untick Sandwiches (or another drop-in) rather than pack.
       var foodLoadP2 = p2Load + gapBreath + noteTaxP2;
+      var foodBreathP2 = p2Load + gapBreath;
       var sandwichCrowdsMains = !!(layout.p2.sandwiches && bag.mains && bag.desserts &&
         mainsN >= 7 && dessertN >= 4 && foodLoadP2 > PAGE - 14);
-      var foodOverPage = foodLoadP2 > PAGE;
+      // Notes-only tip-over: food + classical breath already ≤ PAGE; when-gone /
+      // above-below notes alone cross the line. Absorb into breath so tip-only
+      // Main + Specials (XIV) is not refused when tip+sides leave real room.
+      var foodOverPage = foodLoadP2 > PAGE &&
+        !(foodBreathP2 <= PAGE && noteTaxP2 > 0 && (foodLoadP2 - PAGE) <= noteTaxP2 + 0.05);
       if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 ||
           foodOverPage) {
         layout.fit = 'over';
