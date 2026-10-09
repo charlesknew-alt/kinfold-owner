@@ -3442,7 +3442,11 @@
       });
     }
 
-    if (shareAsFull && !shareInLeft) {
+    // Sunday Roasts stay the page-1 hero — print them before full/split Sharing
+    // so a Best-fit split override never floats Sharing above the roast box.
+    var roastsOnPage1 = !!(bag.sundayRoasts && (layout.pages === 1 || p1opts.sundayRoasts));
+    var deferShareAfterRoasts = !!(shareAsFull && !shareInLeft && roastsOnPage1);
+    if (shareAsFull && !shareInLeft && !deferShareAfterRoasts) {
       flushColumnPending();
       // Full / Best-fit / split Sharing: two even columns whenever there are 2+ dishes.
       var shareFullSplit = shareDishes.length >= 2;
@@ -3474,13 +3478,21 @@
     });
 
     // Sunday Roasts on page 1 (after starters, before promo/classics footers) when balanced here.
-    var roastsOnPage1 = !!(bag.sundayRoasts && (layout.pages === 1 || p1opts.sundayRoasts));
     if (roastsOnPage1) {
       var roastOut1 = renderUnpairedSection(bag.sundayRoasts.name, bag.sundayRoasts.dishes, roastRule, {
         promos: promos, excludeTitles: usedPromoTitles
       });
       usedPromoTitles = usedPromoTitles.concat(roastOut1.usedPromoTitles || []);
       p1 += roastOut1.html;
+    }
+    if (deferShareAfterRoasts) {
+      flushColumnPending();
+      var shareAfterRoastsSplit = shareDishes.length >= 2;
+      p1 += '<section class="sec' + (shareAfterRoastsSplit ? ' sec-split' : '') + '">' +
+        sectionBlock(bag.sharing.name, shareDishes, shareRule, 'wide', {
+          twoCol: shareAfterRoastsSplit
+        }) +
+        '</section>';
     }
 
     if (showColBlock && classicsAsColumn) {

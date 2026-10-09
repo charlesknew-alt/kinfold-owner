@@ -733,8 +733,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow194') !== -1, 'menus page cache-bust is flow194');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow194') !== -1, 'hub menus link cache-bust is flow194');
+assert(page.indexOf('flow195') !== -1, 'menus page cache-bust is flow195');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow195') !== -1, 'hub menus link cache-bust is flow195');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3999,7 +3999,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'Sip & Paint is not auto-added on packed page 2 ahead of Specials');
 })();
 
-// flow194: long Specials split across two columns (like Sides); tip omitted when tight;
+// flow195: long Specials split across two columns (like Sides); tip omitted when tight;
 // tip platter keeps oval aspect (not dashed rect); food never clips into allergy footer.
 (function specialsSplitTwoColumnsLikeSides() {
   var sell = 'A selection of sandwiches is available — ask the team.';
@@ -4150,7 +4150,7 @@ assert(/Long Specials[\s\S]{0,80}split across two even columns/.test(printJs) ||
   printJs.indexOf('two even columns — keep food on the page') !== -1,
   'summary/fillers document Specials two-column split rule');
 
-// flow194: Sunday Roasts + Best-fit Sharing must split (no half-cut dish at page-1
+// flow195: Sunday Roasts + Best-fit Sharing must split (no half-cut dish at page-1
 // footer); Little Bells|Desserts fills the kids column gap; Best-fit Sides split.
 (function sundaySharingSplitAndKidsFeatureFill() {
   var sunday = api.menuById('sunday');
@@ -4222,6 +4222,10 @@ assert(/Long Specials[\s\S]{0,80}split across two even columns/.test(printJs) ||
   assert(/Beef Chilli Nachos/.test(p1), 'second Sharing dish stays on page 1 (not clipped away)');
   assert(!/Beef Chilli Nachos[\s\S]{0,80}Please inform us of any allergies/i.test(p1),
     'Sharing dish does not clip into the page-1 allergy footer');
+  var roastIdx = p1.search(/Sunday Roasts|SUNDAY ROASTS/i);
+  var shareIdx = p1.search(/Sharing Plates|SHARING|Baked Camembert/i);
+  assert(roastIdx !== -1 && shareIdx !== -1 && roastIdx < shareIdx,
+    'Sunday Roasts stay above split Sharing on page 1 (hero first)');
   var kidsRow = (p2.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
   assert(/little-desserts-row/.test(p2), 'Sunday pairs Little Bells beside Desserts');
   assert(/col-feature/.test(kidsRow),
