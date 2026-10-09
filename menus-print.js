@@ -727,7 +727,8 @@
   /**
    * Smallest panel(s) that fit leftover. withGap (kids leftover) reserves a
    * decent band after the food and only allows Stay a While / Gatherings-size
-   * copy; page-1 events fill skips that so rooms copy can still sit in an even column.
+   * copy; page-1 / general column fill prefers a dated event when it fits,
+   * then the smallest evergreen — never jam an oversized Sip & Paint.
    */
   function pickFittingPromos(pool, leftover, n, withGap) {
     var list = (pool || []).slice();
@@ -735,6 +736,13 @@
     var budget = (leftover || 0) - (withGap ? FEATURE_GAP_UNITS : 0);
     if (budget < 4 || !list.length || n < 1) return [];
     var ranked = list.slice().sort(function (a, b) {
+      // General leftover: dated first when it fits the hole, then smaller.
+      // Kids (withGap) already stripped dated, so this only ranks evergreens.
+      if (!withGap) {
+        var da = a && a.date ? 0 : 1;
+        var db = b && b.date ? 0 : 1;
+        if (da !== db) return da - db;
+      }
       return promoUnits(a) - promoUnits(b);
     });
     var out = [];
@@ -748,6 +756,40 @@
       }
     });
     return out;
+  }
+
+  /**
+   * GENERAL leftover rule for every Generate / every opposite-column pair:
+   * food under the short column when it roughly levels the taller neighbour
+   * at min type; else a feature panel (never reprint). Overflow if still over.
+   * clear = how much shorter the short side must be; slack = overshoot vs tall.
+   */
+  function foodFitsColumnLeftover(shortU, tallU, foodU, opts) {
+    opts = opts || {};
+    var clear = opts.clear != null ? opts.clear : 2.5;
+    var slack = opts.slack != null ? opts.slack : 12;
+    if (!(foodU > 0)) return false;
+    if (shortU + clear >= tallU) return false;
+    if (shortU + foodU > tallU + slack) return false;
+    return true;
+  }
+
+  /**
+   * Which side of a pair should take nest food ('left'|'right'), or null.
+   * Same rule for Sharing|Burgers, tip|Specials, Sides|Sandwiches,
+   * Little Bells|Desserts — whoever is short and can take the food.
+   */
+  function planNestInPairLeftover(leftU, rightU, foodU, opts) {
+    var leftOk = foodFitsColumnLeftover(leftU, rightU, foodU, opts);
+    var rightOk = foodFitsColumnLeftover(rightU, leftU, foodU, opts);
+    if (leftOk && rightOk) {
+      // Prefer the larger hole so leftover air shrinks more.
+      return ((rightU || 0) - (leftU || 0)) >= ((leftU || 0) - (rightU || 0))
+        ? 'left' : 'right';
+    }
+    if (leftOk) return 'left';
+    if (rightOk) return 'right';
+    return null;
   }
 
   /**
@@ -2000,28 +2042,38 @@
         layout.overflow = 'drop-in';
         layout.fillers.push('Too much content — remove a dropped-in menu');
       }
-      // Sides still on this page with Specials|Sandwiches: nest Sides into the
-      // leftover (food first). Tip-only is short — prefer Sides under the tip
-      // oval so Specials stay and the tip does not waste a full column of air.
+      // GENERAL leftover fill (every pair): nest trailing column food under the
+      // short side when it levels at min type; else feature panels later.
+      // Specials|tip / Specials|Sandwiches — Sides are the nest candidate.
+      // Do not steal Sides from a proper Sides|Sandwiches seat onto Sharing|Burgers.
       var sandRuleNest = sandwichTipOnly
         ? Object.assign({}, sandRulePlan, { tipOnly: true })
         : sandRulePlan;
       if (sandPartner === 'specials' && bag.sides && layout.p2.sidesOnP2) {
-        if (sandwichTipOnly && sidesFitUnderTip(bag, sandRuleNest, bag.sides)) {
-          var nestTipLoad = p2used - specCostP2 - sideCostP2 +
+        var nestSide = planNestInPairLeftover(
+          specCostP2,
+          sandwichesLevelCost(bag, sandRuleNest),
+          sideCostP2
+        );
+        if (nestSide === 'right') {
+          var nestRightLoad = p2used - specCostP2 - sideCostP2 +
             Math.max(specCostP2, sandCost + sideCostP2);
-          if (nestTipLoad <= CLIP + 6) {
-            p2Load = nestTipLoad;
+          if (nestRightLoad <= CLIP + 6) {
+            p2Load = nestRightLoad;
             layout.p2.sidesUnderTip = true;
-            layout.fillers.push('Sides under Sandwiches tip (fill Specials|tip leftover)');
+            layout.fillers.push(
+              sandwichTipOnly
+                ? 'Sides under Sandwiches tip (fill pair leftover)'
+                : 'Sides under Sandwiches (fill pair leftover)'
+            );
           }
-        } else if (sidesFitUnderSpecials(bag, sandRuleNest, bag.sides)) {
-          var nestLoad = p2used - specCostP2 - sideCostP2 +
+        } else if (nestSide === 'left') {
+          var nestLeftLoad = p2used - specCostP2 - sideCostP2 +
             Math.max(specCostP2 + sideCostP2, sandCost);
-          if (nestLoad <= CLIP + 6) {
-            p2Load = nestLoad;
+          if (nestLeftLoad <= CLIP + 6) {
+            p2Load = nestLeftLoad;
             layout.p2.sidesUnderSpecials = true;
-            layout.fillers.push('Sides under Specials (fill Specials|Sandwiches leftover)');
+            layout.fillers.push('Sides under Specials (fill pair leftover)');
           }
         }
       }
@@ -2079,9 +2131,10 @@
         }
       }
 
-      // Starting guess only — Gemini layout review chooses leftover fill.
-      // Do not dump Sides under Sharing|Burgers just to even leftover. Do move a
-      // trailing unpaired column there when stacking it would clip food.
+      // GENERAL leftover fill applies to every pair (Sharing|Burgers, tip|Specials,
+      // Sides|*, Little Bells|Desserts): food under the short column when it fits,
+      // else feature panels — never dump Sides under Sharing when they still have
+      // a proper Sides|Sandwiches seat. Overflow gate below if still over.
 
       // Foot logo is optional chrome — only keep it when page 2 still has generous
       // leftover after mains/desserts. Readable shared type beats a second logo.
@@ -2292,38 +2345,29 @@
     return true;
   }
 
-  /** True when short Specials beside tall Sandwiches can take Sides in the leftover. */
-  function sidesFitUnderSpecials(bag, sandRule, sidesSec) {
-    if (!bag || !bag.specialMains || !bag.specialMains.dishes || !bag.specialMains.dishes.length) {
-      return false;
-    }
-    if (!sidesSec || !sidesSec.dishes || !sidesSec.dishes.length) return false;
-    var specU = sectionUnits(bag.specialMains, true);
-    var sandU = sandwichesPackCost(bag, sandRule);
-    var sideU = sectionUnits(sidesSec, false);
-    if (specU + 3 >= sandU) return false;
-    if (specU + sideU > sandU + 14) return false;
-    return true;
-  }
-
   /**
-   * Tip-only sell oval is short beside Specials — nest Sides under the tip so
-   * leftover column space holds food instead of a white hole.
+   * Specials|Sandwiches (or tip): which column takes nest Sides, using the
+   * general pair-leftover rule — not a tip-only special case.
    */
-  function sidesFitUnderTip(bag, sandRule, sidesSec) {
+  function sidesNestSideForSpecialsPair(bag, sandRule, sidesSec) {
     if (!bag || !bag.specialMains || !bag.specialMains.dishes || !bag.specialMains.dishes.length) {
-      return false;
+      return null;
     }
-    if (!sidesSec || !sidesSec.dishes || !sidesSec.dishes.length) return false;
-    if (!(sandRule && sandRule.tipOnly)) return false;
+    if (!sidesSec || !sidesSec.dishes || !sidesSec.dishes.length) return null;
     var specU = sectionUnits(bag.specialMains, true);
     var sandU = sandwichesLevelCost(bag, sandRule);
     var sideU = sectionUnits(sidesSec, false);
-    // Tip must be clearly shorter than Specials.
-    if (sandU + 2.5 >= specU) return false;
-    // Tip + Sides should roughly level with Specials (allow modest slack).
-    if (sandU + sideU > specU + 12) return false;
-    return true;
+    return planNestInPairLeftover(specU, sandU, sideU);
+  }
+
+  /** @deprecated thin wrapper — prefer sidesNestSideForSpecialsPair / foodFitsColumnLeftover */
+  function sidesFitUnderSpecials(bag, sandRule, sidesSec) {
+    return sidesNestSideForSpecialsPair(bag, sandRule, sidesSec) === 'left';
+  }
+
+  /** @deprecated thin wrapper — prefer sidesNestSideForSpecialsPair / foodFitsColumnLeftover */
+  function sidesFitUnderTip(bag, sandRule, sidesSec) {
+    return sidesNestSideForSpecialsPair(bag, sandRule, sidesSec) === 'right';
   }
 
   function specialsSandwichesPair(bag, plan, opts) {
@@ -2554,10 +2598,12 @@
   }
 
   /**
-   * GOLDEN RULE: opposite columns start and finish level.
+   * GOLDEN RULE (every Generate): opposite columns start and finish level.
    * Frilly food boxes carry their category title inside the frame (Desserts).
    * Unframed neighbours keep a pair-head, inset so it lines up with that title.
-   * Food on both sides first; a small feature panel under the shorter stack only.
+   * Leftover fill: food under the short stack when it fits (caller nests first);
+   * else a small feature panel under the shorter stack only (never both / never
+   * reprint a panel already used on the sheet).
    */
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
     opts = opts || {};
@@ -3358,11 +3404,10 @@
         var nest1 = null;
         var nestUnderTip1 = false;
         if (layout.pages === 1 && sidesPrint && !p1opts.sidesOnP1) {
-          if (layout.sandwichTipOnly && sidesFitUnderTip(bag, sandRule, sidesPrint)) {
+          var nestSide1 = sidesNestSideForSpecialsPair(bag, sandRule, sidesPrint);
+          if (nestSide1 === 'right' || nestSide1 === 'left') {
             nest1 = sidesPrint;
-            nestUnderTip1 = true;
-          } else if (sidesFitUnderSpecials(bag, sandRule, sidesPrint)) {
-            nest1 = sidesPrint;
+            nestUnderTip1 = nestSide1 === 'right';
           }
         }
         var pairSpec1 = specialsSandwichesPair(bag, plan, {
@@ -3501,14 +3546,12 @@
       var nestSauces2 = null;
       var nestUnderTip2 = false;
       if (p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
-        if (layout.p2.sidesUnderTip ||
-            (layout.sandwichTipOnly && sidesFitUnderTip(bag, sandRule, sidesPrint))) {
+        var nestSide2 = layout.p2.sidesUnderTip ? 'right'
+          : layout.p2.sidesUnderSpecials ? 'left'
+            : sidesNestSideForSpecialsPair(bag, sandRule, sidesPrint);
+        if (nestSide2 === 'right' || nestSide2 === 'left') {
           nest2 = sidesPrint;
-          nestUnderTip2 = true;
-          if (bag.sauces) nestSauces2 = bag.sauces;
-        } else if (layout.p2.sidesUnderSpecials ||
-            sidesFitUnderSpecials(bag, sandRule, sidesPrint)) {
-          nest2 = sidesPrint;
+          nestUnderTip2 = nestSide2 === 'right';
           if (bag.sauces) nestSauces2 = bag.sauces;
         }
       }
@@ -6095,6 +6138,8 @@
     historyCloudUrl: historyCloudUrl,
     measureOppositeColumns: measureOppositeColumns,
     planPromoFill: planPromoFill,
+    foodFitsColumnLeftover: foodFitsColumnLeftover,
+    planNestInPairLeftover: planNestInPairLeftover,
     promoUnits: promoUnits,
     filterUnusedPromos: filterUnusedPromos,
     uniqueFeaturePanelsHtml: uniqueFeaturePanelsHtml,

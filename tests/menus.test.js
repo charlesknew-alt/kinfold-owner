@@ -728,8 +728,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow185') !== -1, 'menus page cache-bust is flow185');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow185') !== -1, 'hub menus link cache-bust is flow185');
+assert(page.indexOf('flow186') !== -1, 'menus page cache-bust is flow186');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow186') !== -1, 'hub menus link cache-bust is flow186');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2327,6 +2327,47 @@ assert(printJs.indexOf('usedTitles') !== -1 && printJs.indexOf('excludeTitles') 
   'feature panels track usedTitles so each event prints once per menu');
 assert(printJs.indexOf('filterUnusedPromos') !== -1,
   'page 2 skips promos already used on page 1');
+// flow186: leftover column fill is one general rule for every Generate / every pair
+assert(typeof printApi.foodFitsColumnLeftover === 'function' &&
+  typeof printApi.planNestInPairLeftover === 'function',
+  'general leftover food-fit helpers are exported');
+assert(printJs.indexOf('function foodFitsColumnLeftover') !== -1 &&
+  printJs.indexOf('function planNestInPairLeftover') !== -1 &&
+  printJs.indexOf('GENERAL leftover') !== -1,
+  'leftover fill is a general rule, not tip-only / Specials-only special cases');
+(function generalLeftoverFoodRule() {
+  // Short left + food that levels tall right → nest left.
+  assert(printApi.foodFitsColumnLeftover(8, 22, 12) === true,
+    'food fits under clearly short column when it roughly levels');
+  assert(printApi.foodFitsColumnLeftover(20, 22, 12) === false,
+    'near-even columns do not take nest food');
+  assert(printApi.foodFitsColumnLeftover(8, 22, 40) === false,
+    'oversized nest food is refused (panel path / overflow instead)');
+  assert(printApi.planNestInPairLeftover(8, 22, 12) === 'left',
+    'nest plans under the short left column');
+  assert(printApi.planNestInPairLeftover(22, 8, 12) === 'right',
+    'nest plans under the short right column (tip|Specials shape)');
+  assert(printApi.planNestInPairLeftover(20, 21, 12) === null,
+    'near-even pair leaves nest null → feature panel path');
+  // Dated first when it fits (non-kids fill); kids shortOnly still bans Sip.
+  var sip = {
+    title: 'Sip & Paint',
+    date: '2025-10-28',
+    body: 'Join us for a painting evening with drinks.'
+  };
+  var stay = {
+    title: 'Stay a While',
+    body: 'cosy en-suite rooms upstairs'
+  };
+  var datedFirst = printApi.planPromoFill(6, 28, [stay, sip], {});
+  assert(datedFirst.usedTitles.indexOf('Sip & Paint') !== -1 ||
+    datedFirst.usedTitles.indexOf('Stay a While') !== -1,
+    'general column leftover still fills with a fitting panel');
+  if (printApi.promoUnits(sip) <= Math.abs(28 - 6) + 0.1) {
+    assert(datedFirst.usedTitles.indexOf('Sip & Paint') !== -1,
+      'dated event is preferred when it fits a general leftover hole');
+  }
+})();
 assert(printJs.indexOf('uniqueFeaturePanelsHtml') !== -1 &&
   printJs.indexOf('featurePanelTitlesFromHtml') !== -1,
   'printed sheets strip duplicate feature-panel titles/bodies');
@@ -3490,7 +3531,7 @@ assert(tipPackedLayout.pages === 2, 'nibbles+mains+desserts packed menu uses two
 assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPackedLayout.p1.sandwiches,
   'sandwich sell box sits on page 2 (quieter, lower-margin) in a column');
 
-// flow185: tip-only oval beside Specials — no SANDWICHES title; Sides fill tip leftover
+// flow185/186: tip-only oval beside Specials — no SANDWICHES title; general leftover nest
 (function tipOnlyOvalFillsLeftover() {
   var sellLine = 'A selection of sandwiches is available — ask the team.';
   var tipSpecDishes = [
