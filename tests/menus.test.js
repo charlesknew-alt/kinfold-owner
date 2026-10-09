@@ -3974,11 +3974,11 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'all mains still print on page 2');
   var p1Cols = (pages[1].match(/classics-block[\s\S]*?<\/section>/) || [''])[0];
   var p1Right = (p1Cols.match(/col col-food[\s\S]*$/) || [''])[0];
-  assert(/col-feature[\s\S]*(Stay a While|Gatherings)/i.test(p1Right),
+  assert(/col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz)/i.test(p1Right),
     'page 1 puts a feature panel under short Burgers (not under Sharing)');
   var p2Pair = (pages[2].match(/sides-sand-row[\s\S]*?<\/section>/) || [''])[0];
   var p2Left = (p2Pair.match(/col col-sides[\s\S]*?(?=<div class="col col-promo)/) || [''])[0];
-  assert(/col-feature[\s\S]*(Stay a While|Gatherings)/i.test(p2Left),
+  assert(/col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz)/i.test(p2Left),
     'page 2 puts a feature panel under shorter Sides when Sandwiches are the tall frilly stack');
 })();
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
