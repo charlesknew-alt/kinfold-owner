@@ -297,8 +297,11 @@ assert(printJs.indexOf('.cols.bottom-cols{flex:0 0 auto}') !== -1,
   'spread leftover sits between sections, not inside the Sides row');
 assert(/\.scallop-pad\{padding:6px 12px 1[02]px/.test(printJs),
   'frilly pad keeps prices and last dessert lines inside the box');
-assert(printJs.indexOf('scallop-pad:has(.sheet-blurb-below)') !== -1,
+assert(printJs.indexOf('scallop-pad:has(.sheet-blurb-below)') !== -1 &&
+  printJs.indexOf('padding-bottom:18px') !== -1,
   'below-box notes get extra scallop bottom pad so they never crop on the frame');
+assert(printJs.indexOf('.scallop-box .scallop-pad:has(.sheet-blurb-below)') !== -1,
+  'below-pad rule beats .scallop-box .scallop-pad shorthand');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
   'opposite columns keep category titles in a pair-head');
 assert(printJs.indexOf('function nestTitleInFrilly') !== -1 && printJs.indexOf('pair-head-inset') !== -1,
@@ -730,8 +733,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow191') !== -1, 'menus page cache-bust is flow191');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow191') !== -1, 'hub menus link cache-bust is flow191');
+assert(page.indexOf('flow192') !== -1, 'menus page cache-bust is flow192');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow192') !== -1, 'hub menus link cache-bust is flow192');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3785,7 +3788,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'tip-only sell oval still prints with Specials');
 })();
 
-// flow191: Sunday packed Little Bells|Sides — omit Gatherings rather than clip
+// flow192: Sunday packed Little Bells|Sides — omit Gatherings rather than clip
 // into the allergy footer; kids below-note stays inside its frilly box.
 (function sundayPackedKidsSidesOmitsGatherings() {
   assert(typeof print.canFitColumnPromos === 'function', 'canFitColumnPromos is exported');

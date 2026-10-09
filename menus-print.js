@@ -4072,11 +4072,14 @@
       // Bottom pad clears dashed/scallop border so below-box notes (Little Bells
       // Sunday roast line) never crop against their own frame.
       '.scallop-pad{padding:6px 12px 12px;overflow:hidden;min-width:0}' +
-      '.scallop-pad:has(.sheet-blurb-below),.scallop-pad:has(.sec-note-after){padding-bottom:14px}' +
       // Food frames stay content-sized — never stretch to fill the tall neighbour.
       '.cols-balanced .col-body > .scallop{height:fit-content;align-self:stretch;flex:0 0 auto}' +
       '.sec-split .share-cols{margin-top:2px}' +
       '.scallop-box .scallop-pad{padding:6px 12px 12px}' +
+      // After .scallop-box pad — :has must win so below notes clear the wave.
+      '.scallop-pad:has(.sheet-blurb-below),.scallop-pad:has(.sec-note-after),' +
+        '.scallop-box .scallop-pad:has(.sheet-blurb-below),' +
+        '.scallop-wide .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
       '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
@@ -4219,7 +4222,9 @@
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
-      '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below){padding-bottom:14px}' +
+      '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
+        '.fill-dense .scallop-box .scallop-pad:has(.sheet-blurb-below),' +
+        '.fill-compact .scallop-box .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
       '.fill-dense .sec-title,.fill-compact .sec-title{letter-spacing:.08em}' +
       '.fill-dense .allergy{margin-top:2mm;padding-top:1mm;font-size:9pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */
