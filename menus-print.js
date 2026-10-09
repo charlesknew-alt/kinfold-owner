@@ -1246,6 +1246,14 @@
       else spielParts.push('A selection of sandwiches is available — ask the team.');
       if (!tipOnly && note) spielParts.push(note);
       var spiel = spielParts.join('\n');
+      // Tip-only: prefer a balanced two-line sell (break on em/en dash) so the
+      // platter frames the words evenly — a single long line makes a flat sausage.
+      if (tipOnly && spiel.indexOf('\n') === -1 && /[—–-]/.test(spiel)) {
+        var dashSplit = spiel.split(/\s*[—–]\s*|\s+-\s+/);
+        if (dashSplit.length === 2 && dashSplit[0].trim() && dashSplit[1].trim()) {
+          spiel = dashSplit[0].trim() + '\n' + dashSplit[1].trim();
+        }
+      }
       var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
       var noteInner = '<div class="promo sandwich-promo' + (tipOnly ? ' sandwich-tip-only' : '') + '">';
       // Tip-only: sell words only. Full empty tip+hours keeps the section title.
@@ -1253,7 +1261,9 @@
         noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
       }
       lines.forEach(function (line, i) {
-        noteInner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
+        // Tip-only: every sell line is a note-line (same weight/size) for an even oval.
+        var lineCls = tipOnly ? 'note-line' : (i === 0 ? 'note-line' : 'desc');
+        noteInner += '<p class="' + lineCls + '">' + esc(line) + '</p>';
       });
       noteInner += '</div>';
       if (opts.hideTitle && !tipOnly) {
@@ -4524,9 +4534,8 @@
          so density / adjacent-column rules never restore a dashed rect. */
       /* Tip-only: soft classic platter hugs the sell words (fit-content, even pad). */
       '.sandwich-tip-only{text-align:center;width:max-content;max-width:100%;margin:0 auto}' +
-      '.sandwich-tip-only .note-line{text-align:center;margin:0;font-weight:500;line-height:1.2;' +
-        'text-wrap:balance;overflow-wrap:normal;hyphens:manual}' +
-      '.sandwich-tip-only .desc{text-align:center;margin:0;line-height:1.2;text-wrap:balance}' +
+      '.sandwich-tip-only .note-line,.sandwich-tip-only .desc{' +
+        'text-align:center;margin:0;font-weight:500;line-height:1.25;text-wrap:balance}' +
       '.page .scallop.scallop-wide.scallop-platter,' +
       '.page .scallop.scallop-platter,' +
       '.scallop.scallop-wide.scallop-platter,' +
@@ -4541,11 +4550,17 @@
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
         /* Content-sized oval: hug sell line; max-width keeps column overflow gates safe. */
         'aspect-ratio:auto;width:fit-content;max-width:100%;min-width:0;min-height:0;height:auto;' +
-        'align-self:center;overflow:visible;box-sizing:border-box;' +
+        'align-self:center!important;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      /* Beat .cols-balanced .col-body > .scallop { align-self:stretch } so tip does not go full-bleed. */
+      '.cols-balanced .col-body > .scallop-platter,' +
+      '.cols-balanced .col-body > .scallop:has(.sandwich-tip-only),' +
+      '.cols-balanced .col-feature > .scallop-platter,' +
+      '.cols-balanced .col-fill > .scallop-platter{' +
+        'align-self:center!important;width:fit-content;max-width:100%}' +
       '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
       '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:11px 26px;display:flex;align-items:center;justify-content:center;' +
+        'padding:16px 22px;display:flex;align-items:center;justify-content:center;' +
         'box-sizing:border-box;min-height:0;width:max-content;max-width:100%}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
@@ -4576,14 +4591,14 @@
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:10px 22px}' +
+        'padding:14px 20px}' +
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
       '.fill-dense .scallop-platter .scallop-pad,.fill-compact .scallop-platter .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:10px 22px}' +
+        'padding:14px 20px}' +
       '.fill-dense .scallop-platter,.fill-compact .scallop-platter{' +
         'min-height:0;border-width:0!important;border-image:none!important;border-radius:50%;' +
         'width:fit-content;max-width:100%}' +

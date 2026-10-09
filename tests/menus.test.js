@@ -753,8 +753,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow202') !== -1, 'menus page cache-bust is flow202');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow202') !== -1, 'hub menus link cache-bust is flow202');
+assert(page.indexOf('flow203') !== -1, 'menus page cache-bust is flow203');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow203') !== -1, 'hub menus link cache-bust is flow203');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2970,6 +2970,12 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
 // Main + Tip Yes + Sandwiches unticked → sell tip in HTML; ticked fillings → no duplicate tip-only
 (function () {
   var sellLine = 'A selection of sandwiches is available — ask the team.';
+  // Tip-only may keep the full sell line or break on the em-dash for a balanced oval.
+  function tipSellIn(html) {
+    return html.indexOf(sellLine) !== -1 ||
+      (html.indexOf('A selection of sandwiches is available') !== -1 &&
+        /ask the team\.?/.test(html));
+  }
   var tipLayout = api.normalizeSectionLayout({
     Sandwiches: {
       tip: true, frame: false, width: 'column', sell: sellLine,
@@ -2984,7 +2990,7 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
   var tipA4 = tipHtmlMain.split('mode-panel mode-a5')[0] || tipHtmlMain;
   // Assert against the sheet body — CSS also names scallop-wide / sandwich-tip-only.
   var tipBody = tipA4.replace(/<style[\s\S]*?<\/style>/gi, '');
-  assert(tipBody.indexOf(sellLine) !== -1, 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
+  assert(tipSellIn(tipBody), 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
   assert(/class="[^"]*sandwich-tip-only/.test(tipBody), 'Main unticked tip uses tip-only marker in HTML');
   assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(tipBody),
     'Main unticked tip uses scallop-wide platter oval in HTML');
@@ -3028,7 +3034,7 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
     sectionLayout: tipLayout,
     includes: { sandwiches: false }
   });
-  assert((upcomingHtml.split('mode-panel mode-a5')[0] || upcomingHtml).indexOf(sellLine) !== -1,
+  assert(tipSellIn(upcomingHtml.split('mode-panel mode-a5')[0] || upcomingHtml),
     'Main (upcoming) + tip Yes + unticked also prints sell tip');
 
   var dessertCard = print.build(api.menuById('desserts'), [
@@ -3653,7 +3659,10 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   });
   var a4 = html.split('mode-panel mode-a5')[0] || html;
   var a4Body = a4.replace(/<style[\s\S]*?<\/style>/gi, '');
-  assert(/class="[^"]*sandwich-tip-only/.test(a4Body) && a4Body.indexOf(sellLine) !== -1,
+  assert(/class="[^"]*sandwich-tip-only/.test(a4Body) &&
+    (a4Body.indexOf(sellLine) !== -1 ||
+      (a4Body.indexOf('A selection of sandwiches is available') !== -1 &&
+        /ask the team\.?/.test(a4Body))),
     'tip-only oval prints sell words on the sheet');
   assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(a4Body),
     'tip-only uses platter oval frame (scallop/platter class wraps sell words)');
@@ -3937,10 +3946,21 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   assert(/aspect-ratio:\s*auto/.test(sheet), 'platter CSS uses oval aspect auto (content-sized)');
   assert(/width:\s*fit-content/.test(sheet) && /max-width:\s*100%/.test(sheet),
     'platter hugs sell words (fit-content) without overflowing the column');
-  assert(/scallop-platter[\s\S]{0,220}padding:\s*11px\s*26px/.test(sheet) ||
-    /padding:\s*11px\s*26px[\s\S]{0,120}scallop-platter/.test(sheet) ||
-    /\.scallop-platter[\s\S]{0,400}padding:\s*11px\s*26px/.test(sheet),
+  assert(/cols-balanced[\s\S]{0,120}\.scallop-platter[\s\S]{0,80}align-self:\s*center!important/.test(sheet) ||
+    /\.cols-balanced\.col-body\s*>\s*\.scallop-platter[\s\S]{0,80}align-self:\s*center!important/.test(sheet) ||
+    /col-body\s*>\s*\.scallop-platter[\s\S]{0,100}align-self:\s*center!important/.test(sheet),
+    'balanced columns do not stretch tip platter full-bleed');
+  assert(/scallop-platter[\s\S]{0,220}padding:\s*16px\s*22px/.test(sheet) ||
+    /padding:\s*16px\s*22px[\s\S]{0,120}scallop-platter/.test(sheet) ||
+    /\.scallop-platter[\s\S]{0,400}padding:\s*16px\s*22px/.test(sheet),
     'platter pad is even on all sides (top=bottom, left=right)');
+  var tipBalanced = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
+    rule: { tip: true, tipOnly: true, sell: 'A selection of sandwiches is available — ask the team.' },
+    tipOnly: true
+  });
+  assert(/note-line">A selection of sandwiches is available</.test(tipBalanced) &&
+    /note-line">ask the team/.test(tipBalanced) && !/<p class="desc">ask the team/.test(tipBalanced),
+    'tip-only sell breaks on em-dash into a balanced two-line platter');
   assert(/scallop-platter[\s\S]{0,200}border-image:\s*none|border-image:\s*none[\s\S]{0,200}scallop-platter/.test(sheet) ||
     /\.scallop-platter[\s\S]{0,300}border-image:\s*none/.test(sheet),
     'platter CSS disables border-image so the oval silhouette can show');
