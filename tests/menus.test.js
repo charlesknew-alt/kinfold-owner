@@ -726,8 +726,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow183') !== -1, 'menus page cache-bust is flow183');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow183') !== -1, 'hub menus link cache-bust is flow183');
+assert(page.indexOf('flow184') !== -1, 'menus page cache-bust is flow184');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow184') !== -1, 'hub menus link cache-bust is flow184');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2771,7 +2771,7 @@ var sparse = [
 var sparseLayout = print.planFluidLayout(mainMenu, sparse);
 assert(sparseLayout.pages === 1, 'sparse menu stays on one page');
 assert(sparseLayout.p1.rooms || sparseLayout.fillers.some(function (f) { return /Stay|Gatherings|Sandwiches|Logo/i.test(f); }), 'sparse menu gets selling fillers');
-// Tip on + Sandwiches ticked → empty selling box; unticked → no box even if Tip is on
+// Tip on + Sandwiches ticked → empty selling box; Main unticked + Tip → sell tip only
 var tipOnLayout = print.planFluidLayout(mainMenu, sparse, {
   sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } }),
   includes: { sandwiches: true }
@@ -2780,13 +2780,23 @@ assert(tipOnLayout.p1.sandwiches || (tipOnLayout.p2 && tipOnLayout.p2.sandwiches
   tipOnLayout.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
   'ticked sandwiches + tip on keeps selling box with 0 dishes');
 assert(tipOnLayout.sandwichesLocked === true, 'ticked empty sandwiches lock the box on the sheet');
+assert(tipOnLayout.sandwichTipOnly !== true, 'ticked empty sandwiches is full tip+hours, not tip-only');
 var noTickTip = print.planFluidLayout(mainMenu, sparse, {
   sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } }),
   includes: { sandwiches: false }
 });
-assert(!noTickTip.p1.sandwiches && !(noTickTip.p2 && noTickTip.p2.sandwiches) &&
-  !noTickTip.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
-  'unticked sandwiches stay off even when Tip is on');
+assert(noTickTip.p1.sandwiches || (noTickTip.p2 && noTickTip.p2.sandwiches) ||
+  noTickTip.fillers.some(function (f) { return /Sandwiches tip/i.test(f); }),
+  'Main unticked + Tip on still places the sell tip box');
+assert(noTickTip.sandwichTipOnly === true, 'Main unticked tip is tip-only (not full sandwiches section)');
+assert(noTickTip.sandwichesLocked === true, 'Main tip-when-unticked is locked chrome');
+var sundayNoTickTip = print.planFluidLayout(api.menuById('sunday'), sparse, {
+  sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: true, sell: 'Ask for today’s sandwiches' } }),
+  includes: { sandwiches: false }
+});
+assert(!sundayNoTickTip.p1.sandwiches && !(sundayNoTickTip.p2 && sundayNoTickTip.p2.sandwiches) &&
+  !sundayNoTickTip.fillers.some(function (f) { return /Sandwiches/i.test(f); }),
+  'Sunday unticked does not get the Main tip-when-unticked sell box');
 var tipOffLayout = print.planFluidLayout(mainMenu, sparse, {
   sectionLayout: api.normalizeSectionLayout({ Sandwiches: { tip: false, sell: '' } }),
   includes: { sandwiches: true }
@@ -2799,6 +2809,14 @@ var tipHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: 
 });
 assert(/Selection at the bar/.test(tipHtml), 'empty tip box prints sell wording');
 assert(/lunch hours/.test(tipHtml), 'empty tip box still shows note/hours');
+var tipOnlyHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
+  rule: { frame: true, tip: true, tipOnly: true, note: '(lunch hours)', sell: 'Selection at the bar',
+    below: 'Upgrade to Fries +£2' }
+});
+assert(/Selection at the bar/.test(tipOnlyHtml), 'tip-only box prints sell wording');
+assert(!/lunch hours/.test(tipOnlyHtml) && !/Upgrade to Fries/.test(tipOnlyHtml),
+  'tip-only box omits hours and below (small ad, not full section)');
+assert(/sandwich-tip-only/.test(tipOnlyHtml), 'tip-only box marks sandwich-tip-only class');
 var tipBelowHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
   rule: {
     frame: true, tip: true, note: '(lunch hours)', sell: 'Selection at the bar',
@@ -2840,6 +2858,61 @@ var plainSand = print.sandwichesBlock({
 });
 assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
   'unframed sandwiches below wording stays in the section box');
+
+// Main + Tip Yes + Sandwiches unticked → sell tip in HTML; ticked fillings → no duplicate tip-only
+(function () {
+  var sellLine = 'A selection of sandwiches is available — ask the team.';
+  var tipLayout = api.normalizeSectionLayout({
+    Sandwiches: {
+      tip: true, frame: false, width: 'column', sell: sellLine,
+      note: '(12 – 2.45 pm Mon to Fri)', above: '(12 – 2.45 pm Mon to Fri)',
+      below: 'Upgrade to Fries +£2'
+    }
+  });
+  var tipHtmlMain = print.build(mainMenu, sparse, {
+    sectionLayout: tipLayout,
+    includes: { sandwiches: false }
+  });
+  var tipA4 = tipHtmlMain.split('mode-panel mode-a5')[0] || tipHtmlMain;
+  assert(tipA4.indexOf(sellLine) !== -1, 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
+  assert(/sandwich-tip-only/.test(tipA4), 'Main unticked tip uses tip-only marker in HTML');
+  assert(!/\(12 – 2\.45 pm Mon to Fri\)/.test(tipA4) ||
+    (tipA4.match(/sandwich-tip-only[\s\S]{0,400}/) || [''])[0].indexOf('12 – 2.45') === -1,
+    'Main unticked tip does not stuff hours into the tip-only sell box');
+
+  var withFillings = sparse.concat([
+    api.dish('Sandwiches', 'Crayfish Marie Rose', 'salad', '10.95', ''),
+    api.dish('Sandwiches', 'BLT', 'bacon', '10.95', '')
+  ]);
+  var filledHtml = print.build(mainMenu, withFillings, {
+    sectionLayout: tipLayout,
+    includes: { sandwiches: true }
+  });
+  var filledA4 = filledHtml.split('mode-panel mode-a5')[0] || filledHtml;
+  assert(/Crayfish Marie Rose/.test(filledA4) && /BLT/.test(filledA4),
+    'Main + sandwiches ticked with fillings prints the full sandwiches list');
+  assert(!/sandwich-tip-only/.test(filledA4),
+    'Main with fillings does not also print a separate tip-only sell box');
+  assert(filledA4.indexOf(sellLine) === -1 || /Crayfish[\s\S]*BLT/.test(filledA4),
+    'filled sandwiches sheet is the dish list, not a tip-only duplicate');
+
+  var upcoming = api.menuById('main-next');
+  var upcomingHtml = print.build(upcoming, sparse, {
+    sectionLayout: tipLayout,
+    includes: { sandwiches: false }
+  });
+  assert((upcomingHtml.split('mode-panel mode-a5')[0] || upcomingHtml).indexOf(sellLine) !== -1,
+    'Main (upcoming) + tip Yes + unticked also prints sell tip');
+
+  var dessertCard = print.build(api.menuById('desserts'), [
+    api.dish('Desserts', 'Sticky Toffee', 'custard', '7.50', 'v'),
+    api.dish('Desserts', 'Ice Cream', 'three scoops', '6.50', 'v')
+  ], {
+    sectionLayout: tipLayout
+  });
+  assert(dessertCard.indexOf(sellLine) === -1 && !/sandwich-tip-only/.test(dessertCard),
+    'desserts card does not print the Sandwiches tip sell box');
+})();
 
 // Card menus: text outside dishes comes from sectionLayout note/sell (not hard-coded only).
 var sandCardDishes = [

@@ -1121,7 +1121,7 @@
 
   /**
    * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list.
-   * With 0 fillings + Tip on: selling box (sell words, then optional note/hours).
+   * tipOnly: small sell-words ad (Main unticked). Else 0 fillings + Tip: sell + note/hours.
    * Frilly box only when Blocks → Sandwiches → Frilly is Yes (not hard-coded).
    * Host sheet: above + dishes + below all sit inside this section’s box
    * (frilly when Yes). Card menus keep above/below outside via cardOutsideWrap.
@@ -1144,14 +1144,16 @@
           aboveKind: rule.aboveKind || 'paragraph', belowKind: rule.belowKind || 'paragraph' };
     var extras = sheetOutsideParts(rule);
     if (!dishes.length) {
-      // Tip box: selling words first, then hours / “all served with…” under the title
+      // Tip-only (Main unticked): sell words in a small ad box — not hours/below.
+      // Ticked empty: selling words first, then hours / “all served with…”.
+      var tipOnly = !!(opts.tipOnly || rule.tipOnly);
       var spielParts = [];
       if (sell) spielParts.push(sell);
       else spielParts.push('A selection of sandwiches is available — ask the team.');
-      if (note) spielParts.push(note);
+      if (!tipOnly && note) spielParts.push(note);
       var spiel = spielParts.join('\n');
       var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
-      var noteInner = '<div class="promo sandwich-promo">';
+      var noteInner = '<div class="promo sandwich-promo' + (tipOnly ? ' sandwich-tip-only' : '') + '">';
       noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
       lines.forEach(function (line, i) {
         noteInner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
@@ -1160,7 +1162,7 @@
       if (opts.hideTitle) {
         noteInner = noteInner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, '');
       }
-      noteInner += extras.belowHtml || '';
+      if (!tipOnly) noteInner += extras.belowHtml || '';
       if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
       if (opts.alignTitle && !opts.hideTitle) {
         return (
@@ -1634,8 +1636,9 @@
 
   /**
    * Decide page split + which optional chrome (logo / feature panels) fits.
-   * Sandwiches follow the Dishes include tick (or named fillings already on the
-   * sheet) — they are never dropped because of space. Promo never forces an extra page.
+   * Named sandwich fillings follow the Dishes tick — never dropped for space.
+   * On Main / Main (upcoming), Tip=Yes also places a sell tip when Sandwiches is
+   * unticked (compulsory chrome). Promo never forces an extra page.
    */
   function planFluidLayout(menu, dishes, opts) {
     opts = opts || {};
@@ -1708,8 +1711,9 @@
         back = backWithoutRoasts;
       }
     }
-    // Named fillings on the composed sheet always print. Empty tip box only when
-    // staff ticked Sandwiches on this host AND Tip is on — never “if it fits”.
+    // Named fillings always print. Empty tip+hours when Sandwiches is ticked and
+    // Tip is on. On Main / Main (upcoming), Tip=Yes also places a sell-only tip
+    // when Sandwiches is unticked — compulsory chrome, never silent when spare room.
     var sandDishCount = sandwichDishesOf(bag).length;
     var sandRule = { tip: true, sell: '', note: '', frame: true };
     if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
@@ -1717,16 +1721,25 @@
     } else if (opts.sectionLayout && opts.sectionLayout.Sandwiches) {
       sandRule = opts.sectionLayout.Sandwiches;
     }
-    var isLongHost = menu.kind === 'long' || menu.id === 'main' || menu.id === 'main-next' || menu.id === 'sunday' ||
-      (root.EBMenus && root.EBMenus.isMainSheet && root.EBMenus.isMainSheet(menu.id));
+    var isMainHost = !!(root.EBMenus && root.EBMenus.isMainSheet)
+      ? root.EBMenus.isMainSheet(menu.id)
+      : (menu.id === 'main' || menu.id === 'main-next');
+    var isLongHost = menu.kind === 'long' || isMainHost || menu.id === 'sunday';
     var includeSandwiches = opts.includes && typeof opts.includes === 'object'
       ? !!opts.includes.sandwiches
       : null;
     var tipOn = sandRule.tip !== false && sandRule.tip !== 'no' && sandRule.tip !== 0;
     var wantSandwiches;
+    var sandwichTipOnly = false;
     if (sandDishCount > 0) {
       wantSandwiches = isLongHost || !!bag.sandwiches;
+    } else if (isMainHost && tipOn) {
+      // Tip=Yes on Main/upcoming: always try to place. Ticked → full empty section
+      // (hours + sell); unticked → tip-only sell words (not a second full section).
+      wantSandwiches = true;
+      sandwichTipOnly = includeSandwiches !== true;
     } else if (isLongHost) {
+      // Sunday: empty tip+hours only when Sandwiches is ticked and Tip is on
       wantSandwiches = includeSandwiches === true && tipOn;
     } else {
       wantSandwiches = !!bag.sandwiches;
@@ -1754,7 +1767,8 @@
       leftover: { p1: 0, p2: 0 },
       summary: '',
       fillers: [],
-      sandwichesLocked: !!wantSandwiches
+      sandwichesLocked: !!wantSandwiches,
+      sandwichTipOnly: !!sandwichTipOnly
     };
     if (roastsOnP1) layout.fillers.push('Sunday Roasts (page 1 — balance)');
     if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
@@ -1800,7 +1814,10 @@
       }
       if (wantSandwiches) {
         layout.p1.sandwiches = true;
-        layout.fillers.push(sandDishCount ? 'Sandwiches (page 1)' : 'Sandwiches box (page 1)');
+        layout.fillers.push(
+          sandDishCount ? 'Sandwiches (page 1)'
+            : sandwichTipOnly ? 'Sandwiches tip (page 1)' : 'Sandwiches box (page 1)'
+        );
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
       add = tryAdd(left1, COST.footLogo + 6);
@@ -1855,7 +1872,10 @@
         layout.p2.sandwiches = true;
         layout.p1.sandwiches = false;
         p2left = Math.max(0, p2left - (tightBack ? sandCost + 2 : sandCost));
-        layout.fillers.push(sandDishCount ? 'Sandwiches (page 2)' : 'Sandwiches box (page 2)');
+        layout.fillers.push(
+          sandDishCount ? 'Sandwiches (page 2)'
+            : sandwichTipOnly ? 'Sandwiches tip (page 2)' : 'Sandwiches box (page 2)'
+        );
       }
       // Overflow (any sheet): food must not clip. Two Column / Best-fit sections
       // that can share a row count as the taller one, not a stack. A trailing
@@ -2783,6 +2803,10 @@
     var mainRule = ruleFor('Mains', plan);
     var littleRule = ruleFor('Little Bells', plan);
     var sandRule = ruleFor('Sandwiches', plan);
+    // Main tip-when-unticked: sell-only ad box (not hours / below as a full section).
+    if (layout.sandwichTipOnly) {
+      sandRule = Object.assign({}, sandRule, { tipOnly: true });
+    }
     var sideRule = ruleFor('Sides', plan);
     var dessRule = ruleFor('Desserts', plan);
     // Feature panel titles already printed — each event box only once per menu.
@@ -3310,7 +3334,9 @@
         p1 += sideSolo1.html;
       }
       if (bag.sauces) p1 += '<section class="sec">' + sectionTitle(bag.sauces.name) + listDishes(bag.sauces.dishes) + '</section>';
-      if (p1opts.sandwiches && !showColBlock) p1 += renderFiller('sandwiches', bag);
+      if (p1opts.sandwiches && !showColBlock) {
+        p1 += renderFiller('sandwiches', bag, promos, { rule: sandRule });
+      }
       if (p1opts.footLogo) p1 += renderFiller('logo', bag);
     }
 

@@ -2836,7 +2836,7 @@
    *   both   — “best fit”: Gemini chooses column or full for this sheet, alongside the rules
    * frame: scalloped “frilly” box around the section
    * note: optional spiel printed under the title (hours, “all served with…”, etc.)
-   * tip: include as a selling box on the long sheet even with 0 dishes
+   * tip: Main/upcoming — sell tip when Sandwiches unticked; also empty tip+hours when ticked
    * sell: selling words for the tip box (used when tip is on / no fillings)
    *
    * Opposite-column pairs (any two Column / Best-fit sections side by side):
@@ -2879,7 +2879,7 @@
       frame: true,
       // Main/Sunday under-title (hours). Card menu overrides note to the filling spiel.
       note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with nachos & salad. FRIES UPGRADE +£2.',
-      // Tip = selling box on Main/Sunday when Sandwiches is ticked and has 0 fillings
+      // Tip = sell box on Main/upcoming when unticked; empty tip+hours when ticked + 0 fillings
       tip: true,
       sell: 'A selection of sandwiches is available — ask the team.'
     },
