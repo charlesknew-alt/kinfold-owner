@@ -753,8 +753,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow203') !== -1, 'menus page cache-bust is flow203');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow203') !== -1, 'hub menus link cache-bust is flow203');
+assert(page.indexOf('flow204') !== -1, 'menus page cache-bust is flow204');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow204') !== -1, 'hub menus link cache-bust is flow204');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2970,7 +2970,7 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
 // Main + Tip Yes + Sandwiches unticked → sell tip in HTML; ticked fillings → no duplicate tip-only
 (function () {
   var sellLine = 'A selection of sandwiches is available — ask the team.';
-  // Tip-only may keep the full sell line or break on the em-dash for a balanced oval.
+  // Tip-only prefers one elegant sell line inside the oval.
   function tipSellIn(html) {
     return html.indexOf(sellLine) !== -1 ||
       (html.indexOf('A selection of sandwiches is available') !== -1 &&
@@ -3950,17 +3950,21 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     /\.cols-balanced\.col-body\s*>\s*\.scallop-platter[\s\S]{0,80}align-self:\s*center!important/.test(sheet) ||
     /col-body\s*>\s*\.scallop-platter[\s\S]{0,100}align-self:\s*center!important/.test(sheet),
     'balanced columns do not stretch tip platter full-bleed');
-  assert(/scallop-platter[\s\S]{0,220}padding:\s*16px\s*22px/.test(sheet) ||
-    /padding:\s*16px\s*22px[\s\S]{0,120}scallop-platter/.test(sheet) ||
-    /\.scallop-platter[\s\S]{0,400}padding:\s*16px\s*22px/.test(sheet),
+  assert(/scallop-platter[\s\S]{0,220}padding:\s*14px\s*28px/.test(sheet) ||
+    /padding:\s*14px\s*28px!important[\s\S]{0,120}scallop-platter/.test(sheet) ||
+    /\.scallop-platter[\s\S]{0,400}padding:\s*14px\s*28px/.test(sheet),
     'platter pad is even on all sides (top=bottom, left=right)');
+  assert(/sandwich-tip-only[\s\S]{0,180}flex-direction:\s*column/.test(sheet) &&
+    /scallop-platter[\s\S]{0,220}display:\s*flex!important/.test(sheet),
+    'tip platter + sell words use flex centre for optical vertical/horizontal balance');
   var tipBalanced = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
     rule: { tip: true, tipOnly: true, sell: 'A selection of sandwiches is available — ask the team.' },
     tipOnly: true
   });
-  assert(/note-line">A selection of sandwiches is available</.test(tipBalanced) &&
-    /note-line">ask the team/.test(tipBalanced) && !/<p class="desc">ask the team/.test(tipBalanced),
-    'tip-only sell breaks on em-dash into a balanced two-line platter');
+  // Prefer a single elegant sell line — do not force an em-dash break into two lines.
+  assert(/note-line">A selection of sandwiches is available — ask the team\.<\/p>/.test(tipBalanced) &&
+    !/note-line">ask the team/.test(tipBalanced.replace(/note-line">A selection of sandwiches is available — ask the team\.<\/p>/, '')),
+    'tip-only sell stays one centred line inside the oval (no forced dash break)');
   assert(/scallop-platter[\s\S]{0,200}border-image:\s*none|border-image:\s*none[\s\S]{0,200}scallop-platter/.test(sheet) ||
     /\.scallop-platter[\s\S]{0,300}border-image:\s*none/.test(sheet),
     'platter CSS disables border-image so the oval silhouette can show');

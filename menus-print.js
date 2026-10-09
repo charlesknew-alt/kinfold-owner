@@ -1246,14 +1246,9 @@
       else spielParts.push('A selection of sandwiches is available — ask the team.');
       if (!tipOnly && note) spielParts.push(note);
       var spiel = spielParts.join('\n');
-      // Tip-only: prefer a balanced two-line sell (break on em/en dash) so the
-      // platter frames the words evenly — a single long line makes a flat sausage.
-      if (tipOnly && spiel.indexOf('\n') === -1 && /[—–-]/.test(spiel)) {
-        var dashSplit = spiel.split(/\s*[—–]\s*|\s+-\s+/);
-        if (dashSplit.length === 2 && dashSplit[0].trim() && dashSplit[1].trim()) {
-          spiel = dashSplit[0].trim() + '\n' + dashSplit[1].trim();
-        }
-      }
+      // Tip-only: prefer one elegant sell line inside the oval. Keep author
+      // newlines if they typed them; do not force an em-dash break (two short
+      // lines made the platter taller and threw optical vertical centre).
       var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
       var noteInner = '<div class="promo sandwich-promo' + (tipOnly ? ' sandwich-tip-only' : '') + '">';
       // Tip-only: sell words only. Full empty tip+hours keeps the section title.
@@ -4529,13 +4524,17 @@
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
-      /* Tip-only sell oval: real ellipse silhouette (frame-platter.png), NOT the
-         rectangular frame-wide.png scallop box. Kill border-image with !important
-         so density / adjacent-column rules never restore a dashed rect. */
-      /* Tip-only: soft classic platter hugs the sell words (fit-content, even pad). */
-      '.sandwich-tip-only{text-align:center;width:max-content;max-width:100%;margin:0 auto}' +
-      '.sandwich-tip-only .note-line,.sandwich-tip-only .desc{' +
-        'text-align:center;margin:0;font-weight:500;line-height:1.25;text-wrap:balance}' +
+      /* Tip-only sell oval: true geometric ellipse (frame-platter.png double-stroke),
+         NOT the rectangular frame-wide.png scallop and NOT a lumpy cloud lobe.
+         Kill border-image with !important so density rules never restore a dashed rect. */
+      /* Tip-only: classy platter hugs the sell words; text optically centred. */
+      '.sandwich-tip-only{' +
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+        'text-align:center;width:max-content;max-width:100%;margin:0 auto;gap:0}' +
+      '.sandwich-tip-only .note-line,.sandwich-tip-only .desc,' +
+      '.promo.sandwich-tip-only > p.note-line,.promo.sandwich-tip-only > p.desc{' +
+        'display:block;text-align:center;margin:0!important;padding:0!important;' +
+        'font-weight:500;line-height:1.2;text-wrap:balance;width:100%}' +
       '.page .scallop.scallop-wide.scallop-platter,' +
       '.page .scallop.scallop-platter,' +
       '.scallop.scallop-wide.scallop-platter,' +
@@ -4548,8 +4547,9 @@
         'background-color:#fff;' +
         'background-image:url("' + asset('frame-platter.png') + '");' +
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
-        /* Content-sized oval: hug sell line; max-width keeps column overflow gates safe. */
+        /* Content-sized true ellipse: hug sell line; flex centres the pad in the oval. */
         'aspect-ratio:auto;width:fit-content;max-width:100%;min-width:0;min-height:0;height:auto;' +
+        'display:flex!important;align-items:center;justify-content:center;' +
         'align-self:center!important;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       /* Beat .cols-balanced .col-body > .scallop { align-self:stretch } so tip does not go full-bleed. */
@@ -4560,12 +4560,16 @@
         'align-self:center!important;width:fit-content;max-width:100%}' +
       '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
       '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:16px 22px;display:flex;align-items:center;justify-content:center;' +
-        'box-sizing:border-box;min-height:0;width:max-content;max-width:100%}' +
+        /* Equal pad all sides — never inherit scallop-pad’s 6/12 asymmetric shorthand. */
+        'padding:14px 28px!important;display:flex;flex-direction:column;' +
+        'align-items:center;justify-content:center;' +
+        'box-sizing:border-box;min-height:0;width:max-content;max-width:100%;margin:0}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
         'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
+      /* Tip-only note-line must win over the generic .note-line margin above. */
+      '.sandwich-tip-only .note-line{margin:0!important}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
       '.lc-price{font-family:var(--serif);text-align:center;font-size:12px;line-height:1.45}' +
@@ -4591,17 +4595,17 @@
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:14px 20px}' +
+        'padding:12px 24px!important}' +
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
       '.fill-dense .scallop-platter .scallop-pad,.fill-compact .scallop-platter .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:14px 20px}' +
+        'padding:12px 24px!important}' +
       '.fill-dense .scallop-platter,.fill-compact .scallop-platter{' +
         'min-height:0;border-width:0!important;border-image:none!important;border-radius:50%;' +
-        'width:fit-content;max-width:100%}' +
+        'width:fit-content;max-width:100%;display:flex!important;align-items:center;justify-content:center}' +
       '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-dense .scallop-box .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-compact .scallop-box .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
