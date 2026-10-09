@@ -769,8 +769,12 @@
 
   /**
    * GENERAL leftover rule for every Generate / every opposite-column pair:
-   * food under the short column when it roughly levels the taller neighbour
-   * at min type; else a feature panel (never reprint). Overflow if still over.
+   * After food is placed at min type, any leftover column gap large enough for
+   * a panel is filled — never leave a Sunday-sized hole under Little Bells (or
+   * tip|Sides / Sharing|Burgers) empty. Food under the short column when it
+   * roughly levels the taller neighbour; else one feature panel (never reprint).
+   * Tip-only sell stays an oval scalloped platter. Never clip food — overflow
+   * / keepContentOnPage may drop the panel only when the sheet still overflows.
    * clear = how much shorter the short side must be; slack = overshoot vs tall.
    */
   function foodFitsColumnLeftover(shortU, tallU, foodU, opts) {
@@ -2931,8 +2935,14 @@
         });
       }
     }
-    var leftFeat = fill.left ? '<div class="col-feature">' + fill.left + '</div>' : '';
-    var rightFeat = fill.right ? '<div class="col-feature">' + fill.right + '</div>' : '';
+    // In-pair leftover fillers (Little Bells|Desserts, tip|Sides, …) are marked
+    // col-feature-level so fitPages never strips them just because type is tight —
+    // that re-opened the Sunday-sized hole under the short food column.
+    var featCls = (opts.shortOnly || opts.force || inPairLevelFill)
+      ? 'col-feature col-feature-level'
+      : 'col-feature';
+    var leftFeat = fill.left ? '<div class="' + featCls + '">' + fill.left + '</div>' : '';
+    var rightFeat = fill.right ? '<div class="' + featCls + '">' + fill.right + '</div>' : '';
     var secClass = opts.secClass || 'col-pair-row';
     var colsClass = opts.colsClass || '';
     var leftClass = opts.leftClass || '';
@@ -4035,19 +4045,31 @@
         // both columns start and finish level — never skipPromos on a food hole.
         // Tip-only: no SANDWICHES pair title — compact oval already carries the sell.
         // Empty partner opposite Sides still needs a leftover panel (column body).
-        // Only skip feature panels when both columns already have food and the
-        // planner marked the sheet too tight for chrome.
+        // GENERAL leftover rule: after food at min type, any column gap large enough
+        // for a panel is filled (tip|Sides included) — page leftover gates foot
+        // chrome, not in-pair leveling. Still food-first: keepContentOnPage may
+        // drop the panel only if the sheet overflows.
         var bothColsHaveFood = !!(sideList.length && p2opts.sandwiches);
+        var tipOnlyPair = !!(p2opts.sandwiches && layout.sandwichTipOnly);
+        var pairHole = Math.abs((sideU || 0) - (rightU || 0));
+        var forcePairFill = null;
+        if (tipOnlyPair && bothColsHaveFood && pairHole > 1.2) {
+          forcePairFill = {
+            shorter: (sideU || 0) < (rightU || 0) ? 'left' : 'right',
+            panels: pairHole > 9 ? 2 : 1
+          };
+        } else if (!sideList.length && p2opts.sandwiches && p2opts.columnPromos !== false) {
+          forcePairFill = { shorter: 'left', panels: rightU > 12 ? 2 : 1 };
+        }
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
-          skipPromos: p2opts.columnPromos === false && bothColsHaveFood,
-          pageLeftover: bothColsHaveFood ? (layout.leftover && layout.leftover.p2) : null,
-          force: littleFoodPartner ? null : (p2Force || (
-            (!sideList.length && p2opts.sandwiches && p2opts.columnPromos !== false)
-              ? { shorter: 'left', panels: rightU > 12 ? 2 : 1 }
-              : null
-          )),
+          shortOnly: tipOnlyPair || bothColsHaveFood,
+          skipPromos: p2opts.columnPromos === false && bothColsHaveFood && !forcePairFill,
+          pageLeftover: (bothColsHaveFood && !forcePairFill)
+            ? (layout.leftover && layout.leftover.p2)
+            : null,
+          force: littleFoodPartner ? null : (p2Force || forcePairFill),
           leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
           rightTitle: (p2opts.sandwiches && !layout.sandwichTipOnly) ? 'Sandwiches' : '',
           secClass: 'sides-sand-row',
@@ -4887,8 +4909,9 @@
           'if(!hidden)return;' +
           'fitGroup(group);' +
         '}' +
-        // Feature panels must not jam in at min type — drop foot promo pairs and
-        // column leftover panels (Gatherings under Little Bells) when dense/overflow.
+        // Foot promo pairs may drop at dense type. In-pair leftover fillers
+        // (col-feature-level under Little Bells / tip|Sides) stay until the page
+        // truly overflows — never reopen a Sunday-sized column hole at tight type.
         'function dropJammedFootPromos(page){' +
           'var foots=page.querySelectorAll(".foot-promos,.foot-promos-one");' +
           'if(!foots.length)return false;' +
@@ -4898,11 +4921,12 @@
           'return true;' +
         '}' +
         'function dropJammedColumnPromos(page){' +
-          'var feats=page.querySelectorAll(".col-feature");' +
-          'if(!feats.length)return false;' +
-          'var dense=page.classList.contains("fill-dense")||page.classList.contains("fill-compact")||page.classList.contains("fill-tight");' +
-          'if(!dense&&!overflows(page))return false;' +
-          'var last=feats[feats.length-1];' +
+          // Optional (non-level) column chrome only — and only when overflowing.
+          // Leveling panels are food-column fillers; keepContentOnPage drops them last.
+          'if(!overflows(page))return false;' +
+          'var optional=[].slice.call(page.querySelectorAll(".col-feature:not(.col-feature-level)"));' +
+          'if(!optional.length)return false;' +
+          'var last=optional[optional.length-1];' +
           'if(last&&last.parentNode){last.parentNode.removeChild(last);return true;}' +
           'return false;' +
         '}' +
@@ -4915,17 +4939,18 @@
           'if(changed)fitGroup(group);' +
         '}' +
         // NEVER clip food off the page. Drop optional chrome first (foot promos,
-        // logos). Column-balance feature panels are last — opposite columns must
-        // stay as level as possible (golden rule).
+        // logos, non-level panels). In-pair leveling panels last — opposite columns
+        // stay filled until food would otherwise clip (golden leftover rule).
         'function dropOverflowingChrome(page){' +
           'if(!overflows(page))return false;' +
           'var foot=page.querySelector(".foot-promos,.foot-promos-one");' +
           'if(foot&&foot.parentNode){foot.parentNode.removeChild(foot);return true;}' +
           'var logo=page.querySelector(".foot-logo");' +
           'if(logo&&logo.style.display!=="none"){logo.style.display="none";return true;}' +
-          'var feats=page.querySelectorAll(".col-feature .scallop");' +
-          'if(feats.length>1){var last=feats[feats.length-1];if(last.parentNode){last.parentNode.removeChild(last);return true;}}' +
-          'if(feats.length===1){var one=feats[0];if(one.parentNode){one.parentNode.removeChild(one);return true;}}' +
+          'var optional=[].slice.call(page.querySelectorAll(".col-feature:not(.col-feature-level) .scallop"));' +
+          'if(optional.length){var o=optional[optional.length-1];if(o.parentNode){o.parentNode.removeChild(o);return true;}}' +
+          'var level=[].slice.call(page.querySelectorAll(".col-feature-level .scallop,.col-feature .scallop"));' +
+          'if(level.length){var one=level[level.length-1];if(one.parentNode){one.parentNode.removeChild(one);return true;}}' +
           'return false;' +
         '}' +
         'function keepContentOnPage(group){' +

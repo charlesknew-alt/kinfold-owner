@@ -733,8 +733,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow195') !== -1, 'menus page cache-bust is flow195');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow195') !== -1, 'hub menus link cache-bust is flow195');
+assert(page.indexOf('flow196') !== -1, 'menus page cache-bust is flow196');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow196') !== -1, 'hub menus link cache-bust is flow196');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -1762,10 +1762,12 @@ assert(/pair-head-inset[\s\S]*Little Bells/.test(tallDessRow),
   'unframed Little Bells heading insets to line up with Desserts in the box');
 assert(!/col-little[\s\S]*col-feature[\s\S]*Sip & Paint/i.test(tallDessRow),
   'leftover under Little Bells does not auto-pick an oversized Sip & Paint');
-if (/col-little[\s\S]*col-feature/.test(tallDessRow)) {
-  assert(/col-little[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz|How are we doing)/i.test(tallDessRow),
-    'leftover space under shorter Little Bells gets a small feature panel when it fits');
-}
+assert(/col-little[\s\S]*col-feature/.test(tallDessRow),
+  'Sunday-sized hole under Little Bells MUST get a feature panel when one fits');
+assert(/col-little[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz|How are we doing)/i.test(tallDessRow),
+  'leftover space under shorter Little Bells gets a small feature panel when it fits');
+assert(/col-feature-level/.test(tallDessRow),
+  'in-pair leftover filler is marked col-feature-level so fitPages keeps it at tight type');
 assert(!/col-desserts[\s\S]*col-feature/.test(tallDessRow),
   'the leftover panel stays in the Little Bells column — not under Desserts');
 assert(/col-little[\s\S]*a choice of roasts[\s\S]*col-desserts/.test(tallDessRow),
@@ -3861,8 +3863,10 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'Gatherings is not nested under Little Bells when leftover is tight');
   assert(body.indexOf('foot-promos') === -1,
     'foot promo pair also omitted on packed Sunday page 2');
-  assert(/dropJammedColumnPromos/.test(printJs),
-    'fitPages drops jammed column feature panels at dense/overflow');
+  assert(/dropJammedColumnPromos/.test(printJs) &&
+    printJs.indexOf('col-feature-level') !== -1 &&
+    printJs.indexOf('col-feature:not(.col-feature-level)') !== -1,
+    'fitPages drops only non-level column chrome on overflow — keeps Sunday leftover fillers');
 })();
 
 // flow188: tip-only oval platter CSS paints full frame-wide silhouette (not border-image rect).
@@ -4230,8 +4234,165 @@ assert(/Long Specials[\s\S]{0,80}split across two even columns/.test(printJs) ||
   assert(/little-desserts-row/.test(p2), 'Sunday pairs Little Bells beside Desserts');
   assert(/col-feature/.test(kidsRow),
     'leftover under Little Bells gets a feature panel (not a huge empty hole)');
+  assert(/col-feature-level/.test(kidsRow),
+    'Sunday leftover filler is col-feature-level (fitPages must not strip at tight type)');
   assert(/sec-split[\s\S]{0,120}Sides|share-cols[\s\S]{0,80}Cheesy Garlic/.test(p2),
     'Best-fit Sides split across two columns when alone under the kids|desserts row');
+})();
+
+// flow196: GENERAL leftover fill — Sunday hole under Little Bells always gets a
+// panel when one fits; Main tip|Sides fills column leftover; tip stays oval platter;
+// fit script keeps col-feature-level until real overflow (never reopen the hole).
+(function flow196LeftoverGapFillRule() {
+  assert(printJs.indexOf('col-feature-level') !== -1 &&
+    /never leave a Sunday-sized hole/i.test(printJs),
+    'GENERAL leftover rule documents Sunday-sized hole fill');
+  assert(/dropJammedColumnPromos[\s\S]{0,400}col-feature:not\(\.col-feature-level\)/.test(printJs) ||
+    printJs.indexOf('col-feature:not(.col-feature-level)') !== -1,
+    'dropJammedColumnPromos skips leveling fillers unless overflowing');
+
+  var sunday = api.menuById('sunday');
+  var sunDishes = [
+    api.dish('Sunday Roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
+    api.dish('Sunday Roasts', 'Nut Roast', 'vegan gravy', '16.95', 'vg'),
+    api.dish('Sunday Roasts', 'Leg of Lamb', 'cooked pink', '20.95', ''),
+    api.dish('Sunday Roasts', 'Chicken Supreme', '', '18.95', ''),
+    api.dish('Sunday Roasts', 'Loin of Pork', '', '18.95', ''),
+    api.dish('Sharing Starters', 'Baked Camembert', 'baguette', '16.95', 'v'),
+    api.dish('Sharing Starters', 'Beef Chilli Nachos', 'jalapenos', '15.95', ''),
+    api.dish('Mains', 'Sweet Potato & Halloumi Burger', 'fries', '16.95', 'v'),
+    api.dish('Mains', 'Cottage Pie', 'mash', '16.95', ''),
+    api.dish('Mains', 'Fish & Chips', 'peas', '18.95', ''),
+    api.dish('Mains', 'Pie of the Day', 'mash gravy', '19.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'rice', '18.95', ''),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'parmesan', '20.95', ''),
+    api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+    api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Beef Burger, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Pasta Bolognese', '', '', 'vg option'),
+    api.dish('Little Bells', 'Ham & Cheese Pizza', '', '', 'v option'),
+    api.dish('Desserts', 'Cheeses', 'selection of cheeses with biscuits', '8.95', 'v'),
+    api.dish('Desserts', 'Three Scoops of Ice Cream or Sorbet',
+      'vanilla strawberry chocolate salted caramel marshmallow mudslide honeycomb cookie crumble & selected sorbets',
+      '5.95', 'vg & gf option'),
+    api.dish('Desserts', 'Chocolate & Raspberry Tart', 'with cream', '8.25', ''),
+    api.dish('Desserts', 'Lime Posset', 'homemade compote & shortbread', '8.25', ''),
+    api.dish('Desserts', 'Sticky Toffee Pudding', 'ice cream and toffee sauce', '8.25', 'gf option'),
+    api.dish('Desserts', 'Apple & Blackberry Crumble', 'ice cream or custard', '8.25', 'gf option'),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v')
+  ];
+  var sunLayout = api.normalizeSectionLayout(Object.assign({}, api.sectionLayoutForMenu('sunday'), {
+    'Little Bells': {
+      width: 'column', frame: false,
+      above: 'All below £9.50 to include a choice of one scoop of ice cream or sorbet.',
+      aboveKind: 'paragraph',
+      below: 'A CHOICE OF ROASTS AT HALF PRICE OF THE ADULTS',
+      belowKind: 'text'
+    },
+    Desserts: { width: 'column', frame: true, note: '' },
+    Sides: { width: 'both', frame: false }
+  }));
+  var sunPlan = print.planFluidLayout(sunday, sunDishes, {
+    sectionLayout: sunLayout,
+    includes: { 'little-bells': true },
+    promos: api.seedPromoBank()
+  });
+  var sunSheet = print.build(sunday, sunDishes, {
+    sectionLayout: sunLayout,
+    includes: { 'little-bells': true },
+    layout: sunPlan,
+    promos: api.seedPromoBank()
+  });
+  var sunA4 = (sunSheet.split('mode-panel mode-a5')[0] || sunSheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  var sunP2 = sunA4.split(/class="page /)[2] || '';
+  var sunKids = (sunP2.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(/col-feature-level/.test(sunKids) &&
+    /col-little[\s\S]*col-feature[\s\S]*(Stay a While|Gatherings|Pub Quiz|How are we)/i.test(sunKids),
+    'screenshot Sunday: leftover under Little Bells gets a leveling feature panel');
+  assert(!/col-desserts[\s\S]*col-feature/.test(sunKids),
+    'Sunday leftover panel is not duplicated under Desserts');
+  var sunTitles = print.featurePanelTitlesFromHtml(sunA4).map(function (t) {
+    return String(t || '').toLowerCase();
+  });
+  var sunSeen = {};
+  var sunDup = sunTitles.some(function (t) {
+    if (!t) return false;
+    if (sunSeen[t]) return true;
+    sunSeen[t] = true;
+    return false;
+  });
+  assert(!sunDup, 'Sunday feature panels print at most once each');
+
+  var sell = 'A selection of sandwiches is available — ask the team.';
+  var mainDishes = [];
+  for (var si = 0; si < 5; si++) {
+    mainDishes.push(api.dish('Starters', 'Starter ' + si, 'long starter description packing', '8.95', ''));
+  }
+  for (var shi = 0; shi < 2; shi++) {
+    mainDishes.push(api.dish('Sharing Plates', 'Share ' + shi, 'share description', '15.95', 'v'));
+  }
+  for (var bi = 0; bi < 3; bi++) {
+    mainDishes.push(api.dish('Burgers', 'Burger ' + bi, 'burger fries salad', '18.95', ''));
+  }
+  [
+    'Pan Fried Seabass', 'Vegetarian Lasagne', 'Pork Wellington', 'Fish & Chips',
+    'Pie of the day', 'Korean Chicken Balls', 'Beef Short Rib Genovese Rigatoni'
+  ].forEach(function (n) {
+    mainDishes.push(api.dish('Mains', n, 'long main description mash gravy peas', '18.95', ''));
+  });
+  [
+    'Venison Tournedos Rossini', 'Baked Gnocchi', 'Creamy Chicken Nduja & Chorizo Penne',
+    'Beef Brisket & Chilli Noodles', 'Pasta Carbonara'
+  ].forEach(function (n, idx) {
+    mainDishes.push(api.dish('Special Mains', n, 'long special description text ' + idx, '15.95',
+      idx === 1 ? 'v' : ''));
+  });
+  [
+    'Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg',
+    'Garlic Bread', 'House Salad', 'Fries'
+  ].forEach(function (n) {
+    mainDishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  var mainLayout = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: "When it's gone, it's gone" },
+    Sandwiches: { tip: true, frame: false, width: 'column', sell: sell },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var mainPlan = print.planFluidLayout(api.menuById('main'), mainDishes, {
+    sectionLayout: mainLayout,
+    includes: { sandwiches: false, specials: true },
+    promos: api.seedPromoBank()
+  });
+  assert(mainPlan.widthOverrides && mainPlan.widthOverrides['Special Mains'] === 'split',
+    'Main Specials still split two columns (food before tip chrome)');
+  assert(mainPlan.p2 && mainPlan.p2.sidesOnP2 === true,
+    'Sides stay on page 2 under split Specials (not clipped off the sheet)');
+  var mainSheet = print.build(api.menuById('main'), mainDishes, {
+    sectionLayout: mainLayout,
+    includes: { sandwiches: false, specials: true },
+    layout: mainPlan,
+    promos: api.seedPromoBank()
+  });
+  assert(/aspect-ratio:\s*1526\/610/.test(mainSheet) && /border-image:none!important/.test(mainSheet),
+    'tip platter CSS keeps oval aspect on Main');
+  var mainA4 = (mainSheet.split('mode-panel mode-a5')[0] || mainSheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  var mainP2 = mainA4.split(/class="page /)[2] || '';
+  assert(/Cheesy Garlic Bread|Chunky Triple/.test(mainP2), 'Sides print under Specials');
+  assert(!/Chunky Triple[\s\S]{0,80}Please inform us of any allergies/i.test(mainP2) &&
+    !/Cheesy Garlic Bread[\s\S]{0,80}Please inform us of any allergies/i.test(mainP2),
+    'Sides do not clip into the allergy footer');
+  if (mainPlan.p2.sandwiches) {
+    assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(mainP2),
+      'when tip is kept it is the oval scalloped platter (not a dashed rect)');
+    var tipRow = (mainP2.match(/sides-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+    if (/col-feature/.test(tipRow)) {
+      assert(/col-feature-level/.test(tipRow),
+        'tip|Sides leftover filler is leveling (kept through tight type)');
+    }
+  }
 })();
 
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
