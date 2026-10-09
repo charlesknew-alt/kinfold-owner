@@ -1939,6 +1939,7 @@
       layout.mode = 'jul-nov';
       layout.p2 = {
         rooms: false, sandwiches: false, footLogo: false, footPromos: false,
+        columnPromos: true,
         sidesOnP2: true, specialsBesideSandwiches: false,
         sidesUnderSpecials: false, sidesUnderTip: false
       };
@@ -2250,6 +2251,20 @@
         }
       }
       p2left = Math.max(0, p2left - gapBreath - noteTaxP2);
+      // Optional chrome decided before note/gap tax — drop it when the sheet
+      // is now packed (logo / Gatherings must not fall off after kids notes).
+      if (layout.p2.footLogo && p2left < COST.footLogo + 4) {
+        layout.p2.footLogo = false;
+        p2left += COST.footLogo;
+        var logoIdx = layout.fillers.indexOf('Logo (page 2)');
+        if (logoIdx !== -1) layout.fillers.splice(logoIdx, 1);
+        if (layout.fillers.indexOf('No page-2 logo (keep food on the page)') === -1) {
+          layout.fillers.push('No page-2 logo (keep food on the page)');
+        }
+      }
+      if (layout.p2.rooms && p2left < promoCost + 4) {
+        layout.p2.rooms = false;
+      }
       layout.leftover.p2 = p2left;
       // Foot / column feature panels ONLY after gap breath + section notes —
       // never place Gatherings under Little Bells when leftover is already tight.
@@ -3516,7 +3531,12 @@
       // Food-first column pairing (Sides/Desserts when Blocks allow); else feature panels.
       var littleP1 = renderLittleBellsRow(
         bag, littleRule, dessRule, sideRule, sidesPrint,
-        { promos: promos, excludeTitles: usedPromoTitles }
+        {
+          promos: promos,
+          excludeTitles: usedPromoTitles,
+          pageLeftover: layout.leftover && layout.leftover.p1,
+          skipPromos: layout.p1 && layout.p1.columnPromos === false
+        }
       );
       usedPromoTitles = usedPromoTitles.concat(littleP1.usedPromoTitles || []);
       p1 += littleP1.html;
@@ -3666,7 +3686,13 @@
     // Food-first column pairing; feature panels fill any remaining short column.
     var littleP2 = renderLittleBellsRow(
       bag, littleRule, dessRule, sideRule, sidesPrint,
-      { promos: promos, excludeTitles: usedPromoTitles, force: littleFoodPartner ? p2Force : null }
+      {
+        promos: promos,
+        excludeTitles: usedPromoTitles,
+        force: littleFoodPartner ? p2Force : null,
+        pageLeftover: layout.leftover && layout.leftover.p2,
+        skipPromos: p2opts.columnPromos === false
+      }
     );
     usedPromoTitles = usedPromoTitles.concat(littleP2.usedPromoTitles || []);
     p2 += littleP2.html;
@@ -4038,11 +4064,14 @@
         'border-image-source:url("' + asset('frame-wide.png') + '");border-image-slice:42 fill}' +
       '.cols-balanced > .col:has(> .col-body > .scallop-wide) + .col > .col-body > .scallop-wide{' +
         'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
-      '.scallop-pad{padding:6px 12px 10px;overflow:hidden;min-width:0}' +
+      // Bottom pad clears dashed/scallop border so below-box notes (Little Bells
+      // Sunday roast line) never crop against their own frame.
+      '.scallop-pad{padding:6px 12px 12px;overflow:hidden;min-width:0}' +
+      '.scallop-pad:has(.sheet-blurb-below),.scallop-pad:has(.sec-note-after){padding-bottom:14px}' +
       // Food frames stay content-sized — never stretch to fill the tall neighbour.
       '.cols-balanced .col-body > .scallop{height:fit-content;align-self:stretch;flex:0 0 auto}' +
       '.sec-split .share-cols{margin-top:2px}' +
-      '.scallop-box .scallop-pad{padding:6px 12px 10px}' +
+      '.scallop-box .scallop-pad{padding:6px 12px 12px}' +
       '.dish{margin:0 0 max(var(--dish-gap-min),var(--dish-gap));min-width:0;max-width:100%}' +
       /* Leaders only between name and price on one row — never under the description */
       /* align-items:center + 1em mark keeps every dish-line the same height (no lunch-gap stretch) */
@@ -4182,7 +4211,10 @@
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{padding:10px 24px 12px}' +
-      '.fill-dense .scallop-pad{padding:4px 10px 6px}' +
+      // Keep bottom pad even when dense — never crop inside-frame notes.
+      '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
+      '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
+      '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below){padding-bottom:14px}' +
       '.fill-dense .sec-title,.fill-compact .sec-title{letter-spacing:.08em}' +
       '.fill-dense .allergy{margin-top:2mm;padding-top:1mm;font-size:9pt}' +
       /* 2×A5 on A4 landscape — cut down the middle */
@@ -4559,8 +4591,8 @@
           'if(!hidden)return;' +
           'fitGroup(group);' +
         '}' +
-        // Feature panels must not jam in at min type — drop foot promo pairs when
-        // the page is already dense/compact or still overflows with them.
+        // Feature panels must not jam in at min type — drop foot promo pairs and
+        // column leftover panels (Gatherings under Little Bells) when dense/overflow.
         'function dropJammedFootPromos(page){' +
           'var foots=page.querySelectorAll(".foot-promos,.foot-promos-one");' +
           'if(!foots.length)return false;' +
@@ -4569,9 +4601,21 @@
           '[].forEach.call(foots,function(el){if(el.parentNode)el.parentNode.removeChild(el);});' +
           'return true;' +
         '}' +
+        'function dropJammedColumnPromos(page){' +
+          'var feats=page.querySelectorAll(".col-feature");' +
+          'if(!feats.length)return false;' +
+          'var dense=page.classList.contains("fill-dense")||page.classList.contains("fill-compact")||page.classList.contains("fill-tight");' +
+          'if(!dense&&!overflows(page))return false;' +
+          'var last=feats[feats.length-1];' +
+          'if(last&&last.parentNode){last.parentNode.removeChild(last);return true;}' +
+          'return false;' +
+        '}' +
         'function dropJammedPromos(group){' +
           'var changed=false;' +
-          'group.forEach(function(pg){if(dropJammedFootPromos(pg))changed=true;});' +
+          'group.forEach(function(pg){' +
+            'if(dropJammedFootPromos(pg))changed=true;' +
+            'if(dropJammedColumnPromos(pg))changed=true;' +
+          '});' +
           'if(changed)fitGroup(group);' +
         '}' +
         // NEVER clip food off the page. Drop optional chrome first (foot promos,
@@ -6237,6 +6281,7 @@
     foodFitsColumnLeftover: foodFitsColumnLeftover,
     planNestInPairLeftover: planNestInPairLeftover,
     canFitFootPromos: canFitFootPromos,
+    canFitColumnPromos: canFitColumnPromos,
     promoUnits: promoUnits,
     filterUnusedPromos: filterUnusedPromos,
     uniqueFeaturePanelsHtml: uniqueFeaturePanelsHtml,

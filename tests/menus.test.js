@@ -295,8 +295,10 @@ assert(printJs.indexOf('.bottom-cols.cols-balanced .col-body{flex:0 0 auto}') !=
   'Sides partner column does not stretch and leave a hole above the panel');
 assert(printJs.indexOf('.cols.bottom-cols{flex:0 0 auto}') !== -1,
   'spread leftover sits between sections, not inside the Sides row');
-assert(/\.scallop-pad\{padding:6px 12px 10px/.test(printJs),
+assert(/\.scallop-pad\{padding:6px 12px 1[02]px/.test(printJs),
   'frilly pad keeps prices and last dessert lines inside the box');
+assert(printJs.indexOf('scallop-pad:has(.sheet-blurb-below)') !== -1,
+  'below-box notes get extra scallop bottom pad so they never crop on the frame');
 assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function pairHeadHtml') !== -1,
   'opposite columns keep category titles in a pair-head');
 assert(printJs.indexOf('function nestTitleInFrilly') !== -1 && printJs.indexOf('pair-head-inset') !== -1,
@@ -728,8 +730,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow189') !== -1, 'menus page cache-bust is flow189');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow189') !== -1, 'hub menus link cache-bust is flow189');
+assert(page.indexOf('flow190') !== -1, 'menus page cache-bust is flow190');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow190') !== -1, 'hub menus link cache-bust is flow190');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3781,6 +3783,79 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'Sides still print with Specials + tip-only');
   assert(/class="[^"]*sandwich-tip-only/.test(a4.replace(/<style[\s\S]*?<\/style>/gi, '')),
     'tip-only sell oval still prints with Specials');
+})();
+
+// flow190: Sunday packed Little Bells|Sides — omit Gatherings rather than clip
+// into the allergy footer; kids below-note stays inside its frilly box.
+(function sundayPackedKidsSidesOmitsGatherings() {
+  assert(typeof print.canFitColumnPromos === 'function', 'canFitColumnPromos is exported');
+  assert(print.canFitColumnPromos(14) === true, 'comfortable leftover may take a column panel');
+  assert(print.canFitColumnPromos(10) === false, 'tight leftover skips column Gatherings');
+  var sunday = api.menuById('sunday');
+  var dishes = [
+    api.dish('Sunday Roasts', 'Topside of Beef', 'roasties', '18.95', ''),
+    api.dish('Sunday Roasts', 'Roast Chicken', 'roasties', '17.95', ''),
+    api.dish('Sunday Roasts', 'Nut Roast', 'roasties', '16.95', 'vg'),
+    api.dish('Mains', 'Fish & Chips', 'peas', '18.95', 'df'),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'parmesan', '20.95', ''),
+    api.dish('Mains', 'Pie of the Day', 'mash', '19.95', ''),
+    api.dish('Mains', 'Chicken Katsu Curry', 'rice', '16.95', ''),
+    api.dish('Mains', 'Ham Egg & Chips', '', '17.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'rice', '18.95', ''),
+    api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+    api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Beef Burger, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Tomato & Basil Pasta', '', '', 'v'),
+    api.dish('Little Bells', 'Kids Mac & Cheese', '', '', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.50', 'vg'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'vg'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'vg'),
+    api.dish('Sides', 'Onion Rings', '', '4.50', 'vg'),
+    api.dish('Sides', 'Truffle Fries', '', '6.50', '')
+  ];
+  var layoutMap = api.normalizeSectionLayout(Object.assign({}, api.sectionLayoutForMenu('sunday'), {
+    'Little Bells': {
+      width: 'column',
+      frame: true,
+      above: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.',
+      below: 'On Sundays, Little Bells can also enjoy a choice of roasts at half the adult price.',
+      aboveKind: 'heading',
+      belowKind: 'text'
+    },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  }));
+  var planned = print.planFluidLayout(sunday, dishes, {
+    sectionLayout: layoutMap,
+    includes: { 'little-bells': true },
+    promos: api.seedPromoBank()
+  });
+  assert(planned.p2 && planned.p2.columnPromos === false,
+    'packed Sunday marks columnPromos false after kids notes + gap breath');
+  assert(planned.leftover && planned.leftover.p2 < 14,
+    'packed Sunday leftover is below the column-panel gate');
+  // Stale flag must not shove Gatherings under Little Bells.
+  planned.p2.columnPromos = true;
+  planned.leftover.p2 = 8;
+  var sheet = print.build(sunday, dishes, {
+    sectionLayout: layoutMap,
+    includes: { 'little-bells': true },
+    layout: planned,
+    promos: api.seedPromoBank()
+  });
+  var body = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  var kidsRow = (body.match(/little-sides-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(/little-sides-row/.test(body), 'Sunday still pairs Little Bells beside Sides');
+  assert(/half the adult price|half the price of the adults/i.test(kidsRow),
+    'Little Bells Sunday roast note still prints inside the kids box');
+  assert(!/col-feature[\s\S]*Gatherings|Gatherings[\s\S]*col-feature/i.test(kidsRow) &&
+    !/<div class="col-feature">[\s\S]*Gatherings/i.test(kidsRow),
+    'Gatherings is not nested under Little Bells when leftover is tight');
+  assert(body.indexOf('foot-promos') === -1,
+    'foot promo pair also omitted on packed Sunday page 2');
+  assert(/dropJammedColumnPromos/.test(printJs),
+    'fitPages drops jammed column feature panels at dense/overflow');
 })();
 
 // flow188: tip-only oval platter CSS paints full frame-wide silhouette (not border-image rect).
