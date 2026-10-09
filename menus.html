@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261009-flow184"></script>
-  <script src="menus-print.js?v=20261009-flow184"></script>
-  <script src="menus-ingest.js?v=20261009-flow184"></script>
+  <script src="menus.js?v=20261009-flow185"></script>
+  <script src="menus-print.js?v=20261009-flow185"></script>
+  <script src="menus-ingest.js?v=20261009-flow185"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -2233,7 +2233,7 @@
             html += '<div><label class="field" style="margin-top:0">Tip box selling words</label>';
             html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2" placeholder="A selection of sandwiches is available…">' +
               escapeAttr(rule.sell || '') + '</textarea></div></div>';
-            html += '<p class="note" style="margin:6px 0 0">On <strong>Main</strong> and <strong>Main (upcoming)</strong>, Tip = Yes prints a small selling box with these words even when Sandwiches is unticked — so guests still see lunch sandwiches are available. When Sandwiches is ticked (fillings, or empty tip+hours), that section prints instead — Tip does not add a second box. Sunday still needs Sandwiches ticked for the empty tip box. Fit always tries to place the tip; only a truly packed sheet may overflow.</p>';
+            html += '<p class="note" style="margin:6px 0 0">On <strong>Main</strong> and <strong>Main (upcoming)</strong>, Tip = Yes prints a compact oval with these selling words (no Sandwiches title) even when Sandwiches is unticked — leftover column space can take Sides or a feature panel. When Sandwiches is ticked (fillings, or empty tip+hours), that section prints instead — Tip does not add a second box. Sunday still needs Sandwiches ticked for the empty tip box. Fit always tries to place the tip; only a truly packed sheet may overflow.</p>';
           }
           html += '</div>';
         }

@@ -767,7 +767,9 @@
     if (opts.rightFrame == null) rightKind = leftKind === 'box' ? 'wide' : 'box';
     var defaults = [
       { title: 'Stay a While', body: 'we’ve got a handful of cosy en-suite rooms if you’d like to settle in for the night.' },
-      { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' }
+      { title: 'Gatherings', body: 'whether it’s a quiet supper or a special get together, we’re always happy to host your event' },
+      // Third evergreen so page-2 leftovers can still fill after page 1 spent Stay/Gatherings.
+      { title: 'Pub Quiz', body: 'Join us for our pub quiz — teams welcome, cash prizes, from 8pm.' }
     ];
     var excludeTitles = opts.excludeTitles || [];
     var list = filterUnusedPromos(promos, excludeTitles);
@@ -832,11 +834,11 @@
     }
     if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1, hole, true);
     if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1, hole, true);
-    // Near-even opposite food columns: one panel under the slightly shorter
-    // side only. Pairing both would burn Stay a While + Gatherings before page 2
-    // solo columns (Desserts / Sides) can fill their empty half.
-    if (pool.length && Math.abs(gap) <= 2.5) {
-      return stackForShort(gap >= 0 ? 'left' : 'right', 1, Math.max(hole, 8), true);
+    // Near-even opposite food columns: skip. A full panel under the slightly
+    // shorter side overshoots and leaves a white hole on the other (Sharing|
+    // Burgers). Real holes (gap > 2.5) still get a panel above.
+    if (Math.abs(gap) <= 2.5) {
+      return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
     }
     return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
   }
@@ -1093,6 +1095,8 @@
       var base = Math.max(COST.sandwiches, sectionUnits({ name: 'Sandwiches', dishes: dishes }, framed));
       return base + Math.min(6, dishes.length) + hours;
     }
+    // Tip-only sell oval is short — do not reserve a full sandwiches column.
+    if (rule && rule.tipOnly) return COST.sandwichTip;
     return COST.sandwiches;
   }
 
@@ -1107,7 +1111,10 @@
     rule = rule || (root.EBMenus && root.EBMenus.sectionLayoutFor
       ? root.EBMenus.sectionLayoutFor('Sandwiches')
       : { note: '', frame: true });
-    if (!dishes.length) return COST.sandwiches;
+    if (!dishes.length) {
+      if (rule && rule.tipOnly) return COST.sandwichTip;
+      return COST.sandwiches;
+    }
     // Frilly frame + hours note add real half-column height beyond dish rows.
     var u = columnFillUnits(
       { name: 'Sandwiches', dishes: dishes },
@@ -1121,7 +1128,8 @@
 
   /**
    * Sandwiches on a long sheet: category spiel (hours etc.) plus the dish list.
-   * tipOnly: small sell-words ad (Main unticked). Else 0 fillings + Tip: sell + note/hours.
+   * tipOnly: compact sell-words oval (Main unticked) — no SANDWICHES title.
+   * Else 0 fillings + Tip: sell + note/hours with the section title.
    * Frilly box only when Blocks → Sandwiches → Frilly is Yes (not hard-coded).
    * Host sheet: above + dishes + below all sit inside this section’s box
    * (frilly when Yes). Card menus keep above/below outside via cardOutsideWrap.
@@ -1144,7 +1152,8 @@
           aboveKind: rule.aboveKind || 'paragraph', belowKind: rule.belowKind || 'paragraph' };
     var extras = sheetOutsideParts(rule);
     if (!dishes.length) {
-      // Tip-only (Main unticked): sell words in a small ad box — not hours/below.
+      // Tip-only (Main unticked): sell words in a compact oval — not hours/below,
+      // and never a lonely SANDWICHES heading that starves the column.
       // Ticked empty: selling words first, then hours / “all served with…”.
       var tipOnly = !!(opts.tipOnly || rule.tipOnly);
       var spielParts = [];
@@ -1154,17 +1163,24 @@
       var spiel = spielParts.join('\n');
       var lines = spiel.split(/\n+/).map(function (l) { return l.trim(); }).filter(Boolean);
       var noteInner = '<div class="promo sandwich-promo' + (tipOnly ? ' sandwich-tip-only' : '') + '">';
-      noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
+      // Tip-only: sell words only. Full empty tip+hours keeps the section title.
+      if (!tipOnly) {
+        noteInner += '<div class="promo-head"><span class="promo-title">Sandwiches</span></div>';
+      }
       lines.forEach(function (line, i) {
         noteInner += '<p class="' + (i === 0 ? 'note-line' : 'desc') + '">' + esc(line) + '</p>';
       });
       noteInner += '</div>';
-      if (opts.hideTitle) {
+      if (opts.hideTitle && !tipOnly) {
         noteInner = noteInner.replace(/<div class="promo-head">[\s\S]*?<\/div>/, '');
       }
       if (!tipOnly) noteInner += extras.belowHtml || '';
       if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
-      if (opts.alignTitle && !opts.hideTitle) {
+      // Default tip chrome: large oval / platter (wide). Explicit box only when forced.
+      if (tipOnly) {
+        frameKind = opts.frame === 'box' ? 'box' : 'wide';
+      }
+      if (opts.alignTitle && !opts.hideTitle && !tipOnly) {
         return (
           '<div class="sandwich-aligned">' +
             '<div class="promo-head pair-head">' +
@@ -1422,6 +1438,8 @@
     sectionHead: 2.8,
     rooms: 9,
     sandwiches: 8,
+    /** Tip-only sell oval (no SANDWICHES title) — compact so leftover takes Sides/panels. */
+    sandwichTip: 3.2,
     footLogo: 7,
     bottomCols: 1
   };
@@ -1744,7 +1762,10 @@
     } else {
       wantSandwiches = !!bag.sandwiches;
     }
-    var sandCost = sandwichesPackCost(bag, sandRule);
+    var sandRuleCost = sandwichTipOnly
+      ? Object.assign({}, sandRule, { tipOnly: true })
+      : sandRule;
+    var sandCost = sandwichesPackCost(bag, sandRuleCost);
     var hasBackContent = !!(bag.sundayRoasts || bag.mains || bag.specialMains || bag.littleBells ||
       bag.desserts || bag.specialDesserts || bag.sides || bag.sauces || bag.sandwiches);
 
@@ -1840,7 +1861,8 @@
       layout.mode = 'jul-nov';
       layout.p2 = {
         rooms: false, sandwiches: false, footLogo: false, footPromos: false,
-        sidesOnP2: true, specialsBesideSandwiches: false, sidesUnderSpecials: false
+        sidesOnP2: true, specialsBesideSandwiches: false,
+        sidesUnderSpecials: false, sidesUnderTip: false
       };
       layout.widthOverrides = {};
       layout.p1.classicsSplit = 1;
@@ -1978,16 +2000,29 @@
         layout.overflow = 'drop-in';
         layout.fillers.push('Too much content — remove a dropped-in menu');
       }
-      // Sides still on this page with short Specials|Sandwiches: nest Sides into
-      // the leftover (food first). Safer than reprinting a feature panel.
-      if (sandPartner === 'specials' && bag.sides && layout.p2.sidesOnP2 &&
-          sidesFitUnderSpecials(bag, sandRulePlan, bag.sides)) {
-        var nestLoad = p2used - specCostP2 - sideCostP2 +
-          Math.max(specCostP2 + sideCostP2, sandCost);
-        if (nestLoad <= CLIP + 6) {
-          p2Load = nestLoad;
-          layout.p2.sidesUnderSpecials = true;
-          layout.fillers.push('Sides under Specials (fill Specials|Sandwiches leftover)');
+      // Sides still on this page with Specials|Sandwiches: nest Sides into the
+      // leftover (food first). Tip-only is short — prefer Sides under the tip
+      // oval so Specials stay and the tip does not waste a full column of air.
+      var sandRuleNest = sandwichTipOnly
+        ? Object.assign({}, sandRulePlan, { tipOnly: true })
+        : sandRulePlan;
+      if (sandPartner === 'specials' && bag.sides && layout.p2.sidesOnP2) {
+        if (sandwichTipOnly && sidesFitUnderTip(bag, sandRuleNest, bag.sides)) {
+          var nestTipLoad = p2used - specCostP2 - sideCostP2 +
+            Math.max(specCostP2, sandCost + sideCostP2);
+          if (nestTipLoad <= CLIP + 6) {
+            p2Load = nestTipLoad;
+            layout.p2.sidesUnderTip = true;
+            layout.fillers.push('Sides under Sandwiches tip (fill Specials|tip leftover)');
+          }
+        } else if (sidesFitUnderSpecials(bag, sandRuleNest, bag.sides)) {
+          var nestLoad = p2used - specCostP2 - sideCostP2 +
+            Math.max(specCostP2 + sideCostP2, sandCost);
+          if (nestLoad <= CLIP + 6) {
+            p2Load = nestLoad;
+            layout.p2.sidesUnderSpecials = true;
+            layout.fillers.push('Sides under Specials (fill Specials|Sandwiches leftover)');
+          }
         }
       }
       // Packed page: any Best-fit category with enough dishes can split across
@@ -2078,10 +2113,11 @@
         (bag.littleBells && bag.littleBells.dishes ? bag.littleBells.dishes.length : 0) +
         (bag.sundayRoasts && !roastsOnP1 && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0);
       var gapBreath = Math.min(8, p2DishN * Math.max(0, TYPE_RANGE.dishGapPx.min - 8) * 0.07);
-      // Nesting Sides under short Specials looks free in unit math (max() stays
-      // on Sandwiches) but classical gaps make the left stack meet the footer
-      // under a full mains list — flow182 clipped here with no overflow gate.
-      if (layout.p2.sidesUnderSpecials) {
+      // Nesting Sides under short Specials (or under a tip oval) looks free in
+      // unit math (max() stays on the tall column) but classical gaps make the
+      // stack meet the footer under a full mains list — flow182 clipped here
+      // with no overflow gate.
+      if (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip) {
         var nestDishN = mainsN + p2SandN +
           (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
           (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0);
@@ -2096,7 +2132,8 @@
           foodOverPage) {
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
-        if ((sandwichCrowdsMains || (foodOverPage && layout.p2.sidesUnderSpecials)) &&
+        if ((sandwichCrowdsMains || (foodOverPage &&
+            (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip))) &&
             layout.fillers.indexOf(
             'Too much content — remove a dropped-in menu') === -1) {
           layout.fillers.push('Too much content — remove a dropped-in menu');
@@ -2269,6 +2306,26 @@
     return true;
   }
 
+  /**
+   * Tip-only sell oval is short beside Specials — nest Sides under the tip so
+   * leftover column space holds food instead of a white hole.
+   */
+  function sidesFitUnderTip(bag, sandRule, sidesSec) {
+    if (!bag || !bag.specialMains || !bag.specialMains.dishes || !bag.specialMains.dishes.length) {
+      return false;
+    }
+    if (!sidesSec || !sidesSec.dishes || !sidesSec.dishes.length) return false;
+    if (!(sandRule && sandRule.tipOnly)) return false;
+    var specU = sectionUnits(bag.specialMains, true);
+    var sandU = sandwichesLevelCost(bag, sandRule);
+    var sideU = sectionUnits(sidesSec, false);
+    // Tip must be clearly shorter than Specials.
+    if (sandU + 2.5 >= specU) return false;
+    // Tip + Sides should roughly level with Specials (allow modest slack).
+    if (sandU + sideU > specU + 12) return false;
+    return true;
+  }
+
   function specialsSandwichesPair(bag, plan, opts) {
     opts = opts || {};
     var rule = ruleFor('Special Mains', plan);
@@ -2276,15 +2333,34 @@
     var sandRule = opts.sandRule || ruleFor('Sandwiches', plan);
     var sideRule = opts.sideRule || ruleFor('Sides', plan);
     var nestSides = opts.nestSides;
+    var nestUnderTip = !!(opts.nestUnderTip || opts.sidesUnderTip);
+    var tipOnly = !!(sandRule && sandRule.tipOnly);
     var leftHtml = sectionBlock('Special Mains', bag.specialMains.dishes, rule, 'box', { hideTitle: true });
     var leftU = sectionUnits({ name: 'Special Mains', dishes: bag.specialMains.dishes }, true);
+    var rightHtml = sandwichesBlock(bag, {
+      rule: sandRule,
+      hideTitle: true,
+      tipOnly: tipOnly,
+      // Tip-only defaults to platter oval; filled/empty tip+hours keep wide when framed.
+      frame: sandRule.frame ? 'wide' : undefined
+    });
+    var rightU = sandwichesLevelCost(bag, sandRule);
     if (nestSides && nestSides.dishes && nestSides.dishes.length) {
-      leftHtml += sectionBlock(nestSides.name || 'Sides', nestSides.dishes, sideRule, '', {});
-      leftU += sectionUnits(nestSides, false);
+      var sidesHtml = sectionBlock(nestSides.name || 'Sides', nestSides.dishes, sideRule, '', {});
+      var sidesU = sectionUnits(nestSides, false);
+      var saucesHtml = '';
+      var saucesU = 0;
       if (opts.nestSauces && opts.nestSauces.dishes && opts.nestSauces.dishes.length) {
-        leftHtml += '<div class="sec-title soft-left">' + esc(opts.nestSauces.name) + '</div>';
-        leftHtml += listDishes(opts.nestSauces.dishes);
-        leftU += sectionUnits(opts.nestSauces, false);
+        saucesHtml = '<div class="sec-title soft-left">' + esc(opts.nestSauces.name) + '</div>' +
+          listDishes(opts.nestSauces.dishes);
+        saucesU = sectionUnits(opts.nestSauces, false);
+      }
+      if (nestUnderTip) {
+        rightHtml += sidesHtml + saucesHtml;
+        rightU += sidesU + saucesU;
+      } else {
+        leftHtml += sidesHtml + saucesHtml;
+        leftU += sidesU + saucesU;
       }
     }
     return pairColumnFood(
@@ -2297,21 +2373,20 @@
         units: leftU
       },
       {
-        title: 'Sandwiches',
+        // Tip-only: no SANDWICHES pair-head / nested title — sell oval only.
+        title: tipOnly ? '' : 'Sandwiches',
+        hideTitle: tipOnly,
         dishes: sandwichDishesOf(bag),
         rule: sandRule,
-        html: sandwichesBlock(bag, {
-          rule: sandRule,
-          hideTitle: true,
-          frame: sandRule.frame ? 'wide' : undefined
-        }),
-        units: sandwichesPackCost(bag, sandRule),
+        html: rightHtml,
+        units: rightU,
         rightClass: 'col-food'
       },
       {
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
         force: opts.force,
+        shortOnly: true,
         secClass: 'specials-sand-row',
         dataSpecials: 'Special Mains'
       }
@@ -2343,6 +2418,7 @@
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
       force: opts.force,
+      shortOnly: !!opts.shortOnly,
       leftTitle: left.hideTitle ? '' : (left.title || ''),
       rightTitle: right.hideTitle ? '' : (right.title || ''),
       secClass: opts.secClass || 'col-pair-row',
@@ -3280,16 +3356,22 @@
         !!(p1opts.sandwiches && !showColBlock)
       )) {
         var nest1 = null;
-        if (layout.pages === 1 && sidesPrint && !p1opts.sidesOnP1 &&
-            sidesFitUnderSpecials(bag, sandRule, sidesPrint)) {
-          nest1 = sidesPrint;
+        var nestUnderTip1 = false;
+        if (layout.pages === 1 && sidesPrint && !p1opts.sidesOnP1) {
+          if (layout.sandwichTipOnly && sidesFitUnderTip(bag, sandRule, sidesPrint)) {
+            nest1 = sidesPrint;
+            nestUnderTip1 = true;
+          } else if (sidesFitUnderSpecials(bag, sandRule, sidesPrint)) {
+            nest1 = sidesPrint;
+          }
         }
         var pairSpec1 = specialsSandwichesPair(bag, plan, {
           sandRule: sandRule,
           sideRule: sideRule,
           promos: promos,
           excludeTitles: usedPromoTitles,
-          nestSides: nest1
+          nestSides: nest1,
+          nestUnderTip: nestUnderTip1
         });
         usedPromoTitles = usedPromoTitles.concat(pairSpec1.usedTitles || []);
         p1 += pairSpec1.html || '';
@@ -3376,7 +3458,7 @@
       var mainU2 = sectionUnits(bag.mains, false);
       var pair2 = levelOppositeColumns(
         sandwichesBlock(bag, {
-          frame: sandRule.frame ? 'box' : undefined,
+          frame: sandRule.frame ? (layout.sandwichTipOnly ? 'wide' : 'box') : undefined,
           rule: sandRule,
           hideTitle: true
         }),
@@ -3388,7 +3470,7 @@
           excludeTitles: usedPromoTitles,
           shortOnly: true,
           force: littleFoodPartner ? null : p2Force,
-          leftTitle: 'Sandwiches',
+          leftTitle: layout.sandwichTipOnly ? '' : 'Sandwiches',
           rightTitle: bag.mains.name,
           secClass: 'mains-sand-row',
           leftClass: '',
@@ -3417,10 +3499,18 @@
     )) {
       var nest2 = null;
       var nestSauces2 = null;
-      if (p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length &&
-          (layout.p2.sidesUnderSpecials || sidesFitUnderSpecials(bag, sandRule, sidesPrint))) {
-        nest2 = sidesPrint;
-        if (bag.sauces) nestSauces2 = bag.sauces;
+      var nestUnderTip2 = false;
+      if (p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) {
+        if (layout.p2.sidesUnderTip ||
+            (layout.sandwichTipOnly && sidesFitUnderTip(bag, sandRule, sidesPrint))) {
+          nest2 = sidesPrint;
+          nestUnderTip2 = true;
+          if (bag.sauces) nestSauces2 = bag.sauces;
+        } else if (layout.p2.sidesUnderSpecials ||
+            sidesFitUnderSpecials(bag, sandRule, sidesPrint)) {
+          nest2 = sidesPrint;
+          if (bag.sauces) nestSauces2 = bag.sauces;
+        }
       }
       var pairSpec2 = specialsSandwichesPair(bag, plan, {
         sandRule: sandRule,
@@ -3429,6 +3519,7 @@
         excludeTitles: usedPromoTitles,
         force: littleFoodPartner ? null : p2Force,
         nestSides: nest2,
+        nestUnderTip: nestUnderTip2,
         nestSauces: nestSauces2
       });
       usedPromoTitles = usedPromoTitles.concat(pairSpec2.usedTitles || []);
@@ -3538,6 +3629,7 @@
           : '&nbsp;';
         // Empty partner opposite Sandwiches (or Sides) must get feature panels so
         // both columns start and finish level — never skipPromos on a food hole.
+        // Tip-only: no SANDWICHES pair title — compact oval already carries the sell.
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
@@ -3547,7 +3639,7 @@
               : null
           )),
           leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
-          rightTitle: p2opts.sandwiches ? 'Sandwiches' : '',
+          rightTitle: (p2opts.sandwiches && !layout.sandwichTipOnly) ? 'Sandwiches' : '',
           secClass: 'sides-sand-row',
           colsClass: 'bottom-cols',
           leftClass: 'col-sides',
@@ -3929,6 +4021,11 @@
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
+      /* Tip-only sell oval: compact platter — no SANDWICHES title, centred sell line. */
+      '.sandwich-tip-only{text-align:center}' +
+      '.sandwich-tip-only .note-line{text-align:center;margin:6px 4px;font-weight:500;line-height:1.35}' +
+      '.scallop:has(.sandwich-tip-only){margin-bottom:6px}' +
+      '.scallop:has(.sandwich-tip-only) .scallop-pad{padding:10px 16px 12px}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
