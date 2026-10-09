@@ -1434,8 +1434,9 @@
     desc: { min: 10, max: 10 },
     title: { min: 16, max: 22 },
     promo: { min: 11, max: 11.5 },
-    /** Floor for vertical space between dishes — never collapse tighter. */
-    dishGapPx: { min: 8, max: 14 }
+    /** Floor for vertical space between dishes — never collapse tighter.
+     *  Classical Word menus breathe; 8px packed like a modern wall. */
+    dishGapPx: { min: 13, max: 18 }
   };
   // One page only with clear headroom at min type — unit model under-counts
   // scalloped boxes / full-width mains vs real browser height.
@@ -1885,7 +1886,14 @@
         } else if (sideCostP2 && layout.p2.sidesOnP2 && canSitInColumn(sideRulePlan)) {
           sandPartner = 'sides';
         } else if (mainCostP2 && canSitInColumn(mainRulePlan)) {
-          sandPartner = 'mains';
+          // Prefer drop-in gate over parking Sandwiches beside a full mains wall
+          // when desserts already sit on this page and leftover is tight.
+          var loadMainPair = p2used - mainCostP2 + Math.max(mainCostP2, sandCost);
+          if (tightBack && dessertN >= 3 && loadMainPair > PAGE - 14) {
+            sandPartner = '';
+          } else {
+            sandPartner = 'mains';
+          }
         }
       }
       if (sandPartner === 'specials') {
@@ -2025,13 +2033,33 @@
       layout.p1.footPromos = canFitFootPromos(p1left);
       layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
-      if (p1used > PAGE + 10 || p2used > PAGE + 14 || p2Load > PAGE) {
+      // Classical breath: modest headroom for the hard dish-gap floor (13px).
+      // Calibrated so Specials that already fitted still pass — no wrap taxes.
+      var p2DishN = mainsN + dessertN +
+        (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0) +
+        (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
+        (bag.specialDesserts && bag.specialDesserts.dishes ? bag.specialDesserts.dishes.length : 0) +
+        (bag.littleBells && bag.littleBells.dishes ? bag.littleBells.dishes.length : 0) +
+        (bag.sundayRoasts && !roastsOnP1 && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0);
+      var gapBreath = Math.min(6, p2DishN * Math.max(0, TYPE_RANGE.dishGapPx.min - 8) * 0.045);
+      // Full mains + desserts + Sandwiches on one back page reads as a busy wall —
+      // refuse and ask to untick Sandwiches (or another drop-in) rather than pack.
+      var sandwichCrowdsMains = !!(layout.p2.sandwiches && bag.mains && bag.desserts &&
+        mainsN >= 7 && dessertN >= 4 && p2Load + gapBreath > PAGE - 14);
+      if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 ||
+          p2Load + gapBreath > PAGE) {
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
+        if (sandwichCrowdsMains && layout.fillers.indexOf(
+            'Too much content — remove a dropped-in menu') === -1) {
+          layout.fillers.push('Too much content — remove a dropped-in menu');
+        }
       }
+      p2left = Math.max(0, p2left - gapBreath);
+      layout.leftover.p2 = p2left;
       applyDropInCapacity_(layout, bag, {
         p1used: p1used,
-        p2Load: p2Load,
+        p2Load: p2Load + gapBreath,
         p1left: p1left,
         p2left: p2left,
         sectionLayout: opts.sectionLayout
@@ -3620,9 +3648,9 @@
     // Fonts are loaded via <link> in build() — @import often fails before print.
     return (
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
-        '--dish-gap:12px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
+        '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
         '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
-        '--dish-gap-min:8px;--dish-gap-max:14px}' +
+        '--dish-gap-min:13px;--dish-gap-max:18px}' +
       '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:50;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -3754,8 +3782,9 @@
       '.dish-leader{display:block;flex:1 1 auto;border-bottom:1px dotted #b0a89c;margin:0 6px;min-width:10px;height:0;align-self:center;transform:translateY(0.35em)}' +
       '.dish-line .lc{width:1em;height:1em;margin:0 0.2em 0 0.08em;flex:0 0 auto;align-self:center;font-size:var(--name);object-fit:contain;display:block}' +
       '.price{font-family:var(--sans);font-weight:500;font-size:clamp(var(--name-min),var(--name),var(--name-max));line-height:1.28;white-space:nowrap;flex:0 0 auto;padding-left:0}' +
-      '.desc{font-family:var(--sans);font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));color:#3a342c;margin-top:2px;line-height:1.4;max-width:100%;overflow-wrap:anywhere}' +
-      '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:400}' +
+      /* Descriptions: Roboto Light so dish names dominate (classical Word menu). */
+      '.desc{font-family:var(--sans);font-weight:300;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max));color:#5a534a;margin-top:2px;line-height:1.35;max-width:100%;overflow-wrap:anywhere}' +
+      '.dish .desc,.promo .desc,.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
       '.tags{color:var(--green);font-style:italic;font-weight:400;font-size:clamp(var(--desc-min),var(--desc),var(--desc-max))}' +
       '.dish-c{text-align:center;margin:0 0 max(var(--dish-gap-min),var(--dish-gap))}' +
       '.dish-c .dish-name{font-family:var(--serif);font-size:clamp(var(--name-min),var(--name),var(--name-max));letter-spacing:.02em}' +
@@ -3846,7 +3875,7 @@
       '.col-feature .scallop + .scallop{margin-top:14px}' +
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
-      '.sandwich-promo .desc{font-weight:400;color:#3a342c}' +
+      '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       '.days{position:absolute;top:18mm;left:6mm;font-family:var(--serif);font-size:9px;font-weight:700;line-height:1.35;letter-spacing:.05em}' +
       '.lc-title{font-family:var(--serif);font-weight:700;font-size:18px;text-align:center;line-height:1.15;margin:2px 0 8px}' +
@@ -3855,13 +3884,13 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — capped to TYPE_RANGE (adult pub, not kids’-menu giant type).
-         airy = max; dense = min. Dish gap never drops below --dish-gap-min (8px). */
-      '.fill-airy{--dish-gap:14px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
-      '.fill-roomy{--dish-gap:12px;--sec-gap:14px;--name:11.35pt;--desc:10pt;--title:20pt;--promo:11.35pt}' +
-      '.fill-normal{--dish-gap:10px;--sec-gap:12px;--name:11.2pt;--desc:10pt;--title:18pt;--promo:11.2pt}' +
-      '.fill-tight{--dish-gap:9px;--sec-gap:10px;--name:11.1pt;--desc:10pt;--title:17pt;--promo:11.1pt}' +
-      '.fill-compact{--dish-gap:8px;--sec-gap:9px;--name:11.05pt;--desc:10pt;--title:16.5pt;--promo:11.05pt}' +
-      '.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
+         airy = max; dense = min. Dish gap never drops below --dish-gap-min (13px). */
+      '.fill-airy{--dish-gap:18px;--sec-gap:18px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
+      '.fill-roomy{--dish-gap:16px;--sec-gap:16px;--name:11.35pt;--desc:10pt;--title:20pt;--promo:11.35pt}' +
+      '.fill-normal{--dish-gap:15px;--sec-gap:15px;--name:11.2pt;--desc:10pt;--title:18pt;--promo:11.2pt}' +
+      '.fill-tight{--dish-gap:14px;--sec-gap:13px;--name:11.1pt;--desc:10pt;--title:17pt;--promo:11.1pt}' +
+      '.fill-compact{--dish-gap:13px;--sec-gap:12px;--name:11.05pt;--desc:10pt;--title:16.5pt;--promo:11.05pt}' +
+      '.fill-dense{--dish-gap:13px;--sec-gap:11px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
       '.fill-dense .scallop-pad{padding:4px 10px 6px}' +
@@ -3875,11 +3904,11 @@
       '.a5-face .page-spacer{display:none}' +
       '.a5-face .allergy{flex:0 0 auto;flex-shrink:0}' +
       /* A5 density — same name/desc floors as A4; titles slightly smaller on the half-sheet */
-      '.a5-face.fill-airy{--dish-gap:12px;--sec-gap:14px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
-      '.a5-face.fill-roomy{--dish-gap:10px;--sec-gap:12px;--name:11.35pt;--desc:10pt;--title:17pt;--promo:11.35pt}' +
-      '.a5-face.fill-normal{--dish-gap:9px;--sec-gap:10px;--name:11.2pt;--desc:10pt;--title:16pt;--promo:11.2pt}' +
-      '.a5-face.fill-tight{--dish-gap:8px;--sec-gap:9px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
-      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:8px;--sec-gap:8px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
+      '.a5-face.fill-airy{--dish-gap:16px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
+      '.a5-face.fill-roomy{--dish-gap:14px;--sec-gap:13px;--name:11.35pt;--desc:10pt;--title:17pt;--promo:11.35pt}' +
+      '.a5-face.fill-normal{--dish-gap:13px;--sec-gap:12px;--name:11.2pt;--desc:10pt;--title:16pt;--promo:11.2pt}' +
+      '.a5-face.fill-tight{--dish-gap:13px;--sec-gap:11px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
+      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:13px;--sec-gap:11px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
       '.a5-face .party-logo{width:72px}' +
       '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
@@ -4123,7 +4152,7 @@
       '<title>' + esc(printSheetLabel(menu.name, ver)) + '</title>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
-      '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
+      '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
       '<style>' + css({ landscape: landscape, guillotine: guillotine || defaultPaper === 'a5' }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +
@@ -4292,16 +4321,21 @@
         '}' +
         'function growGaps(page){' +
           'var cs=getComputedStyle(page);' +
-          'var dish=parseFloat(cs.getPropertyValue("--dish-gap"))||12;' +
+          'var dish=parseFloat(cs.getPropertyValue("--dish-gap"))||15;' +
           'var sec=parseFloat(cs.getPropertyValue("--sec-gap"))||16;' +
+          'var dishMin=parseFloat(cs.getPropertyValue("--dish-gap-min"))||13;' +
+          'var dishMax=parseFloat(cs.getPropertyValue("--dish-gap-max"))||18;' +
+          'if(dish<dishMin)dish=dishMin;' +
           'var baseDish=dish,baseSec=sec;' +
           'for(var i=0;i<14;i++){' +
-            'dish+=1.25;sec+=1.75;' +
+            'if(dish>=dishMax)break;' +
+            'dish=Math.min(dishMax,dish+1.25);sec+=1.75;' +
             'page.style.setProperty("--dish-gap",dish+"px");' +
             'page.style.setProperty("--sec-gap",sec+"px");' +
             'if(overflows(page)){' +
               'dish-=1.25;sec-=1.75;' +
-              'if(dish<=baseDish+0.1){page.style.removeProperty("--dish-gap");page.style.removeProperty("--sec-gap");}' +
+              'if(dish<dishMin)dish=dishMin;' +
+              'if(dish<=baseDish+0.1){page.style.setProperty("--dish-gap",Math.max(dishMin,baseDish)+"px");page.style.removeProperty("--sec-gap");}' +
               'else{page.style.setProperty("--dish-gap",dish+"px");page.style.setProperty("--sec-gap",sec+"px");}' +
               'break;' +
             '}' +

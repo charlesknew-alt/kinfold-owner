@@ -226,11 +226,13 @@ assert(printJs.indexOf('--title-max:22pt') !== -1 && printJs.indexOf('--name-max
 assert(printJs.indexOf('--name-min:11pt') !== -1 && printJs.indexOf('--desc-min:10pt') !== -1,
   'type range CSS vars set readable min sizes (+2pt)');
 assert(printJs.indexOf('--title-min:16pt') !== -1, 'section title min is 16pt');
-assert(printJs.indexOf('--dish-gap-min:8px') !== -1, 'minimum gap between dishes is 8px');
+assert(printJs.indexOf('--dish-gap-min:13px') !== -1, 'minimum gap between dishes is 13px');
 assert(printJs.indexOf('max(var(--dish-gap-min),var(--dish-gap))') !== -1,
   'dish margin respects dish-gap-min floor');
-assert(/\.fill-dense\{[^}]*--name:11pt/.test(printJs) && /\.fill-dense\{[^}]*--dish-gap:8px/.test(printJs),
-  'dense floor uses raised type mins and 8px dish gap');
+assert(/\.fill-dense\{[^}]*--name:11pt/.test(printJs) && /\.fill-dense\{[^}]*--dish-gap:13px/.test(printJs),
+  'dense floor uses raised type mins and 13px dish gap');
+assert(/\.desc\{[^}]*font-weight:300/.test(printJs) && printJs.indexOf('wght@0,300') !== -1,
+  'dish descriptions use Roboto Light (300)');
 assert(/\.fill-airy\{[^}]*--name:11\.5pt/.test(printJs) && /\.fill-airy\{[^}]*--title:22pt/.test(printJs),
   'airy density is capped at type-range max (not kids-menu giant type)');
 assert(printJs.indexOf('min(var(--title),var(--title-max))') !== -1, 'section titles clamp to title-max');
@@ -354,8 +356,9 @@ assert(printApi.typeRange.desc.max === 10 && printApi.typeRange.desc.min === 10,
   'TYPE_RANGE description min/max (+2pt min)');
 assert(printApi.typeRange.name.min === 11 && printApi.typeRange.title.min === 16,
   'TYPE_RANGE name/title mins raised by 2pt');
-assert(printApi.typeRange.dishGapPx && printApi.typeRange.dishGapPx.min === 8,
-  'TYPE_RANGE includes minimum dish gap');
+assert(printApi.typeRange.dishGapPx && printApi.typeRange.dishGapPx.min === 13 &&
+  printApi.typeRange.dishGapPx.max === 18,
+  'TYPE_RANGE includes classical minimum dish gap (13–18px)');
 var sampleCss = printApi.build(api.menuById('main'), api.seed().main, { pages: 1, forceFillClass: 'fill-roomy' });
 assert(sampleCss.indexOf('NaN') === -1, 'generated print CSS has no NaN from broken concatenations');
 assert(sampleCss.indexOf('.dish-line{display:flex') !== -1, 'generated print CSS keeps dish-line flex leaders');
@@ -723,8 +726,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow181') !== -1, 'menus page cache-bust is flow181');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow181') !== -1, 'hub menus link cache-bust is flow181');
+assert(page.indexOf('flow182') !== -1, 'menus page cache-bust is flow182');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow182') !== -1, 'hub menus link cache-bust is flow182');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2070,6 +2073,16 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   });
   assert(layout.fit === 'over' && layout.overflow === 'drop-in',
     'Main with every sub-menu ticked still asks to untick when it will not fit at min type');
+})();
+(function mainsDessertsSandwichesPreferDropIn() {
+  var dishes = api.composeDishes(api.seed(), 'main', {
+    desserts: true, sandwiches: true
+  });
+  var layout = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: api.defaultSectionLayout()
+  });
+  assert(layout.fit === 'over' && layout.overflow === 'drop-in',
+    'full mains + desserts + Sandwiches asks to untick rather than pack a busy page 2');
 })();
 (function sundaySharingMustNotKeepRoastsOffPage1() {
   var dishes = [
