@@ -1049,6 +1049,16 @@
   }
 
   /**
+   * One leftover column panel (Gatherings under Little Bells, etc.) still needs
+   * real spare room after food + section notes. Omit rather than clip into the
+   * allergy footer — same hard rule as foot pairs, slightly smaller hole.
+   */
+  var COL_PROMO_MIN_LEFT = 14;
+  function canFitColumnPromos(leftover) {
+    return (leftover || 0) >= COL_PROMO_MIN_LEFT;
+  }
+
+  /**
    * Two feature panels side-by-side under a full-width food block.
    * Prefer unused titles; pad with evergreen defaults so we always try to fill.
    */
@@ -1691,14 +1701,25 @@
     var p2Food = p2Load + extraP2;
     // Min-type page is PAGE units. Allow anything that still sits on the sheet
     // at that floor — no breath margin, no “packed leftover” penalty.
+    // Caller often passes p2Load already boosted by classical gapBreath. Board
+    // notes (when-gone) must not refuse a drop-in that already fitted with that
+    // breath — short notes absorb into the breath rather than block Specials
+    // when tip+sides still leave real room (XIV tip-only Main).
+    function notesOnlyOver_(food, used, extra) {
+      return used <= PAGE && food > PAGE && extra > 0 && (food - PAGE) <= extra + 0.05;
+    }
     if (onePage) {
-      if (p1Food > PAGE) {
+      if (p1Food > PAGE && !notesOnlyOver_(p1Food, p1used, extraP1)) {
         layout.fit = 'over';
         layout.overflow = 'drop-in';
       }
-    } else if (p1Food > PAGE || p2Food > PAGE) {
-      layout.fit = 'over';
-      layout.overflow = 'drop-in';
+    } else {
+      var p1Over = p1Food > PAGE && !notesOnlyOver_(p1Food, p1used, extraP1);
+      var p2Over = p2Food > PAGE && !notesOnlyOver_(p2Food, p2Load, extraP2);
+      if (p1Over || p2Over) {
+        layout.fit = 'over';
+        layout.overflow = 'drop-in';
+      }
     }
     layout.spareRoom = Math.max(0, onePage ? p1left : Math.min(p1left, p2left));
     layout.canOfferDropIn = layout.fit !== 'over' && layout.spareRoom >= 24;
@@ -2187,28 +2208,55 @@
           (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0);
         gapBreath += classicalGapUnits_(nestDishN);
       }
+      // Little Bells|Sides (Sunday packed): above/below notes were missing from
+      // the back tally, so leftover looked free and Gatherings clipped.
+      var littleRulePlan = { width: 'column', frame: true };
+      if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+        littleRulePlan = root.EBMenus.sectionLayoutFor('Little Bells', opts.sectionLayout) || littleRulePlan;
+      } else if (opts.sectionLayout && opts.sectionLayout['Little Bells']) {
+        littleRulePlan = opts.sectionLayout['Little Bells'];
+      }
+      var kidsSidesPair = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
+        layout.p2.sidesOnP2 && bag.sides && bag.sides.dishes && bag.sides.dishes.length &&
+        wantsColumn(littleRulePlan) && wantsColumn(sideRulePlan));
+      if (kidsSidesPair) {
+        gapBreath += classicalGapUnits_(
+          (bag.littleBells.dishes.length || 0) + (bag.sides.dishes.length || 0)
+        );
+      }
+      var noteTaxP2 = 0;
+      if (bag.littleBells) noteTaxP2 += outsideUnits_(layoutRule_('Little Bells', opts.sectionLayout));
+      if (bag.desserts) noteTaxP2 += outsideUnits_(layoutRule_('Desserts', opts.sectionLayout));
+      if (bag.specialMains) noteTaxP2 += outsideUnits_(layoutRule_('Special Mains', opts.sectionLayout));
+      if (bag.specialDesserts) noteTaxP2 += outsideUnits_(layoutRule_('Special Desserts', opts.sectionLayout));
+      if (bag.sundayRoasts && !roastsOnP1) {
+        noteTaxP2 += outsideUnits_(layoutRule_('Sunday Roasts', opts.sectionLayout));
+      }
       // Full mains + desserts + Sandwiches on one back page reads as a busy wall —
       // refuse and ask to untick Sandwiches (or another drop-in) rather than pack.
+      var foodLoadP2 = p2Load + gapBreath + noteTaxP2;
       var sandwichCrowdsMains = !!(layout.p2.sandwiches && bag.mains && bag.desserts &&
-        mainsN >= 7 && dessertN >= 4 && p2Load + gapBreath > PAGE - 14);
-      var foodOverPage = p2Load + gapBreath > PAGE;
+        mainsN >= 7 && dessertN >= 4 && foodLoadP2 > PAGE - 14);
+      var foodOverPage = foodLoadP2 > PAGE;
       if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 ||
           foodOverPage) {
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
         if ((sandwichCrowdsMains || (foodOverPage &&
-            (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip))) &&
+            (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip || kidsSidesPair))) &&
             layout.fillers.indexOf(
             'Too much content — remove a dropped-in menu') === -1) {
           layout.fillers.push('Too much content — remove a dropped-in menu');
         }
       }
-      p2left = Math.max(0, p2left - gapBreath);
+      p2left = Math.max(0, p2left - gapBreath - noteTaxP2);
       layout.leftover.p2 = p2left;
-      // Foot feature pairs ONLY after gap breath — never place Gatherings / Stay
-      // when leftover is already too small at min type (clips into the allergy).
+      // Foot / column feature panels ONLY after gap breath + section notes —
+      // never place Gatherings under Little Bells when leftover is already tight.
       layout.p1.footPromos = canFitFootPromos(p1left);
       layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
+      layout.p2.columnPromos = canFitColumnPromos(p2left);
+      // applyDropInCapacity_ adds outside notes itself — pass load without noteTax.
       applyDropInCapacity_(layout, bag, {
         p1used: p1used,
         p2Load: p2Load + gapBreath,
@@ -2626,7 +2674,10 @@
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
     opts = opts || {};
     var fill = { left: '', right: '', usedTitles: [] };
-    if (!opts.skipPromos) {
+    // Page leftover gate: never plant Gatherings / Stay under a food pair when
+    // the sheet is already packed (Sunday kids|sides + notes → allergy clip).
+    var skipForLeftover = opts.pageLeftover != null && !canFitColumnPromos(opts.pageLeftover);
+    if (!opts.skipPromos && !skipForLeftover) {
       var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
       var fillOpts = {
         leftFrame: opts.leftFrame || 'box',
@@ -2813,8 +2864,19 @@
         afterHtml: extras.belowHtml
       }
     );
+    // Above/below notes + wrap + frilly border — half-column width wraps the
+    // Sunday roast line; under-count was what let Gatherings jam under kids.
     var kidsU = columnFillUnits(bag.littleBells, littleRule, extras.slots.above) +
-      noteUnits(extras.slots.below);
+      noteUnits(extras.slots.below) + wrapUnits(bag.littleBells);
+    if (littleRule && littleRule.frame) kidsU += 2.4;
+    var pairPromoOpts = {
+      promos: opts.promos,
+      excludeTitles: opts.excludeTitles,
+      shortOnly: true,
+      force: opts.force,
+      pageLeftover: opts.pageLeftover,
+      skipPromos: !!opts.skipPromos
+    };
     // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
     if (dessertsAllowColumn && bag.desserts && bag.desserts.dishes && bag.desserts.dishes.length) {
@@ -2822,18 +2884,14 @@
         hideTitle: true
       });
       var dessU = columnFillUnits(bag.desserts, dessRule, dessRule && dessRule.note);
-      var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, {
-        promos: opts.promos,
-        excludeTitles: opts.excludeTitles,
-        shortOnly: true,
-        force: opts.force,
+      var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, Object.assign({}, pairPromoOpts, {
         leftTitle: bag.littleBells.name,
         rightTitle: bag.desserts.name,
         secClass: 'little-desserts-row',
         colsClass: 'cols-little-desserts',
         leftClass: 'col-little',
         rightClass: 'col-desserts'
-      });
+      }));
       return {
         html: dessPair.html,
         usedDesserts: true,
@@ -2848,18 +2906,14 @@
         hideTitle: true
       });
       var sideU = columnFillUnits(sidesPrint, sideRule, sideRule && sideRule.note);
-      var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, {
-        promos: opts.promos,
-        excludeTitles: opts.excludeTitles,
-        shortOnly: true,
-        force: opts.force,
+      var sidePair = levelOppositeColumns(kidsInner, kidsU, sideInner, sideU, Object.assign({}, pairPromoOpts, {
         leftTitle: bag.littleBells.name,
         rightTitle: sidesPrint.name,
         secClass: 'little-sides-row',
         colsClass: 'cols-little-sides',
         leftClass: 'col-little',
         rightClass: 'col-sides'
-      });
+      }));
       return {
         html: sidePair.html,
         usedDesserts: false,

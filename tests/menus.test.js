@@ -728,8 +728,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow188') !== -1, 'menus page cache-bust is flow188');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow188') !== -1, 'hub menus link cache-bust is flow188');
+assert(page.indexOf('flow189') !== -1, 'menus page cache-bust is flow189');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow189') !== -1, 'hub menus link cache-bust is flow189');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3702,6 +3702,85 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'foot promo not placed when leftover too small (even if footPromos flag is stale)');
   assert(/Cheesy Garlic Bread|Chunky Triple Cooked Chips/.test(body),
     'Sides still print when foot promo is omitted');
+})();
+
+// flow189: XIV-shaped Main + tip-only — Specials fit when tip+sides leave spare
+// (when-gone notes must not refuse a board that already fitted with gap breath).
+(function xivTipOnlySpecialsFit() {
+  var sell = 'A selection of sandwiches is available — ask the team.';
+  var gone = "When it's gone, it's gone";
+  var xiv = [
+    api.dish('Nibbles', 'Nacho Cheese Triangles', '', '6.95', ''),
+    api.dish('Nibbles', 'Mini Bread Rolls', 'bacon jam & smoked whipped butter', '5.95', 'vg option'),
+    api.dish('Starters', 'Braised Lamb Shank', 'toasted red quinoa, smoked tomatoes & bone marrow chimichurri', '10.95', 'gf'),
+    api.dish('Starters', 'Buffalo Cauliflower Florets', 'rainbow slaw & bang bang sauce', '7.95', 'vg'),
+    api.dish('Starters', 'Pan Fried King Prawns', 'smoky romesco, rocket gremolata', '10.95', 'gf'),
+    api.dish('Starters', 'Whitebait', 'aioli & micro parsley', '8.50', ''),
+    api.dish('Starters', 'Ham Hock Pot', 'charmer cheese sauce, sourdough baguette', '8.95', 'gf'),
+    api.dish('Sharing Plates', 'Baked Camembert (to share)', 'bacon jam and warm sourdough baguette', '16.95', 'v'),
+    api.dish('Sharing Plates', 'Beef Chilli Nachos', 'sour cream, guacamole & jalapenos', '15.95', 'gf'),
+    api.dish('Burgers', 'Brisket Burger', 'caramelised onion brioche, bacon jam, monterey jack, onion rings & fries', '18.95', ''),
+    api.dish('Burgers', 'Sweet Potato & Halloumi Burger', 'mexican chilli cheese, onion rings and fries', '16.95', 'v'),
+    api.dish('Mains', 'Osso Bucco', 'veal shank, roasted squash risotto with goats curd', '23.95', 'gf'),
+    api.dish('Mains', 'Chilli Con Carne', 'wild rice, sour cream, giant tortilla chips', '17.95', 'gf'),
+    api.dish('Mains', 'Pan Fried Seabass', 'crushed new potatoes, caper lemon butter', '22.95', 'gf'),
+    api.dish('Mains', 'Vegetarian Lasagne', 'garlic bread, dressed salad', '18.50', 'v'),
+    api.dish('Mains', 'Pork Wellington', 'serrano ham, baby potatoes, beurre blanc', '22.95', ''),
+    api.dish('Mains', 'Fish & Chips', 'mushy peas, lemon & tartare sauce', '18.95', 'gf, df'),
+    api.dish('Mains', 'Pie of the day', 'mash, vegetables & gravy', '20.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'rice ribbon noodles, thai green sauce', '18.95', ''),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'rigatoni, parmesan, burrata & basil', '20.95', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Seasonal Veg', '', '5.50', 'v'),
+    api.dish('Sides', 'Garlic Bread', '', '4.95', 'v'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v')
+  ];
+  var withBoard = xiv.concat(api.seed().specials.map(function (d) {
+    return api.dish(d.section, d.name, d.description || '', d.price || '16.95', d.tags || '');
+  }));
+  var layoutMap = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: gone },
+    'Special Starters': { width: 'column', frame: true, note: gone },
+    'Special Desserts': { width: 'column', frame: true, note: gone },
+    Sandwiches: { tip: true, frame: true, width: 'column', sell: sell },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var baseline = print.planFluidLayout(mainMenu, xiv, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false },
+    promos: api.seedPromoBank()
+  });
+  assert(baseline.fit === 'two' && baseline.sandwichTipOnly === true,
+    'XIV-shaped Main without Specials is tip-only two-pager');
+  assert(baseline.leftover && baseline.leftover.p2 > 10,
+    'XIV tip+sides leave spare leftover on page 2 (visible tip air)');
+  var withSpec = print.planFluidLayout(mainMenu, withBoard, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    promos: api.seedPromoBank()
+  });
+  assert(withSpec.fit !== 'over',
+    'XIV + seed Specials + tip-only still generates (notes do not refuse after gap breath)');
+  assert(withSpec.p2 && withSpec.p2.specialsBesideSandwiches === true,
+    'Specials pair beside tip-only on XIV-shaped sheet');
+  assert(withSpec.p2.sidesUnderTip === true || withSpec.p1.sidesOnP1 === true,
+    'Sides nest under tip leftover or move to page 1 — food stays on the sheet');
+  var sheet = print.build(mainMenu, withBoard, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    layout: withSpec,
+    promos: api.seedPromoBank()
+  });
+  var a4 = sheet.split('mode-panel mode-a5')[0] || sheet;
+  assert(/Pan-Roasted Cod Loin|Slow-Cooked Blade|Wild Mushroom/.test(a4),
+    'Special Mains print on XIV + tip-only sheet');
+  assert(/Cheesy Garlic Bread|Chunky Triple Cooked Chips/.test(a4),
+    'Sides still print with Specials + tip-only');
+  assert(/class="[^"]*sandwich-tip-only/.test(a4.replace(/<style[\s\S]*?<\/style>/gi, '')),
+    'tip-only sell oval still prints with Specials');
 })();
 
 // flow188: tip-only oval platter CSS paints full frame-wide silhouette (not border-image rect).
