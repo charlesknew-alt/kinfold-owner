@@ -726,8 +726,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow182') !== -1, 'menus page cache-bust is flow182');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow182') !== -1, 'hub menus link cache-bust is flow182');
+assert(page.indexOf('flow183') !== -1, 'menus page cache-bust is flow183');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow183') !== -1, 'hub menus link cache-bust is flow183');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2084,6 +2084,90 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   assert(layout.fit === 'over' && layout.overflow === 'drop-in',
     'full mains + desserts + Sandwiches asks to untick rather than pack a busy page 2');
 })();
+(function specialsSandwichesSidesNestOverflowsAtClassicalGap() {
+  // Screenshot-shaped Main page 2: full mains + Specials|Sandwiches with Sides
+  // nested under Specials. After the 13px dish-gap floor this clips the allergy
+  // footer — Generate must gate (untick Sandwiches/Specials), not print clipped food.
+  var dishes = [];
+  var i;
+  for (i = 0; i < 6; i++) {
+    dishes.push(api.dish('Nibbles', 'Nibble ' + i, 'small plate', '6.95', 'v'));
+  }
+  for (i = 0; i < 6; i++) {
+    dishes.push(api.dish('Starters', 'Starter ' + i, 'starter description for fill longish', '8.95', ''));
+  }
+  dishes.push(api.dish('Item Boost', 'Boost Special', 'boost desc', '9.95', ''));
+  for (i = 0; i < 3; i++) {
+    dishes.push(api.dish('Burgers', 'Burger ' + i, 'bun fries salad onion rings', '18.95', ''));
+  }
+  for (i = 0; i < 4; i++) {
+    dishes.push(api.dish('Pub Classics', 'Classic ' + i, 'peas tartare mash gravy', '17.95', ''));
+  }
+  [
+    'Spicy Asian Burger', 'Homemade Beef Lasagne', 'Fish & Chips', 'Ham Egg & Chips',
+    'Chicken Katsu Curry', 'Pie of the Day', 'Trenchmore Wagyu Beef Burger',
+    'Vegetarian Lasagne', 'Pork Wellington', 'Beef Short Rib Genovese Rigatoni'
+  ].forEach(function (n, idx) {
+    dishes.push(api.dish('Mains', n, 'description for ' + n + ' with sides', (15 + idx % 5) + '.95', ''));
+  });
+  [
+    ['Prawn & Chorizo Linguine', 'garlic chilli white wine', '16.95'],
+    ['Wild Mushroom Tagliatelle', 'truffle oil parmesan', '15.95'],
+    ['Crab & Lemon Spaghetti', 'parsley chilli', '17.95']
+  ].forEach(function (x) {
+    dishes.push(api.dish('Special Mains', x[0], x[1], x[2], ''));
+  });
+  [
+    ['Beef Chilli & Cheddar Quesadilla', 'beef chilli cheddar', '10.95'],
+    ['Falafel & Guacamole Ciabatta', 'mixed salad', '8.95'],
+    ['Cajun Chicken Wrap', 'coleslaw', '10.95'],
+    ['Tuna & Red Onion Melt', 'melted cheddar', '9.95'],
+    ['Italian Meat & Mozzarella Ciabatta', 'salami ham mozzarella pesto', '11.50']
+  ].forEach(function (x) {
+    dishes.push(api.dish('Sandwiches', x[0], x[1], x[2], ''));
+  });
+  ['Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Vegetables',
+    'Garlic Bread', 'House Salad'].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  var col = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: "When it's gone, it's gone" },
+    Sandwiches: {
+      width: 'column', frame: true, tip: true,
+      note: '(12 – 2.45 pm Mon to Fri and 12 – 4 pm Sat)\nChoose ciabatta, white or malted bread, served with nachos & salad. FRIES UPGRADE +£2.'
+    },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var layout = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: col,
+    includes: { specials: true, sandwiches: true },
+    promos: []
+  });
+  assert(layout.p2 && layout.p2.specialsBesideSandwiches && layout.p2.sidesUnderSpecials,
+    'packed Main still plans Specials|Sandwiches with Sides under Specials');
+  assert(layout.fit === 'over' && layout.overflow === 'drop-in',
+    'Specials|Sandwiches + Sides under a full mains list overflows at min type + 13px gap');
+  assert(layout.fillers && layout.fillers.indexOf('Too much content — remove a dropped-in menu') !== -1,
+    'overflow filler copy asks to remove a dropped-in menu');
+  // Leaner sheet (fewer mains, Sides can leave page 2) still generates.
+  var lean = dishes.filter(function (d) {
+    return d.section !== 'Nibbles' && d.section !== 'Item Boost';
+  });
+  var kept = 0;
+  lean = lean.filter(function (d) {
+    if (d.section !== 'Mains') return true;
+    kept += 1;
+    return kept <= 5;
+  });
+  var leanLayout = print.planFluidLayout(api.menuById('main'), lean, {
+    sectionLayout: col,
+    includes: { specials: true, sandwiches: true },
+    promos: []
+  });
+  assert(leanLayout.fit !== 'over',
+    'leaner Main with Specials + Sandwiches still generates');
+})();
 (function sundaySharingMustNotKeepRoastsOffPage1() {
   var dishes = [
     api.dish('Nibbles', 'Vegetable Samosas', '', '6.95', 'v'),
@@ -3346,7 +3430,12 @@ assert(clipLayout.pages === 2, 'full starters/sandwiches/mains/desserts sheet us
 assert(clipLayout.p1.sandwiches || (clipLayout.p2 && clipLayout.p2.sandwiches),
   'named sandwich fillings stay on the sheet — never dropped to make space');
 assert(clipLayout.sandwichesLocked === true, 'named sandwich fillings lock sandwiches on the layout');
-assert(/minimum type|two A4/i.test(clipLayout.summary), 'summary explains two pages because one would clip at min type');
+// Full mains + desserts + Sandwiches at the 13px gap floor must gate (untick),
+// not claim a quiet two-pager that would clip food under the allergy footer.
+assert(clipLayout.fit === 'over' || /minimum type|two A4/i.test(clipLayout.summary),
+  'summary explains two pages or drop-in overflow when the sheet will not fit at min type');
+assert(clipLayout.fit !== 'over' || /remove a dropped-in menu|Too much content/i.test(clipLayout.summary),
+  'overflow summary asks to remove a dropped-in menu');
 var sidesSandDishes = [];
 ['Olives', 'Whitebait', 'Arancini', 'Bruschetta', 'Camembert', 'Falafel'].forEach(function (n) {
   sidesSandDishes.push(api.dish('Starters', n, 'starter description for fill', '8.95', ''));

@@ -1452,6 +1452,20 @@
     return u;
   }
 
+  /**
+   * Extra page units for the classical dish-gap floor vs the 8px model the
+   * tally was tuned for. Counts mains + sandwiches pack + specials + sides so
+   * Specials|Sandwiches with Sides nested under cannot look under PAGE while
+   * print clips into the allergy footer. Not a wrap/penalty tax — only the
+   * real min-gap delta (TYPE_RANGE.dishGapPx.min − 8).
+   */
+  function classicalGapUnits_(dishCount) {
+    var n = Math.max(0, Number(dishCount) || 0);
+    var delta = Math.max(0, TYPE_RANGE.dishGapPx.min - 8);
+    if (!n || !delta) return 0;
+    return n * delta * 0.18;
+  }
+
   function sectionUnits(sec, scalloped) {
     if (!sec || !sec.dishes || !sec.dishes.length) return 0;
     var u = COST.sectionHead + (scalloped ? COST.nibblesBox : 0);
@@ -2033,24 +2047,37 @@
       layout.p1.footPromos = canFitFootPromos(p1left);
       layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
-      // Classical breath: modest headroom for the hard dish-gap floor (13px).
-      // Calibrated so Specials that already fitted still pass — no wrap taxes.
-      var p2DishN = mainsN + dessertN +
+      // Classical breath: headroom for the hard dish-gap floor (13px).
+      // Count every food line on page 2 — including Sandwiches — so the gate
+      // matches print. Specials that already fitted still pass (no wrap taxes).
+      var p2SandN = layout.p2.sandwiches ? sandDishCount : 0;
+      var p2DishN = mainsN + dessertN + p2SandN +
         (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0) +
         (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
         (bag.specialDesserts && bag.specialDesserts.dishes ? bag.specialDesserts.dishes.length : 0) +
         (bag.littleBells && bag.littleBells.dishes ? bag.littleBells.dishes.length : 0) +
         (bag.sundayRoasts && !roastsOnP1 && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0);
-      var gapBreath = Math.min(6, p2DishN * Math.max(0, TYPE_RANGE.dishGapPx.min - 8) * 0.045);
+      var gapBreath = Math.min(8, p2DishN * Math.max(0, TYPE_RANGE.dishGapPx.min - 8) * 0.07);
+      // Nesting Sides under short Specials looks free in unit math (max() stays
+      // on Sandwiches) but classical gaps make the left stack meet the footer
+      // under a full mains list — flow182 clipped here with no overflow gate.
+      if (layout.p2.sidesUnderSpecials) {
+        var nestDishN = mainsN + p2SandN +
+          (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
+          (bag.sides && bag.sides.dishes ? bag.sides.dishes.length : 0);
+        gapBreath += classicalGapUnits_(nestDishN);
+      }
       // Full mains + desserts + Sandwiches on one back page reads as a busy wall —
       // refuse and ask to untick Sandwiches (or another drop-in) rather than pack.
       var sandwichCrowdsMains = !!(layout.p2.sandwiches && bag.mains && bag.desserts &&
         mainsN >= 7 && dessertN >= 4 && p2Load + gapBreath > PAGE - 14);
+      var foodOverPage = p2Load + gapBreath > PAGE;
       if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 ||
-          p2Load + gapBreath > PAGE) {
+          foodOverPage) {
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
-        if (sandwichCrowdsMains && layout.fillers.indexOf(
+        if ((sandwichCrowdsMains || (foodOverPage && layout.p2.sidesUnderSpecials)) &&
+            layout.fillers.indexOf(
             'Too much content — remove a dropped-in menu') === -1) {
           layout.fillers.push('Too much content — remove a dropped-in menu');
         }
