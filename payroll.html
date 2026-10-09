@@ -8,7 +8,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="payroll-build" content="20260901-day-night-theme">
+<meta name="payroll-build" content="20261001-wise-banner-exclude">
 <script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -251,11 +251,13 @@ thead th.actions-head{text-align:center;width:44px}
 .dir-item-actions{display:flex;gap:6px}
 .excluded-notice{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--amber-bg);border:1px solid rgba(251,191,36,.2);border-radius:var(--radius);margin-bottom:16px;font-size:12px;color:var(--amber)}
 .excluded-notice strong{font-weight:600}
-.wise-exclusion-panel{display:none;margin-bottom:16px;border:2px solid var(--red);border-radius:var(--radius);background:var(--red-bg);overflow:hidden;position:sticky;top:8px;z-index:40;box-shadow:0 8px 24px rgba(28,22,16,.08)}
+/* Solid surface bg — translucent green/red wash made sticky panel text
+   overlap the payments table when scrolled. */
+.wise-exclusion-panel{display:none;margin-bottom:16px;border:2px solid var(--red);border-radius:var(--radius);background:var(--surface);overflow:hidden;position:sticky;top:8px;z-index:40;box-shadow:0 8px 24px rgba(28,22,16,.08)}
 .wise-exclusion-panel.is-visible{display:block}
-.wise-exclusion-panel.is-ok{border-color:var(--green);background:var(--green-bg);box-shadow:none}
-.wise-exclusion-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(138,61,40,.18)}
-.wise-exclusion-panel.is-ok .wise-exclusion-head{border-bottom-color:rgba(45,90,61,.18)}
+.wise-exclusion-panel.is-ok{border-color:var(--green);box-shadow:0 2px 12px rgba(28,22,16,.06);position:static}
+.wise-exclusion-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(138,61,40,.18);background:var(--red-bg)}
+.wise-exclusion-panel.is-ok .wise-exclusion-head{border-bottom-color:rgba(45,90,61,.18);background:var(--green-bg)}
 .wise-exclusion-title{font-size:14px;font-weight:700;color:var(--red);margin:0}
 .wise-exclusion-panel.is-ok .wise-exclusion-title{color:var(--green)}
 .wise-exclusion-sub{font-size:11px;color:var(--text-muted);margin-top:3px;line-height:1.4}
@@ -493,16 +495,14 @@ function handleFiles(files){
       const parsed=parseBACS(e.target.result);
       if(!parsed.length){showToast('No payments found in '+file.name,'error');return;}
       loadedFileNames.push(file.name);
-      // Filter out excluded staff
-      const exKeys=new Set(excludedStaff.map(s=>s.sortCode+'|'+s.accountNumber));
+      // Filter out excluded staff (normalised bank digits, then name)
       let excludedCount=0, correctedCount=0;
       parsed.forEach(emp=>{
         // Apply Directory overlay — if this person is in the saved Directory,
         // use the Directory's (corrected) name and/or bank details. This stops
         // Wise corrections being silently overwritten on every new BACS upload.
         const corrected = applyDirectoryOverlay(emp);
-        const key = corrected.sortCode + '|' + corrected.accountNumber;
-        if (exKeys.has(key)) {
+        if (isExcludedStaff(corrected) || isExcludedStaff(emp)) {
           excludedCount++;
           sourceDropouts.push({
             name: corrected.name,
@@ -513,14 +513,14 @@ function handleFiles(files){
         }
         // Dedupe by overlaid sort+account so the same person across multiple BACS
         // files only appears once
-        if (!employees.some(e => e.sortCode === corrected.sortCode && e.accountNumber === corrected.accountNumber)) {
+        if (!employees.some(e => bankKey(e) === bankKey(corrected))) {
           if (corrected._correctedFrom) correctedCount++;
           corrected._originalBacs={name:emp.name,sortCode:emp.sortCode,accountNumber:emp.accountNumber};
           employees.push(corrected);
         }
       });
       if(excludedCount>0){$('excludedNotice').style.display='flex';$('excludedCount').textContent=excludedCount;}
-      autoSaveToSheet(parsed.filter(emp=>!exKeys.has(emp.sortCode+'|'+emp.accountNumber)));
+      autoSaveToSheet(parsed.filter(emp=>!isExcludedStaff(emp)&&!isExcludedStaff(applyDirectoryOverlay(emp))));
       lastDownloadLeftOut=null;
       renderFileChips();renderTable();
       const correctedMsg = correctedCount > 0 ? ' (' + correctedCount + ' name/bank corrected from directory)' : '';
@@ -576,17 +576,16 @@ function parseBACS(content){
 }
 
 async function autoSaveToSheet(parsed){
-  const exKeys=new Set(excludedStaff.map(s=>s.sortCode+'|'+s.accountNumber));
-  const dirSorts=new Set(staffDirectory.map(d=>d.sortCode+'|'+d.accountNumber));
+  const dirSorts=new Set(staffDirectory.map(d=>bankKey(d)));
   const dirNames=new Set(staffDirectory.map(d=>(d.name||'').toLowerCase()));
   // Skip entries already in Directory — by sort+account match (normal case)
   // OR by name match (case where Wise corrected someone's bank details, so the
   // BACS sort+account differs from Directory but the name still matches)
   const newStaff=parsed.filter(e=>{
-    const key=e.sortCode+'|'+e.accountNumber;
-    if(dirSorts.has(key))return false;
+    const key=bankKey(e);
+    if(key!=='|'&&dirSorts.has(key))return false;
     if(dirNames.has((e.name||'').toLowerCase()))return false;
-    if(exKeys.has(key))return false;
+    if(isExcludedStaff(e))return false;
     return true;
   }).map(e=>({name:e.name,sortCode:e.sortCode,accountNumber:e.accountNumber,entity:currentEntity}));
   if(newStaff.length)await apiPost({action:'addBatch',staff:newStaff});
@@ -606,6 +605,19 @@ function bankDigits(e){
     sort: String(e&&e.sortCode||'').replace(/\D/g,''),
     acct: String(e&&e.accountNumber||'').replace(/\D/g,'')
   };
+}
+function bankKey(e){
+  const b=bankDigits(e);
+  return b.sort+'|'+b.acct;
+}
+/** True if this person is on the Excluded Staff list (bank match, else name). */
+function isExcludedStaff(person){
+  if(!person||!excludedStaff||!excludedStaff.length)return false;
+  const key=bankKey(person);
+  if(key!=='|'&&excludedStaff.some(s=>bankKey(s)===key))return true;
+  const name=String(person.name||'').toLowerCase().trim();
+  if(!name)return false;
+  return excludedStaff.some(s=>String(s.name||'').toLowerCase().trim()===name);
 }
 function hasValidBankDetails(e){
   const b=bankDigits(e);
@@ -692,7 +704,7 @@ function updateWiseExclusionPanel(){
   if(!combined.length){
     if(employees.length){
       panel.className='wise-exclusion-panel is-visible is-ok';
-      panel.innerHTML=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">✓ Missing / won't pay — none</div><div class="wise-exclusion-sub">Everyone owed money with valid bank details is in the Wise batch.</div></div><div class="wise-exclusion-total">£0.00 out</div></div>`;
+      panel.innerHTML=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">✓ Missing / won't pay — none</div><div class="wise-exclusion-sub">Everyone owed money with valid bank details is in the Wise batch.</div></div><div class="wise-exclusion-total">£0.00 left out</div></div>`;
     }else{
       panel.className='wise-exclusion-panel';
       panel.innerHTML='';
@@ -707,7 +719,7 @@ function updateWiseExclusionPanel(){
   const sub=lastDownloadLeftOut
     ? 'These people were on the Xero/BACS pay run but were not included in the downloaded CSV. Fix bank details (✏️) and download again if needed.'
     : 'Anyone on this pay run who will NOT be in Download Wise CSV — zero/negative net, missing bank, excluded staff, or not imported.';
-  let html=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">⚠ ${combined.length} ${combined.length===1?'person':'people'} — ${esc(title)}</div><div class="wise-exclusion-sub">${esc(sub)}</div></div><div class="wise-exclusion-total">£${fmtMoney(tot)} out</div></div>`;
+  let html=`<div class="wise-exclusion-head"><div><div class="wise-exclusion-title">⚠ ${combined.length} ${combined.length===1?'person':'people'} — ${esc(title)}</div><div class="wise-exclusion-sub">${esc(sub)}</div></div><div class="wise-exclusion-total">£${fmtMoney(tot)} left out</div></div>`;
   html+='<ul class="wise-exclusion-list">';
   combined.forEach(it=>{
     html+=`<li><div><div class="wise-exclusion-name">${esc(it.name||'(unnamed)')}</div><div class="wise-exclusion-reason">${esc(it.reason||'')}</div></div><div class="wise-exclusion-amt">£${fmtMoney(Number(it.amount)||0)}</div></li>`;
@@ -1516,7 +1528,6 @@ function toggleXeroPayslip(i) {
 
 function commitXeroPull() {
   if (!xeroPullState) return;
-  const exKeys = new Set(excludedStaff.map(s => s.sortCode + '|' + s.accountNumber));
   let added = 0, excludedCount = 0, manualCount = 0;
   const pullDropouts = [];
 
@@ -1538,18 +1549,18 @@ function commitXeroPull() {
       }
       return;
     }
+    // Excluded by directory bank details OR by Xero/directory name
+    if (isExcludedStaff(item.dirMatch) || isExcludedStaff({ name: item.xeroName, sortCode: '', accountNumber: '' })) {
+      excludedCount++;
+      pullDropouts.push({
+        name: (item.dirMatch && item.dirMatch.name) || item.xeroName,
+        amount: net,
+        reason: 'On Excluded Staff list (e.g. weekly-paid) — removed before Wise'
+      });
+      return;
+    }
     if (item.dirMatch) {
-      const key = item.dirMatch.sortCode + '|' + item.dirMatch.accountNumber;
-      if (exKeys.has(key)) {
-        excludedCount++;
-        pullDropouts.push({
-          name: item.dirMatch.name || item.xeroName,
-          amount: net,
-          reason: 'On Excluded Staff list (e.g. weekly-paid) — removed before Wise'
-        });
-        return;
-      }
-      if (!employees.some(e => e.sortCode === item.dirMatch.sortCode && e.accountNumber === item.dirMatch.accountNumber)) {
+      if (!employees.some(e => bankKey(e) === bankKey(item.dirMatch))) {
         employees.push({
           name: item.dirMatch.name,
           sortCode: item.dirMatch.sortCode,
