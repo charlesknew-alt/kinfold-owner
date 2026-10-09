@@ -215,8 +215,15 @@ assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists'
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
 assert(fs.existsSync(path.join(root, 'images/frame-wide.png')), 'scalloped frame asset exists');
 assert(fs.existsSync(path.join(root, 'images/frame-platter.png')), 'tip oval platter asset exists');
+var platterBytes = fs.statSync(path.join(root, 'images/frame-platter.png')).size;
+assert(platterBytes > 20000,
+  'tip oval asset carries fine-scallop detail (not a tiny smooth double-stroke ellipse)');
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
+assert(/fine scallop/i.test(printJs),
+  'print CSS/comments name fine-scallop tip oval (Tips / frame-wide family)');
+assert(/border-radius:0/.test(printJs) && !/scallop-platter[\s\S]{0,180}border-radius:50%/.test(printJs),
+  'fine-scallop tip oval does not clip bumps with border-radius 50%');
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
 assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
@@ -753,8 +760,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow207') !== -1, 'menus page cache-bust is flow207');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow207') !== -1, 'hub menus link cache-bust is flow207');
+assert(page.indexOf('flow208') !== -1, 'menus page cache-bust is flow208');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow208') !== -1, 'hub menus link cache-bust is flow208');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2740,11 +2747,11 @@ assert(api.tidyBook({ main: [{ name: 'Olives (vg)', tags: '' }] }).main[0].tags 
 assert(printJs.indexOf('border-image') !== -1, 'scallops use border-image (no stretch through text)');
 assert(!/\.scallop\{[^}]*background-size:\s*100%\s*100%/.test(printJs),
   'no stretched full-bleed frame fill on base scallop');
-assert(/\.scallop-platter[\s\S]{0,500}background-size:\s*100%\s*100%/.test(printJs) ||
-  /scallop\.scallop-wide\.scallop-platter[\s\S]{0,500}background-size:\s*100%\s*100%/.test(printJs),
+assert(/\.scallop-platter[\s\S]{0,800}background-size:\s*100%\s*100%/.test(printJs) ||
+  /scallop\.scallop-wide\.scallop-platter[\s\S]{0,800}background-size:\s*100%\s*100%/.test(printJs),
   'tip platter fills its oval aspect box (not a dashed border-image rect)');
 assert(/frame-platter\.png/.test(printJs), 'tip platter CSS uses frame-platter.png oval asset');
-assert(/aspect-ratio:\s*auto/.test(printJs), 'tip platter CSS is content-sized (aspect-ratio auto)');
+assert(/aspect-ratio:\s*10\/3/.test(printJs), 'tip platter CSS keeps frame-platter oval aspect (10/3)');
 assert(/canBalancedSplit/.test(printJs) && print.canBalancedSplit(4) === true &&
   print.canBalancedSplit(5) === false && print.canBalancedSplit(2) === true,
   'even-split helper: only even dish counts may split 2-col');
@@ -3943,7 +3950,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   assert(/scallop-platter[\s\S]{0,400}frame-platter\.png/.test(sheet) ||
     /frame-platter\.png[\s\S]{0,400}scallop-platter/.test(sheet),
     'platter background uses frame-platter.png (not rectangular frame-wide)');
-  assert(/aspect-ratio:\s*auto/.test(sheet), 'platter CSS uses oval aspect auto (content-sized)');
+  assert(/aspect-ratio:\s*10\/3/.test(sheet), 'platter CSS keeps fine-scallop oval aspect 10/3');
   assert(/width:\s*fit-content/.test(sheet) && /max-width:\s*100%/.test(sheet),
     'platter hugs sell words (fit-content) without overflowing the column');
   assert(/cols-balanced[\s\S]{0,120}\.scallop-platter[\s\S]{0,80}align-self:\s*center!important/.test(sheet) ||
@@ -3957,8 +3964,9 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   assert(/sandwich-tip-only[\s\S]{0,180}flex-direction:\s*column/.test(sheet) &&
     /scallop-platter[\s\S]{0,220}display:\s*flex!important/.test(sheet),
     'tip platter + sell words use flex centre for optical vertical/horizontal balance');
-  assert(/border-radius:\s*50%/.test(sheet) && /frame-platter\.png/.test(sheet),
-    'tip platter is a true geometric oval (border-radius 50% + ellipse asset)');
+  assert(/border-radius:\s*0/.test(sheet) && /frame-platter\.png/.test(sheet) &&
+    /aspect-ratio:\s*10\/3/.test(sheet) && !/scallop-platter[\s\S]{0,180}border-radius:50%/.test(sheet),
+    'tip platter is a fine-scallop oval (Tips family; no border-radius clip)');
   var tipBalanced = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
     rule: { tip: true, tipOnly: true, sell: 'A selection of sandwiches is available — ask the team.' },
     tipOnly: true
@@ -4131,8 +4139,8 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     layout: planned,
     promos: api.seedPromoBank()
   });
-  assert(/aspect-ratio:\s*auto/.test(sheet) && /border-image:none!important/.test(sheet),
-    'tip platter CSS keeps content-sized oval and kills border-image rect');
+  assert(/aspect-ratio:\s*10\/3/.test(sheet) && /border-image:none!important/.test(sheet),
+    'tip platter CSS keeps fine-scallop oval aspect and kills border-image rect');
   assert(/frame-platter\.png/.test(sheet), 'tip uses frame-platter oval asset');
   var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
   var p2 = a4.split(/class="page fill-page/)[2] || a4;
@@ -4513,8 +4521,8 @@ assert(/Long Specials[\s\S]{0,80}split across two even columns/.test(printJs) ||
     layout: mainPlan,
     promos: api.seedPromoBank()
   });
-  assert(/aspect-ratio:\s*auto/.test(mainSheet) && /border-image:none!important/.test(mainSheet),
-    'tip platter CSS keeps content-sized oval on Main');
+  assert(/aspect-ratio:\s*10\/3/.test(mainSheet) && /border-image:none!important/.test(mainSheet),
+    'tip platter CSS keeps fine-scallop oval aspect on Main');
   assert(/frame-platter\.png/.test(mainSheet), 'Main tip uses frame-platter oval');
   var mainA4 = (mainSheet.split('mode-panel mode-a5')[0] || mainSheet).replace(/<style[\s\S]*?<\/style>/gi, '');
   var mainP2 = mainA4.split(/class="page /)[2] || '';
