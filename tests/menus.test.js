@@ -728,8 +728,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow187') !== -1, 'menus page cache-bust is flow187');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow187') !== -1, 'hub menus link cache-bust is flow187');
+assert(page.indexOf('flow188') !== -1, 'menus page cache-bust is flow188');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow188') !== -1, 'hub menus link cache-bust is flow188');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2863,14 +2863,14 @@ assert(/class="[^"]*sandwich-tip-only/.test(tipOnlyHtml), 'tip-only box marks sa
 assert(!/promo-title[^>]*>\s*Sandwiches/i.test(tipOnlyHtml) &&
   !/sec-title[^>]*>\s*Sandwiches/i.test(tipOnlyHtml),
   'tip-only oval omits the SANDWICHES section title');
-assert(/scallop[^"]*scallop-wide[\s\S]*class="[^"]*sandwich-tip-only/.test(tipOnlyHtml),
-  'tip-only default chrome is platter oval (wide)');
+assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]*class="[^"]*sandwich-tip-only/.test(tipOnlyHtml),
+  'tip-only default chrome is platter oval (wide + scallop-platter)');
 // Frilly=No must NOT strip tip-only to bare text (flow186 regression / Charles screenshot).
 var tipOnlyNoFrill = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
   rule: { frame: false, tip: true, tipOnly: true, sell: 'Ask the team for today’s sandwiches' },
   tipOnly: true
 });
-assert(/scallop[^"]*scallop-wide[\s\S]*class="[^"]*sandwich-tip-only/.test(tipOnlyNoFrill),
+assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]*class="[^"]*sandwich-tip-only/.test(tipOnlyNoFrill),
   'tip-only keeps scallop/platter class even when Frilly is No');
 assert(!/sec-plain[\s\S]*sandwich-tip-only/.test(tipOnlyNoFrill),
   'tip-only is never bare sec-plain text');
@@ -2937,7 +2937,7 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
   var tipBody = tipA4.replace(/<style[\s\S]*?<\/style>/gi, '');
   assert(tipBody.indexOf(sellLine) !== -1, 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
   assert(/class="[^"]*sandwich-tip-only/.test(tipBody), 'Main unticked tip uses tip-only marker in HTML');
-  assert(/scallop[^"]*scallop-wide[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(tipBody),
+  assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(tipBody),
     'Main unticked tip uses scallop-wide platter oval in HTML');
   assert(!/sec-plain[\s\S]{0,120}class="[^"]*sandwich-tip-only/.test(tipBody),
     'Main unticked tip is not bare sec-plain (Frilly No still gets platter)');
@@ -3606,7 +3606,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   var a4Body = a4.replace(/<style[\s\S]*?<\/style>/gi, '');
   assert(/class="[^"]*sandwich-tip-only/.test(a4Body) && a4Body.indexOf(sellLine) !== -1,
     'tip-only oval prints sell words on the sheet');
-  assert(/scallop[^"]*scallop-wide[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(a4Body),
+  assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(a4Body),
     'tip-only uses platter oval frame (scallop/platter class wraps sell words)');
   assert(!/sec-plain[\s\S]{0,120}class="[^"]*sandwich-tip-only/.test(a4Body),
     'tip-only sell words are never bare sec-plain');
@@ -3696,12 +3696,43 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     promos: api.seedPromoBank()
   });
   var body = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
-  assert(/scallop[^"]*scallop-wide[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(body),
+  assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(body),
     'forced sides-under-tip still wraps tip-only in scallop/platter');
   assert(body.indexOf('foot-promos') === -1,
     'foot promo not placed when leftover too small (even if footPromos flag is stale)');
   assert(/Cheesy Garlic Bread|Chunky Triple Cooked Chips/.test(body),
     'Sides still print when foot promo is omitted');
+})();
+
+// flow188: tip-only oval platter CSS paints full frame-wide silhouette (not border-image rect).
+(function tipOnlyPlatterCss() {
+  var tipCss = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
+    rule: { tip: true, tipOnly: true, sell: 'A selection of sandwiches is available — ask the team.' },
+    tipOnly: true
+  });
+  assert(/scallop-platter/.test(tipCss), 'tip-only HTML carries scallop-platter class');
+  // Full sheet CSS must size the platter from the oval asset and contrast a stacked panel.
+  var sheet = print.build(api.menuById('main'), [
+    api.dish('Mains', 'Fish & Chips', 'peas', '18.95', ''),
+    api.dish('Special Mains', 'Baked Gnocchi', 'tomato', '15.95', 'v'),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v')
+  ], {
+    sectionLayout: api.normalizeSectionLayout({
+      Sandwiches: { tip: true, frame: false, width: 'column',
+        sell: 'A selection of sandwiches is available — ask the team.' },
+      'Special Mains': { width: 'column', frame: true },
+      Sides: { width: 'column', frame: false }
+    }),
+    includes: { sandwiches: false, specials: true },
+    promos: api.seedPromoBank()
+  });
+  assert(/scallop-platter/.test(sheet) && /frame-wide\.png/.test(sheet),
+    'sheet CSS/HTML includes scallop-platter and frame-wide oval asset');
+  assert(/scallop-platter[\s\S]{0,200}border-image:\s*none|border-image:\s*none[\s\S]{0,200}scallop-platter/.test(sheet) ||
+    /\.scallop-platter[\s\S]{0,300}border-image:\s*none/.test(sheet),
+    'platter CSS disables border-image so the oval silhouette can show');
+  assert(/:has\(\.sandwich-tip-only\)\s*>\s*\.col-feature\s*>\s*\.scallop-wide/.test(sheet),
+    'stacked tip + feature panel flips the panel wave for contrast');
 })();
 
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
