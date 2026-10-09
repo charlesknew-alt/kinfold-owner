@@ -753,8 +753,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow204') !== -1, 'menus page cache-bust is flow204');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow204') !== -1, 'hub menus link cache-bust is flow204');
+assert(page.indexOf('flow205') !== -1, 'menus page cache-bust is flow205');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow205') !== -1, 'hub menus link cache-bust is flow205');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');

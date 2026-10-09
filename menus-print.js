@@ -526,7 +526,7 @@
     // Real Canva/print frames via border-image so waves sit in the border
     // gutter and never cut through dish text (unlike stretched SVG/PNG fill).
     // box = tight scallop, squarer corners; wide = looser wave, rounder corners.
-    // Tip-only also adds scallop-platter (true oval silhouette via frame-platter.png).
+    // Tip-only also adds scallop-platter (oval + fine scallops via frame-platter.png).
     var cls = kind === 'box' ? 'scallop scallop-box' : 'scallop scallop-wide';
     if (extraCls) cls += ' ' + String(extraCls).trim();
     return '<div class="' + cls + '"><div class="scallop-pad">' + inner + '</div></div>';
@@ -549,7 +549,7 @@
   }
 
   /** Two matching rectangles never sit side by side — neighbour uses the other wave.
-   *  Tip-only sell words stay the oval platter; flip the other column instead. */
+   *  Tip-only sell words stay the fine-scallop oval; flip the other column instead. */
   function contrastAdjacentScallops(leftHtml, rightHtml) {
     var lk = firstScallopKind(leftHtml);
     var rk = firstScallopKind(rightHtml);
@@ -1266,9 +1266,9 @@
       }
       if (!tipOnly) noteInner += extras.belowHtml || '';
       if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
-      // Tip-only chrome: always the large oval / platter (wide + scallop-platter) —
-      // never rect box, never bare text. Callers that pass frame:'box' for filled
-      // sandwiches must not shrink tip-only sell words into a rectangular scallop.
+      // Tip-only chrome: always the fine-scallop oval (wide + scallop-platter) —
+      // never rect box, never bare text, never big-lobe waves. Callers that pass
+      // frame:'box' for filled sandwiches must not shrink tip-only into a rect.
       if (tipOnly) {
         frameKind = 'wide';
         return scallop(noteInner, frameKind, 'scallop-platter');
@@ -4524,10 +4524,10 @@
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
-      /* Tip-only sell oval: true geometric ellipse (frame-platter.png double-stroke),
-         NOT the rectangular frame-wide.png scallop and NOT a lumpy cloud lobe.
-         Kill border-image with !important so density rules never restore a dashed rect. */
-      /* Tip-only: classy platter hugs the sell words; text optically centred. */
+      /* Tip-only sell oval: ellipse + fine scallops (frame-platter.png), same visual
+         family as Tips / frame-wide section borders — NOT big-lobe platter waves,
+         NOT a plain double-stroke. Kill border-image so density never restores a rect. */
+      /* Tip-only: fine-scallop oval hugs the sell words; text optically centred. */
       '.sandwich-tip-only{' +
         'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
         'text-align:center;width:max-content;max-width:100%;margin:0 auto;gap:0}' +
