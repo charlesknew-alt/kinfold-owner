@@ -386,6 +386,25 @@ assert(printJs.indexOf('cols[ci].scrollHeight') !== -1 && printJs.indexOf('funct
 assert(printJs.indexOf('function dropOverflowingChrome') !== -1 &&
   printJs.indexOf('.col-feature .scallop') !== -1,
   'overflowing leftover feature panels are removed before dishes clip');
+assert(printJs.indexOf('isPromoOnlyScallop') !== -1 &&
+  printJs.indexOf('col-promo .col-body > .scallop') !== -1,
+  'overflow drop also removes promo-as-column-body (Sip & Paint opposite Sides)');
+assert(printJs.indexOf('getBoundingClientRect') !== -1 &&
+  printJs.indexOf('.allergy') !== -1,
+  'overflows() pixel-measures content bottom vs allergy foot');
+assert(printJs.indexOf('function measurePrintFit') !== -1 &&
+  page.indexOf('measurePrintFit') !== -1,
+  'Arranging DOM-measures printable area before opening preview');
+assert(page.indexOf('never open a half-cut preview') !== -1 ||
+  page.indexOf('Measuring printable area') !== -1,
+  'overflow / arrange copy refuses a clipped success preview');
+assert(page.indexOf('Try deselecting') !== -1 &&
+  page.indexOf('data-overflow-tip') !== -1,
+  'overflow gate names tip / drop-ins to deselect');
+assert(page.indexOf('okToPrint = null') !== -1 ||
+  page.indexOf('advice.okToPrint = null') !== -1 ||
+  page.indexOf('DOM measure still wins') !== -1,
+  'Gemini okToPrint cannot bypass the DOM pre-preview gate');
 assert(printJs.indexOf('splitPromosForColumns') !== -1, 'event panels can split across columns');
 assert(printJs.indexOf('renderOnePromoBox') !== -1, 'event wording renders as separate boxes');
 assert(printJs.indexOf('Bells Lunch Club option') !== -1, 'allergy footer can explain lunch club mark');
@@ -734,8 +753,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow198') !== -1, 'menus page cache-bust is flow198');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow198') !== -1, 'hub menus link cache-bust is flow198');
+assert(page.indexOf('flow199') !== -1, 'menus page cache-bust is flow199');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow199') !== -1, 'hub menus link cache-bust is flow199');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2371,9 +2390,13 @@ assert(printJs.indexOf('function foodFitsColumnLeftover') !== -1 &&
   assert(datedFirst.usedTitles.indexOf('Sip & Paint') !== -1 ||
     datedFirst.usedTitles.indexOf('Stay a While') !== -1,
     'general column leftover still fills with a fitting panel');
-  if (printApi.promoUnits(sip) <= Math.abs(28 - 6) + 0.1) {
+  // Prefer the smallest panel that fits — dated Sip & Paint only when it is
+  // the best fit (never jam a tall event ahead of Stay a While).
+  assert(datedFirst.usedTitles.indexOf('Stay a While') !== -1,
+    'smallest fitting panel (Stay a While) wins over taller Sip & Paint');
+  if (printApi.promoUnits(sip) <= 8) {
     assert(datedFirst.usedTitles.indexOf('Sip & Paint') !== -1,
-      'dated event is preferred when it fits a general leftover hole');
+      'compact dated event can still fill when it is the smallest fit');
   }
 })();
 assert(printJs.indexOf('uniqueFeaturePanelsHtml') !== -1 &&
@@ -4890,6 +4913,110 @@ assert(!/col-promo[\s\S]*pair-head[\s\S]*Sandwiches/.test(sidesSandRow),
     'page 2 puts a feature panel under shorter Sides when Sandwiches are the tall frilly stack');
 })();
 assert(api.includableMenus('desserts').length === 0, 'a card menu does not pull others in');
+
+// flow199: Charles screenshot — tip omitted, Specials column, Sides + Sip & Paint
+// must NOT clip. Empty-partner panels respect page leftover; Sip & Paint dropped
+// when it cannot fit; all Sides stay in HTML or fit===over gates generate.
+(function charlesScreenshotSipPaintMustNotClip() {
+  var sell = 'A selection of sandwiches is available — ask the team.';
+  var dishes = [];
+  for (var si = 0; si < 6; si++) {
+    dishes.push(api.dish('Starters', 'Starter ' + si, 'long starter description for packing page one fully', '8.95', ''));
+  }
+  for (var shi = 0; shi < 2; shi++) {
+    dishes.push(api.dish('Sharing Plates', 'Share ' + shi, 'sharing plate description text here', '15.95', 'v'));
+  }
+  for (var bi = 0; bi < 3; bi++) {
+    dishes.push(api.dish('Burgers', 'Burger ' + bi, 'burger with fries onion rings salad', '18.95', ''));
+  }
+  [
+    'Pan Fried Seabass', 'Vegetarian Lasagne', 'Pork Wellington', 'Fish & Chips',
+    'Pie of the day', 'Korean Chicken Balls', 'Beef Short Rib Genovese Rigatoni'
+  ].forEach(function (n) {
+    dishes.push(api.dish('Mains', n, 'long main description mash gravy peas lemon butter', '18.95', ''));
+  });
+  for (var di = 0; di < 4; di++) {
+    dishes.push(api.dish('Desserts', 'Dessert ' + di, 'pudding description text here nice', '7.95', 'v'));
+  }
+  [
+    'Venison Tournedos Rossini', 'Baked Gnocchi', 'Creamy Chicken Nduja & Chorizo Penne',
+    'Beef Brisket & Chilli Noodles', 'Pasta Carbonara'
+  ].forEach(function (n, idx) {
+    dishes.push(api.dish('Special Mains', n, 'long special description text for dish ' + idx + ' with garnish', '15.95',
+      idx === 1 ? 'v' : ''));
+  });
+  [
+    'Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg',
+    'Garlic Bread', 'House Salad', 'Fries'
+  ].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '5.95', 'v'));
+  });
+  var sip = {
+    title: 'Sip & Paint',
+    date: '2026-10-28',
+    body: 'Weds 28th Oct from 7pm. Join us at the pub for a relaxed evening of painting and drinks — all materials provided, just bring yourself.'
+  };
+  var promos = [sip].concat(api.seedPromoBank());
+  var layoutMap = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: "When it's gone, it's gone" },
+    Sandwiches: { tip: true, frame: false, width: 'column', sell: sell },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    promos: promos
+  });
+  assert(planned.fit === 'two' || planned.fit === 'over',
+    'screenshot Main plans two pages or overflow-gates — never a silent one-pager');
+  var sheet = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    layout: planned,
+    promos: promos
+  });
+  var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  var p2 = a4.split(/class="page /)[2] || a4;
+  var sideHits = ['Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg',
+    'Garlic Bread', 'House Salad', 'Fries'].filter(function (n) {
+    return a4.indexOf(n) !== -1;
+  });
+  assert(sideHits.length === 6 || planned.fit === 'over',
+    'all Sides print or overflow-gate — never Cheesy Garlic Bread alone with a hole');
+  var sidesRow = (p2.match(/sides-sand-row[\s\S]*?<\/section>/) || [])[0] || '';
+  var p2Left = planned.leftover && planned.leftover.p2;
+  if (p2Left != null && p2Left < 14) {
+    assert(!/Sip\s*&amp;\s*Paint|SIP &amp; PAINT/i.test(sidesRow),
+      'tight page-2 leftover: Sip & Paint is not planted opposite Sides (would clip)');
+    // Sip may only sit opposite a TALLER food column (panel ≤ food height).
+    // Never opposite short Sides, and never when columnPromos is off.
+    if (planned.p2 && planned.p2.columnPromos === false) {
+      assert(!/Sip\s*&amp;\s*Paint/i.test(p2),
+        'columnPromos off: Sip & Paint omitted from packed page 2 rather than clipped');
+    }
+  }
+  assert(/isPromoOnlyScallop|col-promo \.col-body > \.scallop/.test(printJs),
+    'fitPages can drop Sip & Paint column-body when DOM still overflows');
+  if (planned.p2 && planned.p2.sandwiches) {
+    assert(/scallop-platter|frame-platter\.png/.test(sheet),
+      'when Tip=Yes fits, tip oval platter (frame-platter) is present');
+  }
+  assert(print.promoUnits(sip) >= 12,
+    'Sip & Paint unit height is pessimistic (≥12) so it will not fit a small hole');
+  var tiny = print.planPromoFill(10, 0, [sip].concat(api.seedPromoBank()), {
+    pageBudget: 6,
+    shortOnly: true
+  });
+  assert(!tiny.left && !tiny.right,
+    'pageBudget 6 refuses Sip & Paint / any panel that would overflow');
+  var roomy = print.planPromoFill(14, 0, api.seedPromoBank(), {
+    pageBudget: 20,
+    shortOnly: true
+  });
+  assert(!!(roomy.right || roomy.left),
+    'with real spare room a small evergreen panel still fills the empty partner');
+})();
 
 var alone = api.sheetPlanFor(book, 'main', {});
 assert(alone.plan.fit === 'one' || alone.plan.fit === 'two', 'main alone fits one or two pages');

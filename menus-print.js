@@ -711,16 +711,23 @@
 
   /**
    * Height of a leftover feature panel. Long dated events (Sip & Paint) score
-   * much taller than Stay a While / Gatherings.
+   * much taller than Stay a While / Gatherings. Unit model was too optimistic
+   * (flow197) — dated events clipped while fit!==over; score them pessimistically.
    */
   var FEATURE_GAP_UNITS = 2.4;
   function promoUnits(p) {
     if (!p) return 0;
     var body = String(p.body || '');
+    // Evergreens stay near the old model; only dated events (Sip & Paint) get
+    // a pessimistic score so they are not jammed into Sides leftovers.
     var u = 3.4;
     u += 1.8;
-    if (p.date) u += 0.7;
-    u += 1 + Math.floor(body.length / 58);
+    if (p.date) {
+      u += 3.2;
+      u += 1.2 + Math.floor(body.length / 42) * 1.1;
+    } else {
+      u += 1 + Math.floor(body.length / 58);
+    }
     return u;
   }
 
@@ -745,14 +752,15 @@
     var budget = (leftover || 0) - (withGap ? FEATURE_GAP_UNITS : 0);
     if (budget < 4 || !list.length || n < 1) return [];
     var ranked = list.slice().sort(function (a, b) {
-      // General leftover: dated first when it fits the hole, then smaller.
-      // Kids (withGap) already stripped dated, so this only ranks evergreens.
-      if (!withGap) {
-        var da = a && a.date ? 0 : 1;
-        var db = b && b.date ? 0 : 1;
-        if (da !== db) return da - db;
-      }
-      return promoUnits(a) - promoUnits(b);
+      // Prefer the SMALLEST panel that fits. Dated events (Sip & Paint) only win
+      // when the hole is clearly large enough — never jam a tall event into a
+      // Sides leftover and clip the allergy footer.
+      var ua = promoUnits(a);
+      var ub = promoUnits(b);
+      if (ua !== ub) return ua - ub;
+      var da = a && a.date ? 1 : 0;
+      var db = b && b.date ? 1 : 0;
+      return da - db;
     });
     var out = [];
     var used = 0;
@@ -845,12 +853,21 @@
       var alt = kind === 'box' ? 'wide' : 'box';
       var n = Math.max(0, Math.min(2, parseInt(panels, 10) || 0));
       var hole = leftover != null ? leftover : Math.abs((rightFood || 0) - (leftFood || 0));
-      // Unit holes often under-count half-column height. When leveling a real
-      // short side (force / shortOnly), allow one small evergreen panel anyway.
-      var fitHole = (allowSmall || opts.force) ? Math.max(hole, 8) : hole;
+      // Page leftover is a HARD ceiling — never place a panel taller than the
+      // printable spare room (empty-partner Sip & Paint was clipping while
+      // unit fit!==over because we inflated the hole to 8 and ignored pageBudget).
+      var pageBudget = opts.pageBudget;
+      var fitHole = hole;
+      if (pageBudget != null) fitHole = Math.min(fitHole, Math.max(0, pageBudget));
+      // Only inflate when we have real page spare (or no page gate).
+      if ((allowSmall || opts.force) && (pageBudget == null || pageBudget >= 8)) {
+        fitHole = Math.max(fitHole, Math.min(8, pageBudget != null ? pageBudget : 8));
+      }
       var fit = pickFittingPromos(pool, fitHole, n, !!opts.shortOnly);
-      if (!fit.length && (allowSmall || opts.force)) {
-        fit = pickFittingPromos(pool, 8, 1, false);
+      // Fallback without gap tax — same as pre-flow199 (modest Stay still fits).
+      if (!fit.length && (allowSmall || opts.force) && (pageBudget == null || pageBudget >= 6)) {
+        var fb = Math.min(8, pageBudget != null ? Math.max(pageBudget, 6) : 8);
+        fit = pickFittingPromos(pool, fb, 1, false);
       }
       if (!fit.length) {
         return { left: '', right: '', note: 'Leftover too small for a feature panel', usedTitles: [] };
@@ -2605,6 +2622,7 @@
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
         skipPromos: opts.skipPromos,
+        pageLeftover: opts.pageLeftover,
         dataSpecials: key
       });
     }
@@ -2911,13 +2929,14 @@
   function levelOppositeColumns(leftInner, leftU, rightInner, rightU, opts) {
     opts = opts || {};
     var fill = { left: '', right: '', usedTitles: [] };
-    // Page leftover gate: never plant Gatherings / Stay under a food pair when
-    // the sheet is already packed (Sunday kids|sides + notes → allergy clip).
+    // Page leftover gate: never plant Gatherings / Stay / Sip & Paint when the
+    // sheet is already packed (unit leftover under COL_PROMO_MIN → allergy clip).
     var skipForLeftover = opts.pageLeftover != null && !canFitColumnPromos(opts.pageLeftover);
-    // Empty partner opposite food is the leftover column itself — still fill it.
-    if (skipForLeftover && (isBlankFoodInner(leftInner) || isBlankFoodInner(rightInner))) {
-      skipForLeftover = false;
-    }
+    var blankPartner = isBlankFoodInner(leftInner) || isBlankFoodInner(rightInner);
+    // Empty partner: a panel that fits WITHIN the food column height does not
+    // grow the page — allow the attempt even when page leftover is tight.
+    // pageBudget = food height refuses oversized Sip & Paint (the screenshot bug).
+    if (skipForLeftover && blankPartner) skipForLeftover = false;
     // In-pair leveling under a known tall envelope (opts.force from Little Bells
     // | Desserts when desserts tower over kids): a panel under the short column
     // does not grow past the tall side — allow it even when page leftover is
@@ -2936,18 +2955,30 @@
         shortOnly: !!opts.shortOnly
       };
       if (opts.force) fillOpts.force = opts.force;
+      // Cap panel height: blank partner ≤ food column; leveling ≤ hole + leftover.
+      if (opts.pageLeftover != null || blankPartner) {
+        var foodSide = Math.max(leftU || 0, rightU || 0);
+        var hole = Math.abs((rightU || 0) - (leftU || 0));
+        if (blankPartner) {
+          fillOpts.pageBudget = foodSide; // never taller than the food beside it
+        } else if (opts.pageLeftover != null) {
+          fillOpts.pageBudget = hole + Math.max(0, opts.pageLeftover);
+        }
+      }
       fill = planPromoFill(leftU || 0, rightU || 0, remaining, fillOpts);
       // If one side is still clearly short and planPromoFill returned nothing usable, force panels.
       var gap = (rightU || 0) - (leftU || 0);
       var minGap = opts.shortOnly ? 1.2 : 2.5;
       if (!fill.left && !fill.right && remaining.length && Math.abs(gap) > minGap) {
-        fill = planPromoFill(leftU || 0, rightU || 0, remaining, {
+        var forceOpts = {
           leftFrame: fillOpts.leftFrame,
           rightFrame: fillOpts.rightFrame,
           excludeTitles: fillOpts.excludeTitles,
           shortOnly: fillOpts.shortOnly,
           force: { shorter: gap > 0 ? 'left' : 'right', panels: Math.abs(gap) > 9 ? 2 : 1 }
-        });
+        };
+        if (fillOpts.pageBudget != null) forceOpts.pageBudget = fillOpts.pageBudget;
+        fill = planPromoFill(leftU || 0, rightU || 0, remaining, forceOpts);
       }
     }
     // In-pair leftover fillers (Little Bells|Desserts, tip|Sides, …) are marked
@@ -3018,6 +3049,7 @@
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
       skipPromos: !!opts.skipPromos,
+      pageLeftover: opts.pageLeftover,
       secClass: 'column-solo-row' + (opts.dataSpecials ? ' specials-col-row' : ''),
       colsClass: 'column-solo-cols',
       leftClass: opts.dataSpecials ? 'col-specials' : '',
@@ -3796,7 +3828,10 @@
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length &&
           !specialsPairedInCol) {
         var soloSpec1 = specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains', {
-          promos: promos, excludeTitles: usedPromoTitles
+          promos: promos,
+          excludeTitles: usedPromoTitles,
+          pageLeftover: layout.leftover && layout.leftover.p1,
+          skipPromos: p1opts.columnPromos === false
         });
         usedPromoTitles = usedPromoTitles.concat(soloSpec1.usedPromoTitles || []);
         p1 += soloSpec1.html || '';
@@ -3953,7 +3988,10 @@
     if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length &&
         !specialsPairedInCol) {
       var soloSpec2 = specialsBesideCourse(bag.specialMains.dishes, plan, 'Special Mains', {
-        promos: promos, excludeTitles: usedPromoTitles
+        promos: promos,
+        excludeTitles: usedPromoTitles,
+        pageLeftover: layout.leftover && layout.leftover.p2,
+        skipPromos: p2opts.columnPromos === false
       });
       usedPromoTitles = usedPromoTitles.concat(soloSpec2.usedPromoTitles || []);
       p2 += soloSpec2.html || '';
@@ -4077,14 +4115,16 @@
         } else if (!sideList.length && p2opts.sandwiches && p2opts.columnPromos !== false) {
           forcePairFill = { shorter: 'left', panels: rightU > 12 ? 2 : 1 };
         }
+        // Always gate on page leftover — empty partner opposite Sides must NOT
+        // plant Sip & Paint when spare room is under COL_PROMO_MIN (screenshot clip).
         var p2Pair = levelOppositeColumns(leftInner, sideU, rightInner, rightU, {
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
           shortOnly: tipOnlyPair || bothColsHaveFood,
+          // columnPromos:false still allows empty-partner fill (panel ≤ food height).
+          // bothColsHaveFood leveling is what we skip when chrome is off.
           skipPromos: p2opts.columnPromos === false && bothColsHaveFood && !forcePairFill,
-          pageLeftover: (bothColsHaveFood && !forcePairFill)
-            ? (layout.leftover && layout.leftover.p2)
-            : null,
+          pageLeftover: layout.leftover && layout.leftover.p2,
           force: littleFoodPartner ? null : (p2Force || forcePairFill),
           leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
           rightTitle: (p2opts.sandwiches && !layout.sandwichTipOnly) ? 'Sandwiches' : '',
@@ -4832,7 +4872,8 @@
         'var STEPS=["fill-airy","fill-roomy","fill-normal","fill-tight","fill-compact","fill-dense"];' +
         'function strip(el){STEPS.forEach(function(c){el.classList.remove(c);});}' +
         // page-body clips with overflow:hidden, so page.scrollHeight alone never sees overflow —
-        // measure the body (and allergy sibling) so density steps actually fire.
+        // measure the body, columns, AND real pixel bottoms vs the allergy foot.
+        // Unit/scrollHeight alone lied in flow197 (Sip & Paint clipped while fit!==over).
         'function overflows(page){' +
           'if(page.scrollHeight>page.clientHeight+2)return true;' +
           'var body=page.querySelector(".page-body");' +
@@ -4843,6 +4884,17 @@
           'for(var ci=0;ci<cols.length;ci++){' +
             'if(cols[ci].scrollHeight>cols[ci].clientHeight+2)return true;' +
           '}' +
+          'try{' +
+            'var pageRect=page.getBoundingClientRect();' +
+            'var allergy=page.querySelector(".allergy");' +
+            'var limit=allergy?allergy.getBoundingClientRect().top:pageRect.bottom;' +
+            'var nodes=page.querySelectorAll(".dish,.scallop,.sec-title,.promo,.col-feature,.col-body");' +
+            'for(var ni=0;ni<nodes.length;ni++){' +
+              'var r=nodes[ni].getBoundingClientRect();' +
+              'if(!r||r.height<1)continue;' +
+              'if(r.bottom>limit+1.5||r.bottom>pageRect.bottom+1.5)return true;' +
+            '}' +
+          '}catch(ePix){}' +
           'return false;' +
         '}' +
         // GOLDEN RULE: opposite columns must start AND finish at the same point.
@@ -4956,14 +5008,23 @@
           'if(changed)fitGroup(group);' +
         '}' +
         // NEVER clip food off the page. Drop optional chrome first (foot promos,
-        // logos, non-level panels). In-pair leveling panels last — opposite columns
-        // stay filled until food would otherwise clip (golden leftover rule).
+        // logos, promo-as-column-body, non-level panels). In-pair leveling last.
+        // Promo column bodies (Sip & Paint opposite Sides) are NOT .col-feature —
+        // flow197 left them in place and they clipped under the allergy footer.
+        'function isPromoOnlyScallop(el){' +
+          'if(!el||!el.classList||!el.classList.contains("scallop"))return false;' +
+          'if(el.querySelector(".dish,.dish-list-tight,.sandwich-tip-only,.sec-title"))return false;' +
+          'return !!el.querySelector(".promo");' +
+        '}' +
         'function dropOverflowingChrome(page){' +
           'if(!overflows(page))return false;' +
           'var foot=page.querySelector(".foot-promos,.foot-promos-one");' +
           'if(foot&&foot.parentNode){foot.parentNode.removeChild(foot);return true;}' +
           'var logo=page.querySelector(".foot-logo");' +
           'if(logo&&logo.style.display!=="none"){logo.style.display="none";return true;}' +
+          'var bodyPromos=[].slice.call(page.querySelectorAll(".col-promo .col-body > .scallop,.col-promo > .scallop"));' +
+          'bodyPromos=bodyPromos.filter(isPromoOnlyScallop);' +
+          'if(bodyPromos.length){var bp=bodyPromos[bodyPromos.length-1];if(bp.parentNode){bp.parentNode.removeChild(bp);return true;}}' +
           'var optional=[].slice.call(page.querySelectorAll(".col-feature:not(.col-feature-level) .scallop"));' +
           'if(optional.length){var o=optional[optional.length-1];if(o.parentNode){o.parentNode.removeChild(o);return true;}}' +
           'var level=[].slice.call(page.querySelectorAll(".col-feature-level .scallop,.col-feature .scallop"));' +
@@ -6427,6 +6488,121 @@
     return sanitizePrintHtmlText_(html);
   }
 
+  /**
+   * Real DOM / pixel gate. Loads the print HTML in a hidden iframe, lets
+   * fitPages drop optional chrome, then reads data-clipped. Unit math alone
+   * has green-lit sheets that still clip Sip & Paint / Sides (flow197).
+   * Returns Promise<{ ok, clipped, html }>.
+   */
+  function measurePrintFit(html, opts) {
+    opts = opts || {};
+    var timeoutMs = opts.timeoutMs != null ? opts.timeoutMs : 4500;
+    return new Promise(function (resolve) {
+      if (!html || typeof document === 'undefined') {
+        resolve({ ok: true, clipped: false, html: html || '', skipped: true });
+        return;
+      }
+      var settled = false;
+      function done(result) {
+        if (settled) return;
+        settled = true;
+        try {
+          if (iframe && iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        } catch (eRm) {}
+        resolve(result);
+      }
+      var iframe = document.createElement('iframe');
+      iframe.setAttribute('title', 'print-fit-measure');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.style.cssText = 'position:fixed;left:-12000px;top:0;width:210mm;height:297mm;opacity:0;pointer-events:none;border:0;';
+      document.body.appendChild(iframe);
+      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+      if (!doc) {
+        done({ ok: true, clipped: false, html: html, skipped: true });
+        return;
+      }
+      var watch = setTimeout(function () {
+        var clipped = false;
+        try {
+          var b = doc.body;
+          clipped = !!(b && b.getAttribute('data-clipped') === '1');
+          if (!clipped && iframe.contentWindow) {
+            var pages = doc.querySelectorAll('.page.fill-page, .a5-face.fill-page');
+            for (var i = 0; i < pages.length; i++) {
+              var pg = pages[i];
+              var allergy = pg.querySelector('.allergy');
+              var pageRect = pg.getBoundingClientRect();
+              var limit = allergy ? allergy.getBoundingClientRect().top : pageRect.bottom;
+              var nodes = pg.querySelectorAll('.dish,.scallop,.promo');
+              for (var j = 0; j < nodes.length; j++) {
+                var r = nodes[j].getBoundingClientRect();
+                if (r && r.height > 1 && (r.bottom > limit + 1.5 || r.bottom > pageRect.bottom + 1.5)) {
+                  clipped = true;
+                  break;
+                }
+              }
+              if (clipped) break;
+            }
+          }
+        } catch (eTo) {}
+        var outHtml = html;
+        try {
+          outHtml = '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+        } catch (eH) {}
+        done({ ok: !clipped, clipped: !!clipped, html: outHtml });
+      }, timeoutMs);
+      try {
+        doc.open();
+        doc.write(html);
+        doc.close();
+      } catch (eW) {
+        clearTimeout(watch);
+        done({ ok: true, clipped: false, html: html, skipped: true });
+        return;
+      }
+      function pageStillClips_() {
+        try {
+          var pages = doc.querySelectorAll('.page.fill-page, .a5-face.fill-page');
+          for (var i = 0; i < pages.length; i++) {
+            var pg = pages[i];
+            if (pg.scrollHeight > pg.clientHeight + 2) return true;
+            var allergy = pg.querySelector('.allergy');
+            var pageRect = pg.getBoundingClientRect();
+            var limit = allergy ? allergy.getBoundingClientRect().top : pageRect.bottom;
+            var nodes = pg.querySelectorAll('.dish,.scallop,.promo,.col-body');
+            for (var j = 0; j < nodes.length; j++) {
+              var r = nodes[j].getBoundingClientRect();
+              if (r && r.height > 1 && (r.bottom > limit + 1.5 || r.bottom > pageRect.bottom + 1.5)) {
+                return true;
+              }
+            }
+          }
+        } catch (ePix) {}
+        return false;
+      }
+      var tries = 0;
+      function poll() {
+        tries += 1;
+        try {
+          var b = doc.body;
+          if (b && b.getAttribute('data-clipped') != null) {
+            var clippedEarly = b.getAttribute('data-clipped') === '1' || pageStillClips_();
+            // Wait past fitPages boot (30/80/400/1200) before accepting green.
+            if (clippedEarly || tries >= 10) {
+              clearTimeout(watch);
+              var out = html;
+              try { out = '<!DOCTYPE html>' + doc.documentElement.outerHTML; } catch (e2) {}
+              done({ ok: !clippedEarly, clipped: clippedEarly, html: out });
+              return;
+            }
+          }
+        } catch (eP) {}
+        if (tries < 14) setTimeout(poll, 200);
+      }
+      setTimeout(poll, 600);
+    });
+  }
+
   function openPrintHtml(html) {
     if (!html) return false;
     html = sanitizePrintHtml(html) || html;
@@ -6630,6 +6806,7 @@
     dayLabelFromMs: dayLabelFromMs,
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
+    measurePrintFit: measurePrintFit,
     sanitizePrintHtml: sanitizePrintHtml,
     downloadPrintHtml: downloadPrintHtml,
     emailPrintHtml: emailPrintHtml,
