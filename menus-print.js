@@ -4483,7 +4483,7 @@
          rectangular frame-wide.png scallop box. Kill border-image with !important
          so density / adjacent-column rules never restore a dashed rect. */
       '.sandwich-tip-only{text-align:center}' +
-      '.sandwich-tip-only .note-line{text-align:center;margin:4px 2px;font-weight:500;line-height:1.35}' +
+      '.sandwich-tip-only .note-line{text-align:center;margin:2px 2px;font-weight:500;line-height:1.25}' +
       '.page .scallop.scallop-wide.scallop-platter,' +
       '.page .scallop.scallop-platter,' +
       '.scallop.scallop-wide.scallop-platter,' +
@@ -4496,12 +4496,13 @@
         'background-color:#fff;' +
         'background-image:url("' + asset('frame-platter.png') + '");' +
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
-        'aspect-ratio:1600/720;width:100%;min-height:0;height:auto;' +
+        /* Flatter oval (1600/480) + tight pad so the scallop hugs one sell line. */
+        'aspect-ratio:1600/480;width:100%;min-height:0;height:auto;' +
         'align-self:stretch;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
       '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:18% 12% 20%;display:flex;align-items:center;justify-content:center;' +
+        'padding:7% 9% 8%;display:flex;align-items:center;justify-content:center;' +
         'box-sizing:border-box;min-height:100%}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
@@ -4527,18 +4528,18 @@
       '.fill-compact .scallop-platter,.fill-dense .scallop-platter,' +
         '.fill-compact .scallop:has(.sandwich-tip-only),.fill-dense .scallop:has(.sandwich-tip-only){' +
         'border-width:0!important;border-image:none!important;border-image-source:none!important;' +
-        'border-radius:50%;margin-bottom:6px;aspect-ratio:1600/720;min-height:0}' +
+        'border-radius:50%;margin-bottom:6px;aspect-ratio:1600/480;min-height:0}' +
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:16% 11% 18%}' +
+        'padding:6% 8% 7%}' +
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
       '.fill-dense .scallop-platter .scallop-pad,.fill-compact .scallop-platter .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:16% 11% 18%}' +
+        'padding:6% 8% 7%}' +
       '.fill-dense .scallop-platter,.fill-compact .scallop-platter{' +
         'min-height:0;border-width:0!important;border-image:none!important;border-radius:50%}' +
       '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
