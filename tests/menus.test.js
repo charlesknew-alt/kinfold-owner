@@ -728,8 +728,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow186') !== -1, 'menus page cache-bust is flow186');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow186') !== -1, 'hub menus link cache-bust is flow186');
+assert(page.indexOf('flow187') !== -1, 'menus page cache-bust is flow187');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow187') !== -1, 'hub menus link cache-bust is flow187');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2863,7 +2863,17 @@ assert(/class="[^"]*sandwich-tip-only/.test(tipOnlyHtml), 'tip-only box marks sa
 assert(!/promo-title[^>]*>\s*Sandwiches/i.test(tipOnlyHtml) &&
   !/sec-title[^>]*>\s*Sandwiches/i.test(tipOnlyHtml),
   'tip-only oval omits the SANDWICHES section title');
-assert(/scallop-wide/.test(tipOnlyHtml), 'tip-only default chrome is platter oval (wide)');
+assert(/scallop[^"]*scallop-wide[\s\S]*class="[^"]*sandwich-tip-only/.test(tipOnlyHtml),
+  'tip-only default chrome is platter oval (wide)');
+// Frilly=No must NOT strip tip-only to bare text (flow186 regression / Charles screenshot).
+var tipOnlyNoFrill = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
+  rule: { frame: false, tip: true, tipOnly: true, sell: 'Ask the team for today’s sandwiches' },
+  tipOnly: true
+});
+assert(/scallop[^"]*scallop-wide[\s\S]*class="[^"]*sandwich-tip-only/.test(tipOnlyNoFrill),
+  'tip-only keeps scallop/platter class even when Frilly is No');
+assert(!/sec-plain[\s\S]*sandwich-tip-only/.test(tipOnlyNoFrill),
+  'tip-only is never bare sec-plain text');
 assert(/Selection at the bar/.test(tipHtml) && /promo-title[^>]*>\s*Sandwiches/i.test(tipHtml),
   'ticked empty tip+hours still prints the Sandwiches title');
 var tipBelowHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
@@ -2923,12 +2933,16 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
     includes: { sandwiches: false }
   });
   var tipA4 = tipHtmlMain.split('mode-panel mode-a5')[0] || tipHtmlMain;
-  assert(tipA4.indexOf(sellLine) !== -1, 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
-  assert(/class="[^"]*sandwich-tip-only/.test(tipA4), 'Main unticked tip uses tip-only marker in HTML');
-  assert(/scallop-wide/.test(tipA4) && /class="[^"]*sandwich-tip-only/.test(tipA4),
+  // Assert against the sheet body — CSS also names scallop-wide / sandwich-tip-only.
+  var tipBody = tipA4.replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(tipBody.indexOf(sellLine) !== -1, 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
+  assert(/class="[^"]*sandwich-tip-only/.test(tipBody), 'Main unticked tip uses tip-only marker in HTML');
+  assert(/scallop[^"]*scallop-wide[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(tipBody),
     'Main unticked tip uses scallop-wide platter oval in HTML');
+  assert(!/sec-plain[\s\S]{0,120}class="[^"]*sandwich-tip-only/.test(tipBody),
+    'Main unticked tip is not bare sec-plain (Frilly No still gets platter)');
   // Tip-only must not print a SANDWICHES heading (pair-head or nested title).
-  var tipChunk = (tipA4.match(/class="[^"]*sandwich-tip-only[\s\S]{0,500}/) || [''])[0];
+  var tipChunk = (tipBody.match(/class="[^"]*sandwich-tip-only[\s\S]{0,500}/) || [''])[0];
   assert(tipChunk && !/(sec-title|promo-title)[^>]*>\s*Sandwiches/i.test(tipChunk),
     'tip-only sell chunk has sell words without Sandwiches title nearby');
   assert(!/\(12 – 2\.45 pm Mon to Fri\)/.test(tipA4) ||
@@ -3556,11 +3570,12 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     api.dish('Desserts', 'Ice Cream', 'three scoops', '6.50', 'v'),
     api.dish('Desserts', 'Chocolate Brownie', 'ice cream', '7.95', 'v')
   ];
+  // Frilly No (frame:false) — tip-only must still get the platter (Charles screenshot).
   var tipSpecLayout = api.normalizeSectionLayout({
     'Special Mains': { width: 'column', frame: true },
     'Special Starters': { width: 'column', frame: true },
     Sandwiches: {
-      tip: true, frame: true, width: 'column', sell: sellLine
+      tip: true, frame: false, width: 'column', sell: sellLine
     },
     Sides: { width: 'column', frame: false },
     Mains: { width: 'full', frame: false }
@@ -3576,6 +3591,11 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'Specials stay beside tip-only (not dropped off the sheet)');
   assert(planned.p2.sidesUnderTip === true || planned.p1.sidesOnP1 === true,
     'Sides nest under tip leftover or move to page-1 leftover — not a starved full-width strip');
+  // Foot promo must not be planned when leftover after gap breath is too small.
+  if (planned.leftover && planned.leftover.p2 != null && !print.canFitFootPromos(planned.leftover.p2)) {
+    assert(planned.p2.footPromos !== true,
+      'foot promo not placed when leftover too small');
+  }
   var html = print.build(mainMenu, tipSpecDishes, {
     sectionLayout: tipSpecLayout,
     includes: { sandwiches: false, specials: true },
@@ -3583,15 +3603,19 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     promos: api.seedPromoBank()
   });
   var a4 = html.split('mode-panel mode-a5')[0] || html;
-  assert(/class="[^"]*sandwich-tip-only/.test(a4) && a4.indexOf(sellLine) !== -1,
+  var a4Body = a4.replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(/class="[^"]*sandwich-tip-only/.test(a4Body) && a4Body.indexOf(sellLine) !== -1,
     'tip-only oval prints sell words on the sheet');
-  assert(/scallop-wide/.test(a4), 'tip-only uses platter oval frame');
+  assert(/scallop[^"]*scallop-wide[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(a4Body),
+    'tip-only uses platter oval frame (scallop/platter class wraps sell words)');
+  assert(!/sec-plain[\s\S]{0,120}class="[^"]*sandwich-tip-only/.test(a4Body),
+    'tip-only sell words are never bare sec-plain');
   assert(/Creamy Chicken Nduja|Baked Gnocchi|Pasta Carbonara/.test(a4),
     'Special Mains stay on the sheet with compact tip');
   assert(/Cheesy Garlic Bread|Chunky Triple Cooked Chips/.test(a4),
     'Sides stay on the sheet with compact tip');
   // No SANDWICHES heading in the tip-only scallop (pair may still mention food elsewhere).
-  var tipOval = (a4.match(/class="[^"]*sandwich-tip-only[\s\S]{0,400}/) || [''])[0];
+  var tipOval = (a4Body.match(/class="[^"]*sandwich-tip-only[\s\S]{0,400}/) || [''])[0];
   assert(tipOval && !/(sec-title|promo-title)[^>]*>\s*Sandwiches/i.test(tipOval),
     'tip-only oval HTML has no Sandwiches title inside');
   // Filled sandwiches on the same shape still get the title.
@@ -3614,6 +3638,70 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     'full Sandwiches section with fillings still prints the Sandwiches title');
   assert(!/class="[^"]*sandwich-tip-only/.test(filledA4b),
     'full Sandwiches section does not use tip-only oval marker');
+})();
+
+// flow187: foot promo omitted when leftover too small (Gatherings must not clip).
+(function footPromoOmitsWhenLeftoverSmall() {
+  assert(typeof print.canFitFootPromos === 'function', 'canFitFootPromos is exported');
+  assert(print.canFitFootPromos(18) === true, 'comfortable leftover may take a foot promo pair');
+  assert(print.canFitFootPromos(12) === false, 'modest leftover skips foot promo pair');
+  assert(print.canFitFootPromos(0) === false, 'empty leftover skips foot promo pair');
+  var sellLine = 'A selection of sandwiches is available — ask the team.';
+  var dishes = [
+    api.dish('Sharing Plates', 'Baked Camembert', 'ciabatta', '16.95', 'v'),
+    api.dish('Burgers', 'Brisket Burger', 'fries', '18.95', ''),
+    api.dish('Mains', 'Pork Wellington', 'mash', '19.95', ''),
+    api.dish('Mains', 'Fish & Chips', 'peas', '18.95', ''),
+    api.dish('Mains', 'Pie of the day', 'mash', '20.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'rice', '18.95', ''),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'parmesan', '20.95', ''),
+    api.dish('Mains', 'Ham Egg & Chips', '', '17.95', ''),
+    api.dish('Mains', 'Chicken Katsu Curry', 'rice', '16.95', ''),
+    api.dish('Special Mains', 'Creamy Chicken Nduja & Chorizo Penne', '', '17.95', ''),
+    api.dish('Special Mains', 'Baked Gnocchi', 'tomato', '15.95', 'v'),
+    api.dish('Special Mains', 'Pasta Carbonara', '', '16.95', ''),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'vg'),
+    api.dish('Sides', 'House Salad', '', '4.95', 'vg'),
+    api.dish('Sides', 'Onion Rings', '', '4.50', 'vg'),
+    api.dish('Sides', 'Truffle Fries', '', '6.50', ''),
+    api.dish('Sides', 'Garlic Bread', '', '4.50', 'v')
+  ];
+  var layoutMap = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true },
+    Sandwiches: { tip: true, frame: false, width: 'column', sell: sellLine },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var planned = print.planFluidLayout(mainMenu, dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    promos: api.seedPromoBank()
+  });
+  // Force the screenshot shape: sides under tip, small leftover, stale footPromos flag.
+  planned.p2 = planned.p2 || {};
+  planned.p2.sidesOnP2 = true;
+  planned.p2.sidesUnderTip = true;
+  planned.p2.sidesUnderSpecials = false;
+  planned.p2.specialsBesideSandwiches = true;
+  planned.p2.sandwiches = true;
+  planned.p1 = planned.p1 || {};
+  planned.p1.sidesOnP1 = false;
+  planned.leftover = { p1: planned.leftover && planned.leftover.p1 || 0, p2: 10 };
+  planned.p2.footPromos = true; // stale — build must still omit
+  var sheet = print.build(mainMenu, dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    layout: planned,
+    promos: api.seedPromoBank()
+  });
+  var body = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(/scallop[^"]*scallop-wide[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(body),
+    'forced sides-under-tip still wraps tip-only in scallop/platter');
+  assert(body.indexOf('foot-promos') === -1,
+    'foot promo not placed when leftover too small (even if footPromos flag is stale)');
+  assert(/Cheesy Garlic Bread|Chunky Triple Cooked Chips/.test(body),
+    'Sides still print when foot promo is omitted');
 })();
 
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);

@@ -546,12 +546,19 @@
     return html.replace(/\bscallop-(box|wide)\b/, 'scallop-' + kind);
   }
 
-  /** Two matching rectangles never sit side by side — neighbour uses the other wave. */
+  /** Two matching rectangles never sit side by side — neighbour uses the other wave.
+   *  Tip-only sell words stay the oval platter; flip the other column instead. */
   function contrastAdjacentScallops(leftHtml, rightHtml) {
     var lk = firstScallopKind(leftHtml);
     var rk = firstScallopKind(rightHtml);
     if (lk && rk && lk === rk) {
-      rightHtml = setFirstScallopKind(rightHtml, oppositeScallopKind(lk));
+      if (/sandwich-tip-only/.test(rightHtml)) {
+        leftHtml = setFirstScallopKind(leftHtml, oppositeScallopKind(rk));
+      } else if (/sandwich-tip-only/.test(leftHtml)) {
+        rightHtml = setFirstScallopKind(rightHtml, oppositeScallopKind(lk));
+      } else {
+        rightHtml = setFirstScallopKind(rightHtml, oppositeScallopKind(lk));
+      }
     }
     return { leftHtml: leftHtml, rightHtml: rightHtml };
   }
@@ -1180,7 +1187,10 @@
     opts = opts || {};
     var dishes = sandwichDishesOf(bag);
     var rule = opts.rule || { frame: true, note: '', tip: true, sell: '' };
-    var wantFrame = !!rule.frame;
+    var tipOnlyEarly = !!(opts.tipOnly || rule.tipOnly);
+    // Tip-only sell words always use the large oval/platter — never bare sec-plain,
+    // even when Blocks → Sandwiches → Frilly is No (frame:false).
+    var wantFrame = tipOnlyEarly ? true : !!rule.frame;
     var frameKind = opts.frame === 'wide' ? 'wide' : 'box';
     var note = (opts.note != null && String(opts.note).trim())
       ? String(opts.note).trim()
@@ -1197,7 +1207,7 @@
       // Tip-only (Main unticked): sell words in a compact oval — not hours/below,
       // and never a lonely SANDWICHES heading that starves the column.
       // Ticked empty: selling words first, then hours / “all served with…”.
-      var tipOnly = !!(opts.tipOnly || rule.tipOnly);
+      var tipOnly = tipOnlyEarly;
       var spielParts = [];
       if (sell) spielParts.push(sell);
       else spielParts.push('A selection of sandwiches is available — ask the team.');
@@ -1218,9 +1228,11 @@
       }
       if (!tipOnly) noteInner += extras.belowHtml || '';
       if (!wantFrame) return '<div class="sec-plain">' + noteInner + '</div>';
-      // Default tip chrome: large oval / platter (wide). Explicit box only when forced.
+      // Tip-only chrome: always the large oval / platter (wide) — never rect box,
+      // never bare text. Callers that pass frame:'box' for filled sandwiches must
+      // not shrink tip-only sell words into a rectangular scallop.
       if (tipOnly) {
-        frameKind = opts.frame === 'box' ? 'box' : 'wide';
+        frameKind = 'wide';
       }
       if (opts.alignTitle && !opts.hideTitle && !tipOnly) {
         return (
@@ -2150,10 +2162,6 @@
       }
       layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
-      // Foot feature pairs only when the page still has comfortable spare room.
-      // At min type / packed mains+desserts, omit rather than jam panels in.
-      layout.p1.footPromos = canFitFootPromos(p1left);
-      layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
 
       // Classical breath: headroom for the hard dish-gap floor (13px).
       // Count every food line on page 2 — including Sandwiches — so the gate
@@ -2194,6 +2202,10 @@
       }
       p2left = Math.max(0, p2left - gapBreath);
       layout.leftover.p2 = p2left;
+      // Foot feature pairs ONLY after gap breath — never place Gatherings / Stay
+      // when leftover is already too small at min type (clips into the allergy).
+      layout.p1.footPromos = canFitFootPromos(p1left);
+      layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16);
       applyDropInCapacity_(layout, bag, {
         p1used: p1used,
         p2Load: p2Load + gapBreath,
@@ -2379,14 +2391,15 @@
     var nestSides = opts.nestSides;
     var nestUnderTip = !!(opts.nestUnderTip || opts.sidesUnderTip);
     var tipOnly = !!(sandRule && sandRule.tipOnly);
+    if (tipOnly && sandRule) sandRule = Object.assign({}, sandRule, { frame: true, tipOnly: true });
     var leftHtml = sectionBlock('Special Mains', bag.specialMains.dishes, rule, 'box', { hideTitle: true });
     var leftU = sectionUnits({ name: 'Special Mains', dishes: bag.specialMains.dishes }, true);
     var rightHtml = sandwichesBlock(bag, {
       rule: sandRule,
       hideTitle: true,
       tipOnly: tipOnly,
-      // Tip-only defaults to platter oval; filled/empty tip+hours keep wide when framed.
-      frame: sandRule.frame ? 'wide' : undefined
+      // Tip-only always platter oval; filled/empty tip+hours keep wide when framed.
+      frame: tipOnly || sandRule.frame ? 'wide' : undefined
     });
     var rightU = sandwichesLevelCost(bag, sandRule);
     if (nestSides && nestSides.dishes && nestSides.dishes.length) {
@@ -2450,10 +2463,12 @@
     var leftFoodKind = leftRule.frame ? 'box' : '';
     var rightFoodKind = rightRule.frame ? (leftFoodKind ? 'wide' : 'box') : '';
     var leftInner = left.html
-      ? (leftFoodKind ? setFirstScallopKind(left.html, leftFoodKind) : left.html)
+      ? (leftFoodKind && !/sandwich-tip-only/.test(left.html)
+          ? setFirstScallopKind(left.html, leftFoodKind) : left.html)
       : sectionBlock(left.title, left.dishes, leftRule, leftFoodKind || 'box', { hideTitle: true });
     var rightInner = right.html
-      ? (rightFoodKind ? setFirstScallopKind(right.html, rightFoodKind) : right.html)
+      ? (rightFoodKind && !/sandwich-tip-only/.test(right.html)
+          ? setFirstScallopKind(right.html, rightFoodKind) : right.html)
       : sectionBlock(right.title, right.dishes, rightRule, rightFoodKind || 'box', { hideTitle: true });
     var leftFrame = leftFoodKind === 'box' ? 'wide' : 'box';
     var rightFrame = oppositeScallopKind(leftFrame);
@@ -2925,9 +2940,10 @@
     var mainRule = ruleFor('Mains', plan);
     var littleRule = ruleFor('Little Bells', plan);
     var sandRule = ruleFor('Sandwiches', plan);
-    // Main tip-when-unticked: sell-only ad box (not hours / below as a full section).
+    // Main tip-when-unticked: sell-only platter oval (not hours / below as a full section).
+    // Force frame so Frilly=No cannot strip the scallop chrome off tip-only sell words.
     if (layout.sandwichTipOnly) {
-      sandRule = Object.assign({}, sandRule, { tipOnly: true });
+      sandRule = Object.assign({}, sandRule, { tipOnly: true, frame: true });
     }
     var sideRule = ruleFor('Sides', plan);
     var dessRule = ruleFor('Desserts', plan);
@@ -3269,7 +3285,9 @@
         }
         // Only add foot panels when the planner left comfortable spare room —
         // never jam them under food at minimum type.
-        if (p1opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p1)) {
+        // Hard gate on leftover — never place a foot pair when the hole is too small
+        // (stale footPromos:true must not shove Gatherings into the allergy clip zone).
+        if (p1opts.footPromos && canFitFootPromos(layout.leftover && layout.leftover.p1)) {
           var foot1 = footPromoPair(promos, { excludeTitles: usedPromoTitles });
           usedPromoTitles = usedPromoTitles.concat(foot1.usedTitles || []);
           if (foot1.html) p1 += foot1.html;
@@ -3311,8 +3329,11 @@
           shareRule
         );
       }
-      if (sandOnLeftCol) {
-        p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
+        if (sandOnLeftCol) {
+        p1 += sandwichesBlock(bag, {
+          frame: layout.sandwichTipOnly ? 'wide' : (sandRule.frame ? 'box' : undefined),
+          rule: sandRule
+        });
       }
       if (sidesOnLeftCol && sidesPrint) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
@@ -3340,7 +3361,10 @@
         p1 += framedBlock(sectionTitle(bag.mains.name) + listDishes(bag.mains.dishes), mainRule);
       }
       if (sandOnRightCol) {
-        p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'box' : undefined, rule: sandRule });
+        p1 += sandwichesBlock(bag, {
+          frame: layout.sandwichTipOnly ? 'wide' : (sandRule.frame ? 'box' : undefined),
+          rule: sandRule
+        });
       }
       if (p1opts.sidesOnP1 && sidesPrint && wantsColumn(sideRule) && !sidesOnLeftCol) {
         p1 += framedBlock(sectionTitle(sidesPrint.name) + listDishes(sidesPrint.dishes), sideRule);
@@ -3621,7 +3645,7 @@
           p2 += listDishes(bag.sauces.dishes);
         }
         p2 += '</section>';
-        if (p2opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p2)) {
+        if (p2opts.footPromos && canFitFootPromos(layout.leftover && layout.leftover.p2)) {
           var footSplit = footPromoPair(remainingPromos, { excludeTitles: usedPromoTitles });
           usedPromoTitles = usedPromoTitles.concat(footSplit.usedTitles || []);
           if (footSplit.html) p2 += footSplit.html;
@@ -3653,7 +3677,7 @@
           }
           p2 += '</section>';
           // Packed page 2 (mains + desserts + sides): omit foot panels if jammed.
-          if (p2opts.footPromos || canFitFootPromos(layout.leftover && layout.leftover.p2)) {
+          if (p2opts.footPromos && canFitFootPromos(layout.leftover && layout.leftover.p2)) {
             var foot2 = footPromoPair(remainingPromos, { excludeTitles: usedPromoTitles });
             usedPromoTitles = usedPromoTitles.concat(foot2.usedTitles || []);
             if (foot2.html) p2 += foot2.html;
@@ -6140,6 +6164,7 @@
     planPromoFill: planPromoFill,
     foodFitsColumnLeftover: foodFitsColumnLeftover,
     planNestInPairLeftover: planNestInPairLeftover,
+    canFitFootPromos: canFitFootPromos,
     promoUnits: promoUnits,
     filterUnusedPromos: filterUnusedPromos,
     uniqueFeaturePanelsHtml: uniqueFeaturePanelsHtml,
