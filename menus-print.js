@@ -4547,6 +4547,8 @@
         'background-color:#fff;' +
         'background-image:url("' + asset('frame-platter.png') + '");' +
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
+        /* Tips-family double ring on the true ellipse (print-safe geometric stroke). */
+        'box-shadow:inset 0 0 0 1.25px #1c1610,inset 0 0 0 3.5px #fff,inset 0 0 0 4.75px #1c1610;' +
         /* Content-sized true ellipse: hug sell line; flex centres the pad in the oval. */
         'aspect-ratio:auto;width:fit-content;max-width:100%;min-width:0;min-height:0;height:auto;' +
         'display:flex!important;align-items:center;justify-content:center;' +

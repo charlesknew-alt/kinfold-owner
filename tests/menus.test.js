@@ -753,8 +753,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow204') !== -1, 'menus page cache-bust is flow204');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow204') !== -1, 'hub menus link cache-bust is flow204');
+assert(page.indexOf('flow206') !== -1, 'menus page cache-bust is flow206');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow206') !== -1, 'hub menus link cache-bust is flow206');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3957,6 +3957,9 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   assert(/sandwich-tip-only[\s\S]{0,180}flex-direction:\s*column/.test(sheet) &&
     /scallop-platter[\s\S]{0,220}display:\s*flex!important/.test(sheet),
     'tip platter + sell words use flex centre for optical vertical/horizontal balance');
+  assert(/box-shadow:\s*inset\s*0\s*0\s*0\s*1\.25px/.test(sheet) &&
+    /frame-platter\.png[\s\S]{0,280}box-shadow:\s*inset/.test(sheet),
+    'tip platter has Tips-family inset double-ring on the geometric oval');
   var tipBalanced = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dishes: [] } }, {
     rule: { tip: true, tipOnly: true, sell: 'A selection of sandwiches is available — ask the team.' },
     tipOnly: true
