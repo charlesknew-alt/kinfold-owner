@@ -1965,6 +1965,39 @@
         }
       }
       layout.leftover.p1 = p1left;
+      // Page-1 hard gate: Best-fit / split Sharing (Roasts + Sharing Starters on
+      // Sunday) must use two even columns when a single stack would clip into
+      // the allergy footer. Two dishes are enough — same family as Sides.
+      if (bag.sharing && bag.sharing.dishes && bag.sharing.dishes.length >= 2) {
+        var shareNameP1 = bag.sharing.name || 'Sharing Plates';
+        var shareRuleP1 = { width: 'both' };
+        if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
+          shareRuleP1 = root.EBMenus.sectionLayoutFor(shareNameP1, opts.sectionLayout) ||
+            root.EBMenus.sectionLayoutFor('Sharing Plates', opts.sectionLayout) ||
+            shareRuleP1;
+        } else if (opts.sectionLayout) {
+          shareRuleP1 = opts.sectionLayout[shareNameP1] ||
+            opts.sectionLayout['Sharing Plates'] || shareRuleP1;
+        }
+        var shareSingle = sectionUnits(bag.sharing, !!(shareRuleP1 && shareRuleP1.frame));
+        var shareSplitU = splitSectionUnits(bag.sharing, !!(shareRuleP1 && shareRuleP1.frame));
+        var p1TightForShare = p1left < shareSingle * 0.55 || p1used + 4 > PAGE - 12;
+        var shareMaySplit = wantsSplit(shareRuleP1) || isBestFit(shareRuleP1) ||
+          String(shareRuleP1.width || '') === 'both' ||
+          String(shareRuleP1.width || '') === 'split';
+        if (shareMaySplit && !lockedColumnWidth(shareRuleP1) &&
+            (wantsSplit(shareRuleP1) || p1TightForShare || shareSplitU < shareSingle - 1)) {
+          layout.widthOverrides['Sharing Plates'] = 'split';
+          if (shareNameP1 && shareNameP1 !== 'Sharing Plates') {
+            layout.widthOverrides[shareNameP1] = 'split';
+          }
+          var shareSaved = Math.max(0, shareSingle - shareSplitU);
+          p1left = Math.min(PAGE, p1left + shareSaved);
+          p1used = Math.max(0, p1used - shareSaved);
+          layout.leftover.p1 = p1left;
+          layout.fillers.push('Sharing (two even columns — keep food on the page)');
+        }
+      }
 
       var p2used = back + COST.bottomCols;
       if (layout.p2.sidesOnP2 && bag.sides) { /* already in back */ }
@@ -2118,17 +2151,25 @@
           }
         }
       }
-      // Packed page: any Best-fit category with enough dishes can split across
-      // two even columns (shorter than a single stack) so food stays on the page.
-      function trySplitBestFit(secName, sec, framed, currentCost) {
-        if (p2Load <= CLIP || !sec || !sec.dishes || sec.dishes.length < 4) return false;
+      // Packed page: long food sections may split across two even columns
+      // (half left, half right) — same family as Sides — so a single-column
+      // stack never clips into the allergy footer. Best-fit sections may split
+      // when the page is over CLIP. Specials / special-mains (and similar long
+      // hosts) may also override a Column lock when one column cannot hold them
+      // at min type; Full-width locks stay full-bleed.
+      function ruleForPlanSplit_(secName) {
         var r = { width: 'both' };
         if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
           r = root.EBMenus.sectionLayoutFor(secName, opts.sectionLayout) || r;
         } else if (opts.sectionLayout && opts.sectionLayout[secName]) {
           r = opts.sectionLayout[secName];
         }
-        // Only when Blocks is Best fit — Column / Full locks stay as set.
+        return r;
+      }
+      function trySplitBestFit(secName, sec, framed, currentCost) {
+        if (p2Load <= CLIP || !sec || !sec.dishes || sec.dishes.length < 2) return false;
+        var r = ruleForPlanSplit_(secName);
+        // Only when Blocks is Best fit — Column / Full locks stay as set here.
         if (lockedColumnWidth(r) || lockedFullWidth(r) || wantsSplit(r)) return false;
         if (!isBestFit(r) && String(r.width || '') !== 'both') return false;
         var splitCost = splitSectionUnits(sec, !!framed);
@@ -2141,6 +2182,76 @@
         }
         return false;
       }
+      /** Food-first split for Specials / long hosts: Column may yield to two
+       *  even columns when a single stack would clip. Full lock never yields. */
+      function trySplitLongHost(secName, sec, framed, currentCost, force) {
+        if (!sec || !sec.dishes || sec.dishes.length < 4) return false;
+        if (!force && p2Load <= CLIP) return false;
+        if (layout.widthOverrides[secName] === 'split') return false;
+        var r = ruleForPlanSplit_(secName);
+        if (lockedFullWidth(r) || wantsSplit(r)) return false;
+        if (!(isBestFit(r) || lockedColumnWidth(r) ||
+            String(r.width || '') === 'both' || String(r.width || '') === 'column')) {
+          return false;
+        }
+        var splitCost = splitSectionUnits(sec, !!framed);
+        var loadIfSplit = p2Load - currentCost + splitCost;
+        if (force || loadIfSplit <= CLIP || loadIfSplit < p2Load - 4) {
+          layout.widthOverrides[secName] = 'split';
+          p2Load = loadIfSplit;
+          layout.fillers.push(secName + ' (two even columns — keep food on the page)');
+          return true;
+        }
+        return false;
+      }
+      // SPECIALS / long host: prefer a 2-col split over parking a tall Specials
+      // column beside tip/Sandwiches (that stack clips into the allergy footer
+      // while tip+Sides leave empty space on the right).
+      if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length >= 4) {
+        var specNSplit = bag.specialMains.dishes.length;
+        var partnerH = 0;
+        if (sandPartner === 'specials' && layout.p2.sandwiches) {
+          partnerH = sandCost;
+          if (layout.p2.sidesUnderTip) partnerH += sideCostP2;
+        }
+        // One-column Specials taller than the tip/Sides partner, or 5+ dishes, or
+        // already over CLIP while paired → unpair and split across both columns.
+        var specialsNeedSplit = sandPartner === 'specials' && (
+          p2Load > CLIP ||
+          specNSplit >= 5 ||
+          (specCostP2 > partnerH + 6 && specNSplit >= 4)
+        );
+        if (specialsNeedSplit || (p2Load > CLIP && sandPartner !== 'specials')) {
+          if (sandPartner === 'specials') {
+            sandPartner = '';
+            layout.p2.specialsBesideSandwiches = false;
+            layout.p2.sidesUnderTip = false;
+            layout.p2.sidesUnderSpecials = false;
+            // Restore Sides onto page 2 under the split when they were parked on
+            // page 1 only to free the Specials|tip seat.
+            if (layout.p1.sidesOnP1 && bag.sides && !layout.p2.sidesOnP2) {
+              layout.p1.sidesOnP1 = false;
+              layout.p2.sidesOnP2 = true;
+              p1left += sideCostP1;
+              p1used -= sideCostP1;
+              p2used += sideCostP1;
+              var sideDumpIdx = layout.fillers.indexOf(
+                'Sides (page 1 leftover — keep food on the page)');
+              if (sideDumpIdx !== -1) layout.fillers.splice(sideDumpIdx, 1);
+            }
+            p2Load = p2used + (layout.p2.sandwiches ? sandCost : 0);
+          }
+          trySplitLongHost('Special Mains', bag.specialMains, true, specCostP2, true);
+          // After split, tip-only is chrome — keep only when leftover allows.
+          if (sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
+            layout.p2.sandwiches = false;
+            p2Load -= sandCost;
+            var tipIdx = layout.fillers.indexOf('Sandwiches tip (page 2)');
+            if (tipIdx !== -1) layout.fillers.splice(tipIdx, 1);
+            layout.fillers.push('Sandwiches tip omitted (keep food on the page)');
+          }
+        }
+      }
       if (bag.sides && layout.p2.sidesOnP2) {
         trySplitBestFit('Sides', bag.sides, false, sideCostP2);
       }
@@ -2150,8 +2261,20 @@
       if (p2Load > CLIP && bag.mains && sandPartner !== 'mains') {
         trySplitBestFit('Mains', bag.mains, false, mainCostP2);
       }
-      if (p2Load > CLIP && bag.specialMains && sandPartner !== 'specials') {
-        trySplitBestFit('Special Mains', bag.specialMains, true, specCostP2);
+      if (p2Load > CLIP && bag.specialMains && sandPartner !== 'specials' &&
+          layout.widthOverrides['Special Mains'] !== 'split') {
+        trySplitLongHost('Special Mains', bag.specialMains, true, specCostP2, false) ||
+          trySplitBestFit('Special Mains', bag.specialMains, true, specCostP2);
+      }
+      // Tip-only after food map: if still over CLIP, drop tip before overflow.
+      if (sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
+        layout.p2.sandwiches = false;
+        p2Load -= sandCost;
+        var tipDropIdx = layout.fillers.indexOf('Sandwiches tip (page 2)');
+        if (tipDropIdx !== -1) layout.fillers.splice(tipDropIdx, 1);
+        if (layout.fillers.indexOf('Sandwiches tip omitted (keep food on the page)') === -1) {
+          layout.fillers.push('Sandwiches tip omitted (keep food on the page)');
+        }
       }
       // If Specials|Sandwiches would still leave Sides clipping, cancel the pair.
       if (sandPartner === 'specials' && bag.sides && layout.p2.sidesOnP2 && p2Load > CLIP) {
@@ -2276,9 +2399,38 @@
       layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16) &&
         !foodOverPage && !sandwichCrowdsMains;
       layout.p2.columnPromos = canFitColumnPromos(p2left) && !foodOverPage && !sandwichCrowdsMains;
-      // Overflow only after panels are dropped. Named Sandwiches still crowd
-      // mains+desserts; food drop-ins (Specials + tip) print if they sit at min type.
-      if (sandwichCrowdsMains || p1used > PAGE + 10 || p2used > PAGE + 14 || foodOverPage) {
+      // Tip-only after food + panels: omit before overflow so Specials/Sides print.
+      // Named sandwich fillings are food and stay. Priority: food → tip → panels.
+      function dropTipOnlyForFood_() {
+        if (!(sandwichTipOnly && layout.p2.sandwiches)) return false;
+        layout.p2.sandwiches = false;
+        p2Load -= sandCost;
+        p2left = Math.max(0, PAGE - p2Load - gapBreath - noteTaxP2);
+        layout.leftover.p2 = p2left;
+        foodLoadP2 = p2Load + gapBreath + noteTaxP2;
+        foodBreathP2 = p2Load + gapBreath;
+        foodOverPage = foodLoadP2 > PAGE &&
+          !(foodBreathP2 <= PAGE && noteTaxP2 > 0 && (foodLoadP2 - PAGE) <= noteTaxP2 + 0.05);
+        var tipOmitIdx = layout.fillers.indexOf('Sandwiches tip (page 2)');
+        if (tipOmitIdx !== -1) layout.fillers.splice(tipOmitIdx, 1);
+        if (layout.fillers.indexOf('Sandwiches tip omitted (keep food on the page)') === -1) {
+          layout.fillers.push('Sandwiches tip omitted (keep food on the page)');
+        }
+        layout.p2.footPromos = canFitFootPromos(p2left) && !tightBack && p2left > (tightBack ? 22 : 16) &&
+          !foodOverPage && !sandwichCrowdsMains;
+        layout.p2.columnPromos = canFitColumnPromos(p2left) && !foodOverPage && !sandwichCrowdsMains;
+        return true;
+      }
+      if (foodOverPage || p2Load > CLIP) dropTipOnlyForFood_();
+      // Overflow only after tip + panels are dropped. Named Sandwiches still crowd
+      // mains+desserts; food drop-ins (Specials) print if they sit at min type.
+      var wouldOverflow = sandwichCrowdsMains || p1used > PAGE + 10 ||
+        p2used > PAGE + 14 || foodOverPage;
+      if ((foodOverPage || sandwichCrowdsMains) && dropTipOnlyForFood_()) {
+        wouldOverflow = sandwichCrowdsMains || p1used > PAGE + 10 ||
+          p2used > PAGE + 14 || foodOverPage;
+      }
+      if (wouldOverflow) {
         layout.fit = 'over';
         layout.overflow = layout.overflow || 'drop-in';
         if ((sandwichCrowdsMains || foodOverPage) &&
@@ -2295,6 +2447,27 @@
         p2left: p2left,
         sectionLayout: opts.sectionLayout
       });
+      // Last tip-only try if drop-in capacity still marked page-2 over.
+      if (layout.fit === 'over' && layout.overflow === 'drop-in' && dropTipOnlyForFood_()) {
+        var savedFit = layout.fit;
+        var savedOverflow = layout.overflow;
+        layout.fit = 'two';
+        layout.overflow = '';
+        applyDropInCapacity_(layout, bag, {
+          p1used: p1used,
+          p2Load: p2Load + gapBreath,
+          p1left: p1left,
+          p2left: p2left,
+          sectionLayout: opts.sectionLayout
+        });
+        if (layout.fit !== 'over') {
+          var overIdx = layout.fillers.indexOf('Too much content — remove a dropped-in menu');
+          if (overIdx !== -1) layout.fillers.splice(overIdx, 1);
+        } else {
+          layout.fit = savedFit;
+          layout.overflow = savedOverflow;
+        }
+      }
     } else {
       layout.pages = 1;
       layout.fit = 'one';
@@ -2314,6 +2487,7 @@
       typeNote +
       ' Columns start and finish level (food first, then feature panels).' +
       ' When capacity is tight, omit or relocate foot/column feature panels so food drop-ins (Specials, etc.) can print — overflow only if food + tip + min gaps still will not fit.' +
+      ' Long Specials (and similar hosts) may split across two even columns like Sides when a single column would clip; tip-only chrome is omitted if leftover cannot hold it.' +
       ' Sides, Sauces and Little Bells use compact item gaps; mains keep the classical dish breathe.' +
       (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
       ' Layout from ' + bag.count + ' dishes.' + bits;
@@ -2725,7 +2899,16 @@
     if (skipForLeftover && (isBlankFoodInner(leftInner) || isBlankFoodInner(rightInner))) {
       skipForLeftover = false;
     }
-    if (!opts.skipPromos && !skipForLeftover) {
+    // In-pair leveling under a known tall envelope (opts.force from Little Bells
+    // | Desserts when desserts tower over kids): a panel under the short column
+    // does not grow past the tall side — allow it even when page leftover is
+    // under COL_PROMO_MIN. Near-even kids|sides on a packed Sunday still omit
+    // Gatherings (unit math underestimates real height → allergy clip).
+    var inPairLevelFill = !!(opts.shortOnly && opts.force &&
+      !isBlankFoodInner(leftInner) && !isBlankFoodInner(rightInner));
+    if (skipForLeftover && inPairLevelFill) skipForLeftover = false;
+    var skipPromosNow = !!opts.skipPromos && !inPairLevelFill;
+    if (!skipPromosNow && !skipForLeftover) {
       var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
       var fillOpts = {
         leftFrame: opts.leftFrame || 'box',
@@ -2836,7 +3019,7 @@
       return columnSoloSection(title, dishes, rule, opts);
     }
     var split = !!(opts.forceSplit || wantsSplit(rule) ||
-      (isBestFit(rule) && opts.preferSplit && dishes.length >= 4));
+      (isBestFit(rule) && opts.preferSplit && dishes.length >= 2));
     if (split && dishes.length >= 2) {
       return {
         html: '<section class="sec sec-split">' + sectionBlock(title, dishes, rule, 'wide', {
@@ -2932,7 +3115,15 @@
         hideTitle: true
       });
       var dessU = columnFillUnits(bag.desserts, dessRule, dessRule && dessRule.note);
+      // Desserts with descriptions often tower over Little Bells — force a
+      // leveling panel under kids so the column gap is never a blank hole
+      // (still inside the desserts envelope; never when kids are already taller).
+      var kidsForce = pairPromoOpts.force;
+      if (!kidsForce && dessU > kidsU + 1.2) {
+        kidsForce = { shorter: 'left', panels: (dessU - kidsU) > 9 ? 2 : 1 };
+      }
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, Object.assign({}, pairPromoOpts, {
+        force: kidsForce,
         leftTitle: bag.littleBells.name,
         rightTitle: bag.desserts.name,
         secClass: 'little-desserts-row',
@@ -3253,9 +3444,11 @@
 
     if (shareAsFull && !shareInLeft) {
       flushColumnPending();
-      p1 += '<section class="sec">' +
+      // Full / Best-fit / split Sharing: two even columns whenever there are 2+ dishes.
+      var shareFullSplit = shareDishes.length >= 2;
+      p1 += '<section class="sec' + (shareFullSplit ? ' sec-split' : '') + '">' +
         sectionBlock(bag.sharing.name, shareDishes, shareRule, 'wide', {
-          twoCol: shareDishes.length >= 2
+          twoCol: shareFullSplit
         }) +
         '</section>';
     }
@@ -3374,7 +3567,16 @@
             '" alt="The Eight Bells"></div></div>';
         }
         if (shareInLeft) {
-          p1 += framedBlock(sectionTitle(bag.sharing.name) + listDishes(shareDishes), shareRule);
+          // Best fit / split / 2+ dishes: two even columns (never a tall single
+          // stack that half-cuts the last Sharing dish into the page-1 footer).
+          var orphanShareSplit = shareDishes.length >= 2 && (
+            wantsSplit(shareRule) || isBestFit(shareRule) || !lockedColumnWidth(shareRule)
+          );
+          p1 += framedBlock(
+            sectionTitle(bag.sharing.name) +
+              (orphanShareSplit ? listDishesCols(shareDishes) : listDishes(shareDishes)),
+            shareRule
+          );
         }
         if (sandOnLeftCol || sandOnRightCol) {
           p1 += sandwichesBlock(bag, { frame: sandRule.frame ? 'wide' : undefined, rule: sandRule });
@@ -3786,9 +3988,14 @@
         var rightU = p2opts.sandwiches ? sandwichesLevelCost(bag, sandRule) : 0;
         var sidesLockedColP2 = !!(sideList.length && lockedColumnWidth(sideRule));
         if (orphanColumnHole(sideU, rightU) && sideList.length && !p2opts.sandwiches && !sidesLockedColP2) {
-          p2 += '<section class="sec">';
+          var orphanSidesSplit = sideList.length >= 2 && (
+            wantsSplit(sideRule) || isBestFit(sideRule) || !lockedColumnWidth(sideRule)
+          );
+          p2 += '<section class="sec' + (orphanSidesSplit ? ' sec-split' : '') + '">';
           p2 += '<div class="sec-title soft-left">' + esc(sidesPrint.name) + '</div>';
-          p2 += listDishes(sideList, (sidesPrint && sidesPrint.name) || 'Sides');
+          p2 += orphanSidesSplit
+            ? listDishesCols(sideList, (sidesPrint && sidesPrint.name) || 'Sides')
+            : listDishes(sideList, (sidesPrint && sidesPrint.name) || 'Sides');
           if (p2opts.sidesOnP2 && bag.sauces) {
             p2 += '<div class="sec-title soft-left">' + esc(bag.sauces.name) + '</div>';
             p2 += listDishes(bag.sauces.dishes, bag.sauces.name || 'Sauces');
@@ -4222,10 +4429,10 @@
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
-      /* Tip-only sell oval: compact platter silhouette (full frame-wide.png), not a
-         short rectangle with border-image waves. Centre the sell line; pad wide.
-         Higher specificity than .scallop / adjacent-column flip so print never
-         falls back to a dashed/notched rect. */
+      /* Tip-only sell oval: full frame-wide.png silhouette (1526×610 platter), not a
+         short border-image rectangle. Kill border-image with !important so density /
+         adjacent-column rules never restore a dashed/notched rect. Keep the asset's
+         aspect ratio so the oval reads as a platter, not a flat pill. */
       '.sandwich-tip-only{text-align:center}' +
       '.sandwich-tip-only .note-line{text-align:center;margin:4px 2px;font-weight:500;line-height:1.35}' +
       '.page .scallop.scallop-wide.scallop-platter,' +
@@ -4233,13 +4440,19 @@
       '.scallop.scallop-wide.scallop-platter,' +
       '.scallop-platter,' +
       '.scallop:has(.sandwich-tip-only){' +
-        'margin-bottom:6px;border-style:none;border-width:0;border-image:none;' +
-        'background:#fff url("' + asset('frame-wide.png') + '") center / 100% 100% no-repeat;' +
-        'min-height:58px;height:auto;align-self:stretch;overflow:visible;' +
+        'margin-bottom:6px;border-style:none!important;border-width:0!important;' +
+        'border-image:none!important;border-image-source:none!important;' +
+        'border-image-width:0!important;border-image-slice:0!important;' +
+        'background-color:#fff;' +
+        'background-image:url("' + asset('frame-wide.png') + '");' +
+        'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
+        'aspect-ratio:1526/610;width:100%;min-height:0;height:auto;' +
+        'align-self:stretch;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
       '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:16px 32px 18px}' +
+        'padding:14% 10% 16%;display:flex;align-items:center;justify-content:center;' +
+        'box-sizing:border-box;min-height:100%}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
         'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
@@ -4263,17 +4476,21 @@
       /* Tip platter keeps the full oval asset — density must not re-enable border-image. */
       '.fill-compact .scallop-platter,.fill-dense .scallop-platter,' +
         '.fill-compact .scallop:has(.sandwich-tip-only),.fill-dense .scallop:has(.sandwich-tip-only){' +
-        'border-width:0;border-image:none;margin-bottom:6px}' +
+        'border-width:0!important;border-image:none!important;border-image-source:none!important;' +
+        'margin-bottom:6px;aspect-ratio:1526/610;min-height:0}' +
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
-        '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{padding:10px 24px 12px}' +
+        '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{' +
+        'padding:12% 9% 14%}' +
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
       '.fill-dense .scallop-platter .scallop-pad,.fill-compact .scallop-platter .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad,' +
-        '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{padding:14px 28px 16px}' +
-      '.fill-dense .scallop-platter,.fill-compact .scallop-platter{min-height:54px;border-width:0;border-image:none}' +
+        '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{' +
+        'padding:12% 9% 14%}' +
+      '.fill-dense .scallop-platter,.fill-compact .scallop-platter{' +
+        'min-height:0;border-width:0!important;border-image:none!important}' +
       '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-dense .scallop-box .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-compact .scallop-box .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
@@ -4485,14 +4702,19 @@
         plan.sectionLayout = root.EBMenus.defaultSectionLayout();
       }
       // Best-fit packing choices (column | full | split) for any category.
+      // Specials long-host may override a Column lock via widthOverrides when a
+      // single stack would clip — honour that split on the plan.
       if (layout.widthOverrides && typeof layout.widthOverrides === 'object') {
         plan.widthOverrides = Object.assign({}, plan.widthOverrides || {}, layout.widthOverrides);
         Object.keys(layout.widthOverrides).forEach(function (sec) {
           var w = String(layout.widthOverrides[sec] || '').toLowerCase();
           if (w !== 'column' && w !== 'full' && w !== 'split') return;
           var cur = (plan.sectionLayout && plan.sectionLayout[sec]) || {};
-          if (root.EBMenus && root.EBMenus.isLockedColumnWidth &&
-              root.EBMenus.isLockedColumnWidth(cur.width)) return;
+          var isSpecHost = /^special\b/i.test(sec);
+          if (w !== 'split' || !isSpecHost) {
+            if (root.EBMenus && root.EBMenus.isLockedColumnWidth &&
+                root.EBMenus.isLockedColumnWidth(cur.width)) return;
+          }
           if (root.EBMenus && root.EBMenus.isLockedFullWidth &&
               root.EBMenus.isLockedFullWidth(cur.width)) return;
           plan.sectionLayout = plan.sectionLayout || {};

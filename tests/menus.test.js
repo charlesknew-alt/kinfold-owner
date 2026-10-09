@@ -733,8 +733,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow193') !== -1, 'menus page cache-bust is flow193');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow193') !== -1, 'hub menus link cache-bust is flow193');
+assert(page.indexOf('flow194') !== -1, 'menus page cache-bust is flow194');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow194') !== -1, 'hub menus link cache-bust is flow194');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2712,7 +2712,11 @@ assert(api.tidyBook({ main: [{ name: 'Olives (vg)', tags: '' }] }).main[0].tags 
   'tidyBook lifts tags across a saved book');
 
 assert(printJs.indexOf('border-image') !== -1, 'scallops use border-image (no stretch through text)');
-assert(printJs.indexOf('background-size:100% 100%') === -1, 'no stretched full-bleed frame fill');
+assert(!/\.scallop\{[^}]*background-size:\s*100%\s*100%/.test(printJs),
+  'no stretched full-bleed frame fill on base scallop');
+assert(/\.scallop-platter[\s\S]{0,500}background-size:\s*100%\s*100%/.test(printJs) ||
+  /scallop\.scallop-wide\.scallop-platter[\s\S]{0,500}background-size:\s*100%\s*100%/.test(printJs),
+  'tip platter fills its oval aspect box (not a dashed border-image rect)');
 assert(print.planFluidLayout, 'planFluidLayout exported');
 
 var book = api.seed();
@@ -3993,6 +3997,237 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   var p2Html = a4.split(/class="page fill-page/)[2] || a4;
   assert(!/Sip\s*&amp;\s*Paint|SIP &amp; PAINT/i.test(p2Html),
     'Sip & Paint is not auto-added on packed page 2 ahead of Specials');
+})();
+
+// flow194: long Specials split across two columns (like Sides); tip omitted when tight;
+// tip platter keeps oval aspect (not dashed rect); food never clips into allergy footer.
+(function specialsSplitTwoColumnsLikeSides() {
+  var sell = 'A selection of sandwiches is available — ask the team.';
+  var dishes = [];
+  for (var i = 0; i < 6; i++) {
+    dishes.push(api.dish('Starters', 'Starter ' + i, 'long starter description for packing page one fully', '8.95', ''));
+  }
+  for (var i = 0; i < 2; i++) {
+    dishes.push(api.dish('Sharing Plates', 'Share ' + i, 'sharing plate description text here', '15.95', 'v'));
+  }
+  for (var i = 0; i < 3; i++) {
+    dishes.push(api.dish('Burgers', 'Burger ' + i, 'burger with fries onion rings salad', '18.95', ''));
+  }
+  for (var i = 0; i < 9; i++) {
+    dishes.push(api.dish('Mains', 'Main ' + i, 'long description for main dish with mash gravy peas', '18.95', ''));
+  }
+  [
+    'Venison Tournedos Rossini',
+    'Baked Gnocchi',
+    'Creamy Chicken Nduja & Chorizo Penne',
+    'Beef Brisket & Chilli Noodles',
+    'Pasta Carbonara'
+  ].forEach(function (n, idx) {
+    dishes.push(api.dish('Special Mains', n, 'long special description text for dish ' + idx + ' with garnish', '15.95',
+      idx === 1 ? 'v' : ''));
+  });
+  [
+    'Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg',
+    'Garlic Bread', 'House Salad', 'Fries'
+  ].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  var layoutMap = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: "When it's gone, it's gone" },
+    Sandwiches: { tip: true, frame: false, width: 'column', sell: sell },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    promos: api.seedPromoBank()
+  });
+  assert(planned.widthOverrides && planned.widthOverrides['Special Mains'] === 'split',
+    'long Specials get a two-column split override (food-first, like Sides)');
+  assert(planned.p2 && planned.p2.specialsBesideSandwiches === false,
+    'Specials unpair from tip so they can span both columns');
+  assert(planned.p2.sidesOnP2 === true, 'Sides stay under the split Specials on page 2');
+  assert(planned.fit !== 'over', 'split Specials + Sides fit without overflow gate');
+  var sheet = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    layout: planned,
+    promos: api.seedPromoBank()
+  });
+  assert(/aspect-ratio:\s*1526\/610/.test(sheet) && /border-image:none!important/.test(sheet),
+    'tip platter CSS keeps oval aspect and kills border-image rect');
+  var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  var p2 = a4.split(/class="page fill-page/)[2] || a4;
+  assert(/sec-split/.test(p2) && /share-cols/.test(p2),
+    'Specials render as sec-split with share-cols (half left, half right)');
+  var splitSec = (p2.match(/sec-split[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(/Venison Tournedos Rossini/.test(splitSec) && /Pasta Carbonara/.test(splitSec),
+    'split Specials put early and late dishes across the two columns');
+  assert(!/specials-sand-row/.test(p2),
+    'tall Specials are not parked in a single column beside tip');
+  assert(/Cheesy Garlic Bread|Chunky Triple/.test(p2), 'Sides print under the split');
+  // Allergy footer must not sit inside a Specials dish line (clip gate).
+  assert(!/Carbonara[\s\S]{0,120}Please inform us of any allergies/i.test(p2),
+    'Pasta Carbonara does not clip into the allergy footer text');
+  assert(/Please inform us of any allergies/i.test(p2), 'allergy footer still prints');
+  if (planned.p2.sandwiches) {
+    assert(/scallop[^"]*scallop-wide[^"]*scallop-platter[\s\S]{0,500}class="[^"]*sandwich-tip-only/.test(p2),
+      'when tip fits after food, it stays the oval scalloped platter');
+  }
+})();
+
+(function tipOmittedWhenSpecialsSplitNeedsCapacity() {
+  var sell = 'A selection of sandwiches is available — ask the team.';
+  var dishes = [];
+  for (var i = 0; i < 5; i++) {
+    dishes.push(api.dish('Starters', 'Starter ' + i, 'long starter description packing', '8.95', ''));
+  }
+  for (var i = 0; i < 2; i++) {
+    dishes.push(api.dish('Sharing Plates', 'Share ' + i, 'share desc', '15.95', 'v'));
+  }
+  for (var i = 0; i < 3; i++) {
+    dishes.push(api.dish('Burgers', 'Burger ' + i, 'burger fries', '18.95', ''));
+  }
+  for (var i = 0; i < 9; i++) {
+    dishes.push(api.dish('Mains', 'Main ' + i, 'long main description mash gravy peas lemon', '18.95', ''));
+  }
+  for (var i = 0; i < 4; i++) {
+    dishes.push(api.dish('Desserts', 'Dessert ' + i, 'pudding description text', '7.95', 'v'));
+  }
+  [
+    'Venison Tournedos Rossini', 'Baked Gnocchi', 'Creamy Chicken Nduja & Chorizo Penne',
+    'Beef Brisket & Chilli Noodles', 'Pasta Carbonara', 'Wild Mushroom Stroganoff'
+  ].forEach(function (n, idx) {
+    dishes.push(api.dish('Special Mains', n, 'long special description text for dish ' + idx, '15.95', ''));
+  });
+  [
+    'Cheesy Garlic Bread', 'Chunky Triple Cooked Chips', 'Seasonal Veg',
+    'Garlic Bread', 'House Salad', 'Fries'
+  ].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  var layoutMap = api.normalizeSectionLayout({
+    'Special Mains': { width: 'column', frame: true, note: "When it's gone, it's gone" },
+    Sandwiches: { tip: true, frame: false, width: 'column', sell: sell },
+    Sides: { width: 'column', frame: false },
+    Mains: { width: 'full', frame: false }
+  });
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    promos: []
+  });
+  assert(planned.widthOverrides && planned.widthOverrides['Special Mains'] === 'split',
+    'capacity-tight Specials still split across two columns');
+  assert(
+    planned.p2.sandwiches === false ||
+      (planned.fillers || []).indexOf('Sandwiches tip omitted (keep food on the page)') !== -1 ||
+      planned.fit === 'over',
+    'tip omitted when capacity needs it, or overflow only after tip/panels cannot save food'
+  );
+  if ((planned.fillers || []).indexOf('Sandwiches tip omitted (keep food on the page)') !== -1) {
+    assert(planned.p2.sandwiches === false, 'omitted tip is not still scheduled on page 2');
+  }
+  var sheet = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: true },
+    layout: planned,
+    promos: []
+  });
+  var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(/Pasta Carbonara|Venison Tournedos|Baked Gnocchi/.test(a4),
+    'Specials food still prints when tip is dropped for capacity');
+  if (planned.p2.sandwiches === false) {
+    assert(!/class="[^"]*sandwich-tip-only/.test(a4),
+      'tip-only oval is absent from HTML when planner omitted it');
+  }
+})();
+
+assert(printJs.indexOf('trySplitLongHost') !== -1,
+  'planner exposes food-first long-host split (Specials family)');
+assert(/Long Specials[\s\S]{0,80}split across two even columns/.test(printJs) ||
+  printJs.indexOf('two even columns — keep food on the page') !== -1,
+  'summary/fillers document Specials two-column split rule');
+
+// flow194: Sunday Roasts + Best-fit Sharing must split (no half-cut dish at page-1
+// footer); Little Bells|Desserts fills the kids column gap; Best-fit Sides split.
+(function sundaySharingSplitAndKidsFeatureFill() {
+  var sunday = api.menuById('sunday');
+  var dishes = [
+    api.dish('Sunday Roasts', 'Sirloin of Beef', 'cooked pink', '21.95', ''),
+    api.dish('Sunday Roasts', 'Nut Roast', 'vegan gravy', '16.95', 'vg'),
+    api.dish('Sunday Roasts', 'Leg of Lamb', 'cooked pink', '20.95', ''),
+    api.dish('Sunday Roasts', 'Chicken Supreme', '', '18.95', ''),
+    api.dish('Sunday Roasts', 'Loin of Pork', '', '18.95', ''),
+    api.dish('Sharing Starters', 'Baked Camembert', 'baguette bacon jam', '16.95', 'v'),
+    api.dish('Sharing Starters', 'Beef Chilli Nachos', 'jalapenos sour cream', '15.95', ''),
+    api.dish('Mains', 'Venison Casserole', 'mash', '19.95', ''),
+    api.dish('Mains', 'Beef Chilli', 'rice', '16.95', ''),
+    api.dish('Mains', 'Fish & Chips', 'peas', '18.95', ''),
+    api.dish('Mains', 'Pie of the Day', 'mash gravy', '19.95', ''),
+    api.dish('Mains', 'Korean Chicken Balls', 'rice', '18.95', ''),
+    api.dish('Mains', 'Beef Short Rib Genovese Rigatoni', 'parmesan', '20.95', ''),
+    api.dish('Little Bells', 'Fish Fingers, Chunky Chips & Peas', '', '', ''),
+    api.dish('Little Bells', 'Chicken Goujons, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Beef Burger, Fries & Dressed Salad', '', '', ''),
+    api.dish('Little Bells', 'Tomato & Basil Pasta', '', '', 'v'),
+    api.dish('Little Bells', 'Kids Mac & Cheese', '', '', ''),
+    api.dish('Desserts', 'Sticky Toffee Pudding', 'ice cream', '7.95', 'v'),
+    api.dish('Desserts', 'Chocolate Brownie', 'cream', '7.50', 'v'),
+    api.dish('Desserts', 'Cheesecake', 'berry', '7.50', 'v'),
+    api.dish('Desserts', 'Ice Cream', 'scoops', '6.50', 'v'),
+    api.dish('Desserts', 'Lime Posset', 'shortbread', '7.50', 'v'),
+    api.dish('Desserts', 'Apple Crumble', 'custard', '7.50', 'v'),
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),
+    api.dish('Sides', 'Chunky Triple Cooked Chips', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v')
+  ];
+  var layoutMap = api.normalizeSectionLayout(Object.assign({}, api.sectionLayoutForMenu('sunday'), {
+    'Sunday Roasts': {
+      width: 'full', frame: true,
+      note: 'All our roasts are served with roast potatoes, Yorkshire pudding, seasonal vegetables and gravy.'
+    },
+    'Sharing Plates': { width: 'both', frame: false },
+    'Little Bells': {
+      width: 'column', frame: true,
+      above: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.',
+      below: 'A CHOICE OF ROASTS AT HALF PRICE OF THE ADULTS',
+      aboveKind: 'heading', belowKind: 'text'
+    },
+    Desserts: { width: 'column', frame: true },
+    Sides: { width: 'both', frame: false },
+    Mains: { width: 'full', frame: false }
+  }));
+  var planned = print.planFluidLayout(sunday, dishes, {
+    sectionLayout: layoutMap,
+    includes: { 'little-bells': true },
+    promos: api.seedPromoBank()
+  });
+  assert(planned.widthOverrides && planned.widthOverrides['Sharing Plates'] === 'split',
+    'Sunday Best-fit Sharing gets a two-column split so dishes are not half-cut at page 1');
+  assert(planned.fit !== 'over', 'Sunday Sharing split keeps the sheet printable');
+  var sheet = print.build(sunday, dishes, {
+    sectionLayout: layoutMap,
+    includes: { 'little-bells': true },
+    layout: planned,
+    promos: api.seedPromoBank()
+  });
+  var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
+  var pages = a4.split(/class="page /);
+  var p1 = pages[1] || '';
+  var p2 = pages[2] || '';
+  assert(/share-cols[\s\S]*Baked Camembert|Baked Camembert[\s\S]{0,120}share-cols/.test(p1),
+    'Sharing Starters print across two even columns on page 1');
+  assert(/Beef Chilli Nachos/.test(p1), 'second Sharing dish stays on page 1 (not clipped away)');
+  assert(!/Beef Chilli Nachos[\s\S]{0,80}Please inform us of any allergies/i.test(p1),
+    'Sharing dish does not clip into the page-1 allergy footer');
+  var kidsRow = (p2.match(/little-desserts-row[\s\S]*?<\/section>/) || [])[0] || '';
+  assert(/little-desserts-row/.test(p2), 'Sunday pairs Little Bells beside Desserts');
+  assert(/col-feature/.test(kidsRow),
+    'leftover under Little Bells gets a feature panel (not a huge empty hole)');
+  assert(/sec-split[\s\S]{0,120}Sides|share-cols[\s\S]{0,80}Cheesy Garlic/.test(p2),
+    'Best-fit Sides split across two columns when alone under the kids|desserts row');
 })();
 
 var seedMainLayout = print.planFluidLayout(mainMenu, aloneDishes);
