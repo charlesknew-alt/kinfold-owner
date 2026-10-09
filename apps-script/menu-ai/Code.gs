@@ -451,8 +451,13 @@ function reviewLayoutWithGemini_(body) {
     'BEST-FIT WIDTHS: layout.bestFit lists EVERY section staff set to “Best fit (AI chooses)”. ' +
     'For those only, set sectionWidths to column, full, or split — any category may use any of the three. ' +
     'column = half opposite another section; full = one full-bleed stack; ' +
-    'split = that one category across two even columns (shorter height — use when a single stack would clip or look sparse). ' +
-    'Prefer column or split so food fits. Locked Column / Full must not change.\n' +
+    'split = that one category across two even columns — ONLY when dish count is EVEN (2,4,6…). ' +
+    'Never split odd counts (3→2|1, 5→3|2) — that leaves a large empty hole; keep column or full instead. ' +
+    'Prefer column or even-split so food fits. Locked Column / Full must not change.\n' +
+    'HARD OVERFLOW GATE: okToPrint MUST be false whenever any food would clip outside the printable area ' +
+    '(into/over the allergy footer, half-cut dishes, Sides/tip dropping off). ' +
+    'Deterministic capacity always wins — you cannot green-light a clipped sheet. ' +
+    'When in doubt that food fits, set okToPrint false.\n' +
     'SHARED TYPE SCALE:\n' +
     '- Same title/name/description size on both pages. Maximise that shared size.\n' +
     '- Prefer fewer feature panels on the packed page over shrinking type.\n' +
@@ -554,6 +559,21 @@ function reviewLayoutWithGemini_(body) {
       { shorter: 'even', panels: 0 }
   };
 
+  // Deterministic overflow always wins — AI cannot green-light a clipped sheet.
+  var okToPrint = advice.okToPrint !== false;
+  if (layout.fit === 'over') okToPrint = false;
+
+  // Reject uneven splits server-side (odd dish counts → 3|2 hole).
+  // layout.sections from the client is { "Special Mains": 5, ... }.
+  var dishCounts = layout.sections || {};
+  Object.keys(sectionWidths).forEach(function (sec) {
+    if (sectionWidths[sec] !== 'split') return;
+    var n = dishCounts[sec];
+    if (n && typeof n === 'object') n = n.dishes || n.count || 0;
+    n = Number(n) || 0;
+    if (n >= 2 && n % 2 !== 0) delete sectionWidths[sec];
+  });
+
   return {
     ok: true,
     source: 'gemini-layout',
@@ -562,7 +582,7 @@ function reviewLayoutWithGemini_(body) {
     sandwichesOn: sandwichesOn,
     sidesOn: sidesOn || undefined,
     dropFootLogo: !!advice.dropFootLogo,
-    okToPrint: advice.okToPrint !== false,
+    okToPrint: okToPrint,
     columnBalance: columnBalance,
     sectionWidths: sectionWidths,
     notes: String(advice.notes || '').slice(0, 280)

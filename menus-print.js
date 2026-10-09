@@ -526,7 +526,7 @@
     // Real Canva/print frames via border-image so waves sit in the border
     // gutter and never cut through dish text (unlike stretched SVG/PNG fill).
     // box = tight scallop, squarer corners; wide = looser wave, rounder corners.
-    // Tip-only also adds scallop-platter (full frame-wide oval silhouette).
+    // Tip-only also adds scallop-platter (true oval silhouette via frame-platter.png).
     var cls = kind === 'box' ? 'scallop scallop-box' : 'scallop scallop-wide';
     if (extraCls) cls += ' ' + String(extraCls).trim();
     return '<div class="' + cls + '"><div class="scallop-pad">' + inner + '</div></div>';
@@ -1970,9 +1970,9 @@
       }
       layout.leftover.p1 = p1left;
       // Page-1 hard gate: Best-fit / split Sharing (Roasts + Sharing Starters on
-      // Sunday) must use two even columns when a single stack would clip into
-      // the allergy footer. Two dishes are enough — same family as Sides.
-      if (bag.sharing && bag.sharing.dishes && bag.sharing.dishes.length >= 2) {
+      // Sunday) may use two even columns when a single stack would clip — only
+      // when the dish count is even (no 3|2 hole).
+      if (bag.sharing && bag.sharing.dishes && canBalancedSplit(bag.sharing.dishes.length)) {
         var shareNameP1 = bag.sharing.name || 'Sharing Plates';
         var shareRuleP1 = { width: 'both' };
         if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
@@ -2171,7 +2171,9 @@
         return r;
       }
       function trySplitBestFit(secName, sec, framed, currentCost) {
-        if (p2Load <= CLIP || !sec || !sec.dishes || sec.dishes.length < 2) return false;
+        if (p2Load <= CLIP || !sec || !sec.dishes || !canBalancedSplit(sec.dishes.length)) {
+          return false;
+        }
         var r = ruleForPlanSplit_(secName);
         // Only when Blocks is Best fit — Column / Full locks stay as set here.
         if (lockedColumnWidth(r) || lockedFullWidth(r) || wantsSplit(r)) return false;
@@ -2187,9 +2189,11 @@
         return false;
       }
       /** Food-first split for Specials / long hosts: Column may yield to two
-       *  even columns when a single stack would clip. Full lock never yields. */
+       *  even columns when a single stack would clip. Full lock never yields.
+       *  Odd dish counts never split (avoids 3|2 hole). */
       function trySplitLongHost(secName, sec, framed, currentCost, force) {
-        if (!sec || !sec.dishes || sec.dishes.length < 4) return false;
+        if (!sec || !sec.dishes || !canBalancedSplit(sec.dishes.length)) return false;
+        if (sec.dishes.length < 4) return false;
         if (!force && p2Load <= CLIP) return false;
         if (layout.widthOverrides[secName] === 'split') return false;
         var r = ruleForPlanSplit_(secName);
@@ -2208,9 +2212,9 @@
         }
         return false;
       }
-      // SPECIALS / long host: prefer a 2-col split over parking a tall Specials
-      // column beside tip/Sandwiches (that stack clips into the allergy footer
-      // while tip+Sides leave empty space on the right).
+      // SPECIALS / long host: prefer an EVEN 2-col split over parking a tall
+      // Specials column beside tip/Sandwiches. Odd counts stay single-column
+      // (no 3|2 gap) — drop tip chrome or overflow-gate rather than uneven split.
       if (bag.specialMains && bag.specialMains.dishes && bag.specialMains.dishes.length >= 4) {
         var specNSplit = bag.specialMains.dishes.length;
         var partnerH = 0;
@@ -2219,7 +2223,7 @@
           if (layout.p2.sidesUnderTip) partnerH += sideCostP2;
         }
         // One-column Specials taller than the tip/Sides partner, or 5+ dishes, or
-        // already over CLIP while paired → unpair and split across both columns.
+        // already over CLIP while paired → unpair; split only when N is even.
         var specialsNeedSplit = sandPartner === 'specials' && (
           p2Load > CLIP ||
           specNSplit >= 5 ||
@@ -2245,8 +2249,10 @@
             }
             p2Load = p2used + (layout.p2.sandwiches ? sandCost : 0);
           }
-          trySplitLongHost('Special Mains', bag.specialMains, true, specCostP2, true);
-          // After split, tip-only is chrome — keep only when leftover allows.
+          if (canBalancedSplit(specNSplit)) {
+            trySplitLongHost('Special Mains', bag.specialMains, true, specCostP2, true);
+          }
+          // Tip-only is chrome — keep only when leftover allows (never clip food).
           if (sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
             layout.p2.sandwiches = false;
             p2Load -= sandCost;
@@ -2491,7 +2497,7 @@
       typeNote +
       ' Columns start and finish level (food first, then feature panels).' +
       ' When capacity is tight, omit or relocate foot/column feature panels so food drop-ins (Specials, etc.) can print — overflow only if food + tip + min gaps still will not fit.' +
-      ' Long Specials (and similar hosts) may split across two even columns like Sides when a single column would clip; tip-only chrome is omitted if leftover cannot hold it.' +
+      ' Long Specials (and similar hosts) may split across two even columns like Sides only when the dish count is even (no 3|2 hole); tip-only chrome is omitted if leftover cannot hold it.' +
       ' Sides, Sauces and Little Bells use compact item gaps; mains keep the classical dish breathe.' +
       (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
       ' Layout from ' + bag.count + ' dishes.' + bits;
@@ -2511,11 +2517,20 @@
     return wrapTightDishList(html, name);
   }
 
-  /** Split a section across two columns when it has enough dishes to look sparse full-width. */
+  /**
+   * Only split when the two stacks are line-by-line even (equal dish counts).
+   * Odd counts (3|2, 4|3) leave a large empty hole — keep a single column instead.
+   */
+  function canBalancedSplit(n) {
+    n = Number(n) || 0;
+    return n >= 2 && n % 2 === 0;
+  }
+
+  /** Split a section across two columns when counts allow an even / balanced stack. */
   function listDishesCols(list, name) {
     list = list || [];
-    if (list.length < 2) return listDishes(list, name);
-    var mid = Math.ceil(list.length / 2);
+    if (!canBalancedSplit(list.length)) return listDishes(list, name);
+    var mid = list.length / 2;
     return wrapTightDishList(
       '<div class="cols share-cols">' +
         '<div class="col">' + listDishes(list.slice(0, mid)) + '</div>' +
@@ -2599,7 +2614,7 @@
     var note = String(rule.note || '').trim();
     if (extras.aboveHtml) inner += extras.aboveHtml;
     else if (note) inner += '<div class="sec-note">' + esc(note).replace(/\n/g, '<br>') + '</div>';
-    inner += wantsSplit(rule) && dishes.length >= 2 ? listDishesCols(dishes) : listDishes(dishes);
+    inner += wantsSplit(rule) && canBalancedSplit(dishes.length) ? listDishesCols(dishes) : listDishes(dishes);
     if (extras.belowHtml) inner += extras.belowHtml;
     var secCls = 'specials-beside' + (wantsSplit(rule) ? ' sec-split' : '');
     return {
@@ -2838,8 +2853,8 @@
   /** Height when a category is split across two even columns (shared title). */
   function splitSectionUnits(sec, scalloped) {
     if (!sec || !sec.dishes || !sec.dishes.length) return 0;
-    if (sec.dishes.length < 2) return sectionUnits(sec, scalloped);
-    var mid = Math.ceil(sec.dishes.length / 2);
+    if (!canBalancedSplit(sec.dishes.length)) return sectionUnits(sec, scalloped);
+    var mid = sec.dishes.length / 2;
     var leftU = 0;
     var rightU = 0;
     sec.dishes.slice(0, mid).forEach(function (d) { leftU += dishUnits(d); });
@@ -3029,8 +3044,8 @@
       return columnSoloSection(title, dishes, rule, opts);
     }
     var split = !!(opts.forceSplit || wantsSplit(rule) ||
-      (isBestFit(rule) && opts.preferSplit && dishes.length >= 2));
-    if (split && dishes.length >= 2) {
+      (isBestFit(rule) && opts.preferSplit && canBalancedSplit(dishes.length)));
+    if (split && canBalancedSplit(dishes.length)) {
       return {
         html: '<section class="sec sec-split">' + sectionBlock(title, dishes, rule, 'wide', {
           twoCol: true,
@@ -3054,7 +3069,8 @@
     }
     return {
       html: '<section class="sec">' + sectionBlock(title, dishes, rule, 'wide', {
-        twoCol: canSitInColumn(rule) && dishes.length >= 4 && !opts.preferColumn,
+        twoCol: canSitInColumn(rule) && canBalancedSplit(dishes.length) &&
+          dishes.length >= 4 && !opts.preferColumn,
         hideTitle: !!opts.hideTitle
       }) + '</section>',
       usedPromoTitles: []
@@ -3368,7 +3384,7 @@
         p1 += flushedCol.html;
       } else {
         // Best fit / full / split: full-bleed (split = two even dish columns).
-        var flushSplit = wantsSplit(colPending.rule) && colPending.dishes.length >= 2;
+        var flushSplit = wantsSplit(colPending.rule) && canBalancedSplit(colPending.dishes.length);
         p1 += '<section class="sec' + (flushSplit ? ' sec-split' : '') + '">' +
           sectionBlock(colPending.title, colPending.dishes, colPending.rule, 'wide', {
             hideTitle: !!(colPending.opts && colPending.opts.hideTitle),
@@ -3390,7 +3406,7 @@
           usedPromoTitles = usedPromoTitles.concat(takeSpec.usedPromoTitles || []);
           p1 += takeSpec.html || '';
         } else {
-          var takeSplit = wantsSplit(rule) && block.dishes.length >= 2;
+          var takeSplit = wantsSplit(rule) && canBalancedSplit(block.dishes.length);
           p1 += '<section class="sec' + (takeSplit ? ' sec-split' : '') + '">' +
             sectionBlock(block.title, block.dishes, rule, 'wide', {
               hideTitle: !!(block.opts && block.opts.hideTitle),
@@ -3458,8 +3474,8 @@
     var deferShareAfterRoasts = !!(shareAsFull && !shareInLeft && roastsOnPage1);
     if (shareAsFull && !shareInLeft && !deferShareAfterRoasts) {
       flushColumnPending();
-      // Full / Best-fit / split Sharing: two even columns whenever there are 2+ dishes.
-      var shareFullSplit = shareDishes.length >= 2;
+      // Full / Best-fit / split Sharing: two even columns only when count is even.
+      var shareFullSplit = canBalancedSplit(shareDishes.length);
       p1 += '<section class="sec' + (shareFullSplit ? ' sec-split' : '') + '">' +
         sectionBlock(bag.sharing.name, shareDishes, shareRule, 'wide', {
           twoCol: shareFullSplit
@@ -3497,7 +3513,7 @@
     }
     if (deferShareAfterRoasts) {
       flushColumnPending();
-      var shareAfterRoastsSplit = shareDishes.length >= 2;
+      var shareAfterRoastsSplit = canBalancedSplit(shareDishes.length);
       p1 += '<section class="sec' + (shareAfterRoastsSplit ? ' sec-split' : '') + '">' +
         sectionBlock(bag.sharing.name, shareDishes, shareRule, 'wide', {
           twoCol: shareAfterRoastsSplit
@@ -3589,9 +3605,9 @@
             '" alt="The Eight Bells"></div></div>';
         }
         if (shareInLeft) {
-          // Best fit / split / 2+ dishes: two even columns (never a tall single
-          // stack that half-cuts the last Sharing dish into the page-1 footer).
-          var orphanShareSplit = shareDishes.length >= 2 && (
+          // Best fit / split: two even columns only when dish count is even
+          // (never a 3|2 hole, never a tall single stack that clips the footer).
+          var orphanShareSplit = canBalancedSplit(shareDishes.length) && (
             wantsSplit(shareRule) || isBestFit(shareRule) || !lockedColumnWidth(shareRule)
           );
           p1 += framedBlock(
@@ -3975,7 +3991,7 @@
     if (showBottom) {
       var sidesCol = sidesPrint && wantsColumn(sideRule);
       var sideList = (p2opts.sidesOnP2 && sidesPrint && !littleP2.usedSides) ? sidesPrint.dishes.slice() : [];
-      var sidesSplit = wantsSplit(sideRule) && sideList.length >= 2;
+      var sidesSplit = wantsSplit(sideRule) && canBalancedSplit(sideList.length);
       var remainingPromos = filterUnusedPromos(promos, usedPromoTitles);
       // Split (Best-fit AI / planner): one category across two even columns.
       if (sidesSplit && sideList.length && !p2opts.sandwiches) {
@@ -4463,10 +4479,9 @@
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
-      /* Tip-only sell oval: full frame-wide.png silhouette (1526×610 platter), not a
-         short border-image rectangle. Kill border-image with !important so density /
-         adjacent-column rules never restore a dashed/notched rect. Keep the asset's
-         aspect ratio so the oval reads as a platter, not a flat pill. */
+      /* Tip-only sell oval: real ellipse silhouette (frame-platter.png), NOT the
+         rectangular frame-wide.png scallop box. Kill border-image with !important
+         so density / adjacent-column rules never restore a dashed rect. */
       '.sandwich-tip-only{text-align:center}' +
       '.sandwich-tip-only .note-line{text-align:center;margin:4px 2px;font-weight:500;line-height:1.35}' +
       '.page .scallop.scallop-wide.scallop-platter,' +
@@ -4477,15 +4492,16 @@
         'margin-bottom:6px;border-style:none!important;border-width:0!important;' +
         'border-image:none!important;border-image-source:none!important;' +
         'border-image-width:0!important;border-image-slice:0!important;' +
+        'border-radius:50%;' +
         'background-color:#fff;' +
-        'background-image:url("' + asset('frame-wide.png') + '");' +
+        'background-image:url("' + asset('frame-platter.png') + '");' +
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
-        'aspect-ratio:1526/610;width:100%;min-height:0;height:auto;' +
+        'aspect-ratio:1600/720;width:100%;min-height:0;height:auto;' +
         'align-self:stretch;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
       '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:14% 10% 16%;display:flex;align-items:center;justify-content:center;' +
+        'padding:18% 12% 20%;display:flex;align-items:center;justify-content:center;' +
         'box-sizing:border-box;min-height:100%}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
@@ -4507,24 +4523,24 @@
       '.fill-dense{--dish-gap:13px;--sec-gap:11px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
-      /* Tip platter keeps the full oval asset — density must not re-enable border-image. */
+      /* Tip platter keeps the oval asset — density must not re-enable border-image. */
       '.fill-compact .scallop-platter,.fill-dense .scallop-platter,' +
         '.fill-compact .scallop:has(.sandwich-tip-only),.fill-dense .scallop:has(.sandwich-tip-only){' +
         'border-width:0!important;border-image:none!important;border-image-source:none!important;' +
-        'margin-bottom:6px;aspect-ratio:1526/610;min-height:0}' +
+        'border-radius:50%;margin-bottom:6px;aspect-ratio:1600/720;min-height:0}' +
       '.fill-compact .scallop-platter .scallop-pad,.fill-dense .scallop-platter .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:12% 9% 14%}' +
+        'padding:16% 11% 18%}' +
       // Keep bottom pad even when dense — never crop inside-frame notes.
       '.fill-dense .scallop-pad{padding:4px 10px 12px}' +
       '.fill-compact .scallop-pad{padding:5px 10px 12px}' +
       '.fill-dense .scallop-platter .scallop-pad,.fill-compact .scallop-platter .scallop-pad,' +
         '.fill-dense .scallop:has(.sandwich-tip-only) .scallop-pad,' +
         '.fill-compact .scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:12% 9% 14%}' +
+        'padding:16% 11% 18%}' +
       '.fill-dense .scallop-platter,.fill-compact .scallop-platter{' +
-        'min-height:0;border-width:0!important;border-image:none!important}' +
+        'min-height:0;border-width:0!important;border-image:none!important;border-radius:50%}' +
       '.fill-dense .scallop-pad:has(.sheet-blurb-below),.fill-compact .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-dense .scallop-box .scallop-pad:has(.sheet-blurb-below),' +
         '.fill-compact .scallop-box .scallop-pad:has(.sheet-blurb-below){padding-bottom:18px}' +
@@ -4963,6 +4979,21 @@
             'fitGroup(group);' +
           '}' +
         '}' +
+        // Hard printable gate: after chrome is gone, food still overflowing must
+        // block Save. Deterministic DOM measure — Gemini cannot override this.
+        'function markClippedIfNeeded(group){' +
+          'var clipped=group.some(overflows);' +
+          'if(clipped)document.body.setAttribute("data-clipped","1");' +
+          'else if(document.body.getAttribute("data-clipped")!=="1")' +
+            'document.body.setAttribute("data-clipped","0");' +
+          'var sb=document.getElementById("saveToMenus");' +
+          'var hint=document.getElementById("printHint");' +
+          'if(clipped){' +
+            'if(sb){sb.disabled=true;sb.textContent="Won\\u2019t fit \\u2014 Discard";}' +
+            'if(hint)hint.textContent="Food is outside the printable area. Discard, untick a drop-in (Sandwiches, Specials, \\u2026), then Generate again.";' +
+          '}' +
+          'return clipped;' +
+        '}' +
         // After shared type is locked, grow gaps / spread sections so leftover space
         // is not a blank bottom third — fill top→bottom evenly without changing type size.
         'function clearSpread(page){' +
@@ -5034,6 +5065,7 @@
           'a5.forEach(spreadPage);' +
           'keepContentOnPage(a4);' +
           'keepContentOnPage(a5);' +
+          'markClippedIfNeeded(a4.concat(a5));' +
           'fitPreviewToScreen();' +
         '}' +
         'function fitPreviewToScreen(){' +
@@ -5143,6 +5175,10 @@
         // Stamp Roman, save into Print history, return parent to history, close preview.
         'var sb=document.getElementById("saveToMenus");' +
         'if(sb){sb.onclick=function(){' +
+          'fitPages();' +
+          'if(document.body.getAttribute("data-clipped")==="1"){' +
+            'alert("This sheet still clips outside the printable area. Discard and untick a drop-in, then Generate again.");' +
+            'return;}' +
           'if(!window.opener||!window.opener.EBMenuPrint||!window.opener.EBMenuPrint.commitPrintVersion){' +
             'alert("Keep the Menus tab open, then click Save again.");return;}' +
           'var api=window.opener.EBMenuPrint;' +
@@ -6604,6 +6640,7 @@
     canFitFootPromos: canFitFootPromos,
     canFitColumnPromos: canFitColumnPromos,
     isTightListSection: isTightListSection,
+    canBalancedSplit: canBalancedSplit,
     promoUnits: promoUnits,
     filterUnusedPromos: filterUnusedPromos,
     uniqueFeaturePanelsHtml: uniqueFeaturePanelsHtml,

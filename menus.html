@@ -426,9 +426,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261009-flow196"></script>
-  <script src="menus-print.js?v=20261009-flow196"></script>
-  <script src="menus-ingest.js?v=20261009-flow196"></script>
+  <script src="menus.js?v=20261009-flow197"></script>
+  <script src="menus-print.js?v=20261009-flow197"></script>
+  <script src="menus-ingest.js?v=20261009-flow197"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4570,7 +4570,7 @@
         }
         // JS already placed the food map. Gemini may refine Best-fit widths
         // (column / full / split) and leftover feature panels — not locked widths,
-        // and never dump Sides under Sharing.
+        // and never dump Sides under Sharing. Never accept an uneven split.
         var bal = advice.columnBalance;
         if (!bal && advice.columns) bal = advice.columns;
         if (bal && typeof bal === 'object') {
@@ -4583,6 +4583,11 @@
         if (widths && typeof widths === 'object' && result.plan.sectionLayout) {
           var bestFit = Array.isArray(advice.bestFit) ? advice.bestFit
             : (layoutPayload().bestFit || []);
+          var dishCountBySec = {};
+          (result.dishes || []).forEach(function (d) {
+            if (!d || !d.section) return;
+            dishCountBySec[d.section] = (dishCountBySec[d.section] || 0) + 1;
+          });
           Object.keys(widths).forEach(function (sec) {
             var w = String(widths[sec] || '').toLowerCase();
             if (w !== 'column' && w !== 'full' && w !== 'split') return;
@@ -4591,6 +4596,12 @@
             // Never override a staff Column / Full lock.
             if (EBMenus.isLockedColumnWidth && EBMenus.isLockedColumnWidth(cur.width)) return;
             if (EBMenus.isLockedFullWidth && EBMenus.isLockedFullWidth(cur.width)) return;
+            // Even-split rule: reject odd counts (3|2 hole). Deterministic — AI cannot override.
+            if (w === 'split') {
+              var n = dishCountBySec[sec] || 0;
+              if (EBMenuPrint.canBalancedSplit && !EBMenuPrint.canBalancedSplit(n)) return;
+              if (!EBMenuPrint.canBalancedSplit && n >= 2 && n % 2 !== 0) return;
+            }
             result.plan.sectionLayout[sec] = Object.assign({}, cur, { width: w });
             layout.widthOverrides = layout.widthOverrides || {};
             layout.widthOverrides[sec] = w;
@@ -4674,16 +4685,51 @@
               var local = localColumnBalanceFallback();
               if (local) advice.columnBalance = local.columnBalance;
             }
+            // Hard gate: deterministic overflow / Gemini okToPrint:false cannot green-light clip.
+            var blocked = (layout && layout.fit === 'over') ||
+              (advice && advice.okToPrint === false);
             var li3 = overlay.querySelector('[data-step="3"]');
             if (li3) {
               li3.style.opacity = '1';
-              if (!advice) li3.textContent = 'Balance check skipped';
+              if (blocked) li3.textContent = 'Print blocked — food would clip outside the page';
+              else if (!advice) li3.textContent = 'Balance check skipped';
               else if (advice.source === 'local-column-fallback') {
                 li3.textContent = 'Columns checked locally — adding feature panels under shorter stacks';
               } else if (advice.notes) li3.textContent = 'Gemini: ' + advice.notes;
               else li3.textContent = 'Gemini checked opposite columns before release';
             }
+            if (blocked) {
+              if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+              if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+              if (hint) hint.disabled = false;
+              result.plan.fit = 'over';
+              if (layout) layout.fit = 'over';
+              showOverflowGate_(result);
+              return;
+            }
             applyLayoutAdvice(advice);
+            // Re-plan after AI width tweaks — unit gate still wins over Gemini.
+            if (menu.kind === 'long' && EBMenuPrint.planFluidLayout) {
+              var recheck = EBMenuPrint.planFluidLayout(menu, result.dishes, {
+                promos: promos,
+                sectionLayout: result.plan.sectionLayout || effectiveSectionLayout(menuId),
+                includes: hostIncludes()
+              });
+              if (recheck && recheck.fit === 'over') {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+                if (hint) hint.disabled = false;
+                result.plan.layout = recheck;
+                result.plan.fit = 'over';
+                showOverflowGate_(result);
+                return;
+              }
+              if (recheck) {
+                layout = recheck;
+                result.plan.layout = recheck;
+                result.plan.fit = recheck.fit;
+              }
+            }
             var sum = document.getElementById('arrangeSummary');
             if (sum) {
               sum.style.display = 'block';
