@@ -4536,13 +4536,13 @@
         'background-color:#fff;' +
         'background-image:url("' + asset('frame-platter.png') + '");' +
         'background-position:center;background-size:100% 100%;background-repeat:no-repeat;' +
-        /* Flatter oval (1600/480) + tight pad so the scallop hugs one sell line. */
-        'aspect-ratio:1600/480;width:100%;min-height:0;height:auto;' +
+        /* Flat oval (1600/360). Pad in px (not % of width) so the scallop hugs the sell line. */
+        'aspect-ratio:1600/360;width:100%;min-height:0;height:auto;' +
         'align-self:stretch;overflow:visible;box-sizing:border-box;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.page .scallop-platter .scallop-pad,.scallop-platter .scallop-pad,' +
       '.scallop:has(.sandwich-tip-only) .scallop-pad{' +
-        'padding:7% 9% 8%;display:flex;align-items:center;justify-content:center;' +
+        'padding:8px 16px 10px;display:flex;align-items:center;justify-content:center;' +
         'box-sizing:border-box;min-height:100%}' +
       /* Stacked tip + feature panel: tip keeps the oval platter; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
