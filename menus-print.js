@@ -834,11 +834,11 @@
     }
     if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1, hole, true);
     if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1, hole, true);
-    // Near-even opposite food columns: skip. A full panel under the slightly
-    // shorter side overshoots and leaves a white hole on the other (Sharing|
-    // Burgers). Real holes (gap > 2.5) still get a panel above.
-    if (Math.abs(gap) <= 2.5) {
-      return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
+    // Near-even opposite food columns: one panel under the slightly shorter
+    // side only. Pairing both would burn Stay a While + Gatherings before page 2
+    // solo columns (Desserts / Sides) can fill their empty half.
+    if (pool.length && Math.abs(gap) <= 2.5) {
+      return stackForShort(gap >= 0 ? 'left' : 'right', 1, Math.max(hole, 8), true);
     }
     return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
   }

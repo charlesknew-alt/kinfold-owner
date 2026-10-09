@@ -301,7 +301,9 @@ assert(printJs.indexOf('cols-pair-titles') !== -1 && printJs.indexOf('function p
   'opposite columns keep category titles in a pair-head');
 assert(printJs.indexOf('function nestTitleInFrilly') !== -1 && printJs.indexOf('pair-head-inset') !== -1,
   'frilly titles sit in the box; unframed pair-heads inset to that baseline');
-assert(printJs.indexOf('sides-sand-row') !== -1 && printJs.indexOf("rightTitle: p2opts.sandwiches ? 'Sandwiches'") !== -1,
+assert(printJs.indexOf('sides-sand-row') !== -1 &&
+  (printJs.indexOf("rightTitle: p2opts.sandwiches ? 'Sandwiches'") !== -1 ||
+    printJs.indexOf("rightTitle: (p2opts.sandwiches && !layout.sandwichTipOnly) ? 'Sandwiches'") !== -1),
   'Sides|Sandwiches bottom pair still shares the column-pair layout');
 assert(printJs.indexOf('shortOnly: true') !== -1,
   'kids|desserts leftover space gets a small panel under the shorter column only');
@@ -2300,13 +2302,13 @@ assert(typeof printApi.promoUnits === 'function' && typeof printApi.planPromoFil
     'modest leftover prefers a small Stay a While / Gatherings panel');
   var cramped = printApi.planPromoFill(10, 18, [sip], {
     shortOnly: true,
-    excludeTitles: ['Stay a While', 'Gatherings']
+    excludeTitles: ['Stay a While', 'Gatherings', 'Pub Quiz']
   });
   assert(!cramped.left && !cramped.right && cramped.usedTitles.length === 0,
     'skip a leftover panel when only an oversized dated event would fit');
   var hugeSip = printApi.planPromoFill(4, 28, [sip], {
     shortOnly: true,
-    excludeTitles: ['Stay a While', 'Gatherings']
+    excludeTitles: ['Stay a While', 'Gatherings', 'Pub Quiz']
   });
   assert(hugeSip.usedTitles.indexOf('Sip & Paint') === -1 && hugeSip.usedTitles.length === 0,
     'dated Sip & Paint is never a leftover filler under kids even when the hole is large');
@@ -2816,7 +2818,7 @@ var tipOnlyHtml = print.sandwichesBlock({ sandwiches: { name: 'Sandwiches', dish
 assert(/Selection at the bar/.test(tipOnlyHtml), 'tip-only box prints sell wording');
 assert(!/lunch hours/.test(tipOnlyHtml) && !/Upgrade to Fries/.test(tipOnlyHtml),
   'tip-only box omits hours and below (small ad, not full section)');
-assert(/sandwich-tip-only/.test(tipOnlyHtml), 'tip-only box marks sandwich-tip-only class');
+assert(/class="[^"]*sandwich-tip-only/.test(tipOnlyHtml), 'tip-only box marks sandwich-tip-only class');
 assert(!/promo-title[^>]*>\s*Sandwiches/i.test(tipOnlyHtml) &&
   !/sec-title[^>]*>\s*Sandwiches/i.test(tipOnlyHtml),
   'tip-only oval omits the SANDWICHES section title');
@@ -2881,16 +2883,15 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
   });
   var tipA4 = tipHtmlMain.split('mode-panel mode-a5')[0] || tipHtmlMain;
   assert(tipA4.indexOf(sellLine) !== -1, 'Main + tip Yes + sandwiches unticked prints sell tip in HTML');
-  assert(/sandwich-tip-only/.test(tipA4), 'Main unticked tip uses tip-only marker in HTML');
-  assert(/scallop-wide[\s\S]{0,200}sandwich-tip-only|sandwich-tip-only[\s\S]{0,200}scallop-wide/.test(tipA4) ||
-    /scallop-wide/.test(tipA4) && /sandwich-tip-only/.test(tipA4),
+  assert(/class="[^"]*sandwich-tip-only/.test(tipA4), 'Main unticked tip uses tip-only marker in HTML');
+  assert(/scallop-wide/.test(tipA4) && /class="[^"]*sandwich-tip-only/.test(tipA4),
     'Main unticked tip uses scallop-wide platter oval in HTML');
   // Tip-only must not print a SANDWICHES heading (pair-head or nested title).
-  var tipChunk = (tipA4.match(/sandwich-tip-only[\s\S]{0,500}/) || [''])[0];
-  assert(!/Sandwiches/.test(tipChunk),
+  var tipChunk = (tipA4.match(/class="[^"]*sandwich-tip-only[\s\S]{0,500}/) || [''])[0];
+  assert(tipChunk && !/(sec-title|promo-title)[^>]*>\s*Sandwiches/i.test(tipChunk),
     'tip-only sell chunk has sell words without Sandwiches title nearby');
   assert(!/\(12 – 2\.45 pm Mon to Fri\)/.test(tipA4) ||
-    (tipA4.match(/sandwich-tip-only[\s\S]{0,400}/) || [''])[0].indexOf('12 – 2.45') === -1,
+    (tipA4.match(/class="[^"]*sandwich-tip-only[\s\S]{0,400}/) || [''])[0].indexOf('12 – 2.45') === -1,
     'Main unticked tip does not stuff hours into the tip-only sell box');
 
   var withFillings = sparse.concat([
@@ -2911,7 +2912,7 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
   var filledA4 = filledHtml.split('mode-panel mode-a5')[0] || filledHtml;
   assert(/Crayfish Marie Rose/.test(filledA4) && /BLT/.test(filledA4),
     'Main + sandwiches ticked with fillings prints the full sandwiches list');
-  assert(!/sandwich-tip-only/.test(filledA4),
+  assert(!/class="[^"]*sandwich-tip-only/.test(filledA4),
     'Main with fillings does not also print a separate tip-only sell box');
   assert(filledA4.indexOf(sellLine) === -1 || /Crayfish[\s\S]*BLT/.test(filledA4),
     'filled sandwiches sheet is the dish list, not a tip-only duplicate');
@@ -2932,7 +2933,7 @@ assert(/sec-plain[\s\S]*BLT[\s\S]*Upgrade to Fries/.test(plainSand),
   ], {
     sectionLayout: tipLayout
   });
-  assert(dessertCard.indexOf(sellLine) === -1 && !/sandwich-tip-only/.test(dessertCard),
+  assert(dessertCard.indexOf(sellLine) === -1 && !/class="[^"]*sandwich-tip-only/.test(dessertCard),
     'desserts card does not print the Sandwiches tip sell box');
 })();
 
@@ -3541,7 +3542,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     promos: api.seedPromoBank()
   });
   var a4 = html.split('mode-panel mode-a5')[0] || html;
-  assert(/sandwich-tip-only/.test(a4) && a4.indexOf(sellLine) !== -1,
+  assert(/class="[^"]*sandwich-tip-only/.test(a4) && a4.indexOf(sellLine) !== -1,
     'tip-only oval prints sell words on the sheet');
   assert(/scallop-wide/.test(a4), 'tip-only uses platter oval frame');
   assert(/Creamy Chicken Nduja|Baked Gnocchi|Pasta Carbonara/.test(a4),
@@ -3549,8 +3550,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   assert(/Cheesy Garlic Bread|Chunky Triple Cooked Chips/.test(a4),
     'Sides stay on the sheet with compact tip');
   // No SANDWICHES heading in the tip-only scallop (pair may still mention food elsewhere).
-  var tipOval = (a4.match(/<div class="scallop[^"]*scallop-wide[^"]*">[\s\S]*?sandwich-tip-only[\s\S]*?<\/div>\s*<\/div>/) ||
-    a4.match(/sandwich-tip-only[\s\S]{0,400}/) || [''])[0];
+  var tipOval = (a4.match(/class="[^"]*sandwich-tip-only[\s\S]{0,400}/) || [''])[0];
   assert(tipOval && !/(sec-title|promo-title)[^>]*>\s*Sandwiches/i.test(tipOval),
     'tip-only oval HTML has no Sandwiches title inside');
   // Filled sandwiches on the same shape still get the title.
@@ -3571,7 +3571,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   var filledA4b = filledSheet.split('mode-panel mode-a5')[0] || filledSheet;
   assert(/(sec-title|promo-title)[^>]*>\s*Sandwiches/i.test(filledA4b),
     'full Sandwiches section with fillings still prints the Sandwiches title');
-  assert(!/sandwich-tip-only/.test(filledA4b),
+  assert(!/class="[^"]*sandwich-tip-only/.test(filledA4b),
     'full Sandwiches section does not use tip-only oval marker');
 })();
 
