@@ -753,8 +753,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow201') !== -1, 'menus page cache-bust is flow201');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow201') !== -1, 'hub menus link cache-bust is flow201');
+assert(page.indexOf('flow202') !== -1, 'menus page cache-bust is flow202');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow202') !== -1, 'hub menus link cache-bust is flow202');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -3935,10 +3935,12 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
     /frame-platter\.png[\s\S]{0,400}scallop-platter/.test(sheet),
     'platter background uses frame-platter.png (not rectangular frame-wide)');
   assert(/aspect-ratio:\s*auto/.test(sheet), 'platter CSS uses oval aspect auto (content-sized)');
-  assert(/scallop-platter[\s\S]{0,220}padding:\s*10px\s*18px\s*12px/.test(sheet) ||
-    /padding:\s*10px\s*18px\s*12px[\s\S]{0,120}scallop-platter/.test(sheet) ||
-    /\.scallop-platter[\s\S]{0,400}padding:\s*10px\s*18px\s*12px/.test(sheet),
-    'platter pad hugs the sell line (px pad + content height, no aspect air)');
+  assert(/width:\s*fit-content/.test(sheet) && /max-width:\s*100%/.test(sheet),
+    'platter hugs sell words (fit-content) without overflowing the column');
+  assert(/scallop-platter[\s\S]{0,220}padding:\s*11px\s*26px/.test(sheet) ||
+    /padding:\s*11px\s*26px[\s\S]{0,120}scallop-platter/.test(sheet) ||
+    /\.scallop-platter[\s\S]{0,400}padding:\s*11px\s*26px/.test(sheet),
+    'platter pad is even on all sides (top=bottom, left=right)');
   assert(/scallop-platter[\s\S]{0,200}border-image:\s*none|border-image:\s*none[\s\S]{0,200}scallop-platter/.test(sheet) ||
     /\.scallop-platter[\s\S]{0,300}border-image:\s*none/.test(sheet),
     'platter CSS disables border-image so the oval silhouette can show');
