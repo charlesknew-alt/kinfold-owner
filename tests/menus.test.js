@@ -219,7 +219,32 @@ assert(fs.existsSync(path.join(root, 'images/frame.png')), 'frame.png alias exis
 assert(fs.existsSync(path.join(root, 'images/frame-platter.png')), 'tip oval platter asset exists');
 var platterBytes = fs.statSync(path.join(root, 'images/frame-platter.png')).size;
 assert(platterBytes > 20000,
-  'tip oval asset carries dense fine-scallop detail (not a tiny smooth double-stroke ellipse)');
+  'tip oval asset carries rounded fine-scallop detail (not a tiny smooth double-stroke ellipse)');
+(function assertTipPlatterRoundedULobes() {
+  // Tip oval keeps soft U-lobe pitch (~37), not denser saw-tooth teeth (live flow212
+  // still had the jagged platter). Rect panels remain cut-corner frame-wide/box.
+  var cp = require('child_process');
+  var py = [
+    'from PIL import Image',
+    'import numpy as np, sys',
+    'root=sys.argv[1]',
+    'a=np.array(Image.open(f"{root}/images/frame-platter.png").convert("RGBA"))',
+    'w=a.shape[1]',
+    'm=(a[:,:,0]>180)&(a[:,:,3]>40)',
+    'ys=[np.where(m[:,x])[0][0] for x in range(w//6,5*w//6) if len(np.where(m[:,x])[0])]',
+    'ys=np.array(ys,float); t=np.arange(len(ys))',
+    'r=ys-np.polyval(np.polyfit(t,ys,2),t); r-=r.mean()',
+    'ac=np.correlate(r,r,mode="full"); ac=ac[len(ac)//2:]; ac/=ac[0]',
+    'pp=None',
+    'for lag in range(20,80):',
+    '  if ac[lag]>ac[lag-1] and ac[lag]>=ac[lag+1] and ac[lag]>0.25:',
+    '    pp=lag; break',
+    'assert pp is not None and abs(pp-37)<=3, pp',
+    'print(f"ok {pp}")'
+  ].join('\n');
+  var out = cp.execFileSync('python3', ['-c', py, root], { encoding: 'utf8' });
+  assert(/ok/.test(out), 'tip platter scallop period is rounded U-lobes (~37), not denser teeth');
+})();
 (function assertCutCornerFrameAssets() {
   // PNG corners must be transparent (true cut-off), with ink inside the slice
   // region so border-image cannot collapse to sharp 90° boxes.
@@ -242,8 +267,10 @@ assert(platterBytes > 20000,
 })();
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
-assert(/fine scallop/i.test(printJs),
+assert(/fine scallop|rounded fine scallop/i.test(printJs),
   'print CSS/comments name fine-scallop tip oval (Tips / frame-wide family)');
+assert(/rounded fine scallops|same pitch|NOT dense saw-tooth|~37px pitch/i.test(printJs),
+  'print comments encode tip oval rounded U-lobe waveform (not denser saw-tooth)');
 assert(/cut-off concave|inverse fillet|cut-corner/i.test(printJs),
   'print CSS/comments encode cut-corner concave rectangular frames system-wide');
 assert(/border-image-slice:64 fill/.test(printJs) && /border-image-slice:80 fill/.test(printJs),
@@ -817,8 +844,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow212') !== -1, 'menus page cache-bust is flow212');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow212') !== -1, 'hub menus link cache-bust is flow212');
+assert(page.indexOf('flow213') !== -1, 'menus page cache-bust is flow213');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow213') !== -1, 'hub menus link cache-bust is flow213');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
