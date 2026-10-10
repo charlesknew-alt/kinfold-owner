@@ -248,22 +248,35 @@ assert(platterBytes > 20000,
 (function assertCutCornerFrameAssets() {
   // PNG corners must be transparent (true cut-off), with ink inside the slice
   // region so border-image cannot collapse to sharp 90° boxes.
+  // Edge pitch must match pre-flow212 (box~18, wide~37) — not finer flow212 rewrite.
   var cp = require('child_process');
   var py = [
     'from PIL import Image',
-    'import sys',
-    'samples=[("frame-box.png",64),("frame-wide.png",80),("frame.png",64)]',
+    'import numpy as np, sys',
     'root=sys.argv[1]',
-    'for name,sl in samples:',
+    'def period(name):',
+    '  a=np.array(Image.open(f"{root}/images/{name}").convert("RGBA")); w=a.shape[1]',
+    '  ink=(a[:,:,0]<120)&(a[:,:,3]>40)',
+    '  ys=[np.where(ink[:,x])[0][0] for x in range(w//5,4*w//5) if ink[:,x].any()]',
+    '  ys=np.array(ys,float); t=np.arange(len(ys))',
+    '  r=ys-np.polyval(np.polyfit(t,ys,2),t); r-=r.mean()',
+    '  ac=np.correlate(r,r,mode="full"); ac=ac[len(ac)//2:]; ac/=(ac[0] or 1)',
+    '  for lag in range(6,min(90,len(ac)-1)):',
+    '    if ac[lag]>ac[lag-1] and ac[lag]>=ac[lag+1] and ac[lag]>0.2: return lag',
+    '  return None',
+    'samples=[("frame-box.png",64,18),("frame-wide.png",80,37),("frame.png",64,18)]',
+    'for name,sl,expect in samples:',
     '  im=Image.open(f"{root}/images/{name}").convert("RGBA"); w,h=im.size; px=im.load()',
     '  for x,y in [(2,2),(w-3,2),(2,h-3),(w-3,h-3)]:',
     '    if px[x,y][3]>=30: raise SystemExit(f"{name} corner opaque")',
     '  ink=sum(1 for y in range(sl) for x in range(sl) if px[x,y][3]>10 and sum(px[x,y][:3])<700)',
     '  if ink<40: raise SystemExit(f"{name} TL slice ink={ink}")',
+    '  p=period(name)',
+    '  if p is None or abs(p-expect)>4: raise SystemExit(f"{name} pitch={p} expect~{expect}")',
     'print("ok")'
   ].join('\n');
   var out = cp.execFileSync('python3', ['-c', py, root], { encoding: 'utf8' });
-  assert(/ok/.test(out), 'cut-corner frame PNGs have transparent notches + slice ink');
+  assert(/ok/.test(out), 'cut-corner frames: transparent notches + pre-flow212 scallop pitch');
 })();
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
@@ -844,8 +857,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow213') !== -1, 'menus page cache-bust is flow213');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow213') !== -1, 'hub menus link cache-bust is flow213');
+assert(page.indexOf('flow214') !== -1, 'menus page cache-bust is flow214');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow214') !== -1, 'hub menus link cache-bust is flow214');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');

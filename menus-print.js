@@ -525,10 +525,11 @@
   function scallop(inner, kind, extraCls) {
     // Real Canva/print frames via border-image so waves sit in the border
     // gutter and never cut through dish text (unlike stretched SVG/PNG fill).
-    // Rectangular frames (box + wide): cut-off concave corners (inverse fillet)
-    // with a fine scalloped border — never sharp 90°. box = tighter wave;
-    // wide = slightly looser wave (pair contrast). Tip-only adds scallop-platter
-    // (oval + fine scallops via frame-platter.png) and stays oval.
+    // Rectangular frames (box + wide): pre-flow212 scallop character/pitch/weight
+    // with cut-off concave corners only (inverse fillet) — never the finer
+    // whole-box waveform from flow212, never sharp 90°. box = tighter wave
+    // (~18px); wide = looser (~37px, matches tip platter). Tip-only adds
+    // scallop-platter (oval via frame-platter.png) and stays oval.
     var cls = kind === 'box' ? 'scallop scallop-box' : 'scallop scallop-wide';
     if (extraCls) cls += ' ' + String(extraCls).trim();
     return '<div class="' + cls + '"><div class="scallop-pad">' + inner + '</div></div>';
@@ -4397,17 +4398,18 @@
       '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),var(--title-max));letter-spacing:.1em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:var(--sec-gap)}' +
       '.classics-block{margin-top:4px}' +
-      /* System-wide rectangular feature frames: cut-off concave corners
-         (inverse fillet) + fine scallop border. Transparent PNG corners +
-         transparent element background so notches are not filled as 90° boxes.
-         Tip-only oval is excluded via .scallop-platter overrides below. */
+      /* System-wide rectangular feature frames: pre-flow212 scallop waveform
+         + cut-off concave corners (inverse fillet) only. Transparent PNG
+         corners + transparent element background so notches are not filled
+         as 90° boxes. Tip-only oval is excluded via .scallop-platter below. */
       '.scallop{margin:0 0 8px;background:transparent;position:relative;height:fit-content;' +
         'border-style:solid;border-color:transparent;border-width:14px;' +
         'border-image-slice:64 fill;border-image-repeat:stretch;border-image-width:14px;' +
         'overflow:hidden;max-width:100%;' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-      // Cut-corner Canva frames: box = tight fine scallop, wide = looser wave.
-      // Slice must cover the full concave corner (never slice:42 — that dropped ink).
+      // Cut-corner Canva frames: restored pre-flow212 edge character
+      // (box ~18px pitch, wide ~37px). Slice covers full concave corner
+      // (never slice:42 — that dropped ink into sharp 90° boxes).
       '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:14px;border-image-width:14px;border-image-slice:80 fill}' +
       '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:64 fill}' +
       // Adjacent food scallops: matching frames pick the other wave on the neighbour.
