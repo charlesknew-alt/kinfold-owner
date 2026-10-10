@@ -217,11 +217,39 @@ assert(fs.existsSync(path.join(root, 'images/frame-wide.png')), 'scalloped frame
 assert(fs.existsSync(path.join(root, 'images/frame-platter.png')), 'tip oval platter asset exists');
 var platterBytes = fs.statSync(path.join(root, 'images/frame-platter.png')).size;
 assert(platterBytes > 20000,
-  'tip oval asset carries dense fine-scallop detail (not a tiny smooth double-stroke ellipse)');
+  'tip oval asset carries rounded fine-scallop detail (not a tiny smooth double-stroke ellipse)');
+(function assertTipPlatterMatchesFrameWideScallops() {
+  // Tip oval edge must share frame-wide scallop pitch (rounded U-lobes), not denser saw-teeth.
+  var cp = require('child_process');
+  var py = [
+    'from PIL import Image',
+    'import numpy as np, sys',
+    'root=sys.argv[1]',
+    'def period(path, mode):',
+    '  a=np.array(Image.open(path).convert("RGBA"))',
+    '  w=a.shape[1]',
+    '  m=((a[:,:,3]>40)&(a[:,:,0]<100)) if mode=="ink" else ((a[:,:,0]>180)&(a[:,:,3]>40))',
+    '  ys=[np.where(m[:,x])[0][0] for x in range(w//6,5*w//6) if len(np.where(m[:,x])[0])]',
+    '  ys=np.array(ys,float); t=np.arange(len(ys))',
+    '  r=ys-np.polyval(np.polyfit(t,ys,2),t); r-=r.mean()',
+    '  ac=np.correlate(r,r,mode="full"); ac=ac[len(ac)//2:]; ac/=ac[0]',
+    '  for lag in range(20,80):',
+    '    if ac[lag]>ac[lag-1] and ac[lag]>=ac[lag+1] and ac[lag]>0.25: return lag',
+    '  return None',
+    'pf=period(f"{root}/images/frame-wide.png","ink")',
+    'pp=period(f"{root}/images/frame-platter.png","white")',
+    'assert pf and pp and abs(pf-pp)<=3, (pf,pp)',
+    'print(f"ok {pf} {pp}")'
+  ].join('\n');
+  var out = cp.execFileSync('python3', ['-c', py, root], { encoding: 'utf8' });
+  assert(/ok/.test(out), 'tip platter scallop period matches frame-wide (rounded U-lobes, not denser teeth)');
+})();
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
-assert(/fine scallop/i.test(printJs),
+assert(/fine scallop|rounded fine scallop/i.test(printJs),
   'print CSS/comments name fine-scallop tip oval (Tips / frame-wide family)');
+assert(/rounded fine scallops|same pitch|NOT dense saw-tooth/i.test(printJs),
+  'print comments encode tip oval waveform match to rect frames (not denser saw-tooth)');
 assert(/border-radius:0/.test(printJs) && !/scallop-platter[\s\S]{0,180}border-radius:50%/.test(printJs),
   'fine-scallop tip oval does not clip bumps with border-radius 50%');
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
@@ -760,8 +788,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow209') !== -1, 'menus page cache-bust is flow209');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow209') !== -1, 'hub menus link cache-bust is flow209');
+assert(page.indexOf('flow211') !== -1, 'menus page cache-bust is flow211');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow211') !== -1, 'hub menus link cache-bust is flow211');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
