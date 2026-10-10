@@ -4537,7 +4537,7 @@
       /* Tip-only sell oval: ellipse + rounded fine scallops (frame-platter.png).
          Soft U-curve lobes at ~37px pitch (waveform match to pre-cut-corner
          Tips / frame-wide family) — NOT dense saw-tooth / pointy teeth,
-         NOT big-lobe waves. Rect panels stay cut-corner frame-box/wide. */
+         NOT big-lobe waves. Rect panels stay pre-flow212 scallop + cut-corner. */
       /* Tip-only: fine-scallop oval hugs the sell words; text optically centred
          (equal air top/bottom via flex + even pad; prefer one sell line). */
       '.sandwich-tip-only{' +
