@@ -629,6 +629,12 @@ assert(api.includableMenus('brunch').some(function (m) { return m.id === 'specia
 var addedCard = api.addCustomMenu({ name: 'Bar snacks', kind: 'card' });
 assert(addedCard.ok && api.menuById('bar-snacks').kind === 'card',
   'owner can add a card extra menu');
+assert(api.menuById('bar-snacks').name === 'Bar Snacks',
+  'card menu names are title-cased for the tab label');
+assert(api.SECTIONS.indexOf('Bar Snacks') !== -1,
+  'adding a card menu also creates a matching category');
+assert(api.ownPageMenuForSection('Bar Snacks').id === 'bar-snacks',
+  'card menu pairs with its category for drop-in');
 assert(api.includableMenus('main').some(function (m) { return m.id === 'bar-snacks'; }),
   'extra card menus can be ticked onto Main');
 assert(!api.addCustomMenu({ name: 'Main menu', kind: 'long' }).ok,
@@ -640,6 +646,27 @@ assert(api.removeCustomMenu('brunch').ok && api.menuById('brunch').id === 'main'
 api.resetExtras();
 assert(api.SECTIONS.indexOf('Sharing Boards') === -1 && !api.MENUS.some(function (m) { return m.id === 'bar-snacks'; }),
   'resetExtras restores built-in menus and categories');
+// Charles: category-only "Breakfast" is not a tab — promote with Add menu / Add as tab.
+api.resetExtras();
+var breakfastCat = api.addCustomSection('Breakfast');
+assert(breakfastCat.ok && api.SECTIONS.indexOf('Breakfast') !== -1 &&
+  !api.MENUS.some(function (m) { return m.id === 'breakfast'; }),
+  'Breakfast as category alone does not create a menu tab');
+assert(!api.ownPageMenuForSection('Breakfast'),
+  'category-only Breakfast has no own-page card yet');
+var breakfastTab = api.addCustomMenu({ name: 'Breakfast', kind: 'card' });
+assert(breakfastTab.ok && api.menuById('breakfast').kind === 'card' &&
+  api.MENUS.some(function (m) { return m.id === 'breakfast' && m.custom && m.staff !== false; }),
+  'Add menu Card creates a Breakfast tab (staff-visible, non-party)');
+assert(api.ownPageMenuForSection('Breakfast').id === 'breakfast',
+  'Breakfast category maps to the Breakfast card tab');
+assert(page.indexOf('data-menu-from-section') !== -1 && page.indexOf('Add as tab') !== -1,
+  'owner UI can promote a category to a menu tab');
+assert(page.indexOf('creates a tab') !== -1 && page.indexOf('not a tab') !== -1,
+  'owner UI distinguishes menu tabs from categories');
+assert(page.indexOf('Array.isArray(state.extraMenus) ? state.extraMenus') !== -1,
+  'cloud apply keeps local extra menus when remote omits the array');
+api.resetExtras();
 assert(page.indexOf("'little-bells'") !== -1 && page.indexOf('Little Bells (kids)') !== -1,
   'staff Menus offer Little Bells kids include checkbox');
 assert(page.indexOf("STAFF_MENU_IDS") !== -1 && /little-bells/.test(page.match(/STAFF_MENU_IDS\s*=\s*\[[^\]]+\]/)[0]),
@@ -760,8 +787,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow209') !== -1, 'menus page cache-bust is flow209');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow209') !== -1, 'hub menus link cache-bust is flow209');
+assert(page.indexOf('flow210') !== -1, 'menus page cache-bust is flow210');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow210') !== -1, 'hub menus link cache-bust is flow210');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
