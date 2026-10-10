@@ -525,11 +525,8 @@
   function scallop(inner, kind, extraCls) {
     // Real Canva/print frames via border-image so waves sit in the border
     // gutter and never cut through dish text (unlike stretched SVG/PNG fill).
-    // Rectangular frames (box + wide): pre-flow212 scallop character/pitch/weight
-    // with cut-off concave corners only (inverse fillet) — never the finer
-    // whole-box waveform from flow212, never sharp 90°. box = tighter wave
-    // (~18px); wide = looser (~37px, matches tip platter). Tip-only adds
-    // scallop-platter (oval via frame-platter.png) and stays oval.
+    // box = tight scallop, squarer corners; wide = looser wave, rounder corners.
+    // Tip-only also adds scallop-platter (oval + fine scallops via frame-platter.png).
     var cls = kind === 'box' ? 'scallop scallop-box' : 'scallop scallop-wide';
     if (extraCls) cls += ' ' + String(extraCls).trim();
     return '<div class="' + cls + '"><div class="scallop-pad">' + inner + '</div></div>';
@@ -584,7 +581,7 @@
     return String(dateStr || '');
   }
 
-  /** One scalloped event/selling box. frameKind: 'box' or 'wide' (both rect cut-corner). */
+  /** One scalloped event/selling box. frameKind: 'box' (rect) or 'wide' (oval). */
   function renderOnePromoBox(promos, frameKind) {
     promos = (promos || []).filter(function (p) { return p && p.title; });
     if (!promos.length) return '';
@@ -4398,25 +4395,18 @@
       '.sec-title.soft{font-size:min(calc(var(--title) - 2pt),var(--title-max));letter-spacing:.1em}' +
       '.sec-title.under{text-align:center;text-decoration:underline;text-underline-offset:3px;margin-top:var(--sec-gap)}' +
       '.classics-block{margin-top:4px}' +
-      /* System-wide rectangular feature frames: pre-flow212 scallop waveform
-         + cut-off concave corners (inverse fillet) only. Transparent PNG
-         corners + transparent element background so notches are not filled
-         as 90° boxes. Tip-only oval is excluded via .scallop-platter below. */
-      '.scallop{margin:0 0 8px;background:transparent;position:relative;height:fit-content;' +
-        'border-style:solid;border-color:transparent;border-width:14px;' +
-        'border-image-slice:64 fill;border-image-repeat:stretch;border-image-width:14px;' +
-        'overflow:hidden;max-width:100%;' +
-        '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
-      // Cut-corner Canva frames: restored pre-flow212 edge character
-      // (box ~18px pitch, wide ~37px). Slice covers full concave corner
-      // (never slice:42 — that dropped ink into sharp 90° boxes).
-      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:14px;border-image-width:14px;border-image-slice:80 fill}' +
-      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:14px;border-image-width:14px;border-image-slice:64 fill}' +
+      '.scallop{margin:0 0 8px;background:#fff;position:relative;height:fit-content;' +
+        'border-style:solid;border-color:transparent;border-width:12px;' +
+        'border-image-slice:48 fill;border-image-repeat:stretch;border-image-width:12px;' +
+        'overflow:hidden;max-width:100%}' +
+      // Original Canva frames: box = tight scallop, wide = looser wave. Single line only.
+      '.scallop-wide{border-image-source:url("' + asset('frame-wide.png') + '");border-width:12px;border-image-width:12px;border-image-slice:42 fill}' +
+      '.scallop-box{border-image-source:url("' + asset('frame-box.png') + '");border-width:12px;border-image-width:12px;border-image-slice:48 fill}' +
       // Adjacent food scallops: matching frames pick the other wave on the neighbour.
       '.cols-balanced > .col:has(> .col-body > .scallop-box) + .col > .col-body > .scallop-box{' +
-        'border-image-source:url("' + asset('frame-wide.png') + '");border-image-slice:80 fill}' +
+        'border-image-source:url("' + asset('frame-wide.png') + '");border-image-slice:42 fill}' +
       '.cols-balanced > .col:has(> .col-body > .scallop-wide:not(.scallop-platter)) + .col > .col-body > .scallop-wide:not(.scallop-platter){' +
-        'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:64 fill}' +
+        'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       // Bottom pad clears dashed/scallop border so below-box notes (Little Bells
       // Sunday roast line) never crop against their own frame.
       '.scallop-pad{padding:6px 12px 12px;overflow:hidden;min-width:0}' +
@@ -4535,9 +4525,9 @@
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
       /* Tip-only sell oval: ellipse + rounded fine scallops (frame-platter.png).
-         Soft U-curve lobes at ~37px pitch (waveform match to pre-cut-corner
-         Tips / frame-wide family) — NOT dense saw-tooth / pointy teeth,
-         NOT big-lobe waves. Rect panels stay pre-flow212 scallop + cut-corner. */
+         Soft U-curve lobes at ~37px pitch (waveform match to Tips / frame-wide
+         family) — NOT dense saw-tooth / pointy teeth, NOT big-lobe waves.
+         Rect panels use classic Canva frame-box / frame-wide (no cut-corners). */
       /* Tip-only: fine-scallop oval hugs the sell words; text optically centred
          (equal air top/bottom via flex + even pad; prefer one sell line). */
       '.sandwich-tip-only{' +
@@ -4578,9 +4568,9 @@
         'padding:14px 28px!important;display:flex;flex-direction:column;' +
         'align-items:center;justify-content:center;' +
         'box-sizing:border-box;min-height:0;width:max-content;max-width:100%;margin:0}' +
-      /* Stacked tip + feature panel: tip keeps the fine-scallop oval; panel uses cut-corner rect. */
+      /* Stacked tip + feature panel: tip keeps the fine-scallop oval; panel uses the other wave. */
       '.col:has(.sandwich-tip-only) > .col-feature > .scallop-wide:not(.scallop-platter){' +
-        'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:64 fill}' +
+        'border-image-source:url("' + asset('frame-box.png') + '");border-image-slice:48 fill}' +
       '.note-line{font-size:10.5pt;font-weight:500;margin:4px 0}' +
       /* Tip-only note-line must win over the generic .note-line margin above. */
       '.sandwich-tip-only .note-line{margin:0!important}' +
@@ -4598,8 +4588,8 @@
       '.fill-tight{--dish-gap:14px;--sec-gap:13px;--name:11.1pt;--desc:10pt;--title:17pt;--promo:11.1pt}' +
       '.fill-compact{--dish-gap:13px;--sec-gap:12px;--name:11.05pt;--desc:10pt;--title:16.5pt;--promo:11.05pt}' +
       '.fill-dense{--dish-gap:13px;--sec-gap:11px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
-      '.fill-compact .scallop:not(.scallop-platter),.fill-dense .scallop:not(.scallop-platter){border-width:12px;border-image-width:12px;margin-bottom:5px}' +
-      '.fill-dense .scallop:not(.scallop-platter){border-width:11px;border-image-width:11px}' +
+      '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
+      '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
       /* Tip platter keeps the oval asset — density must not re-enable border-image. */
       '.fill-compact .scallop-platter,.fill-dense .scallop-platter,' +
         '.fill-compact .scallop:has(.sandwich-tip-only),.fill-dense .scallop:has(.sandwich-tip-only){' +

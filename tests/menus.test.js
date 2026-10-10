@@ -215,14 +215,14 @@ assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists'
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
 assert(fs.existsSync(path.join(root, 'images/frame-wide.png')), 'scalloped frame asset exists');
 assert(fs.existsSync(path.join(root, 'images/frame-box.png')), 'box frame asset exists');
-assert(fs.existsSync(path.join(root, 'images/frame.png')), 'frame.png alias exists for cut-corner rects');
+assert(!fs.existsSync(path.join(root, 'images/frame.png')),
+  'frame.png cut-corner alias must stay removed (pre-flow212 had no frame.png)');
 assert(fs.existsSync(path.join(root, 'images/frame-platter.png')), 'tip oval platter asset exists');
 var platterBytes = fs.statSync(path.join(root, 'images/frame-platter.png')).size;
 assert(platterBytes > 20000,
   'tip oval asset carries rounded fine-scallop detail (not a tiny smooth double-stroke ellipse)');
 (function assertTipPlatterRoundedULobes() {
-  // Tip oval keeps soft U-lobe pitch (~37), not denser saw-tooth teeth (live flow212
-  // still had the jagged platter). Rect panels remain cut-corner frame-wide/box.
+  // Tip oval keeps soft U-lobe pitch (~37) from flow213; rect panels are classic frames.
   var cp = require('child_process');
   var py = [
     'from PIL import Image',
@@ -245,38 +245,32 @@ assert(platterBytes > 20000,
   var out = cp.execFileSync('python3', ['-c', py, root], { encoding: 'utf8' });
   assert(/ok/.test(out), 'tip platter scallop period is rounded U-lobes (~37), not denser teeth');
 })();
-(function assertCutCornerFrameAssets() {
-  // PNG corners must be transparent (true cut-off), with ink inside the slice
-  // region so border-image cannot collapse to sharp 90° boxes.
-  // Edge pitch must match pre-flow212 (box~18, wide~37) — not finer flow212 rewrite.
+(function assertRectFramesMatchPreFlow212() {
+  // Exact bytes from a596223 (last good before f7c1158 cut-corner rewrite).
+  var crypto = require('crypto');
+  var expect = {
+    'frame-box.png': '45c7ba4a2f408936743eb8af7ac95714',
+    'frame-wide.png': '539b09eb8249f1474792bd392467ae2c'
+  };
+  Object.keys(expect).forEach(function (name) {
+    var buf = fs.readFileSync(path.join(root, 'images', name));
+    var md5 = crypto.createHash('md5').update(buf).digest('hex');
+    assert(md5 === expect[name], name + ' md5 ' + md5 + ' must equal pre-flow212 ' + expect[name]);
+  });
+  // Corners must NOT be the transparent inverse-fillet cut-corners from flow212+.
   var cp = require('child_process');
   var py = [
     'from PIL import Image',
-    'import numpy as np, sys',
+    'import sys',
     'root=sys.argv[1]',
-    'def period(name):',
-    '  a=np.array(Image.open(f"{root}/images/{name}").convert("RGBA")); w=a.shape[1]',
-    '  ink=(a[:,:,0]<120)&(a[:,:,3]>40)',
-    '  ys=[np.where(ink[:,x])[0][0] for x in range(w//5,4*w//5) if ink[:,x].any()]',
-    '  ys=np.array(ys,float); t=np.arange(len(ys))',
-    '  r=ys-np.polyval(np.polyfit(t,ys,2),t); r-=r.mean()',
-    '  ac=np.correlate(r,r,mode="full"); ac=ac[len(ac)//2:]; ac/=(ac[0] or 1)',
-    '  for lag in range(6,min(90,len(ac)-1)):',
-    '    if ac[lag]>ac[lag-1] and ac[lag]>=ac[lag+1] and ac[lag]>0.2: return lag',
-    '  return None',
-    'samples=[("frame-box.png",64,18),("frame-wide.png",80,37),("frame.png",64,18)]',
-    'for name,sl,expect in samples:',
+    'for name in ("frame-box.png","frame-wide.png"):',
     '  im=Image.open(f"{root}/images/{name}").convert("RGBA"); w,h=im.size; px=im.load()',
-    '  for x,y in [(2,2),(w-3,2),(2,h-3),(w-3,h-3)]:',
-    '    if px[x,y][3]>=30: raise SystemExit(f"{name} corner opaque")',
-    '  ink=sum(1 for y in range(sl) for x in range(sl) if px[x,y][3]>10 and sum(px[x,y][:3])<700)',
-    '  if ink<40: raise SystemExit(f"{name} TL slice ink={ink}")',
-    '  p=period(name)',
-    '  if p is None or abs(p-expect)>4: raise SystemExit(f"{name} pitch={p} expect~{expect}")',
+    '  opaque=sum(1 for x,y in [(2,2),(w-3,2),(2,h-3),(w-3,h-3)] if px[x,y][3]>=200)',
+    '  if opaque<3: raise SystemExit(f"{name} looks cut-corner (opaque corners={opaque})")',
     'print("ok")'
   ].join('\n');
   var out = cp.execFileSync('python3', ['-c', py, root], { encoding: 'utf8' });
-  assert(/ok/.test(out), 'cut-corner frames: transparent notches + pre-flow212 scallop pitch');
+  assert(/ok/.test(out), 'rect frames keep classic opaque corners (no new inward cut-corners)');
 })();
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
@@ -284,14 +278,14 @@ assert(/fine scallop|rounded fine scallop/i.test(printJs),
   'print CSS/comments name fine-scallop tip oval (Tips / frame-wide family)');
 assert(/rounded fine scallops|same pitch|NOT dense saw-tooth|~37px pitch/i.test(printJs),
   'print comments encode tip oval rounded U-lobe waveform (not denser saw-tooth)');
-assert(/cut-off concave|inverse fillet|cut-corner/i.test(printJs),
-  'print CSS/comments encode cut-corner concave rectangular frames system-wide');
-assert(/border-image-slice:64 fill/.test(printJs) && /border-image-slice:80 fill/.test(printJs),
-  'rect scallop slices cover full concave corners (64 box / 80 wide)');
-assert(/\.scallop\{[^}]*background:transparent/.test(printJs),
-  'base .scallop background is transparent so cut corners are not filled white');
-assert(!/border-image-slice:42 fill/.test(printJs),
-  'old slice:42 (missed wide corner ink → sharp 90°) is gone');
+assert(/border-image-slice:42 fill/.test(printJs) && /border-image-slice:48 fill/.test(printJs),
+  'rect scallop slices restored to pre-flow212 (42 wide / 48 box)');
+assert(/\.scallop\{[^}]*background:#fff/.test(printJs),
+  'base .scallop background is white (classic Canva frames, not transparent cut-corners)');
+assert(!/border-image-slice:64 fill/.test(printJs) && !/border-image-slice:80 fill/.test(printJs),
+  'raised cut-corner slices 64/80 from flow212+ must be gone');
+assert(!/cut-off concave|inverse fillet|cut-corner/i.test(printJs),
+  'print CSS/comments must not encode cut-corner rectangular frames');
 assert(/border-radius:0/.test(printJs) && !/scallop-platter[\s\S]{0,180}border-radius:50%/.test(printJs),
   'fine-scallop tip oval does not clip bumps with border-radius 50%');
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
@@ -857,8 +851,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow214') !== -1, 'menus page cache-bust is flow214');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow214') !== -1, 'hub menus link cache-bust is flow214');
+assert(page.indexOf('flow215') !== -1, 'menus page cache-bust is flow215');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow215') !== -1, 'hub menus link cache-bust is flow215');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -1775,10 +1769,9 @@ assert(printJs.indexOf('foot-logo') !== -1, 'page-2 logo when space');
 assert(printJs.indexOf('sandwichNote') !== -1 || printJs.indexOf('Sandwiches') !== -1, 'sandwiches selling box');
 assert(printJs.indexOf('frame-wide.png') !== -1 && printJs.indexOf('frame-box.png') !== -1, 'scallop frame assets');
 assert(fs.existsSync(path.join(root, 'images/frame-box.png')), 'box frame asset exists');
-assert(fs.existsSync(path.join(root, 'images/frame.png')), 'frame.png cut-corner alias exists');
 assert(fs.existsSync(path.join(root, 'images/lunch-club-mark.png')), 'lunch club mark exists');
 assert(/scallop-box\{[^}]*frame-box\.png/.test(printJs) && /scallop-wide\{[^}]*frame-wide\.png/.test(printJs),
-  'rect feature panels map scallop-box/wide to cut-corner frame assets');
+  'rect feature panels map scallop-box/wide to classic Canva frame assets');
 
 // stub localStorage for version counter
 global.localStorage = {
