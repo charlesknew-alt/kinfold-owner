@@ -214,14 +214,44 @@ assert(page.indexOf('menus-print.js') !== -1, 'branded print script is loaded');
 assert(fs.existsSync(path.join(root, 'menus-print.js')), 'menus-print.js exists');
 assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')), 'logo asset exists');
 assert(fs.existsSync(path.join(root, 'images/frame-wide.png')), 'scalloped frame asset exists');
+assert(fs.existsSync(path.join(root, 'images/frame-box.png')), 'box frame asset exists');
+assert(fs.existsSync(path.join(root, 'images/frame.png')), 'frame.png alias exists for cut-corner rects');
 assert(fs.existsSync(path.join(root, 'images/frame-platter.png')), 'tip oval platter asset exists');
 var platterBytes = fs.statSync(path.join(root, 'images/frame-platter.png')).size;
 assert(platterBytes > 20000,
   'tip oval asset carries dense fine-scallop detail (not a tiny smooth double-stroke ellipse)');
+(function assertCutCornerFrameAssets() {
+  // PNG corners must be transparent (true cut-off), with ink inside the slice
+  // region so border-image cannot collapse to sharp 90° boxes.
+  var cp = require('child_process');
+  var py = [
+    'from PIL import Image',
+    'import sys',
+    'samples=[("frame-box.png",64),("frame-wide.png",80),("frame.png",64)]',
+    'root=sys.argv[1]',
+    'for name,sl in samples:',
+    '  im=Image.open(f"{root}/images/{name}").convert("RGBA"); w,h=im.size; px=im.load()',
+    '  for x,y in [(2,2),(w-3,2),(2,h-3),(w-3,h-3)]:',
+    '    if px[x,y][3]>=30: raise SystemExit(f"{name} corner opaque")',
+    '  ink=sum(1 for y in range(sl) for x in range(sl) if px[x,y][3]>10 and sum(px[x,y][:3])<700)',
+    '  if ink<40: raise SystemExit(f"{name} TL slice ink={ink}")',
+    'print("ok")'
+  ].join('\n');
+  var out = cp.execFileSync('python3', ['-c', py, root], { encoding: 'utf8' });
+  assert(/ok/.test(out), 'cut-corner frame PNGs have transparent notches + slice ink');
+})();
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
 assert(/fine scallop/i.test(printJs),
   'print CSS/comments name fine-scallop tip oval (Tips / frame-wide family)');
+assert(/cut-off concave|inverse fillet|cut-corner/i.test(printJs),
+  'print CSS/comments encode cut-corner concave rectangular frames system-wide');
+assert(/border-image-slice:64 fill/.test(printJs) && /border-image-slice:80 fill/.test(printJs),
+  'rect scallop slices cover full concave corners (64 box / 80 wide)');
+assert(/\.scallop\{[^}]*background:transparent/.test(printJs),
+  'base .scallop background is transparent so cut corners are not filled white');
+assert(!/border-image-slice:42 fill/.test(printJs),
+  'old slice:42 (missed wide corner ink → sharp 90°) is gone');
 assert(/border-radius:0/.test(printJs) && !/scallop-platter[\s\S]{0,180}border-radius:50%/.test(printJs),
   'fine-scallop tip oval does not clip bumps with border-radius 50%');
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
@@ -787,8 +817,13 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
+<<<<<<< HEAD
 assert(page.indexOf('flow211') !== -1, 'menus page cache-bust is flow211');
 assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow211') !== -1, 'hub menus link cache-bust is flow211');
+=======
+assert(page.indexOf('flow210') !== -1, 'menus page cache-bust is flow210');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow210') !== -1, 'hub menus link cache-bust is flow210');
+>>>>>>> be22428 (Use cut-corner scallop frames on all rectangular panels (flow210).)
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -1705,7 +1740,10 @@ assert(printJs.indexOf('foot-logo') !== -1, 'page-2 logo when space');
 assert(printJs.indexOf('sandwichNote') !== -1 || printJs.indexOf('Sandwiches') !== -1, 'sandwiches selling box');
 assert(printJs.indexOf('frame-wide.png') !== -1 && printJs.indexOf('frame-box.png') !== -1, 'scallop frame assets');
 assert(fs.existsSync(path.join(root, 'images/frame-box.png')), 'box frame asset exists');
+assert(fs.existsSync(path.join(root, 'images/frame.png')), 'frame.png cut-corner alias exists');
 assert(fs.existsSync(path.join(root, 'images/lunch-club-mark.png')), 'lunch club mark exists');
+assert(/scallop-box\{[^}]*frame-box\.png/.test(printJs) && /scallop-wide\{[^}]*frame-wide\.png/.test(printJs),
+  'rect feature panels map scallop-box/wide to cut-corner frame assets');
 
 // stub localStorage for version counter
 global.localStorage = {
