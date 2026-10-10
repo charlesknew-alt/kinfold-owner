@@ -146,6 +146,7 @@
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
       padding: 4px 0;
     }
+    .owner-extras-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .spell-hints {
       margin: 4px 0 8px; padding: 8px 10px; background: #fff8e8; border: 1px solid #e4d9cc;
       border-radius: 10px; font-size: 13px;
@@ -426,9 +427,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261010-flow209"></script>
-  <script src="menus-print.js?v=20261010-flow209"></script>
-  <script src="menus-ingest.js?v=20261010-flow209"></script>
+  <script src="menus.js?v=20261010-flow210"></script>
+  <script src="menus-print.js?v=20261010-flow210"></script>
+  <script src="menus-ingest.js?v=20261010-flow210"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -734,10 +735,13 @@
         if (Array.isArray(state.book[k]) && state.book[k].length) hasDish = true;
       });
       if (!hasDish) return false;
+      // Apply extras when either list is present. Missing arrays must not wipe
+      // the other side (older cloud payloads may omit extraMenus).
       if (EBMenus.applyExtras && (Array.isArray(state.extraMenus) || Array.isArray(state.extraSections))) {
+        var curEx = EBMenus.extrasState ? EBMenus.extrasState() : { sections: [], menus: [] };
         EBMenus.applyExtras({
-          sections: state.extraSections,
-          menus: state.extraMenus
+          sections: Array.isArray(state.extraSections) ? state.extraSections : curEx.sections,
+          menus: Array.isArray(state.extraMenus) ? state.extraMenus : curEx.menus
         });
       }
       book = EBMenus.tidyBook ? EBMenus.tidyBook(state.book) : state.book;
@@ -767,9 +771,11 @@
       cloudUpdatedAt = Number(state.updatedAt) || Date.now();
       ensureExtraMenuStores();
       saveLocalOnly();
-      if (!book[menuId] || !book[menuId].length) {
-        menuId = 'main';
-      }
+      // Keep the selected tab even when the new menu is still empty (e.g. Breakfast
+      // just added). Only fall back when that menu id is unknown after extras apply.
+      var knownMenu = EBMenus.MENUS.some(function (m) { return m.id === menuId; });
+      if (!knownMenu) menuId = 'main';
+      if (!book[menuId]) book[menuId] = [];
       dishId = (dishes()[0] && dishes()[0].id) || '';
       return true;
     }
@@ -1893,16 +1899,16 @@
       var extras = currentExtrasState();
       var html = '<div class="include-box outside-text-box" id="ownerExtrasBox" style="margin-bottom:14px">';
       html += '<h3>Add menus &amp; categories</h3>';
-      html += '<p class="note" style="margin:0 0 10px">Owner only. New menus appear as tabs (staff see them too, except Party). New categories appear in the Section dropdown on every menu.</p>';
+      html += '<p class="note" style="margin:0 0 10px">Owner only. <strong>New menu</strong> creates a tab (staff see it too, except Party). <strong>New category</strong> only adds a Section dropdown option — it is <em>not</em> a tab. If you already added a name as a category, use <strong>Add as tab</strong> beside it.</p>';
       html += '<div class="owner-extras-grid">';
 
       html += '<div>';
-      html += '<label class="field">New menu</label>';
+      html += '<label class="field">New menu (creates a tab)</label>';
       html += '<div class="owner-extras-row">';
-      html += '<input type="text" id="extraMenuName" placeholder="e.g. Brunch" maxlength="48" autocomplete="off">';
+      html += '<input type="text" id="extraMenuName" placeholder="e.g. Breakfast" maxlength="48" autocomplete="off">';
       html += '<select id="extraMenuKind" aria-label="Menu type">';
+      html += '<option value="card" selected>Card (like Specials)</option>';
       html += '<option value="long">Long sheet (like Main)</option>';
-      html += '<option value="card">Card (like Specials)</option>';
       html += '<option value="party">Party / occasion</option>';
       html += '</select>';
       html += '<button type="button" class="go" id="doAddExtraMenu">Add menu</button>';
@@ -1911,15 +1917,17 @@
         html += '<ul class="owner-extras-list">';
         extras.menus.forEach(function (m) {
           var kindLabel = m.kind === 'card' ? 'card' : (m.kind === 'party' ? 'party' : 'long');
-          html += '<li><span>' + escapeAttr(m.name) + ' <span class="note">(' + kindLabel + ')</span></span>';
+          html += '<li><span>' + escapeAttr(m.name) + ' <span class="note">(' + kindLabel + ' · tab)</span></span>';
           html += '<button type="button" class="link" data-remove-extra-menu="' + escapeAttr(m.id) + '">Remove</button></li>';
         });
         html += '</ul>';
+      } else {
+        html += '<p class="note" style="margin:8px 0 0">No custom tabs yet. Type a name above and tap <strong>Add menu</strong>.</p>';
       }
       html += '</div>';
 
       html += '<div>';
-      html += '<label class="field">New category</label>';
+      html += '<label class="field">New category (section dropdown only — not a tab)</label>';
       html += '<div class="owner-extras-row">';
       html += '<input type="text" id="extraSectionName" placeholder="e.g. Sharing boards" maxlength="48" autocomplete="off">';
       html += '<button type="button" class="go" id="doAddExtraSection">Add category</button>';
@@ -1927,8 +1935,16 @@
       if (extras.sections && extras.sections.length) {
         html += '<ul class="owner-extras-list">';
         extras.sections.forEach(function (s) {
-          html += '<li><span>' + escapeAttr(s) + '</span>';
-          html += '<button type="button" class="link" data-remove-extra-section="' + escapeAttr(s) + '">Remove</button></li>';
+          var hasTab = !!(EBMenus.ownPageMenuForSection && EBMenus.ownPageMenuForSection(s));
+          html += '<li><span>' + escapeAttr(s) +
+            (hasTab ? ' <span class="note">(has tab)</span>' : ' <span class="note">(no tab)</span>') +
+            '</span><span class="owner-extras-actions">';
+          if (!hasTab) {
+            html += '<button type="button" class="link" data-menu-from-section="' + escapeAttr(s) +
+              '" title="Create a Card menu tab with this name">Add as tab</button>';
+          }
+          html += '<button type="button" class="link" data-remove-extra-section="' + escapeAttr(s) + '">Remove</button>';
+          html += '</span></li>';
         });
         html += '</ul>';
       }
@@ -2806,6 +2822,24 @@
           render();
         };
       }
+      // Category without a matching card menu → create the tab (Breakfast case).
+      document.querySelectorAll('[data-menu-from-section]').forEach(function (b) {
+        b.onclick = function () {
+          var name = b.getAttribute('data-menu-from-section') || '';
+          var res = EBMenus.addCustomMenu({ name: name, kind: 'card' });
+          if (!res.ok) {
+            alert(res.error || 'Could not add menu tab.');
+            return;
+          }
+          ensureExtraMenuStores();
+          menuId = res.menu.id;
+          dishId = '';
+          mode = 'complete';
+          flowStep = 1;
+          save();
+          render();
+        };
+      });
       document.querySelectorAll('[data-remove-extra-menu]').forEach(function (b) {
         b.onclick = function () {
           var id = b.getAttribute('data-remove-extra-menu');

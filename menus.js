@@ -1274,7 +1274,8 @@
 
   function addCustomMenu(opts) {
     opts = opts || {};
-    var name = String(opts.name || '').replace(/\s+/g, ' ').trim();
+    // Title-case so "breakfast" / "Bar snacks" match categories and tab labels.
+    var name = titleCaseLabel_(opts.name);
     if (!name) return { ok: false, error: 'Type a menu name.' };
     if (name.length > 48) return { ok: false, error: 'Keep the menu name short.' };
     if (MENUS.some(function (m) { return m.name.toLowerCase() === name.toLowerCase(); })) {
@@ -1294,6 +1295,11 @@
       row.comfortable = cap > 0 ? cap : 10;
     }
     extraMenus.push(row);
+    // Card tabs pair with a same-named category (Section dropdown + drop-in).
+    // Skip when the owner already added the category (Charles’s Breakfast case).
+    if (kind === 'card' && !SECTIONS.some(function (s) { return s.toLowerCase() === name.toLowerCase(); })) {
+      extraSections.push(name);
+    }
     rebuildMenusAndSections_();
     return { ok: true, menu: extrasState().menus.filter(function (m) { return m.id === row.id; })[0] };
   }
