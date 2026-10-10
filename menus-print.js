@@ -4527,7 +4527,7 @@
       /* Tip-only sell oval: ellipse + rounded fine scallops (frame-platter.png).
          Soft U-curve lobes at ~37px pitch (waveform match to Tips / frame-wide
          family) — NOT dense saw-tooth / pointy teeth, NOT big-lobe waves.
-         Rect panels use classic Canva frame-box / frame-wide (no cut-corners). */
+         Rect panels use classic Canva frame-box / frame-wide (pre-f7c1158). */
       /* Tip-only: fine-scallop oval hugs the sell words; text optically centred
          (equal air top/bottom via flex + even pad; prefer one sell line). */
       '.sandwich-tip-only{' +
