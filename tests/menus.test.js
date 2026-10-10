@@ -787,8 +787,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow210') !== -1, 'menus page cache-bust is flow210');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow210') !== -1, 'hub menus link cache-bust is flow210');
+assert(page.indexOf('flow211') !== -1, 'menus page cache-bust is flow211');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow211') !== -1, 'hub menus link cache-bust is flow211');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
@@ -2313,28 +2313,69 @@ assert(printJs.indexOf('2×A5') !== -1 || printJs.indexOf('guillotine') !== -1, 
 assert(printJs.indexOf('fill-page') !== -1 && printJs.indexOf('page-spacer') !== -1, 'pages fill with spacer');
 assert(printJs.indexOf('col-promo') !== -1, 'promo sits in its own column');
 assert(typeof api.pickPromos === 'function', 'pickPromos exported');
+assert(typeof api.markPromosUsed === 'function' && typeof api.eligiblePromos === 'function',
+  'auto-pick deck helpers exported');
 assert(api.seedPromoBank().length >= 2, 'promo bank has seed wording');
 var bank = [
   api.promoItem('Stay a While', 'rooms', '', 'stay'),
   api.promoItem('Old quiz', 'done', '2020-01-01', 'old'),
-  api.promoItem('Pub Quiz', 'tonight', '2099-06-15', 'quiz')
+  api.promoItem('Pub Quiz', 'tonight', '2099-06-15', 'quiz'),
+  api.promoItem('Weekend Breakfasts', 'sat sun', '', 'weekend-breakfasts')
 ];
-var auto = api.pickPromos(bank, {}, { today: new Date('2026-09-22'), max: 2 });
-assert(auto.length === 2 && auto[0].id === 'quiz', 'auto-pick prefers upcoming date first');
-assert(auto.some(function (p) { return p.id === 'stay'; }), 'auto-pick keeps evergreen after dated');
+// Deterministic shuffle: rng always 0 → reverse order.
+var fixedRng = function () { return 0; };
+var deck = { order: [], used: [] };
+var auto = api.pickPromos(bank, {}, {
+  today: new Date('2026-09-22'), max: 4, deck: deck, rng: fixedRng
+});
+assert(auto.length === 3, 'auto-pick draws every eligible panel up to max');
 assert(auto.every(function (p) { return p.id !== 'old'; }), 'auto-pick skips past dates');
-var dayA = api.pickPromos(
-  [api.promoItem('A', 'a', '', 'a'), api.promoItem('B', 'b', '', 'b'), api.promoItem('C', 'c', '', 'c')],
-  {},
-  { today: new Date('2026-09-22'), max: 2 }
-);
-var dayB = api.pickPromos(
-  [api.promoItem('A', 'a', '', 'a'), api.promoItem('B', 'b', '', 'b'), api.promoItem('C', 'c', '', 'c')],
-  {},
-  { today: new Date('2026-09-23'), max: 2 }
-);
-assert(dayA[0].id !== dayB[0].id || dayA[1].id !== dayB[1].id,
-  'evergreen bank wording rotates by calendar day');
+assert(auto.some(function (p) { return p.id === 'weekend-breakfasts'; }),
+  'Weekend Breakfasts stays in the auto pool when eligible');
+assert(auto.some(function (p) { return p.id === 'quiz'; }),
+  'upcoming dated panels stay in the auto pool');
+api.markPromosUsed(deck, auto.slice(0, 2), ['stay', 'quiz', 'weekend-breakfasts'], fixedRng);
+var next = api.pickPromos(bank, {}, {
+  today: new Date('2026-09-22'), max: 4, deck: deck, rng: fixedRng
+});
+assert(next.length === 1, 'deck draws without replacement until exhausted');
+assert(next[0].id !== auto[0].id && next[0].id !== auto[1].id,
+  'second Generate does not repeat the first two panels');
+// Charles screenshot bank: all evergreen + Sip & Paint eligible; past quiz out.
+var charlesBank = [
+  api.promoItem('Stay a While', 'rooms', '', 'stay'),
+  api.promoItem('Gatherings', 'events', '', 'gatherings'),
+  api.promoItem('Pub Quiz', 'done', '2026-10-05', 'quiz-past'),
+  api.promoItem('Large Functions', 'rooms', '', 'large'),
+  api.promoItem('How are we doing?', 'feedback', '', 'how'),
+  api.promoItem('All tips go to staff working today!', 'tips', '', 'tips'),
+  api.promoItem('Sip & Paint', 'paint', '2026-10-28', 'sip'),
+  api.promoItem('Weekend Breakfasts', 'brunch', '', 'weekend-breakfasts')
+];
+var elig = api.eligiblePromos(charlesBank, new Date('2026-10-10'));
+assert(elig.length === 7 && !elig.some(function (p) { return p.id === 'quiz-past'; }),
+  'Charles bank: past Pub Quiz drops out; Weekend Breakfasts stays eligible');
+assert(elig.some(function (p) { return p.id === 'weekend-breakfasts'; }) &&
+  elig.some(function (p) { return p.id === 'tips'; }),
+  'Weekend Breakfasts and tips are in the auto pool');
+var charlesDeck = { order: [], used: [] };
+var firstSheet = api.pickPromos(charlesBank, {}, {
+  today: new Date('2026-10-10'), max: 4, deck: charlesDeck, rng: fixedRng
+});
+assert(firstSheet.length === 4, 'Auto for Generate peeks up to four');
+api.markPromosUsed(charlesDeck, firstSheet, elig.map(function (p) { return p.id; }), fixedRng);
+var secondSheet = api.pickPromos(charlesBank, {}, {
+  today: new Date('2026-10-10'), max: 4, deck: charlesDeck, rng: fixedRng
+});
+var seenFirst = {};
+firstSheet.forEach(function (p) { seenFirst[p.id] = true; });
+assert(secondSheet.every(function (p) { return !seenFirst[p.id]; }),
+  'second Generate uses the remaining bank (Weekend Breakfasts / tips not starved)');
+assert(page.indexOf('each line shows once before any repeats') !== -1,
+  'Wording UI explains without-replacement auto-pick');
+assert(page.indexOf('promoDeck') !== -1 && page.indexOf('commitAutoPromoDeck_') !== -1,
+  'auto deck persists locally and advances after Generate');
+assert(aiGs.indexOf('promoDeck') !== -1, 'Apps Script cloud state keeps promoDeck');
 assert(printJs.indexOf('planPromoFill') !== -1 && printJs.indexOf('promoBesidePartner') !== -1,
   'feature panels placed only to even opposite columns');
 assert(typeof printApi.promoUnits === 'function' && typeof printApi.planPromoFill === 'function',

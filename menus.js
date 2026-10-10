@@ -2762,18 +2762,119 @@
     return weekdays[dt.getDay()] + ' ' + day + ord + ' ' + months[dt.getMonth()];
   }
 
+  /** Fisher–Yates; opts.rng = () => [0,1) for tests. */
+  function shuffleIds_(ids, rng) {
+    var out = (ids || []).slice();
+    var rand = typeof rng === 'function' ? rng : Math.random;
+    var i;
+    for (i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(rand() * (i + 1));
+      var tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
+  }
+
+  function normalizePromoDeck(raw) {
+    var order = [];
+    var used = [];
+    var seen = {};
+    if (raw && typeof raw === 'object') {
+      (Array.isArray(raw.order) ? raw.order : []).forEach(function (id) {
+        id = String(id || '');
+        if (!id || seen[id]) return;
+        seen[id] = true;
+        order.push(id);
+      });
+      seen = {};
+      (Array.isArray(raw.used) ? raw.used : []).forEach(function (id) {
+        id = String(id || '');
+        if (!id || seen[id]) return;
+        seen[id] = true;
+        used.push(id);
+      });
+    }
+    return { order: order, used: used };
+  }
+
+  /** Eligible bank lines for auto-pick (titled, not past-dated). */
+  function eligiblePromos(bank, today) {
+    today = today || new Date();
+    return (Array.isArray(bank) ? bank : []).filter(function (p) {
+      return p && p.title && p.id && !isPastPromoDate(p.date, today);
+    });
+  }
+
+  /**
+   * Keep the shared auto-pick deck in sync with the bank:
+   * drop past / removed ids, append newly eligible ids (shuffled),
+   * reshuffle the whole eligible set when the unused pile is empty.
+   */
+  function syncPromoDeck(deck, eligibleIds, rng) {
+    deck = normalizePromoDeck(deck);
+    var elig = {};
+    (eligibleIds || []).forEach(function (id) { elig[String(id)] = true; });
+    deck.order = deck.order.filter(function (id) { return elig[id]; });
+    deck.used = deck.used.filter(function (id) { return elig[id]; });
+    var inDeck = {};
+    deck.order.forEach(function (id) { inDeck[id] = true; });
+    deck.used.forEach(function (id) { inDeck[id] = true; });
+    var fresh = (eligibleIds || []).filter(function (id) { return !inDeck[String(id)]; });
+    if (fresh.length) {
+      deck.order = deck.order.concat(shuffleIds_(fresh, rng));
+    }
+    var unused = deck.order.filter(function (id) {
+      return deck.used.indexOf(id) === -1;
+    });
+    if (!unused.length && (eligibleIds || []).length) {
+      deck.order = shuffleIds_(eligibleIds, rng);
+      deck.used = [];
+    }
+    return deck;
+  }
+
+  /**
+   * After a successful Generate, mark these panels used so the next auto-pick
+   * draws without replacement until the deck is exhausted (then reshuffles).
+   */
+  function markPromosUsed(deck, promos, eligibleIds, rng) {
+    var next = syncPromoDeck(deck, eligibleIds, rng);
+    (promos || []).forEach(function (p) {
+      var id = p && p.id ? String(p.id) : '';
+      if (!id) return;
+      if (next.used.indexOf(id) === -1) next.used.push(id);
+    });
+    var unused = next.order.filter(function (id) {
+      return next.used.indexOf(id) === -1;
+    });
+    if (!unused.length && next.order.length) {
+      next.order = shuffleIds_(next.order, rng);
+      next.used = [];
+    }
+    // Write back so the caller’s persisted deck object advances.
+    if (deck && typeof deck === 'object') {
+      deck.order = next.order;
+      deck.used = next.used;
+      return deck;
+    }
+    return next;
+  }
+
   /**
    * Choose bank wording for Generate.
    * If staff ticked “No events”: nothing.
    * If staff ticked any bank line: use those (manual override, past dates allowed).
-   * If none ticked: auto-pick upcoming/evergreen only — never past-dated.
-   * Evergreen lines rotate by calendar day so each day’s sheet feels different.
+   * If none ticked: auto-pick from ALL eligible panels (dated drop out once past)
+   * via a shuffled deck without replacement across Generates (opts.deck).
+   * Peek by default; call markPromosUsed after a successful print.
    */
   function pickPromos(bank, ticks, opts) {
     opts = opts || {};
     // Two columns × up to 2 blurbs — enough to fill, not a stack of empty boxes
     var max = opts.max != null ? opts.max : 4;
     var today = opts.today || new Date();
+    var rng = opts.rng;
     bank = Array.isArray(bank) ? bank.slice() : [];
     ticks = ticks || {};
     if (ticks[PROMO_NONE_ID]) return [];
@@ -2787,30 +2888,29 @@
     if (anyTick) {
       chosen = bank.filter(function (p) { return p && ticks[p.id]; });
     } else {
-      var eligible = bank.filter(function (p) {
-        return p && p.title && !isPastPromoDate(p.date, today);
-      });
-      var dated = [];
-      var evergreen = [];
-      eligible.forEach(function (p) {
-        if (p.date) dated.push(p);
-        else evergreen.push(p);
-      });
-      dated.sort(function (a, b) {
-        var ad = a.date || '';
-        var bd = b.date || '';
-        return ad < bd ? -1 : ad > bd ? 1 : 0;
-      });
-      // Rotate evergreen by day-of-year so Stay a While / Gatherings / quiz cycle
-      if (evergreen.length > 1) {
-        var start = new Date(today.getFullYear(), 0, 0);
-        var dayNum = Math.floor((startOfDay(today) - start) / 86400000);
-        var rot = ((dayNum % evergreen.length) + evergreen.length) % evergreen.length;
-        evergreen = evergreen.slice(rot).concat(evergreen.slice(0, rot));
+      var eligible = eligiblePromos(bank, today);
+      var byId = {};
+      eligible.forEach(function (p) { byId[p.id] = p; });
+      var ids = eligible.map(function (p) { return p.id; });
+      var deck = syncPromoDeck(opts.deck, ids, rng);
+      if (opts.deck && typeof opts.deck === 'object') {
+        opts.deck.order = deck.order;
+        opts.deck.used = deck.used;
       }
-      chosen = dated.concat(evergreen);
+      var unused = deck.order.filter(function (id) {
+        return deck.used.indexOf(id) === -1 && byId[id];
+      });
+      chosen = unused.map(function (id) { return byId[id]; });
     }
-    return chosen.slice(0, Math.max(0, max));
+    chosen = chosen.slice(0, Math.max(0, max));
+    // Dedupe by id so one sheet never repeats a panel.
+    var seenPick = {};
+    chosen = chosen.filter(function (p) {
+      if (!p || !p.id || seenPick[p.id]) return false;
+      seenPick[p.id] = true;
+      return true;
+    });
+    return chosen;
   }
 
   function normalizePromoBank(raw) {
@@ -3266,6 +3366,10 @@
     seedPromoBank: seedPromoBank,
     normalizePromoBank: normalizePromoBank,
     pickPromos: pickPromos,
+    eligiblePromos: eligiblePromos,
+    normalizePromoDeck: normalizePromoDeck,
+    syncPromoDeck: syncPromoDeck,
+    markPromosUsed: markPromosUsed,
     isPastPromoDate: isPastPromoDate,
     formatPromoDate: formatPromoDate,
     toIsoDate: toIsoDate,

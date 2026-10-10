@@ -427,9 +427,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261010-flow210"></script>
-  <script src="menus-print.js?v=20261010-flow210"></script>
-  <script src="menus-ingest.js?v=20261010-flow210"></script>
+  <script src="menus.js?v=20261010-flow211"></script>
+  <script src="menus-print.js?v=20261010-flow211"></script>
+  <script src="menus-ingest.js?v=20261010-flow211"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -442,6 +442,7 @@
     var META_STORAGE = 'eb-menus-meta-v1';
     var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
     var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
+    var PROMO_DECK = 'eb-menu-promo-deck-v1';
     var LAYOUT_STORAGE = 'eb-menu-section-layout-v2';
     var LAYOUT_STORAGE_LEGACY = 'eb-menu-section-layout-v1';
     var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1';
@@ -452,6 +453,7 @@
     var metaBook = loadMeta();
     var promoBank = loadPromoBank();
     var promoTicks = loadPromoTicks();
+    var promoDeck = loadPromoDeck();
     var layoutBook = loadSectionLayoutBook();
     var dishCatalogue = loadDishCatalogue();
     var menuId = isStaffMode ? 'specials' : 'main';
@@ -645,11 +647,46 @@
     function hostPromoTicks() {
       return (promoTicks[menuId] && typeof promoTicks[menuId] === 'object') ? promoTicks[menuId] : {};
     }
+    function loadPromoDeck() {
+      try {
+        var raw = JSON.parse(localStorage.getItem(PROMO_DECK) || 'null');
+        return EBMenus.normalizePromoDeck ? EBMenus.normalizePromoDeck(raw) : { order: [], used: [] };
+      } catch (e) {
+        return { order: [], used: [] };
+      }
+    }
+    function savePromoDeck() {
+      try {
+        localStorage.setItem(PROMO_DECK, JSON.stringify(promoDeck || { order: [], used: [] }));
+      } catch (e) {}
+    }
     function pickedPromosForSheet() {
       if (!window.EBMenus || typeof EBMenus.pickPromos !== 'function') return [];
       var menu = EBMenus.menuById(menuId);
-      var max = menu && menu.kind === 'party' ? 2 : 5;
-      return EBMenus.pickPromos(promoBank, hostPromoTicks(), { max: max });
+      // Party sheets: two blurbs. Long sheets: up to four (matches Wording copy).
+      var max = menu && menu.kind === 'party' ? 2 : 4;
+      promoDeck = EBMenus.normalizePromoDeck
+        ? EBMenus.normalizePromoDeck(promoDeck)
+        : (promoDeck || { order: [], used: [] });
+      return EBMenus.pickPromos(promoBank, hostPromoTicks(), {
+        max: max,
+        deck: promoDeck
+      });
+    }
+    /** After a successful Generate, advance the without-replacement auto deck. */
+    function commitAutoPromoDeck_(promos) {
+      if (!window.EBMenus || typeof EBMenus.markPromosUsed !== 'function') return;
+      var ticks = hostPromoTicks();
+      var noneId = EBMenus.PROMO_NONE_ID || '__none__';
+      var forced = Object.keys(ticks).some(function (k) { return k !== noneId && ticks[k]; });
+      if (forced || ticks[noneId]) return;
+      var eligible = EBMenus.eligiblePromos
+        ? EBMenus.eligiblePromos(promoBank)
+        : (promoBank || []);
+      var ids = eligible.map(function (p) { return p.id; });
+      promoDeck = EBMenus.markPromosUsed(promoDeck, promos || [], ids);
+      savePromoDeck();
+      queueCloudPush();
     }
     function load() {
       try {
@@ -693,6 +730,9 @@
       localStorage.setItem(STORAGE + '-includes', JSON.stringify(includes));
       localStorage.setItem(PROMO_STORAGE, JSON.stringify(promoBank));
       localStorage.setItem(PROMO_TICKS, JSON.stringify(promoTicks));
+      try {
+        localStorage.setItem(PROMO_DECK, JSON.stringify(promoDeck || { order: [], used: [] }));
+      } catch (eDeck) {}
       localStorage.setItem(LAYOUT_STORAGE, JSON.stringify(layoutBook));
       try {
         localStorage.setItem(CATALOGUE_STORAGE, JSON.stringify(dishCatalogue || []));
@@ -721,6 +761,7 @@
         includes: includes,
         promoBank: promoBank,
         promoTicks: promoTicks,
+        promoDeck: promoDeck || { order: [], used: [] },
         // Per-menu Blocks book (main / sunday / …). Legacy flat maps migrate on load.
         sectionLayout: layoutBook,
         dishCatalogue: dishCatalogue || [],
@@ -759,6 +800,11 @@
         ? EBMenus.normalizePromoBank(state.promoBank)
         : (Array.isArray(state.promoBank) ? state.promoBank : promoBank);
       promoTicks = state.promoTicks && typeof state.promoTicks === 'object' ? state.promoTicks : {};
+      if (state.promoDeck && typeof state.promoDeck === 'object') {
+        promoDeck = EBMenus.normalizePromoDeck
+          ? EBMenus.normalizePromoDeck(state.promoDeck)
+          : state.promoDeck;
+      }
       layoutBook = EBMenus.normalizeSectionLayoutBook
         ? EBMenus.normalizeSectionLayoutBook(state.sectionLayout)
         : (state.sectionLayout && typeof state.sectionLayout === 'object' ? state.sectionLayout : layoutBook);
@@ -2593,7 +2639,7 @@
       var auto = pickedPromosForSheet();
       var html = '<div class="include-box"><h3>Events &amp; selling lines on this sheet</h3>';
       html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Tick <strong>No events or selling lines</strong> for a clean sheet (Christmas party menus often want this). ' +
-        'Leave everything unticked and we’ll auto-pick up to four. Edit the bank further down.</p>';
+        'Leave everything unticked and we’ll auto-pick up to four from the whole bank (past dates drop out; each line shows once before any repeats). Edit the bank further down.</p>';
       html += '<div class="include-row">';
       html += '<label style="font-weight:700">';
       html += '<input type="checkbox" data-promo-tick="' + escapeAttr(noneId) + '"' + (noneOn ? ' checked' : '') + '> ';
@@ -4718,6 +4764,9 @@
           var opened = EBMenuPrint.openPrintHtml && EBMenuPrint.openPrintHtml(finalHtml || html);
           if (!opened) {
             alert('Allow pop-ups to open the menu preview, then Save or Discard.');
+          } else {
+            // Advance the shared without-replacement deck only after a real preview.
+            commitAutoPromoDeck_(promos);
           }
         }
         function blockClipped() {
