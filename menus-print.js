@@ -4524,9 +4524,9 @@
       '.promo-date{font-family:var(--sans);font-weight:500;font-size:9.5pt;letter-spacing:.02em;text-transform:none;color:#5a534a}' +
       '.sandwich-promo .note-line{font-weight:500}' +
       '.sandwich-promo .desc{font-weight:300;color:#5a534a}' +
-      /* Tip-only sell oval: ellipse + fine scallops (frame-platter.png), same visual
-         family as Tips / frame-wide section borders — NOT big-lobe platter waves,
-         NOT a plain double-stroke. Kill border-image so density never restores a rect. */
+      /* Tip-only sell oval: ellipse + dense fine scallops (frame-platter.png), same
+         family as Tips / frame-wide — higher-frequency smaller lobes than early
+         scallop platters; NOT big waves, NOT a plain double-stroke. */
       /* Tip-only: fine-scallop oval hugs the sell words; text optically centred
          (equal air top/bottom via flex + even pad; prefer one sell line). */
       '.sandwich-tip-only{' +

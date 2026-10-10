@@ -217,7 +217,7 @@ assert(fs.existsSync(path.join(root, 'images/frame-wide.png')), 'scalloped frame
 assert(fs.existsSync(path.join(root, 'images/frame-platter.png')), 'tip oval platter asset exists');
 var platterBytes = fs.statSync(path.join(root, 'images/frame-platter.png')).size;
 assert(platterBytes > 20000,
-  'tip oval asset carries fine-scallop detail (not a tiny smooth double-stroke ellipse)');
+  'tip oval asset carries dense fine-scallop detail (not a tiny smooth double-stroke ellipse)');
 var printJs = fs.readFileSync(path.join(root, 'menus-print.js'), 'utf8');
 assert(printJs.indexOf('EBMenuPrint') !== -1 && printJs.indexOf('scallop') !== -1, 'print builder has scalloped boxes');
 assert(/fine scallop/i.test(printJs),
@@ -760,8 +760,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow208') !== -1, 'menus page cache-bust is flow208');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow208') !== -1, 'hub menus link cache-bust is flow208');
+assert(page.indexOf('flow209') !== -1, 'menus page cache-bust is flow209');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow209') !== -1, 'hub menus link cache-bust is flow209');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');
