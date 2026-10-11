@@ -555,6 +555,11 @@ assert(page.indexOf('overflowMakeFit') !== -1 && page.indexOf('generateMenuWithM
   'overflow gate offers Make it fit with compact spacing path');
 assert(page.indexOf('Make it fit keeps every selected dish') !== -1,
   'Make it fit copy explains content is preserved');
+assert(page.indexOf('makeFitTried') !== -1 &&
+  page.indexOf('Make it fit already tried compact spacing') !== -1,
+  'after Make it fit fails, gate hides the button (no same-box loop)');
+assert(page.indexOf('Unit over must never bounce Make it fit') !== -1,
+  'Make it fit path documents clearing unit over instead of reopening the gate');
 assert(page.indexOf('dropInOfferOverlay') !== -1 && page.indexOf('There is space on the sheet') !== -1,
   'spare leftover offers dropping in a sub-menu');
 assert(page.indexOf('is too big to fit') !== -1 && page.indexOf('try a different one') !== -1,
@@ -867,9 +872,9 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow217c') !== -1, 'menus page cache-bust is flow217c');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow217c') !== -1,
-  'hub menus link cache-bust is flow217c');
+assert(page.indexOf('flow218') !== -1, 'menus page cache-bust is flow218');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow218') !== -1,
+  'hub menus link cache-bust is flow218');
 assert(page.indexOf('builder-fold') !== -1 && page.indexOf('function builderFold') !== -1,
   'builder folds collapse advanced config');
 assert(page.indexOf('include-always-open') !== -1 && page.indexOf('includeTicksBox') !== -1,
@@ -2290,6 +2295,55 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   });
   assert(/\bmake-fit\b/.test(fitHtml) && fitHtml.indexOf('--dish-gap-min:5px') !== -1,
     'Make it fit print body uses 5px dish-gap floor');
+})();
+(function makeFitNeverReturnsUnitOver() {
+  // Packed Sunday + Specials + tip used to keep fit:over on Make it fit, so the
+  // button reopened the same overflow box immediately (flow218).
+  function d(sec, name, desc) {
+    return api.dish(sec, name, desc || 'with a fairly long description to inflate units', '12.95', '');
+  }
+  var dishes = [];
+  var i;
+  for (i = 0; i < 6; i++) dishes.push(d('Nibbles', 'Nibble ' + i));
+  for (i = 0; i < 8; i++) dishes.push(d('Starters', 'Starter ' + i));
+  for (i = 0; i < 8; i++) dishes.push(d('Sunday Roasts', 'Roast ' + i, 'cooked pink with roasties'));
+  for (i = 0; i < 10; i++) dishes.push(d('Mains', 'Main ' + i, 'served with fries salad'));
+  for (i = 0; i < 8; i++) dishes.push(d('Little Bells', 'Kid ' + i));
+  for (i = 0; i < 8; i++) dishes.push(d('Desserts', 'Dessert ' + i, 'with ice cream'));
+  for (i = 0; i < 6; i++) dishes.push(d('Sides', 'Side ' + i));
+  for (i = 0; i < 4; i++) dishes.push(d('Sauces', 'Sauce ' + i));
+  for (i = 0; i < 4; i++) {
+    dishes.push(Object.assign(d('Special Starters', 'SS ' + i), { fromMenu: 'specials' }));
+  }
+  for (i = 0; i < 6; i++) {
+    dishes.push(Object.assign(d('Special Mains', 'SM ' + i, 'special main'), { fromMenu: 'specials' }));
+  }
+  for (i = 0; i < 3; i++) {
+    dishes.push(Object.assign(d('Special Desserts', 'SD ' + i), { fromMenu: 'specials' }));
+  }
+  var layout = Object.assign({}, api.defaultSectionLayout());
+  layout.Sandwiches = Object.assign({}, layout.Sandwiches || {}, {
+    tip: true,
+    sell: 'Sandwiches available Mon–Sat lunch'
+  });
+  var normal = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: layout,
+    promos: [],
+    includes: { specials: true }
+  });
+  var fitted = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: layout,
+    promos: [],
+    includes: { specials: true },
+    makeFit: true
+  });
+  assert(normal.fit === 'over',
+    'packed Sunday+Specials+tip is over at normal spacing (precondition)');
+  assert(fitted.fit !== 'over' && fitted.makeFit === true,
+    'Make it fit never returns unit over — DOM measure is the hard gate');
+  assert((fitted.fillers || []).some(function (f) {
+    return /Make it fit — compact spacing/i.test(String(f || ''));
+  }), 'Make it fit records compact-spacing filler when unit tally was tight');
 })();
 (function canBalancedSplitNearEvenForMakeFit() {
   assert(print.canBalancedSplit(4) === true && print.canBalancedSplit(5) === false,

@@ -1575,13 +1575,15 @@
   /**
    * Extra page units for the classical dish-gap floor vs the 8px model the
    * tally was tuned for. Counts mains / sandwiches / specials that keep the
-   * 13px breathe — not Sides, Sauces or Little Bells (compact stacks).
-   * Not a wrap/penalty tax — only the real min-gap delta
-   * (TYPE_RANGE.dishGapPx.min − 8) on classical dishes.
+   * classical breathe — not Sides, Sauces or Little Bells (compact stacks).
+   * Not a wrap/penalty tax — only the real min-gap delta (gapPx − 8).
+   * Make it fit passes 5px so this tax drops to zero.
    */
-  function classicalGapUnits_(dishCount) {
+  function classicalGapUnits_(dishCount, gapPx) {
     var n = Math.max(0, Number(dishCount) || 0);
-    var delta = Math.max(0, TYPE_RANGE.dishGapPx.min - 8);
+    var gap = gapPx != null ? Number(gapPx) : TYPE_RANGE.dishGapPx.min;
+    if (!isFinite(gap)) gap = TYPE_RANGE.dishGapPx.min;
+    var delta = Math.max(0, gap - 8);
     if (!n || !delta) return 0;
     return n * delta * 0.18;
   }
@@ -2379,7 +2381,7 @@
       if (layout.p2.sidesUnderSpecials || layout.p2.sidesUnderTip) {
         var nestClassicalN = mainsN + p2SandN +
           (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0);
-        gapBreath += classicalGapUnits_(nestClassicalN);
+        gapBreath += classicalGapUnits_(nestClassicalN, gapFloor);
         // Named sandwich fillings + Specials nest is taller than a tip oval —
         // keep a small floor so a full mains wall still overflows. Tip-only
         // (0 fillings) must not pick up this tax.
@@ -2592,7 +2594,7 @@
         wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
           p2used > p2OverLimit || foodOverPage;
       }
-      if (wouldOverflow) {
+      if (wouldOverflow && !makeFit) {
         layout.fit = 'over';
         var dropInFood = (dishes || []).some(function (d) { return d && d.fromMenu; });
         layout.overflow = layout.overflow || (dropInFood ? 'drop-in' : 'food');
@@ -2603,6 +2605,13 @@
             layout.fillers.indexOf(overMsg) === -1 &&
             layout.fillers.indexOf('Too much content — remove a dropped-in menu') === -1) {
           layout.fillers.push(overMsg);
+        }
+      } else if (wouldOverflow && makeFit) {
+        // Unit tally stays advisory on Make it fit — open preview; DOM measures.
+        layout.fit = layout.pages === 1 ? 'one' : 'two';
+        layout.overflow = '';
+        if (layout.fillers.indexOf('Make it fit — compact spacing; preview will verify') === -1) {
+          layout.fillers.push('Make it fit — compact spacing; preview will verify');
         }
       }
       // applyDropInCapacity_ adds outside notes itself — pass load without noteTax.
@@ -2632,6 +2641,18 @@
         } else {
           layout.fit = savedFit;
           layout.overflow = savedOverflow;
+        }
+      }
+      // Make it fit: never hard-fail on unit / drop-in capacity — DOM compressGaps
+      // (5px) + measurePrintFit decide. Stops Make it fit → same box loop.
+      if (makeFit && layout.fit === 'over') {
+        layout.fit = layout.pages === 1 ? 'one' : 'two';
+        layout.overflow = '';
+        layout.fillers = (layout.fillers || []).filter(function (f) {
+          return !/Too much content/i.test(String(f || ''));
+        });
+        if (layout.fillers.indexOf('Make it fit — compact spacing; preview will verify') === -1) {
+          layout.fillers.push('Make it fit — compact spacing; preview will verify');
         }
       }
     } else {
@@ -2675,6 +2696,17 @@
         layout.p2 = Object.assign({}, layout.p2, {
           rooms: false, footPromos: false, columnPromos: false, footLogo: false
         });
+      }
+      // Belt-and-braces: Make it fit never returns unit over (DOM is the gate).
+      if (layout.fit === 'over') {
+        layout.fit = layout.pages === 1 ? 'one' : 'two';
+        layout.overflow = '';
+        layout.fillers = (layout.fillers || []).filter(function (f) {
+          return !/Too much content/i.test(String(f || ''));
+        });
+        if (layout.fillers.indexOf('Make it fit — compact spacing; preview will verify') === -1) {
+          layout.fillers.push('Make it fit — compact spacing; preview will verify');
+        }
       }
     } else {
       layout.gapFloorPx = TYPE_RANGE.dishGapPx.min;
