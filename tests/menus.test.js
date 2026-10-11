@@ -990,6 +990,15 @@ assert(ingestJs.indexOf('navigates the Menus frame to raw') !== -1 && ingestJs.i
   'Email/Save use no-cors so manager iframe never shows raw Apps Script JSON');
 assert(aiGs.indexOf('AUTHORIZE_DRIVE_PRINT_HISTORY') !== -1,
   'Apps Script has one-click Drive authorise for print HTML');
+assert(aiGs.indexOf('driveAuthHelp_') !== -1 &&
+  aiGs.indexOf('historyHtmlFolderCreateOrOpen_') !== -1 &&
+  aiGs.indexOf('DriveApp.getRootFolder()') !== -1 &&
+  aiGs.indexOf('myaccount.google.com/permissions') !== -1 &&
+  aiGs.indexOf('Do NOT only click Run again') !== -1,
+  'Drive authorise touches DriveApp first and documents revoke / Auth link');
+assert(fs.readFileSync(path.join(root, 'apps-script/menu-ai/appsscript.json'), 'utf8')
+  .indexOf('https://www.googleapis.com/auth/drive"') !== -1,
+  'Menu AI oauthScopes includes full Drive (createFolder)');
 assert(printJs.indexOf("action: 'emailPrintHistory'") !== -1 && printJs.indexOf('entry: meta') !== -1,
   'email POSTs sheet HTML with the mail request');
 assert(ingestJs.indexOf('Never GET-by-id') !== -1 && ingestJs.indexOf("action === 'emailPrintHistory'") !== -1,

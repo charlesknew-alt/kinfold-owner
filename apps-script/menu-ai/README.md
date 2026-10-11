@@ -45,14 +45,24 @@ After pulling, push with `clasp push` from this folder, then update the live web
 
 ### One-time Drive authorisation (phone Download / Print PDF)
 
-Print sheets need Drive so phones can open menus saved on the PC. After adding the Drive scope, the **script owner** must grant access once:
+Print sheets need Drive so phones can open menus saved on the PC. `DriveApp.createFolder` requires scope `https://www.googleapis.com/auth/drive` (already in `appsscript.json`). The **script owner** (`charlesknew@gmail.com`) must grant that Allow once — a prior Allow for email/Gmail alone is not enough. Re-running without Allow just logs the same error.
 
-1. Open the Menu AI project in [script.google.com](https://script.google.com)
-2. Select **`AUTHORIZE_DRIVE_PRINT_HISTORY`** → **Run** → Review permissions → Allow **Google Drive**
-3. On the **PC**: Menus → Print history → **Sync now** (re-uploads HTML into Drive)
-4. On the **phone**: Sync now, then Download / Print PDF
+1. Open the Menu AI project in [script.google.com](https://script.google.com) **as charlesknew@gmail.com** (editor, not the Menus website)
+2. Select **`AUTHORIZE_DRIVE_PRINT_HISTORY`** → **Run**
+3. When the popup/banner appears: **Review permissions** → pick the account that owns the script → **Allow**  
+   (leave Google Drive checked — “See, edit, create, and delete all of your Google Drive files”)
+4. **Run again.** Execution log should say `Drive authorised. Folder: Eight Bells Menu Print History`
+5. If **no popup** (or Allow already done but Drive still fails):  
+   a. Open [Google Account → Third-party access](https://myaccount.google.com/permissions)  
+   b. Remove **Eight Bells Menu AI** / this Apps Script  
+   c. Or open the **AUTH LINK** printed in the Execution log  
+   d. Return to the editor → Run → Review permissions → Allow (full Drive)
+6. On the **PC**: Menus → Print history → **Sync now** (re-uploads HTML into Drive)
+7. On the **phone**: Sync now, then Download / Print PDF
 
-Until Drive is allowed, saves fall back to Script Properties (newest ~3 sheets only) and you may see a JSON warning page if an old form-POST path navigates the Menus iframe — use flow118+ which posts via no-cors when embedded.
+Check anytime: web app `?action=driveStatus` → `canWrite: true` when OK.
+
+Until Drive is allowed, saves fall back to Script Properties (gzip’d; newest ~8 sheets) and you may see a JSON warning page if an old form-POST path navigates the Menus iframe — use flow118+ which posts via no-cors when embedded.
 
 ### One-time Gmail authorisation (Email button)
 

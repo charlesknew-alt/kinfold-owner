@@ -23,7 +23,9 @@
  * MENU_EMAIL_USE_FROM=1 after fixing Gmail → Accounts → Send mail as.
  *
  * DRIVE (Print history HTML archive for phone ↔ PC):
- * Run AUTHORIZE_DRIVE_PRINT_HISTORY once → Allow Google Drive.
+ * Run AUTHORIZE_DRIVE_PRINT_HISTORY once in the editor → Review permissions
+ * → Allow full Google Drive (not email-only). If no popup: revoke the app at
+ * myaccount.google.com/permissions, or open the AUTH LINK in the Execution log.
  * Without this, sheets fall back to Script Properties (small quota).
  */
 
@@ -31,12 +33,34 @@
  * ★ ONE-TIME: select this in the function dropdown (top toolbar) → Run → Allow.
  * Grants Drive so print HTML lands in “Eight Bells Menu Print History”
  * instead of Script Properties (fixes phone download + quota wipes).
+ *
+ * DriveApp.createFolder needs https://www.googleapis.com/auth/drive (in
+ * appsscript.json). A prior Allow for email/Gmail alone is not enough.
+ *
+ * Important: call DriveApp BEFORE throwing a custom Error — Apps Script’s
+ * Review permissions dialog is triggered by the Drive call, not by our throw.
  */
 function AUTHORIZE_DRIVE_PRINT_HISTORY() {
-  var folder = historyHtmlFolder_();
-  if (!folder) {
-    throw new Error('Drive still not authorised — click Allow on the permission prompt, then Run again');
+  var authUrl = driveAuthUrl_();
+  if (authUrl) {
+    Logger.log('AUTH LINK (open in a new tab if no Review permissions popup):');
+    Logger.log(authUrl);
   }
+
+  // Touch DriveApp directly (do NOT use historyHtmlFolder_ — it swallows errors).
+  // getRootFolder forces the editor OAuth / Review permissions UI when needed.
+  var folder = null;
+  var driveErr = '';
+  try {
+    DriveApp.getRootFolder();
+    folder = historyHtmlFolderCreateOrOpen_();
+  } catch (eDrive) {
+    driveErr = String(eDrive && eDrive.message ? eDrive.message : eDrive);
+  }
+  if (!folder) {
+    throw new Error(driveAuthHelp_(driveErr, authUrl));
+  }
+
   var probeName = '_varlo_drive_probe.txt';
   var existing = folder.getFilesByName(probeName);
   while (existing.hasNext()) {
@@ -52,6 +76,78 @@ function AUTHORIZE_DRIVE_PRINT_HISTORY() {
     folderName: folder.getName(),
     probeFileId: id
   };
+}
+
+/** OAuth consent URL when scopes are still missing (empty string if unknown). */
+function driveAuthUrl_() {
+  try {
+    var authInfo = ScriptApp.getAuthorizationInfo(ScriptApp.AuthMode.FULL);
+    if (!authInfo) return '';
+    return String(authInfo.getAuthorizationUrl() || '');
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * Human steps when DriveApp still lacks auth/drive after Run.
+ * @param {string} rawErr
+ * @param {string=} authUrl
+ */
+function driveAuthHelp_(rawErr, authUrl) {
+  var detail = String(rawErr || '').replace(/\s+/g, ' ').trim();
+  var url = String(authUrl || '').trim() || driveAuthUrl_();
+  var needsDrive = /auth\/drive|permission to call DriveApp/i.test(detail);
+  var lines = [
+    'Drive still not authorised for this Apps Script project.',
+    'Do NOT only click Run again — you must complete Allow first.'
+  ];
+  if (detail) lines.push('DriveApp said: ' + detail);
+  if (url) {
+    lines.push('OPEN THIS AUTH LINK in a new browser tab (same account that owns the script): ' + url);
+  }
+  lines.push(
+    'Fix (script owner, charlesknew@gmail.com — not a Workspace login unless that owns the project):',
+    '1) In the Apps Script EDITOR (not the Menus website): select AUTHORIZE_DRIVE_PRINT_HISTORY → Run.',
+    '2) Popup / banner: Review permissions → choose the account that owns this project → Allow.',
+    '   Leave Google Drive checked — need “See, edit, create, and delete all of your Google Drive files”.',
+    '3) If NO popup and re-Run keeps failing: open https://myaccount.google.com/permissions',
+    '   → remove “Eight Bells Menu AI” / this Apps Script → return here → Run → Review permissions → Allow.',
+    '4) Or open the Auth link above, Allow full Drive, then Run AUTHORIZE_DRIVE_PRINT_HISTORY again.',
+    '5) Success log line: “Drive authorised. Folder: Eight Bells Menu Print History”.',
+    '6) Then Menus → Print history → Sync now (PC), then Sync on phone.',
+    'If Allow is greyed out / blocked: Google Workspace admin may be denying Drive scope for this app.'
+  );
+  if (needsDrive) {
+    lines.push(
+      'Note: DriveApp.createFolder needs scope https://www.googleapis.com/auth/drive',
+      '(already listed in appsscript.json — the missing piece is the one-time Allow).'
+    );
+  }
+  return lines.join(' ');
+}
+
+/**
+ * Open or create the print-history Drive folder; throws on DriveApp failure
+ * (unlike historyHtmlFolder_ which returns null for web-app fallback).
+ */
+function historyHtmlFolderCreateOrOpen_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = String(props.getProperty('HIST_FOLDER_ID') || '');
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (e) {
+      try { props.deleteProperty('HIST_FOLDER_ID'); } catch (e0) {}
+    }
+  }
+  var existing = DriveApp.getFoldersByName('Eight Bells Menu Print History');
+  if (existing.hasNext()) {
+    var found = existing.next();
+    try { props.setProperty('HIST_FOLDER_ID', found.getId()); } catch (e1) {}
+    return found;
+  }
+  var folder = DriveApp.createFolder('Eight Bells Menu Print History');
+  try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
+  return folder;
 }
 
 /**
@@ -823,24 +919,8 @@ function historyWriteIndex_(list) {
  * Returns null when Drive is not authorised — callers fall back to props.
  */
 function historyHtmlFolder_() {
-  var props = PropertiesService.getScriptProperties();
-  var id = String(props.getProperty('HIST_FOLDER_ID') || '');
-  if (id) {
-    try { return DriveApp.getFolderById(id); } catch (e) {
-      // Stale / trashed folder id — clear and recreate below.
-      try { props.deleteProperty('HIST_FOLDER_ID'); } catch (e0) {}
-    }
-  }
   try {
-    var existing = DriveApp.getFoldersByName('Eight Bells Menu Print History');
-    if (existing.hasNext()) {
-      var found = existing.next();
-      try { props.setProperty('HIST_FOLDER_ID', found.getId()); } catch (e1) {}
-      return found;
-    }
-    var folder = DriveApp.createFolder('Eight Bells Menu Print History');
-    try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
-    return folder;
+    return historyHtmlFolderCreateOrOpen_();
   } catch (e3) {
     return null;
   }
@@ -858,7 +938,8 @@ function historyDriveStatus_() {
     canWrite: false,
     error: '',
     createError: '',
-    getError: ''
+    getError: '',
+    authUrl: driveAuthUrl_()
   };
   if (storedId) {
     try {
@@ -879,8 +960,9 @@ function historyDriveStatus_() {
       } catch (eCreate) {
         out.createError = String(eCreate && eCreate.message ? eCreate.message : eCreate);
       }
-      out.error = out.createError || out.getError ||
-        'DriveApp could not open or create the print-history folder — run AUTHORIZE_DRIVE_PRINT_HISTORY';
+      out.error = driveAuthHelp_(out.createError || out.getError ||
+        'DriveApp could not open or create the print-history folder');
+      out.authUrl = driveAuthUrl_();
       return out;
     }
     out.folderId = folder.getId();
