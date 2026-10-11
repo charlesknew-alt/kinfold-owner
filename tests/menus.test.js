@@ -878,9 +878,9 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow219') !== -1, 'menus page cache-bust is flow219');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow219') !== -1,
-  'hub menus link cache-bust is flow219');
+assert(page.indexOf('flow220') !== -1, 'menus page cache-bust is flow220');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow220') !== -1,
+  'hub menus link cache-bust is flow220');
 assert(page.indexOf('builder-fold') !== -1 && page.indexOf('function builderFold') !== -1,
   'builder folds collapse advanced config');
 assert(page.indexOf('include-always-open') !== -1 && page.indexOf('includeTicksBox') !== -1,
@@ -2303,6 +2303,65 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   });
   assert(/\bmake-fit\b/.test(fitHtml) && fitHtml.indexOf('--dish-gap-min:5px') !== -1,
     'Make it fit print body uses 5px dish-gap floor');
+})();
+(function tipOnlyDoesNotKillFeaturePanelFill() {
+  // Tip oval is small chrome — must not set sandwichCrowdsMains and wipe
+  // column/foot feature panels (gaps stayed empty while tip still fitted).
+  function d(sec, name, desc, price) {
+    return api.dish(sec, name, desc || '', price || '14.95', '');
+  }
+  var dishes = [
+    d('Nibbles', 'Nachos', '', '6.95'),
+    d('Nibbles', 'Rolls', '', '5.95'),
+    d('Starters', 'Prawns', 'garlic', '10.95'),
+    d('Starters', 'Whitebait', '', '7.95'),
+    d('Starters', 'Cauli', '', '8.25'),
+    d('Sharing Plates', 'Camembert', 'ciabatta', '14.95'),
+    d('Sharing Plates', 'Nachos', 'chilli', '14.95'),
+    d('Burgers', 'Brisket', 'fries', '16.95'),
+    d('Burgers', 'Halloumi', 'fries', '16.95')
+  ];
+  var i;
+  for (i = 0; i < 8; i++) dishes.push(d('Mains', 'Main ' + i, 'sides salad', '16.95'));
+  for (i = 0; i < 5; i++) {
+    dishes.push(Object.assign(d('Special Mains', 'SM ' + i, 'desc', '18.95'), { fromMenu: 'specials' }));
+  }
+  dishes.push(Object.assign(d('Special Starters', 'Mackerel Pate', 'toast', '8.95'), { fromMenu: 'specials' }));
+  for (i = 0; i < 6; i++) dishes.push(d('Sides', 'Side ' + i, '', '4.95'));
+  for (i = 0; i < 4; i++) dishes.push(d('Desserts', 'Dess ' + i, '', '7.95'));
+  var layout = Object.assign({}, api.defaultSectionLayout());
+  layout.Sandwiches = Object.assign({}, layout.Sandwiches || {}, {
+    tip: true,
+    sell: 'Ask about today’s sandwiches'
+  });
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    promos: api.seedPromoBank(),
+    includes: { specials: true }
+  });
+  assert(planned.sandwichTipOnly === true && planned.p2 && planned.p2.sandwiches === true,
+    'Main tip-only is planned on page 2');
+  assert(planned.fit !== 'over', 'tip-only does not force unit over');
+  var fitted = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layout,
+    promos: api.seedPromoBank(),
+    includes: { specials: true },
+    makeFit: true
+  });
+  assert(fitted.makeFit === true && fitted.omitFeaturePanels !== true,
+    'Make it fit keeps leftover feature panels (does not omit them)');
+  assert(fitted.p2 && fitted.p2.sandwiches === true,
+    'Make it fit keeps the tip oval');
+})();
+(function nearEvenColumnsFillBothFeaturePanels() {
+  var bank = [
+    { id: 'a', title: 'Stay a While', body: 'rooms' },
+    { id: 'b', title: 'Gatherings', body: 'events' },
+    { id: 'c', title: 'Pub Quiz', body: 'quiz' }
+  ];
+  var fill = print.planPromoFill(10, 10.5, bank, { pageBudget: 20 });
+  assert(fill.left && fill.right,
+    'near-even opposite columns get a feature panel under each side when room');
 })();
 (function makeFitNeverReturnsUnitOver() {
   // Packed Sunday + Specials + tip used to keep fit:over on Make it fit, so the
@@ -4654,15 +4713,15 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   });
   assert(planned.widthOverrides && planned.widthOverrides['Special Mains'] === 'split',
     'capacity-tight Specials still split across two columns');
+  // Tip oval is compact chrome — after Specials split, keep it (flow220). Only
+  // omit tip when food is still over CLIP; never treat tip like a sandwiches wall.
+  assert(planned.fit !== 'over',
+    'Specials split + tip-only does not force unit over');
   assert(
-    planned.p2.sandwiches === false ||
-      (planned.fillers || []).indexOf('Sandwiches tip omitted (keep food on the page)') !== -1 ||
-      planned.fit === 'over',
-    'tip omitted when capacity needs it, or overflow only after tip/panels cannot save food'
+    planned.p2.sandwiches === true ||
+      (planned.fillers || []).indexOf('Sandwiches tip omitted (keep food on the page)') !== -1,
+    'tip kept when Specials split frees room, else omitted only if food still over'
   );
-  if ((planned.fillers || []).indexOf('Sandwiches tip omitted (keep food on the page)') !== -1) {
-    assert(planned.p2.sandwiches === false, 'omitted tip is not still scheduled on page 2');
-  }
   var sheet = print.build(api.menuById('main'), dishes, {
     sectionLayout: layoutMap,
     includes: { sandwiches: false, specials: true },
@@ -4671,10 +4730,10 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   });
   var a4 = (sheet.split('mode-panel mode-a5')[0] || sheet).replace(/<style[\s\S]*?<\/style>/gi, '');
   assert(/Pasta Carbonara|Venison Tournedos|Baked Gnocchi/.test(a4),
-    'Specials food still prints when tip is dropped for capacity');
-  if (planned.p2.sandwiches === false) {
-    assert(!/class="[^"]*sandwich-tip-only/.test(a4),
-      'tip-only oval is absent from HTML when planner omitted it');
+    'Specials food still prints with tip-only chrome');
+  if (planned.p2.sandwiches === true) {
+    assert(/class="[^"]*sandwich-tip-only/.test(a4),
+      'tip-only oval prints when planner kept it beside split Specials');
   }
 })();
 

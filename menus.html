@@ -473,9 +473,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261011-flow219"></script>
-  <script src="menus-print.js?v=20261011-flow219"></script>
-  <script src="menus-ingest.js?v=20261011-flow219"></script>
+  <script src="menus.js?v=20261011-flow220"></script>
+  <script src="menus-print.js?v=20261011-flow220"></script>
+  <script src="menus-ingest.js?v=20261011-flow220"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4521,7 +4521,8 @@
       result.plan.promos = promos;
       result.plan.includes = hostIncludes();
       result.plan.makeFit = true;
-      result.plan.omitFeaturePanels = true;
+      // Keep leftover feature panels — Make it fit only compresses dish gaps.
+      result.plan.omitFeaturePanels = false;
       result.plan.sectionLayout = sheetLayout;
       if (layout.widthOverrides) result.plan.widthOverrides = layout.widthOverrides;
       var btn = document.getElementById('doGenerate');
@@ -5091,7 +5092,8 @@
                   openOk((probe2 && probe2.html) || retryHtml);
                   return;
                 }
-                // Auto Make it fit before blocking — compact gaps, keep all food.
+                // Auto Make it fit before blocking — compact gaps, keep tip + food,
+                // and still fill leftover holes with feature panels (flow220).
                 // planFluidLayout(makeFit) never returns unit over (flow218); DOM decides.
                 if (!result.plan.makeFit && EBMenuPrint.planFluidLayout) {
                   var fitLayout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
@@ -5109,19 +5111,10 @@
                       layout: fitLayout,
                       makeFit: true,
                       fit: fitLayout.fit,
-                      omitFeaturePanels: true,
+                      omitFeaturePanels: false,
+                      promos: promos,
                       widthOverrides: fitLayout.widthOverrides || result.plan.widthOverrides
                     });
-                    if (fitPlan.layout.p1) {
-                      fitPlan.layout.p1 = Object.assign({}, fitPlan.layout.p1, {
-                        footPromos: false, columnPromos: false, rooms: false, footLogo: false
-                      });
-                    }
-                    if (fitPlan.layout.p2) {
-                      fitPlan.layout.p2 = Object.assign({}, fitPlan.layout.p2, {
-                        footPromos: false, columnPromos: false, rooms: false, footLogo: false
-                      });
-                    }
                     var fitHtml = EBMenuPrint.build(menu, result.dishes, fitPlan);
                     return EBMenuPrint.measurePrintFit(fitHtml, { timeoutMs: 4500 }).then(function (probe3) {
                       if (probe3 && probe3.clipped) {

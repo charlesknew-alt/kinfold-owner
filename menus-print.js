@@ -908,11 +908,25 @@
     }
     if (gap > 2.5) return stackForShort('left', gap > 9 ? 2 : 1, hole, true);
     if (gap < -2.5) return stackForShort('right', -gap > 9 ? 2 : 1, hole, true);
-    // Near-even opposite food columns: one panel under the slightly shorter
-    // side only. Pairing both would burn Stay a While + Gatherings before page 2
-    // solo columns (Desserts / Sides) can fill their empty half.
+    // Near-even opposite food columns: fill BOTH sides when two unused panels
+    // fit (Sharing|Burgers left an empty Burgers half after Stay went left).
+    // Fall back to one under the slightly shorter side when the pool is thin.
     if (pool.length && Math.abs(gap) <= 2.5) {
-      return stackForShort(gap >= 0 ? 'left' : 'right', 1, Math.max(hole, 8), true);
+      var evenHole = Math.max(hole, 8);
+      if (pool.length >= 2 && (opts.pageBudget == null || opts.pageBudget >= 10)) {
+        var leftFit = pickFittingPromos(pool, evenHole, 1, !!opts.shortOnly);
+        var rightPool = filterUnusedPromos(pool, usedKeysFromPromos(leftFit));
+        var rightFit = pickFittingPromos(rightPool, evenHole, 1, !!opts.shortOnly);
+        if (leftFit.length && rightFit.length) {
+          return {
+            left: renderOnePromoBox(leftFit, leftKind),
+            right: renderOnePromoBox(rightFit, rightKind),
+            note: 'Feature panels under both near-even columns',
+            usedTitles: usedKeysFromPromos(leftFit.concat(rightFit))
+          };
+        }
+      }
+      return stackForShort(gap >= 0 ? 'left' : 'right', 1, evenHole, true);
     }
     return { left: '', right: '', note: 'No feature panels — columns already even', usedTitles: [] };
   }
@@ -2297,7 +2311,8 @@
             trySplitLongHost('Special Mains', bag.specialMains, true, specCostP2, true);
           }
           // Tip-only is chrome — keep only when leftover allows (never clip food).
-          if (sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
+          // Make it fit keeps the oval and lets DOM compressGaps decide.
+          if (!makeFit && sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
             layout.p2.sandwiches = false;
             p2Load -= sandCost;
             var tipIdx = layout.fillers.indexOf('Sandwiches tip (page 2)');
@@ -2321,7 +2336,8 @@
           trySplitBestFit('Special Mains', bag.specialMains, true, specCostP2);
       }
       // Tip-only after food map: if still over CLIP, drop tip before overflow.
-      if (sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
+      // Make it fit keeps tip — compact spacing is the hard gate.
+      if (!makeFit && sandwichTipOnly && layout.p2.sandwiches && p2Load > CLIP) {
         layout.p2.sandwiches = false;
         p2Load -= sandCost;
         var tipDropIdx = layout.fillers.indexOf('Sandwiches tip (page 2)');
@@ -2410,13 +2426,17 @@
       if (bag.sundayRoasts && !roastsOnP1) {
         noteTaxP2 += outsideUnits_(layoutRule_('Sunday Roasts', opts.sectionLayout));
       }
-      // Full mains + desserts + Sandwiches on one back page reads as a busy wall —
-      // refuse and ask to untick Sandwiches (or another drop-in) rather than pack.
+      // Full mains + desserts + named Sandwiches fillings on one back page reads
+      // as a busy wall — refuse and ask to untick Sandwiches rather than pack.
+      // Tip-only sell oval is compact chrome (~3 units) — never treat it as a
+      // sandwiches wall (that killed page-1/2 feature-panel fill while the tip
+      // still fitted, and made Make it fit look like the tip was too big).
       // Food before feature panels: drop rooms / foot / column chrome first, then
       // gate overflow only when food + tip + classical min gaps still will not fit.
       var foodLoadP2 = p2Load + gapBreath + noteTaxP2;
       var foodBreathP2 = p2Load + gapBreath;
-      var sandwichCrowdsMains = !!(layout.p2.sandwiches && bag.mains && bag.desserts &&
+      var sandwichCrowdsMains = !!(layout.p2.sandwiches && !sandwichTipOnly &&
+        sandDishCount > 0 && bag.mains && bag.desserts &&
         mainsN >= 7 && dessertN >= 4 && foodLoadP2 > PAGE - 14);
       // Notes-only tip-over: food + classical breath already ≤ PAGE; when-gone /
       // above-below notes alone cross the line. Absorb into breath so tip-only
@@ -2474,7 +2494,9 @@
         layout.p2.columnPromos = canFitColumnPromos(p2left) && !foodOverPage && !sandwichCrowdsMains;
         return true;
       }
-      if (foodOverPage || p2Load > CLIP) dropTipOnlyForFood_();
+      // Make it fit keeps the tip oval — compressGaps (5px) is the hard gate.
+      // Normal Generate may still drop tip-only chrome when food is truly over.
+      if (!makeFit && (foodOverPage || p2Load > CLIP)) dropTipOnlyForFood_();
       /**
        * Try food arrangements before won't-fit / before a false DOM clip:
        * drop leftover panels, and when Little Bells + Desserts are Full on a
@@ -2588,7 +2610,7 @@
       var p2OverLimit = makeFit ? PAGE + 18 : PAGE + 14;
       var wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
         p2used > p2OverLimit || foodOverPage;
-      if ((foodOverPage || sandwichCrowdsMains) && dropTipOnlyForFood_()) {
+      if (!makeFit && (foodOverPage || sandwichCrowdsMains) && dropTipOnlyForFood_()) {
         wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
           p2used > p2OverLimit || foodOverPage;
       }
@@ -2688,17 +2710,9 @@
     if (makeFit) {
       layout.makeFit = true;
       layout.gapFloorPx = TYPE_RANGE.dishGapPx.makeFitMin;
-      layout.omitFeaturePanels = true;
-      if (layout.p1) {
-        layout.p1 = Object.assign({}, layout.p1, {
-          rooms: false, footPromos: false, columnPromos: false, footLogo: false
-        });
-      }
-      if (layout.p2) {
-        layout.p2 = Object.assign({}, layout.p2, {
-          rooms: false, footPromos: false, columnPromos: false, footLogo: false
-        });
-      }
+      // Keep tip + leftover feature panels. Make it fit only lowers dish gaps —
+      // panels still fill opposite-column / foot holes when spare room remains.
+      layout.omitFeaturePanels = false;
       // Belt-and-braces: Make it fit never returns unit over (DOM is the gate).
       if (layout.fit === 'over') {
         layout.fit = layout.pages === 1 ? 'one' : 'two';
@@ -5061,7 +5075,9 @@
       if (!plan.sectionLayout && root.EBMenus && root.EBMenus.defaultSectionLayout) {
         plan.sectionLayout = root.EBMenus.defaultSectionLayout();
       }
-      if (layout.omitFeaturePanels || plan.makeFit || layout.makeFit) {
+      // Make it fit must NOT force omitFeaturePanels — leftover gaps still take
+      // Stay a While / Gatherings after compact spacing. Only honour an explicit omit.
+      if (layout.omitFeaturePanels || plan.omitFeaturePanels) {
         plan.omitFeaturePanels = true;
       }
       // Best-fit packing choices (column | full | split) for any category.
