@@ -851,8 +851,26 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow215') !== -1, 'menus page cache-bust is flow215');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow215') !== -1, 'hub menus link cache-bust is flow215');
+assert(page.indexOf('flow216') !== -1, 'menus page cache-bust is flow216');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow216') !== -1, 'hub menus link cache-bust is flow216');
+assert(page.indexOf('builder-fold') !== -1 && page.indexOf('function builderFold') !== -1,
+  'builder folds collapse advanced config');
+assert(page.indexOf('include-always-open') !== -1 && page.indexOf('includeTicksBox') !== -1,
+  'include ticks stay in an always-open box');
+assert(page.indexOf('builderFoldOpen') !== -1,
+  'fold open state is session-tracked (collapsed by default)');
+assert(page.indexOf('is-settings-fold') !== -1,
+  'Blocks section settings are collapsible');
+assert(page.indexOf('Tip / selling box (Sandwiches when empty)') !== -1,
+  'tip/selling include tick stays visible on long sheets');
+assert(page.indexOf('Add menus & categories') !== -1 && page.indexOf("builderFold('owner-extras'") !== -1,
+  'owner categories panel is a collapsed fold');
+assert(page.indexOf("builderFold('outside-text'") !== -1,
+  'text outside dishes is a collapsed fold');
+assert(page.indexOf("builderFold('feature-bank'") !== -1,
+  'feature panel bank editing is a collapsed fold');
+assert(page.indexOf("builderFold('party-blurbs'") !== -1,
+  'party blurbs are a collapsed fold');
 (function checkMenusStaffStableEntry() {
   var staffPath = path.join(root, 'menus-staff.html');
   assert(fs.existsSync(staffPath), 'menus-staff.html stable staff entry exists');

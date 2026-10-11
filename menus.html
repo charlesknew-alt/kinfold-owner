@@ -86,12 +86,58 @@
     .flow-nav-top { margin: 0 0 14px; padding-bottom: 12px; border-bottom-width: 1px; }
     .flow-nav-bottom { margin: 16px 0 0; padding-top: 12px; border-top-width: 1px; }
 
+    /* Collapsible advanced config — include ticks stay outside these folds */
+    .builder-fold {
+      border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px;
+      background: var(--paint-wash); overflow: hidden;
+    }
+    .builder-fold.outside-text-box {
+      border-color: var(--paint-deep);
+      background: linear-gradient(180deg, #fff 0%, var(--paint-wash) 100%);
+    }
+    .builder-fold-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      width: 100%; padding: 12px 14px; border: 0; background: transparent;
+      text-align: left; cursor: pointer; font-family: var(--sans); color: var(--ink);
+    }
+    .builder-fold-head:hover { background: rgba(255,255,255,.55); }
+    .builder-fold-title {
+      font-family: var(--serif); font-weight: 500; font-size: 17px; margin: 0;
+    }
+    .builder-fold-summary {
+      font-size: 13px; color: var(--ink-soft); margin-top: 4px; line-height: 1.35;
+    }
+    .builder-fold-head .chev {
+      font-size: 16px; color: var(--ink-soft); line-height: 1; padding-top: 2px; flex: 0 0 auto;
+    }
+    .builder-fold.is-open .builder-fold-head {
+      border-bottom: 1px solid var(--line); background: rgba(255,255,255,.65);
+    }
+    .builder-fold-body { display: none; padding: 12px 14px 14px; }
+    .builder-fold.is-open .builder-fold-body { display: block; }
+    .include-box.include-always-open { margin-bottom: 14px; }
+    .include-box .tip-include-row {
+      margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line);
+    }
+    .include-box .tip-include-row label {
+      display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; cursor: pointer;
+    }
+
     .section-block {
       border: 1px solid var(--line); border-radius: 14px; margin: 0 0 12px; background: var(--white-warm); overflow: hidden;
     }
     .section-block-head {
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
       padding: 12px 14px; background: #fff; border-bottom: 1px solid var(--line);
+    }
+    .section-block.is-settings-fold .section-block-head {
+      width: 100%; border: 0; border-bottom: 1px solid var(--line); cursor: pointer;
+      font-family: var(--sans); color: var(--ink); text-align: left;
+    }
+    .section-block.is-settings-fold:not(.is-open) .section-block-head { border-bottom: 0; }
+    .section-block.is-settings-fold:not(.is-open) .section-block-body { display: none; }
+    .section-block.is-settings-fold .section-block-head .chev {
+      font-size: 16px; color: var(--ink-soft); margin-left: auto;
     }
     .section-block-head .title {
       font-family: var(--serif); font-weight: 500; font-size: 18px; letter-spacing: 0.02em;
@@ -427,9 +473,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261010-flow215"></script>
-  <script src="menus-print.js?v=20261010-flow215"></script>
-  <script src="menus-ingest.js?v=20261010-flow215"></script>
+  <script src="menus.js?v=20261010-flow216"></script>
+  <script src="menus-print.js?v=20261010-flow216"></script>
+  <script src="menus-ingest.js?v=20261010-flow216"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -466,6 +512,8 @@
     var pendingAddSection = ''; // Add from a subcategory → pre-fill Section
     var pendingScroll = null;   // { y, section } — keep place after save / cancel
     var flowStep = 1; // staff: 1 dishes · 2 generate · owner: + blocks + wording
+    // Advanced builder panels stay collapsed unless the user opens them (session-only).
+    var builderFoldOpen = {};
     var viewMode = 'edit'; // edit | panels | catalogue | history
     var historyFilter = 'all';
     var historyCache = [];
@@ -1708,7 +1756,8 @@
       // —— 1. Dishes ——
       html += flowStepShell(1, 'Dishes', menu.name,
         list.length
-          ? (list.length + ' dish' + (list.length === 1 ? '' : 'es') + ' · ' + sectionCount(list) + ' sections')
+          ? (list.length + ' dish' + (list.length === 1 ? '' : 'es') + ' · ' + sectionCount(list) +
+            ' sections · ' + includeTicksSummary_(menuId))
           : (isStaffMode ? 'Empty — add dishes below' : 'Empty — upload or add dishes'),
         renderDishesStep(menu, list));
 
@@ -1845,6 +1894,105 @@
       return html;
     }
 
+    /** Collapsed-by-default advanced panel; body stays in the DOM so saved fields persist. */
+    function builderFold(id, title, summary, bodyHtml, opts) {
+      opts = opts || {};
+      var open = !!builderFoldOpen[id];
+      var cls = 'builder-fold' + (open ? ' is-open' : '') + (opts.extraClass ? ' ' + opts.extraClass : '');
+      var html = '<section class="' + cls + '" data-fold-id="' + escapeAttr(id) + '"' +
+        (opts.id ? ' id="' + escapeAttr(opts.id) + '"' : '') + '>';
+      html += '<button type="button" class="builder-fold-head" data-builder-fold="' + escapeAttr(id) + '" aria-expanded="' + (open ? 'true' : 'false') + '">';
+      html += '<div><div class="builder-fold-title">' + escapeAttr(title) + '</div>';
+      if (summary) html += '<div class="builder-fold-summary">' + summary + '</div>';
+      html += '</div><span class="chev" aria-hidden="true">' + (open ? '▾' : '▸') + '</span></button>';
+      html += '<div class="builder-fold-body">' + (bodyHtml || '') + '</div></section>';
+      return html;
+    }
+
+    function bindBuilderFolds_() {
+      document.querySelectorAll('[data-builder-fold]').forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var id = btn.getAttribute('data-builder-fold');
+          if (!id) return;
+          builderFoldOpen[id] = !builderFoldOpen[id];
+          var open = !!builderFoldOpen[id];
+          var panel = btn.closest('[data-fold-id], .section-block.is-settings-fold');
+          if (panel) {
+            if (open) panel.classList.add('is-open');
+            else panel.classList.remove('is-open');
+          }
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          var chev = btn.querySelector('.chev');
+          if (chev) chev.textContent = open ? '▾' : '▸';
+        };
+      });
+    }
+
+    function ownerExtrasSummary_() {
+      var extras = currentExtrasState();
+      var menusN = (extras.menus || []).length;
+      var secsN = (extras.sections || []).length;
+      if (!menusN && !secsN) return 'No custom tabs or categories yet';
+      var bits = [];
+      if (menusN) bits.push(menusN + ' menu' + (menusN === 1 ? '' : 's'));
+      if (secsN) bits.push(secsN + ' categor' + (secsN === 1 ? 'y' : 'ies'));
+      return bits.join(' · ');
+    }
+
+    function outsideTextSummary_(menu, list) {
+      var rules = layoutFor(menuId);
+      var defaults = EBMenus.defaultSectionLayout();
+      var filled = 0;
+      var tipOn = false;
+      function hasText(rule) {
+        if (!rule) return false;
+        return !!(String(rule.note || '').trim() || String(rule.above || '').trim() ||
+          String(rule.below || '').trim() || String(rule.sell || '').trim());
+      }
+      if (menu.kind !== 'long') {
+        EBMenus.SECTIONS.forEach(function (sec) {
+          if (hasText(rules[sec] || defaults[sec])) filled += 1;
+        });
+        return filled ? filled + ' wording block' + (filled === 1 ? '' : 's') + ' set' : 'No extra wording yet';
+      }
+      ['Sandwiches', 'Little Bells', 'Desserts'].forEach(function (sec) {
+        var r = rules[sec] || defaults[sec] || {};
+        if (hasText(r)) filled += 1;
+        if (sec === 'Sandwiches' && r.tip) tipOn = true;
+      });
+      var bits = [];
+      if (filled) bits.push(filled + ' section note' + (filled === 1 ? '' : 's'));
+      bits.push(tipOn ? 'Tip / selling on' : 'Tip / selling off');
+      var nIn = (list || []).length;
+      if (nIn) bits.push(nIn + ' dish' + (nIn === 1 ? '' : 'es') + ' on sheet');
+      return bits.join(' · ');
+    }
+
+    function partyBlurbsSummary_() {
+      var m = EBMenus.normalizeMeta(metaBook[menuId] || EBMenus.emptyMeta());
+      var bits = [];
+      if (m.title) bits.push(escapeAttr(m.title));
+      bits.push(m.paper === 'a5' ? '2×A5' : 'A4');
+      return bits.join(' · ') || 'Party sheet blurbs';
+    }
+
+    function featureBankSummary_() {
+      var n = (promoBank || []).length;
+      return n ? n + ' line' + (n === 1 ? '' : 's') + ' in the bank' : 'Bank empty — add Stay a While, quizzes…';
+    }
+
+    function includeTicksSummary_(hostId) {
+      var extras = EBMenus.includableMenus(hostId) || [];
+      var on = 0;
+      extras.forEach(function (m) {
+        if (isStaffMode && !staffCanSeeMenu(m)) return;
+        if (includes[hostId] && includes[hostId][m.id]) on += 1;
+      });
+      return on ? on + ' drop-in' + (on === 1 ? '' : 's') + ' ticked' : 'No drop-ins ticked';
+    }
+
     function flowNav(prev, next, nextLabel, pos) {
       var cls = 'flow-nav no-print' + (pos === 'top' ? ' flow-nav-top' : ' flow-nav-bottom');
       var html = '<div class="' + cls + '">';
@@ -1861,23 +2009,13 @@
       return flowNav(prev, next, nextLabel, 'top') + (innerHtml || '') + flowNav(prev, next, nextLabel, 'bottom');
     }
 
-    function renderDishesStep(menu, list) {
-      var html = '';
-      if (isStaffMode) {
-        html += '<p class="step-lede">Upload or paste a menu, edit dishes, clear when you need a fresh start, then generate. Layout and event wording stay as the owner set them. Send a whole category (Sandwiches, Desserts, Little Bells, Specials) to its own menu in one go.</p>';
-      } else {
-        html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Each dish has a section dropdown — we auto-guess after extract. Send Sandwiches, Desserts, Little Bells or Specials to their own menu in one go (replaces that menu and removes them from this sheet).</p>';
-      }
-
-      if (!isStaffMode) html += renderOwnerExtrasBox();
-
-      if (EBMenus.isMainSheet && EBMenus.isMainSheet(menu.id)) {
-        html += renderMainPairBox(menu, list);
-      }
-
+    function renderIncludeAndTipBox(menu, list) {
       var extras = EBMenus.includableMenus(menuId);
+      var showTip = menu.kind === 'long';
+      if (!extras.length && !showTip) return '';
+      var html = '<div class="include-box include-always-open" id="includeTicksBox">';
+      html += '<h3>Also put on this sheet</h3>';
       if (extras.length) {
-        html += '<div class="include-box"><h3>Also put on this sheet</h3>';
         html += '<p class="note" style="margin:0 0 8px">Tick what you want on this print. If Generate says the sheet is too full, untick one dropped-in menu (Sandwiches, Desserts, Little Bells or Specials) and try again. Generate does not drop food off the page to make space.</p><div class="include-row">';
         extras.forEach(function (m) {
           // Staff: same menus they can open as tabs (incl. Little Bells kids on Main/Sunday)
@@ -1886,8 +2024,38 @@
           var label = m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
           html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(label) + '</label>';
         });
-        html += '</div></div>';
+        html += '</div>';
+      } else {
+        html += '<p class="note" style="margin:0 0 8px">No drop-in menus for this sheet.</p>';
       }
+      if (showTip) {
+        var sand = (layoutFor(menuId).Sandwiches) || (EBMenus.defaultSectionLayout().Sandwiches) || { tip: true };
+        html += '<div class="tip-include-row">';
+        html += '<label><input type="checkbox" data-layout-tip="Sandwiches" value="yes"' +
+          (sand.tip ? ' checked' : '') + '> Tip / selling box (Sandwiches when empty)</label>';
+        html += '<p class="note" style="margin:6px 0 0">Quick include for the tip oval. Selling words and hours live under <strong>Text outside dishes</strong> (collapsed below) or Blocks.</p>';
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderDishesStep(menu, list) {
+      var html = '';
+      if (isStaffMode) {
+        html += '<p class="step-lede">Upload or paste a menu, edit dishes, clear when you need a fresh start, then generate. Layout and event wording stay as the owner set them. Tick drop-ins below; open advanced panels only if you need them.</p>';
+      } else {
+        html += '<p class="step-lede">Upload a whole menu, or edit dishes in their section blocks. Tick which sub-menus print on this sheet, then generate. Categories, outside text and other settings stay collapsed until you need them.</p>';
+      }
+
+      // Inclusion ticks stay visible — never fold these away.
+      html += renderIncludeAndTipBox(menu, list);
+
+      if (EBMenus.isMainSheet && EBMenus.isMainSheet(menu.id)) {
+        html += renderMainPairBox(menu, list);
+      }
+
+      if (!isStaffMode) html += renderOwnerExtrasBox();
 
       if (menu.kind === 'long' && EBMenus.ownPageMenuForSection) {
         var dropN = 0;
@@ -1902,8 +2070,8 @@
         }
       }
 
-      // Card menus + staff (no Blocks step): edit spiel / ice cream / notes here.
-      // Staff Specials board notes live in the same “Text outside dishes” box.
+      // Card menus + staff (no Blocks step): spiel / ice cream / notes — collapsed by default.
+      // Staff Specials board notes live in the same “Text outside dishes” fold.
       if (menu.kind !== 'long' || isStaffMode) {
         html += renderOutsideTextEditors(menu, list, { compact: menu.kind === 'long' });
       } else {
@@ -1943,61 +2111,63 @@
      */
     function renderOwnerExtrasBox() {
       var extras = currentExtrasState();
-      var html = '<div class="include-box outside-text-box" id="ownerExtrasBox" style="margin-bottom:14px">';
-      html += '<h3>Add menus &amp; categories</h3>';
-      html += '<p class="note" style="margin:0 0 10px">Owner only. <strong>New menu</strong> creates a tab (staff see it too, except Party). <strong>New category</strong> only adds a Section dropdown option — it is <em>not</em> a tab. If you already added a name as a category, use <strong>Add as tab</strong> beside it.</p>';
-      html += '<div class="owner-extras-grid">';
+      var body = '';
+      body += '<p class="note" style="margin:0 0 10px">Owner only. <strong>New menu</strong> creates a tab (staff see it too, except Party). <strong>New category</strong> only adds a Section dropdown option — it is <em>not</em> a tab. If you already added a name as a category, use <strong>Add as tab</strong> beside it.</p>';
+      body += '<div class="owner-extras-grid">';
 
-      html += '<div>';
-      html += '<label class="field">New menu (creates a tab)</label>';
-      html += '<div class="owner-extras-row">';
-      html += '<input type="text" id="extraMenuName" placeholder="e.g. Breakfast" maxlength="48" autocomplete="off">';
-      html += '<select id="extraMenuKind" aria-label="Menu type">';
-      html += '<option value="card" selected>Card (like Specials)</option>';
-      html += '<option value="long">Long sheet (like Main)</option>';
-      html += '<option value="party">Party / occasion</option>';
-      html += '</select>';
-      html += '<button type="button" class="go" id="doAddExtraMenu">Add menu</button>';
-      html += '</div>';
+      body += '<div>';
+      body += '<label class="field">New menu (creates a tab)</label>';
+      body += '<div class="owner-extras-row">';
+      body += '<input type="text" id="extraMenuName" placeholder="e.g. Breakfast" maxlength="48" autocomplete="off">';
+      body += '<select id="extraMenuKind" aria-label="Menu type">';
+      body += '<option value="card" selected>Card (like Specials)</option>';
+      body += '<option value="long">Long sheet (like Main)</option>';
+      body += '<option value="party">Party / occasion</option>';
+      body += '</select>';
+      body += '<button type="button" class="go" id="doAddExtraMenu">Add menu</button>';
+      body += '</div>';
       if (extras.menus && extras.menus.length) {
-        html += '<ul class="owner-extras-list">';
+        body += '<ul class="owner-extras-list">';
         extras.menus.forEach(function (m) {
           var kindLabel = m.kind === 'card' ? 'card' : (m.kind === 'party' ? 'party' : 'long');
-          html += '<li><span>' + escapeAttr(m.name) + ' <span class="note">(' + kindLabel + ' · tab)</span></span>';
-          html += '<button type="button" class="link" data-remove-extra-menu="' + escapeAttr(m.id) + '">Remove</button></li>';
+          body += '<li><span>' + escapeAttr(m.name) + ' <span class="note">(' + kindLabel + ' · tab)</span></span>';
+          body += '<button type="button" class="link" data-remove-extra-menu="' + escapeAttr(m.id) + '">Remove</button></li>';
         });
-        html += '</ul>';
+        body += '</ul>';
       } else {
-        html += '<p class="note" style="margin:8px 0 0">No custom tabs yet. Type a name above and tap <strong>Add menu</strong>.</p>';
+        body += '<p class="note" style="margin:8px 0 0">No custom tabs yet. Type a name above and tap <strong>Add menu</strong>.</p>';
       }
-      html += '</div>';
+      body += '</div>';
 
-      html += '<div>';
-      html += '<label class="field">New category (section dropdown only — not a tab)</label>';
-      html += '<div class="owner-extras-row">';
-      html += '<input type="text" id="extraSectionName" placeholder="e.g. Sharing boards" maxlength="48" autocomplete="off">';
-      html += '<button type="button" class="go" id="doAddExtraSection">Add category</button>';
-      html += '</div>';
+      body += '<div>';
+      body += '<label class="field">New category (section dropdown only — not a tab)</label>';
+      body += '<div class="owner-extras-row">';
+      body += '<input type="text" id="extraSectionName" placeholder="e.g. Sharing boards" maxlength="48" autocomplete="off">';
+      body += '<button type="button" class="go" id="doAddExtraSection">Add category</button>';
+      body += '</div>';
       if (extras.sections && extras.sections.length) {
-        html += '<ul class="owner-extras-list">';
+        body += '<ul class="owner-extras-list">';
         extras.sections.forEach(function (s) {
           var hasTab = !!(EBMenus.ownPageMenuForSection && EBMenus.ownPageMenuForSection(s));
-          html += '<li><span>' + escapeAttr(s) +
+          body += '<li><span>' + escapeAttr(s) +
             (hasTab ? ' <span class="note">(has tab)</span>' : ' <span class="note">(no tab)</span>') +
             '</span><span class="owner-extras-actions">';
           if (!hasTab) {
-            html += '<button type="button" class="link" data-menu-from-section="' + escapeAttr(s) +
+            body += '<button type="button" class="link" data-menu-from-section="' + escapeAttr(s) +
               '" title="Create a Card menu tab with this name">Add as tab</button>';
           }
-          html += '<button type="button" class="link" data-remove-extra-section="' + escapeAttr(s) + '">Remove</button>';
-          html += '</span></li>';
+          body += '<button type="button" class="link" data-remove-extra-section="' + escapeAttr(s) + '">Remove</button>';
+          body += '</span></li>';
         });
-        html += '</ul>';
+        body += '</ul>';
       }
-      html += '</div>';
+      body += '</div>';
 
-      html += '</div></div>';
-      return html;
+      body += '</div>';
+      return builderFold('owner-extras', 'Add menus & categories', escapeAttr(ownerExtrasSummary_()), body, {
+        extraClass: 'outside-text-box',
+        id: 'ownerExtrasBox'
+      });
     }
 
     /**
@@ -2131,64 +2301,66 @@
       opts = opts || {};
       var defaults = EBMenus.defaultSectionLayout();
       var menuRules = layoutFor(menuId);
-      var html = '';
-      html += '<div class="include-box outside-text-box" style="margin-bottom:14px">';
-      html += '<h3>Text outside dishes</h3>';
-      html += '<p class="note" style="margin:0 0 12px">Hours, “served with…”, ice cream, Sunday notes — anything that prints around the dishes, not as a dish row.</p>';
+      var body = '';
+      body += '<p class="note" style="margin:0 0 12px">Hours, “served with…”, ice cream, Sunday notes — anything that prints around the dishes, not as a dish row.</p>';
 
       if (menu.id === 'specials') {
         var noteSecs = EBMenus.SPECIALS_SECTIONS || ['Special Starters', 'Special Mains', 'Special Desserts'];
         noteSecs.forEach(function (sec) {
           var ruleSp = menuRules[sec] || defaults[sec] || { note: '' };
-          html += '<label class="field">' + escapeAttr(sec) + ' — under the title</label>';
-          html += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
+          body += '<label class="field">' + escapeAttr(sec) + ' — under the title</label>';
+          body += '<textarea data-layout-note="' + escapeAttr(sec) + '" rows="2" placeholder="e.g. When it’s gone, it’s gone">' +
             escapeAttr(ruleSp.note || '') + '</textarea>';
         });
-        html += '<p class="note" style="margin:8px 0 0">Shows in the Specials frilly box. When Specials are ticked onto Main / Sunday the note lines up with that sheet (not centred like this card).</p>';
-        html += '</div>';
-        return html;
+        body += '<p class="note" style="margin:8px 0 0">Shows in the Specials frilly box. When Specials are ticked onto Main / Sunday the note lines up with that sheet (not centred like this card).</p>';
+        return builderFold('outside-text', 'Text outside dishes', escapeAttr(outsideTextSummary_(menu, list)), body, {
+          extraClass: 'outside-text-box'
+        });
       }
 
       if (menu.id === 'sandwiches') {
         var sand = menuRules.Sandwiches || defaults.Sandwiches || { note: '', sell: '', tip: true };
-        html += renderCardOutsideBoxes('Sandwiches', sand, {
+        body += renderCardOutsideBoxes('Sandwiches', sand, {
           abovePlaceholder: 'Optional line above the fillings',
           belowPlaceholder: 'Served on either Ciabatta…'
         });
-        html += '<label class="field" style="margin-top:12px">Tip / selling box (Main &amp; Sunday when empty)</label>';
-        html += '<textarea data-layout-sell="Sandwiches" rows="3" placeholder="A selection of sandwiches is available…">' +
+        body += '<label class="field" style="margin-top:12px">Tip / selling box (Main &amp; Sunday when empty)</label>';
+        body += '<textarea data-layout-sell="Sandwiches" rows="3" placeholder="A selection of sandwiches is available…">' +
           escapeAttr(sand.sell || '') + '</textarea>';
-        html += '<p class="note" style="margin:6px 0 0">Used when you tick Sandwiches on Main / Sunday and that menu has 0 fillings. Unticked Sandwiches stay off the sheet.</p>';
-        html += '</div>';
-        return html;
+        body += '<p class="note" style="margin:6px 0 0">Used when you tick Sandwiches on Main / Sunday and that menu has 0 fillings. Unticked Sandwiches stay off the sheet.</p>';
+        return builderFold('outside-text', 'Text outside dishes', escapeAttr(outsideTextSummary_(menu, list)), body, {
+          extraClass: 'outside-text-box'
+        });
       }
 
       if (menu.id === 'little-bells') {
         var lb = menuRules['Little Bells'] || defaults['Little Bells'] || {};
-        html += renderCardOutsideBoxes('Little Bells', lb, {
+        body += renderCardOutsideBoxes('Little Bells', lb, {
           abovePlaceholder: 'All £9.50\nto include a choice of one scoop of ice cream or sorbet.',
           belowPlaceholder: 'Little Bells on Sunday have a choice of roasts at half the price of the adults.'
         });
-        html += '</div>';
-        return html;
+        return builderFold('outside-text', 'Text outside dishes', escapeAttr(outsideTextSummary_(menu, list)), body, {
+          extraClass: 'outside-text-box'
+        });
       }
 
       if (menu.id === 'desserts' || menu.id === 'lunch-club') {
         var secName = menu.id === 'desserts' ? 'Desserts' : 'Mains';
         var rule = menuRules[secName] || defaults[secName] || { note: '' };
         if (menu.id === 'desserts') {
-          html += renderCardOutsideBoxes('Desserts', rule, {
+          body += renderCardOutsideBoxes('Desserts', rule, {
             abovePlaceholder: 'Optional line above the puddings',
             belowPlaceholder: 'Optional line under the dish box'
           });
         } else {
-          html += '<label class="field">Note under the title</label>';
-          html += '<textarea data-layout-note="' + escapeAttr(secName) + '" rows="2" placeholder="Optional line above the dishes">' +
+          body += '<label class="field">Note under the title</label>';
+          body += '<textarea data-layout-note="' + escapeAttr(secName) + '" rows="2" placeholder="Optional line above the dishes">' +
             escapeAttr(rule.note || '') + '</textarea>';
-          html += '<p class="note" style="margin:6px 0 0">Optional. Leave blank for no extra line on the card.</p>';
+          body += '<p class="note" style="margin:6px 0 0">Optional. Leave blank for no extra line on the card.</p>';
         }
-        html += '</div>';
-        return html;
+        return builderFold('outside-text', 'Text outside dishes', escapeAttr(outsideTextSummary_(menu, list)), body, {
+          extraClass: 'outside-text-box'
+        });
       }
 
       // Main / Sunday — call out Sandwiches + Little Bells wording specifically.
@@ -2197,26 +2369,27 @@
         var nIn = (list || []).filter(function (d) {
           return (d.section || '') === sec || (sec === 'Sandwiches' && /sandwich/i.test(d.section || ''));
         }).length;
-        html += '<div class="section-block" data-section="' + escapeAttr(sec) + '" style="margin-bottom:12px">';
-        html += '<div class="section-block-head"><div class="title">' + escapeAttr(sec) + '</div>';
-        html += '<div class="meta"><span class="chip">' + nIn + ' on this sheet</span></div></div>';
-        html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
-        html += renderCardOutsideBoxes(sec, rule, {
+        body += '<div class="section-block" data-section="' + escapeAttr(sec) + '" style="margin-bottom:12px">';
+        body += '<div class="section-block-head"><div class="title">' + escapeAttr(sec) + '</div>';
+        body += '<div class="meta"><span class="chip">' + nIn + ' on this sheet</span></div></div>';
+        body += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
+        body += renderCardOutsideBoxes(sec, rule, {
           abovePlaceholder: sec === 'Little Bells' ? 'All £9.50\nto include a choice of one scoop…' : 'Optional line above the dishes',
           belowPlaceholder: sec === 'Little Bells' ? 'Little Bells on Sunday…' : 'Optional line under the dishes'
         });
         if (sec === 'Sandwiches') {
-          html += '<label class="field" style="margin-top:10px">Tip box selling words</label>';
-          html += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2">' +
+          body += '<label class="field" style="margin-top:10px">Tip box selling words</label>';
+          body += '<textarea data-layout-sell="' + escapeAttr(sec) + '" rows="2">' +
             escapeAttr(rule.sell || '') + '</textarea>';
         }
-        html += '</div></div>';
+        body += '</div></div>';
       });
       if (opts.compact) {
-        html += '<p class="note" style="margin:0">More section notes (Starters, Roasts…) are in <strong>Blocks</strong>.</p>';
+        body += '<p class="note" style="margin:0">More section notes (Starters, Roasts…) are in <strong>Blocks</strong>.</p>';
       }
-      html += '</div>';
-      return html;
+      return builderFold('outside-text', 'Text outside dishes', escapeAttr(outsideTextSummary_(menu, list)), body, {
+        extraClass: 'outside-text-box'
+      });
     }
 
     function renderBlocksStep(menu, list, opts) {
@@ -2250,8 +2423,12 @@
         if (!dishesIn.length && !defaults[sec]) return;
         var rule = menuRules[sec] || defaults[sec] || { width: 'full', frame: false };
         var widthLabel = (EBMenus.WIDTH_OPTIONS.filter(function (w) { return w.id === rule.width; })[0] || {}).label || rule.width;
-        html += '<div class="section-block" data-section="' + escapeAttr(sec) + '">';
-        html += '<div class="section-block-head">';
+        var foldId = 'block:' + sec;
+        var foldOpen = !!builderFoldOpen[foldId];
+        html += '<div class="section-block is-settings-fold' + (foldOpen ? ' is-open' : '') +
+          '" data-section="' + escapeAttr(sec) + '" data-fold-id="' + escapeAttr(foldId) + '">';
+        html += '<button type="button" class="section-block-head" data-builder-fold="' + escapeAttr(foldId) +
+          '" aria-expanded="' + (foldOpen ? 'true' : 'false') + '">';
         html += '<div class="title">' + escapeAttr(sec) + '</div>';
         html += '<div class="meta">';
         html += '<span class="chip">' + dishesIn.length + ' dish' + (dishesIn.length === 1 ? '' : 'es') + '</span>';
@@ -2260,8 +2437,11 @@
         if (sec === 'Sandwiches') {
           html += '<span class="chip">' + (rule.tip ? 'Tip box on' : 'Tip box off') + '</span>';
         }
-        html += '</div></div>';
+        html += '</div>';
+        html += '<span class="chev" aria-hidden="true">' + (foldOpen ? '▾' : '▸') + '</span>';
+        html += '</button>';
         if (defaults[sec]) {
+          // Body stays in the DOM when collapsed so saved width/frame/tip/notes persist.
           html += '<div class="section-block-body" style="padding-top:10px;padding-bottom:12px">';
           html += '<div class="layout-row" style="grid-template-columns:1fr 1fr;border:0;padding:0">';
           html += '<div><label class="field" style="margin-top:0">Width</label>';
@@ -2309,10 +2489,11 @@
 
     function renderWordingStep(menu) {
       var html = '';
-      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want on <strong>this</strong> sheet. The shared bank lives under <strong>Feature panels</strong> at the top (no need to open Main first).</p>';
-      if (menu.kind === 'party') html += renderPartyBlurbsBox();
+      html += '<p class="step-lede">Stay a While, pub quizzes, gatherings — tick what you want on <strong>this</strong> sheet. Detailed party blurbs and the shared bank stay collapsed until you open them.</p>';
+      // Inclusion ticks for feature lines stay visible.
       if (menu.kind === 'long' || menu.kind === 'party') html += renderPromoTicksBox();
       else html += '<p class="note">Event wording from the bank is for Main, Sunday, and Party sheets (including 2×A5).</p>';
+      if (menu.kind === 'party') html += renderPartyBlurbsBox();
       html += '<p class="note" style="margin:12px 0 8px"><button type="button" class="soft" data-view-jump="panels">Open Feature panels</button> — edit the shared bank for every menu.</p>';
       return withFlowNav(html, 2, 4, 'Next · Generate');
     }
@@ -2320,10 +2501,10 @@
     function renderFeaturePanels() {
       var el = document.getElementById('editor');
       var html = '';
-      html += '<div class="include-box" style="margin-bottom:14px">';
+      html += '<div class="include-box include-always-open" style="margin-bottom:14px">';
       html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:22px;margin:0 0 8px">Feature panels</h3>';
-      html += '<p class="note" style="margin:0">Shared across Main, Sunday, Specials and Party. Add Stay a While, quizzes and events here. ' +
-        'On each menu’s <strong>Wording</strong> step, tick which lines print on that sheet.</p>';
+      html += '<p class="note" style="margin:0">Shared across Main, Sunday, Specials and Party. ' +
+        'On each menu’s <strong>Wording</strong> step, tick which lines print on that sheet. Bank editing is collapsed below.</p>';
       html += '</div>';
       html += renderWordingBank();
       el.innerHTML = html;
@@ -2375,25 +2556,24 @@
 
     function renderPartyBlurbsBox() {
       var m = EBMenus.normalizeMeta(metaBook[menuId] || EBMenus.emptyMeta());
-      var html = '<div class="include-box" style="margin-bottom:14px"><h3>Top &amp; bottom blurbs</h3>';
-      html += '<p class="note" style="margin:0 0 10px">These are the <strong>Christmas / party sheet</strong> lines — not the pub-quiz bank below. ' +
+      var body = '';
+      body += '<p class="note" style="margin:0 0 10px">These are the <strong>Christmas / party sheet</strong> lines — not the pub-quiz bank. ' +
         '<strong>Top</strong> is the menu name under the logo. <strong>Bottom</strong> is the pre-order / deposit note under the dishes. ' +
         'Course prices sit under the top blurb. Event selling lines are controlled separately.</p>';
-      html += '<label class="field" style="margin-top:0">Top blurb style</label>' + blurbKindSelect('metaTopKind', m.topKind);
-      html += '<label class="field">Top blurb</label>';
-      html += '<textarea id="metaTitle" rows="2" placeholder="Christmas Party Menu">' + escapeAttr(m.title || 'Christmas Party Menu') + '</textarea>';
-      html += field('Course prices (under top blurb)', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
-      html += '<label class="field">Bottom blurb style</label>' + blurbKindSelect('metaBottomKind', m.bottomKind);
-      html += '<label class="field">Bottom blurb</label>';
-      html += '<textarea id="metaNotes" rows="3" placeholder="Choices must be pre-ordered…">' + escapeAttr(m.notes || '') + '</textarea>';
-      html += '<label class="field" style="margin-top:12px">Paper size</label>';
-      html += '<div class="opt-row">';
-      html += '<label><input type="radio" name="partyPaper" value="a4"' + (m.paper === 'a4' ? ' checked' : '') + '> Full A4</label>';
-      html += '<label><input type="radio" name="partyPaper" value="a5"' + (m.paper === 'a5' ? ' checked' : '') + '> 2×A5 on A4 (guillotine)</label>';
-      html += '</div>';
-      html += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party blurbs</button>';
-      html += '</div>';
-      return html;
+      body += '<label class="field" style="margin-top:0">Top blurb style</label>' + blurbKindSelect('metaTopKind', m.topKind);
+      body += '<label class="field">Top blurb</label>';
+      body += '<textarea id="metaTitle" rows="2" placeholder="Christmas Party Menu">' + escapeAttr(m.title || 'Christmas Party Menu') + '</textarea>';
+      body += field('Course prices (under top blurb)', 'metaPrices', m.coursePrices || '2 courses £32.95 · 3 courses £39.95');
+      body += '<label class="field">Bottom blurb style</label>' + blurbKindSelect('metaBottomKind', m.bottomKind);
+      body += '<label class="field">Bottom blurb</label>';
+      body += '<textarea id="metaNotes" rows="3" placeholder="Choices must be pre-ordered…">' + escapeAttr(m.notes || '') + '</textarea>';
+      body += '<label class="field" style="margin-top:12px">Paper size</label>';
+      body += '<div class="opt-row">';
+      body += '<label><input type="radio" name="partyPaper" value="a4"' + (m.paper === 'a4' ? ' checked' : '') + '> Full A4</label>';
+      body += '<label><input type="radio" name="partyPaper" value="a5"' + (m.paper === 'a5' ? ' checked' : '') + '> 2×A5 on A4 (guillotine)</label>';
+      body += '</div>';
+      body += '<button class="go" id="doSaveMeta" type="button" style="margin-top:12px">Save party blurbs</button>';
+      return builderFold('party-blurbs', 'Top & bottom blurbs', partyBlurbsSummary_(), body);
     }
 
     function renderGenerateStep(menu) {
@@ -2637,9 +2817,9 @@
       var noneOn = !!ticks[noneId];
       var anyBank = Object.keys(ticks).some(function (k) { return k !== noneId && ticks[k]; });
       var auto = pickedPromosForSheet();
-      var html = '<div class="include-box"><h3>Events &amp; selling lines on this sheet</h3>';
+      var html = '<div class="include-box include-always-open"><h3>Events &amp; selling lines on this sheet</h3>';
       html += '<p class="note" style="margin:0 0 8px">Tick lines from the bank to force them onto Generate. Tick <strong>No events or selling lines</strong> for a clean sheet (Christmas party menus often want this). ' +
-        'Leave everything unticked and we’ll auto-pick up to four from the whole bank (past dates drop out; each line shows once before any repeats). Edit the bank further down.</p>';
+        'Leave everything unticked and we’ll auto-pick up to four from the whole bank (past dates drop out; each line shows once before any repeats). Edit the bank under Feature panels.</p>';
       html += '<div class="include-row">';
       html += '<label style="font-weight:700">';
       html += '<input type="checkbox" data-promo-tick="' + escapeAttr(noneId) + '"' + (noneOn ? ' checked' : '') + '> ';
@@ -2667,36 +2847,39 @@
     }
 
     function renderWordingBank() {
-      var html = '<p class="note">Bank of short blurbs for the menu — rooms, quizzes, events. Add a <strong>date</strong> for one-offs (pub quiz night). Past dates are skipped on auto-pick unless you tick them.</p>';
-      html += '<div class="include-box" style="margin-bottom:14px"><h3>Add or edit</h3>';
       var edit = null;
       promoBank.forEach(function (p) { if (p.id === editingPromoId) edit = p; });
-      html += field('Title', 'promoTitle', edit ? edit.title : '');
-      html += '<label class="field">Wording</label><textarea id="promoBody" placeholder="Join us from 8pm…">' + escapeAttr(edit ? edit.body : '') + '</textarea>';
-      html += dateFieldHtml(edit ? edit.date : '');
-      html += '<div class="toolbar-row">';
-      html += '<button class="go" id="doSavePromo" type="button">' + (edit ? 'Save wording' : 'Add to bank') + '</button>';
-      if (edit) html += '<button class="link" id="doCancelPromo" type="button">Cancel edit</button>';
-      html += '</div></div>';
-      html += '<h3 style="font-family:var(--serif);font-weight:500;font-size:18px;margin:4px 0 8px">In the bank</h3>';
+      var body = '';
+      body += '<p class="note" style="margin:0 0 10px">Bank of short blurbs for the menu — rooms, quizzes, events. Add a <strong>date</strong> for one-offs (pub quiz night). Past dates are skipped on auto-pick unless you tick them.</p>';
+      body += '<div class="include-box" style="margin-bottom:14px;background:#fff"><h3>Add or edit</h3>';
+      body += field('Title', 'promoTitle', edit ? edit.title : '');
+      body += '<label class="field">Wording</label><textarea id="promoBody" placeholder="Join us from 8pm…">' + escapeAttr(edit ? edit.body : '') + '</textarea>';
+      body += dateFieldHtml(edit ? edit.date : '');
+      body += '<div class="toolbar-row">';
+      body += '<button class="go" id="doSavePromo" type="button">' + (edit ? 'Save wording' : 'Add to bank') + '</button>';
+      if (edit) body += '<button class="link" id="doCancelPromo" type="button">Cancel edit</button>';
+      body += '</div></div>';
+      body += '<h3 style="font-family:var(--serif);font-weight:500;font-size:18px;margin:4px 0 8px">In the bank</h3>';
       if (!promoBank.length) {
-        html += '<p class="note">Empty — add Stay a While, a pub quiz, etc.</p>';
-        return html;
+        body += '<p class="note">Empty — add Stay a While, a pub quiz, etc.</p>';
+      } else {
+        promoBank.forEach(function (p) {
+          var past = EBMenus.isPastPromoDate(p.date);
+          body += '<div class="dish-row" style="grid-template-columns:1fr auto">';
+          body += '<div><div class="name">' + escapeAttr(p.title);
+          if (p.date) body += ' <span style="font-weight:500">' + escapeAttr(EBMenus.formatPromoDate(p.date) || p.date) + '</span>';
+          if (past) body += ' <span class="from">past</span>';
+          body += '</div>';
+          if (p.body) body += '<div class="meta">' + escapeAttr(p.body) + '</div>';
+          body += '</div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">';
+          body += '<button type="button" class="link" data-edit-promo="' + escapeAttr(p.id) + '">Edit</button>';
+          body += '<button type="button" class="link" data-del-promo="' + escapeAttr(p.id) + '">Remove</button>';
+          body += '</div></div>';
+        });
       }
-      promoBank.forEach(function (p) {
-        var past = EBMenus.isPastPromoDate(p.date);
-        html += '<div class="dish-row" style="grid-template-columns:1fr auto">';
-        html += '<div><div class="name">' + escapeAttr(p.title);
-        if (p.date) html += ' <span style="font-weight:500">' + escapeAttr(EBMenus.formatPromoDate(p.date) || p.date) + '</span>';
-        if (past) html += ' <span class="from">past</span>';
-        html += '</div>';
-        if (p.body) html += '<div class="meta">' + escapeAttr(p.body) + '</div>';
-        html += '</div><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">';
-        html += '<button type="button" class="link" data-edit-promo="' + escapeAttr(p.id) + '">Edit</button>';
-        html += '<button type="button" class="link" data-del-promo="' + escapeAttr(p.id) + '">Remove</button>';
-        html += '</div></div>';
-      });
-      return html;
+      // Open the fold when editing a line so the form is reachable after re-render.
+      if (edit) builderFoldOpen['feature-bank'] = true;
+      return builderFold('feature-bank', 'Feature panel bank', escapeAttr(featureBankSummary_()), body);
     }
 
     function sectionAddFooter_(sec) {
@@ -2941,6 +3124,7 @@
     function bindEditor() {
       bindDateField();
       bindOwnerExtras_();
+      bindBuilderFolds_();
       document.querySelectorAll('[data-view-jump]').forEach(function (b) {
         b.onclick = function () {
           var next = b.getAttribute('data-view-jump');
@@ -3166,13 +3350,15 @@
           if (!w && !f && !n && !t && !s && !ab && !bl) return;
           var above = ab ? ab.value : (next[sec].above || '');
           var below = bl ? bl.value : (next[sec].below || '');
+          var tipOn = !!next[sec].tip;
+          if (t) tipOn = t.type === 'checkbox' ? !!t.checked : t.value === 'yes';
           next[sec] = {
             width: (w && w.value) || next[sec].width,
             frame: f ? f.value === 'yes' : !!next[sec].frame,
             note: n ? n.value : ((ab || bl)
               ? [String(above || '').trim(), String(below || '').trim()].filter(Boolean).join('\n\n')
               : (next[sec].note || '')),
-            tip: t ? t.value === 'yes' : !!next[sec].tip,
+            tip: tipOn,
             sell: s ? s.value : (next[sec].sell || ''),
             above: above,
             aboveKind: abk ? abk.value : (next[sec].aboveKind || 'heading'),
@@ -3196,6 +3382,12 @@
               focusSel = '[data-layout-' + k + '="' + sec.replace(/"/g, '') + '"]';
             }
           });
+          // Tip include tick: save without a full re-render so the include box stays put.
+          if (sel.getAttribute('data-layout-tip') && sel.type === 'checkbox') {
+            persistLayoutFromDom();
+            renderPreview();
+            return;
+          }
           rememberScroll_(sec, focusSel);
           persistLayoutFromDom();
           render();
