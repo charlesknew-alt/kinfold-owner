@@ -1074,7 +1074,8 @@
    * real spare room after food + section notes. Omit rather than clip into the
    * allergy footer — same hard rule as foot pairs, slightly smaller hole.
    */
-  var COL_PROMO_MIN_LEFT = 14;
+  /** Raised so barely-clear leftover cannot plant Sip & Paint and clip Sides. */
+  var COL_PROMO_MIN_LEFT = 16;
   function canFitColumnPromos(leftover) {
     return (leftover || 0) >= COL_PROMO_MIN_LEFT;
   }
@@ -1780,6 +1781,9 @@
   function planFluidLayout(menu, dishes, opts) {
     opts = opts || {};
     var makeFit = !!opts.makeFit;
+    var gapFloor = makeFit
+      ? (TYPE_RANGE.dishGapPx.makeFitMin != null ? TYPE_RANGE.dishGapPx.makeFitMin : 5)
+      : TYPE_RANGE.dishGapPx.min;
     var promos = Array.isArray(opts.promos) ? opts.promos : null;
     // Empty array from the host means “auto” — fall back to seed wording bank.
     if (promos && !promos.length && root.EBMenus && root.EBMenus.seedPromoBank) {
@@ -2205,7 +2209,8 @@
         return r;
       }
       function trySplitBestFit(secName, sec, framed, currentCost) {
-        if (p2Load <= CLIP || !sec || !sec.dishes || !canBalancedSplit(sec.dishes.length)) {
+        if (p2Load <= CLIP || !sec || !sec.dishes ||
+            !canBalancedSplit(sec.dishes.length, { nearEven: makeFit })) {
           return false;
         }
         var r = ruleForPlanSplit_(secName);
@@ -2226,7 +2231,8 @@
        *  even columns when a single stack would clip. Full lock never yields.
        *  Odd dish counts never split (avoids 3|2 hole). */
       function trySplitLongHost(secName, sec, framed, currentCost, force) {
-        if (!sec || !sec.dishes || !canBalancedSplit(sec.dishes.length)) return false;
+        if (!sec || !sec.dishes ||
+            !canBalancedSplit(sec.dishes.length, { nearEven: makeFit })) return false;
         if (sec.dishes.length < 4) return false;
         if (!force && p2Load <= CLIP) return false;
         if (layout.widthOverrides[secName] === 'split') return false;
@@ -2359,15 +2365,14 @@
       layout.leftover.p1 = p1left;
       layout.leftover.p2 = p2left;
 
-      // Classical breath: headroom for the hard dish-gap floor (13px) on
-      // mains / starters / desserts / sandwiches / specials. Sides, Sauces and
-      // Little Bells use compact stacks — do not tax them at mains-level gaps.
+      // Classical breath: headroom for the usual (or Make it fit) dish-gap floor
+      // on mains / desserts / sandwiches / specials. Compact stacks are untaxed.
       var p2SandN = layout.p2.sandwiches ? sandDishCount : 0;
       var p2DishN = mainsN + dessertN + p2SandN +
         (bag.specialMains && bag.specialMains.dishes ? bag.specialMains.dishes.length : 0) +
         (bag.specialDesserts && bag.specialDesserts.dishes ? bag.specialDesserts.dishes.length : 0) +
         (bag.sundayRoasts && !roastsOnP1 && bag.sundayRoasts.dishes ? bag.sundayRoasts.dishes.length : 0);
-      var gapBreath = Math.min(8, p2DishN * Math.max(0, TYPE_RANGE.dishGapPx.min - 8) * 0.07);
+      var gapBreath = Math.min(8, p2DishN * Math.max(0, gapFloor - 8) * 0.07);
       // Nesting Sides under short Specials (or under a tip oval) looks free in
       // unit math (max() stays on the tall column). Tax only classical dishes in
       // that stack — compact Sides must not refuse Specials while panels still fit.
@@ -2466,8 +2471,113 @@
         return true;
       }
       if (foodOverPage || p2Load > CLIP) dropTipOnlyForFood_();
-      // Overflow only after tip + panels are dropped. Named Sandwiches still crowd
-      // mains+desserts; food drop-ins (Specials) print if they sit at min type.
+      /**
+       * Try food arrangements before won't-fit / before a false DOM clip:
+       * drop leftover panels, and when Little Bells + Desserts are Full on a
+       * packed back page, force a column pair so they share a row (Charles
+       * Sunday ~35 dishes — unit math said fit:two while full-bleed kids +
+       * puddings + Sides still clipped in the browser).
+       */
+      function stripFeatureChrome_() {
+        var stripped = false;
+        function off(pageOpts, key) {
+          if (pageOpts && pageOpts[key]) { pageOpts[key] = false; stripped = true; }
+        }
+        ['rooms', 'footPromos', 'columnPromos', 'footLogo'].forEach(function (k) {
+          off(layout.p1, k);
+          off(layout.p2, k);
+        });
+        if (stripped) {
+          // Drop stale “Stay a While / Gatherings (page N)” filler lines.
+          // Do NOT set omitFeaturePanels here — in-pair leveling under
+          // Little Bells|Desserts must still fill a Sunday-sized hole when spare.
+          layout.fillers = (layout.fillers || []).filter(function (f) {
+            return !/Stay a While|Gatherings \(page|Logo \(page/i.test(String(f || ''));
+          });
+          if (layout.fillers.indexOf('Feature panels omitted (keep food on the page)') === -1) {
+            layout.fillers.push('Feature panels omitted (keep food on the page)');
+          }
+        }
+        return stripped;
+      }
+      function refreshFoodLoad_() {
+        foodLoadP2 = p2Load + gapBreath + noteTaxP2;
+        foodBreathP2 = p2Load + gapBreath;
+        foodOverPage = foodLoadP2 > PAGE &&
+          !(foodBreathP2 <= PAGE && noteTaxP2 > 0 && (foodLoadP2 - PAGE) <= noteTaxP2 + 0.05);
+        p2left = Math.max(0, PAGE - p2Load - gapBreath - noteTaxP2);
+        layout.leftover.p2 = p2left;
+      }
+      function tryPackedFoodArrangements_(force) {
+        layout.widthOverrides = layout.widthOverrides || {};
+        var littleRuleArr = layoutRule_('Little Bells', opts.sectionLayout);
+        var dessRuleArr = layoutRule_('Desserts', opts.sectionLayout);
+        var packedBack = !!(bag.mains && bag.littleBells && bag.desserts &&
+          bag.littleBells.dishes && bag.littleBells.dishes.length &&
+          bag.desserts.dishes && bag.desserts.dishes.length);
+        // Tight leftover or Make it fit: rearrange before the DOM gate rejects.
+        var tightBackDom = packedBack && (foodOverPage || p2left < 22 || force || makeFit);
+        if (!tightBackDom && !force && !makeFit) return false;
+        var changed = stripFeatureChrome_();
+        if ((layout.p1 && layout.p1.sundayRoasts && bag.sharing) || makeFit || force) {
+          if (stripFeatureChrome_()) changed = true;
+        }
+        var kidsNeedsCol = !!(bag.littleBells &&
+          (lockedFullWidth(littleRuleArr) || makeFit) &&
+          layout.widthOverrides['Little Bells'] !== 'column');
+        var dessNeedsCol = !!(bag.desserts &&
+          (lockedFullWidth(dessRuleArr) || makeFit) &&
+          layout.widthOverrides.Desserts !== 'column');
+        if (packedBack && kidsNeedsCol &&
+            (dessNeedsCol || (bag.sides && canSitInColumn(sideRulePlan)) || makeFit)) {
+          layout.widthOverrides['Little Bells'] = 'column';
+          changed = true;
+          if (dessNeedsCol || makeFit || lockedFullWidth(dessRuleArr)) {
+            layout.widthOverrides.Desserts = 'column';
+          }
+          if (layout.widthOverrides['Little Bells'] === 'column' &&
+              layout.widthOverrides.Desserts === 'column') {
+            var kidsPairU = sectionUnits(bag.littleBells, !!(littleRuleArr && littleRuleArr.frame)) +
+              wrapUnits(bag.littleBells);
+            var dessPairU = sectionUnits(bag.desserts, !!(dessRuleArr && dessRuleArr.frame)) +
+              wrapUnits(bag.desserts);
+            var pairSaved = Math.max(0, Math.min(kidsPairU, dessPairU) - COST.sectionHead * 0.5);
+            if (pairSaved > 0.5) {
+              p2Load = Math.max(0, p2Load - pairSaved);
+              p2used = Math.max(0, p2used - pairSaved);
+              refreshFoodLoad_();
+            }
+            if (layout.fillers.indexOf(
+              'Little Bells|Desserts (column pair — keep food on the page)') === -1) {
+              layout.fillers.push(
+                'Little Bells|Desserts (column pair — keep food on the page)');
+            }
+            // Keep columnPromos false so empty Sides partners stay panel-free,
+            // but allow in-pair leveling under kids|desserts when spare remains.
+            if (layout.p2) layout.p2.columnPromos = false;
+          } else if (layout.widthOverrides['Little Bells'] === 'column' &&
+              bag.sides && layout.p2.sidesOnP2 && canSitInColumn(sideRulePlan)) {
+            if (layout.fillers.indexOf(
+              'Little Bells|Sides (column pair — keep food on the page)') === -1) {
+              layout.fillers.push('Little Bells|Sides (column pair — keep food on the page)');
+            }
+            if (layout.p2) layout.p2.columnPromos = false;
+            var kidsSideU = sectionUnits(bag.littleBells, true) + wrapUnits(bag.littleBells);
+            var sideSaved = Math.max(0, Math.min(kidsSideU, sideCostP2) - 2);
+            if (sideSaved > 0.5) {
+              p2Load = Math.max(0, p2Load - sideSaved);
+              p2used = Math.max(0, p2used - sideSaved);
+              refreshFoodLoad_();
+            }
+          }
+        }
+        return changed;
+      }
+      // Always try packed arrangements when leftover is tight — unit fit:two
+      // still lied for full-bleed Little Bells + Desserts + Sides.
+      tryPackedFoodArrangements_(false);
+      // Overflow only after tip + panels + arrangements. Named Sandwiches still
+      // crowd mains+desserts; food drop-ins (Specials) print if they sit at min type.
       // Feature panels never cause won't-fit — they were already omitted above.
       // Make it fit: more unit headroom — DOM compressGaps is the hard gate.
       var p1OverLimit = makeFit ? PAGE + 14 : PAGE + 10;
@@ -2475,6 +2585,10 @@
       var wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
         p2used > p2OverLimit || foodOverPage;
       if ((foodOverPage || sandwichCrowdsMains) && dropTipOnlyForFood_()) {
+        wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
+          p2used > p2OverLimit || foodOverPage;
+      }
+      if (wouldOverflow && tryPackedFoodArrangements_(true)) {
         wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
           p2used > p2OverLimit || foodOverPage;
       }
@@ -2548,6 +2662,23 @@
 
     layout.typeRange = TYPE_RANGE;
     layout.orderedDishes = dishes;
+    if (makeFit) {
+      layout.makeFit = true;
+      layout.gapFloorPx = TYPE_RANGE.dishGapPx.makeFitMin;
+      layout.omitFeaturePanels = true;
+      if (layout.p1) {
+        layout.p1 = Object.assign({}, layout.p1, {
+          rooms: false, footPromos: false, columnPromos: false, footLogo: false
+        });
+      }
+      if (layout.p2) {
+        layout.p2 = Object.assign({}, layout.p2, {
+          rooms: false, footPromos: false, columnPromos: false, footLogo: false
+        });
+      }
+    } else {
+      layout.gapFloorPx = TYPE_RANGE.dishGapPx.min;
+    }
     return layout;
   }
 
@@ -2564,17 +2695,22 @@
   /**
    * Only split when the two stacks are line-by-line even (equal dish counts).
    * Odd counts (3|2, 4|3) leave a large empty hole — keep a single column instead.
+   * Make it fit may allow near-even (e.g. 5 → 3|2) when opts.nearEven is set.
    */
-  function canBalancedSplit(n) {
+  function canBalancedSplit(n, opts) {
     n = Number(n) || 0;
-    return n >= 2 && n % 2 === 0;
+    if (n < 2) return false;
+    if (n % 2 === 0) return true;
+    opts = opts || {};
+    return !!opts.nearEven && n >= 3;
   }
 
   /** Split a section across two columns when counts allow an even / balanced stack. */
-  function listDishesCols(list, name) {
+  function listDishesCols(list, name, opts) {
     list = list || [];
-    if (!canBalancedSplit(list.length)) return listDishes(list, name);
-    var mid = list.length / 2;
+    opts = opts || {};
+    if (!canBalancedSplit(list.length, opts)) return listDishes(list, name);
+    var mid = Math.ceil(list.length / 2);
     return wrapTightDishList(
       '<div class="cols share-cols">' +
         '<div class="col">' + listDishes(list.slice(0, mid)) + '</div>' +
@@ -2967,15 +3103,24 @@
     // grow the page — allow the attempt even when page leftover is tight.
     // pageBudget = food height refuses oversized Sip & Paint (the screenshot bug).
     // omitFeaturePanels is a hard food-only measure pass — never plant chrome.
-    if (skipForLeftover && blankPartner && !opts.omitFeaturePanels) skipForLeftover = false;
-    // In-pair leveling is optional leftover chrome only. Never bypass leftover
-    // or skipPromos for it — panels must not trip Generate won't-fit (Charles:
-    // feature panels only drop into leftover; if they do not fit, omit them).
+    // Hard-tight leftover (<10): never bypass — packed Sunday with leftover=8
+    // must not re-plant Gatherings under Little Bells.
+    var hardTight = opts.pageLeftover != null && opts.pageLeftover < 10;
+    if (skipForLeftover && blankPartner && !opts.omitFeaturePanels && !hardTight) {
+      skipForLeftover = false;
+    }
+    // In-pair leveling under a tall food envelope (opts.force): a panel under the
+    // short column does not grow past the tall side — allow even when leftover is
+    // hard-tight / under COL_PROMO_MIN (page height is already set by the tall food).
+    // skipPromos / omitFeaturePanels still win below (packed chrome-off stays off).
     var inPairLevelFill = !!(opts.shortOnly && opts.force &&
       !isBlankFoodInner(leftInner) && !isBlankFoodInner(rightInner));
-    // skipPromos / omitFeaturePanels are absolute. Do not re-plant leveling
-    // panels when the planner already said column chrome is off (packed Sunday
-    // kids|desserts was planting Gatherings via inPairLevelFill bypass).
+    if (skipForLeftover && inPairLevelFill && !opts.omitFeaturePanels && !opts.skipPromos) {
+      skipForLeftover = false;
+    }
+    // skipPromos / omitFeaturePanels are absolute (no leveling bypass of hard skip).
+    // Callers that want in-pair leveling when columnPromos is false must pass
+    // skipPromos:false themselves (e.g. Little Bells|Desserts with force).
     var skipPromosNow = !!opts.skipPromos || !!opts.omitFeaturePanels;
     if (!skipPromosNow && !skipForLeftover) {
       var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
@@ -3215,6 +3360,9 @@
       }
       var dessPair = levelOppositeColumns(kidsInner, kidsU, dessInner, dessU, Object.assign({}, pairPromoOpts, {
         force: kidsForce,
+        // Tall desserts envelope: allow leveling even when page columnPromos is
+        // off — still respects omitFeaturePanels and hard-tight leftover.
+        skipPromos: kidsForce ? !!opts.omitFeaturePanels : pairPromoOpts.skipPromos,
         leftTitle: bag.littleBells.name,
         rightTitle: bag.desserts.name,
         secClass: 'little-desserts-row',
@@ -4872,9 +5020,14 @@
       if (!plan.sectionLayout && root.EBMenus && root.EBMenus.defaultSectionLayout) {
         plan.sectionLayout = root.EBMenus.defaultSectionLayout();
       }
+      if (layout.omitFeaturePanels || plan.makeFit || layout.makeFit) {
+        plan.omitFeaturePanels = true;
+      }
       // Best-fit packing choices (column | full | split) for any category.
       // Specials long-host may override a Column lock via widthOverrides when a
       // single stack would clip — honour that split on the plan.
+      // Packed Sunday may also force Little Bells|Desserts to column even when
+      // Blocks says Full — keep food on the page (ruleFor reads widthOverrides).
       if (layout.widthOverrides && typeof layout.widthOverrides === 'object') {
         plan.widthOverrides = Object.assign({}, plan.widthOverrides || {}, layout.widthOverrides);
         Object.keys(layout.widthOverrides).forEach(function (sec) {
@@ -4882,11 +5035,12 @@
           if (w !== 'column' && w !== 'full' && w !== 'split') return;
           var cur = (plan.sectionLayout && plan.sectionLayout[sec]) || {};
           var isSpecHost = /^special\b/i.test(sec);
+          var fitOverride = (sec === 'Little Bells' || sec === 'Desserts') && w === 'column';
           if (w !== 'split' || !isSpecHost) {
-            if (root.EBMenus && root.EBMenus.isLockedColumnWidth &&
+            if (!fitOverride && root.EBMenus && root.EBMenus.isLockedColumnWidth &&
                 root.EBMenus.isLockedColumnWidth(cur.width)) return;
           }
-          if (root.EBMenus && root.EBMenus.isLockedFullWidth &&
+          if (!fitOverride && root.EBMenus && root.EBMenus.isLockedFullWidth &&
               root.EBMenus.isLockedFullWidth(cur.width)) return;
           plan.sectionLayout = plan.sectionLayout || {};
           plan.sectionLayout[sec] = Object.assign({}, cur, { width: w });

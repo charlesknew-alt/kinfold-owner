@@ -476,6 +476,14 @@ assert(page.indexOf('never open a half-cut preview') !== -1 ||
 assert(page.indexOf('Try deselecting') !== -1 &&
   page.indexOf('data-overflow-tip') !== -1,
   'overflow gate names tip / drop-ins to deselect');
+assert(page.indexOf('feature panels (Sip & Paint') === -1,
+  'overflow gate never tells staff to deselect feature panels');
+assert(page.indexOf('they never block Generate') !== -1,
+  'overflow copy states feature panels never block Generate');
+assert(/skipPromosNow\s*=\s*!!opts\.skipPromos\s*\|\|\s*!!opts\.omitFeaturePanels/.test(printJs),
+  'skipPromos / omitFeaturePanels are absolute (no leveling bypass of hard skip)');
+assert(printJs.indexOf('falsely blocked core Sunday') !== -1,
+  'measurePrintFit waits for fitPages before accepting clipped');
 assert(page.indexOf('okToPrint = null') !== -1 ||
   page.indexOf('advice.okToPrint = null') !== -1 ||
   page.indexOf('DOM measure still wins') !== -1,
@@ -859,8 +867,9 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow216') !== -1, 'menus page cache-bust is flow216');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow216') !== -1, 'hub menus link cache-bust is flow216');
+assert(page.indexOf('flow217c') !== -1, 'menus page cache-bust is flow217c');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow217c') !== -1,
+  'hub menus link cache-bust is flow217c');
 assert(page.indexOf('builder-fold') !== -1 && page.indexOf('function builderFold') !== -1,
   'builder folds collapse advanced config');
 assert(page.indexOf('include-always-open') !== -1 && page.indexOf('includeTicksBox') !== -1,
@@ -2287,6 +2296,81 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
     'normal balanced split requires even counts');
   assert(print.canBalancedSplit(5, { nearEven: true }) === true,
     'Make it fit allows near-even balanced splits');
+})();
+(function charlesSundayPackedListFitsTwoPages() {
+  // Live Charles/Kate block: ~35 dishes with Full Little Bells + Desserts.
+  // Root cause was stacking kids + puddings + Sides full-bleed while unit math
+  // said fit:two — Generate must column-pair before won't-fit / DOM clip.
+  function d(section, name, desc) {
+    return api.dish(section, name, desc || '', '12.00', '');
+  }
+  var dishes = [
+    d('Nibbles', 'Vegetable Samosas', 'mango chutney'),
+    d('Nibbles', 'Mini Bread Rolls', 'salted butter'),
+    d('Nibbles', 'Vegetable Spring Rolls', 'sweet chilli'),
+    d('Nibbles', 'Nacho Cheese Triangles', 'salsa'),
+    d('Starters', 'Pan Fried King Prawns', 'garlic butter, sourdough'),
+    d('Starters', 'Whitebait', 'tartare, lemon'),
+    d('Starters', 'Mackerel Pate', 'toast, pickle'),
+    d('Starters', 'Bang Bang Cauliflower', 'peanut dressing'),
+    d('Starters', 'Ham Hock Pot', 'piccalilli, toast'),
+    d('Sunday Roasts', 'Sirloin of Beef', 'cooked pink, Yorkshire, roasties'),
+    d('Sunday Roasts', 'Chicken Supreme', 'crispy skin, stuffing'),
+    d('Sunday Roasts', 'Leg of Lamb', 'cooked pink, mint'),
+    d('Sunday Roasts', 'Nut Roast', 'vegetarian gravy'),
+    d('Sunday Roasts', 'Loin of Pork', 'crackling, apple'),
+    d('Mains', 'Osso Bucco', 'saffron risotto'),
+    d('Mains', 'Beef Chilli', 'rice, sour cream'),
+    d('Mains', 'Creamy Chicken Nduja & Chorizo Penne', 'parmesan'),
+    d('Mains', 'Sweet Potato & Halloumi Burger', 'fries, slaw'),
+    d('Mains', 'Wild Mushroom & Truffle Risotto', 'parmesan'),
+    d('Little Bells', 'Fish Fingers', 'chips, peas'),
+    d('Little Bells', 'Chicken Goujons', 'chips, beans'),
+    d('Little Bells', 'Beef Burger', 'fries'),
+    d('Little Bells', 'Ham & Cheese Pizza', ''),
+    d('Little Bells', 'Cheesy Pasta', ''),
+    d('Sides', 'Cheesy Garlic Bread', ''),
+    d('Sides', 'Fries', ''),
+    d('Sides', 'Chunky Triple Cooked Chips', ''),
+    d('Desserts', 'Cheeses', 'biscuits, chutney'),
+    d('Desserts', 'Three Scoops', 'ice cream or sorbet'),
+    d('Desserts', 'Chocolate & Raspberry Tart', 'cream'),
+    d('Desserts', 'Sticky Toffee', 'toffee sauce, ice cream'),
+    d('Desserts', 'Apple & Blackberry Crumble', 'custard'),
+    d('Desserts', 'Lime Posset', 'shortbread'),
+    d('Sharing', 'Baked Camembert', 'sourdough, chutney'),
+    d('Sharing', 'Beef Chilli Nachos', 'cheese, jalapeños')
+  ];
+  assert(dishes.length === 35, 'Charles Sunday proof set is 35 dishes');
+  var sl = api.sectionLayoutForMenu('sunday');
+  assert(sl['Little Bells'].width === 'full' && sl.Desserts.width === 'full',
+    'proof uses default Full Little Bells + Desserts (the false-reject shape)');
+  var layout = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: sl,
+    includes: { 'little-bells': true, desserts: true },
+    promos: []
+  });
+  assert(layout.fit !== 'over' && layout.pages === 2,
+    'Charles Sunday list generates on two A4 pages (not overflow gate)');
+  assert(layout.widthOverrides && layout.widthOverrides['Little Bells'] === 'column' &&
+    layout.widthOverrides.Desserts === 'column',
+    'packed Sunday forces Little Bells|Desserts column pair before reject');
+  assert(layout.p1 && layout.p1.rooms === false && layout.p1.footPromos === false,
+    'packed Sunday drops page-1 leftover panels before food can clip');
+  var html = print.build(api.menuById('sunday'), dishes, {
+    layout: layout,
+    sectionLayout: sl,
+    includes: { 'little-bells': true, desserts: true },
+    promos: [],
+    widthOverrides: layout.widthOverrides,
+    meta: api.emptyMeta()
+  });
+  assert(/little-desserts-row/.test(html) && /col-little/.test(html),
+    'Charles Sunday print pairs Little Bells beside Desserts');
+  assert(/Osso Bucco/.test(html) && /Vegetable Samosas/.test(html) && /Lime Posset/.test(html),
+    'Charles Sunday print keeps the full dish list');
+  assert((html.match(/class="page /g) || []).length === 2,
+    'Charles Sunday print is exactly two A4 pages');
 })();
 (function mainSpecialsFitAtMinType() {
   var dishes = api.composeDishes(api.seed(), 'main', { specials: true });
@@ -4093,8 +4177,8 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
 // into the allergy footer; kids below-note stays inside its frilly box.
 (function sundayPackedKidsSidesOmitsGatherings() {
   assert(typeof print.canFitColumnPromos === 'function', 'canFitColumnPromos is exported');
-  assert(print.canFitColumnPromos(14) === true, 'comfortable leftover may take a column panel');
-  assert(print.canFitColumnPromos(10) === false, 'tight leftover skips column Gatherings');
+  assert(print.canFitColumnPromos(16) === true, 'comfortable leftover may take a column panel');
+  assert(print.canFitColumnPromos(12) === false, 'tight leftover skips column Gatherings');
   var sunday = api.menuById('sunday');
   var dishes = [
     api.dish('Sunday Roasts', 'Topside of Beef', 'roasties', '18.95', ''),
@@ -4137,7 +4221,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   });
   assert(planned.p2 && planned.p2.columnPromos === false,
     'packed Sunday marks columnPromos false after kids notes + gap breath');
-  assert(planned.leftover && planned.leftover.p2 < 14,
+  assert(planned.leftover && planned.leftover.p2 < 16,
     'packed Sunday leftover is below the column-panel gate');
   // Stale flag must not shove Gatherings under Little Bells.
   planned.p2.columnPromos = true;

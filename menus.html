@@ -473,9 +473,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261011-flow217"></script>
-  <script src="menus-print.js?v=20261011-flow217"></script>
-  <script src="menus-ingest.js?v=20261011-flow217"></script>
+  <script src="menus.js?v=20261011-flow217c"></script>
+  <script src="menus-print.js?v=20261011-flow217c"></script>
+  <script src="menus-ingest.js?v=20261011-flow217c"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4284,6 +4284,9 @@
         result.plan.text = layout.summary;
         result.plan.promos = promos;
         result.plan.includes = hostIncludes();
+        if (layout.omitFeaturePanels) result.plan.omitFeaturePanels = true;
+        if (layout.widthOverrides) result.plan.widthOverrides = layout.widthOverrides;
+        if (layout.makeFit) result.plan.makeFit = true;
       } else if (menu.kind === 'party') {
         result.plan.promos = pickedPromosForSheet();
       }
@@ -4495,7 +4498,9 @@
       result.plan.promos = promos;
       result.plan.includes = hostIncludes();
       result.plan.makeFit = true;
+      result.plan.omitFeaturePanels = true;
       result.plan.sectionLayout = sheetLayout;
+      if (layout.widthOverrides) result.plan.widthOverrides = layout.widthOverrides;
       if (layout.fit === 'over') {
         showOverflowGate_(result);
         return;
@@ -4844,6 +4849,9 @@
         result.plan.promos = promos;
         result.plan.sectionLayout = sheetLayout;
         result.plan.includes = hostIncludes();
+        if (layout.omitFeaturePanels) result.plan.omitFeaturePanels = true;
+        if (layout.widthOverrides) result.plan.widthOverrides = layout.widthOverrides;
+        if (layout.makeFit) result.plan.makeFit = true;
         if (layout.fit === 'over') {
           if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
           if (hint) hint.disabled = false;
@@ -5073,7 +5081,11 @@
                   });
                   if (fitLayout && fitLayout.fit !== 'over') {
                     var fitPlan = Object.assign({}, result.plan, {
-                      layout: fitLayout, makeFit: true, fit: fitLayout.fit
+                      layout: fitLayout,
+                      makeFit: true,
+                      fit: fitLayout.fit,
+                      omitFeaturePanels: true,
+                      widthOverrides: fitLayout.widthOverrides || result.plan.widthOverrides
                     });
                     if (fitPlan.layout.p1) {
                       fitPlan.layout.p1 = Object.assign({}, fitPlan.layout.p1, {
@@ -5182,6 +5194,8 @@
                 layout = recheck;
                 result.plan.layout = recheck;
                 result.plan.fit = recheck.fit;
+                if (recheck.omitFeaturePanels) result.plan.omitFeaturePanels = true;
+                if (recheck.widthOverrides) result.plan.widthOverrides = recheck.widthOverrides;
               }
             }
             var sum = document.getElementById('arrangeSummary');
