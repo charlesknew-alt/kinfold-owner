@@ -473,9 +473,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261011-flow220"></script>
-  <script src="menus-print.js?v=20261011-flow220"></script>
-  <script src="menus-ingest.js?v=20261011-flow220"></script>
+  <script src="menus.js?v=20261011-flow222"></script>
+  <script src="menus-print.js?v=20261011-flow222"></script>
+  <script src="menus-ingest.js?v=20261011-flow222"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4416,9 +4416,9 @@
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
       html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Too much content to fit on this sheet</div>';
       if (makeFitTried) {
-        html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Compact spacing still could not fit every selected dish without clipping. Feature panels were already omitted. Please untick a drop-in menu or remove dishes, then Generate again — never open a half-cut preview.</p>';
+        html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Compact spacing still reported a tight sheet. Untick a drop-in below, or Close and try Generate again. Feature panels only fill leftover space — they never block the sheet.</p>';
       } else {
-        html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Selected food would clip outside the printable area even after omitting feature panels and compressing spacing. Feature panels only fill leftover space — they never block Generate. Please untick a drop-in menu or remove dishes, then Generate again — never open a half-cut preview.</p>';
+        html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Selected food may clip at the usual spacing. Feature panels only fill leftover space — they never block Generate. Use <strong>Make it fit</strong> to open a compact preview, or untick a drop-in below.</p>';
       }
       var culprits = [];
       var ticked = tickedDropIns_();
@@ -4541,18 +4541,14 @@
         if (!opened) alert('Allow pop-ups to open the menu preview, then Save or Discard.');
         else commitAutoPromoDeck_(promos);
       }
+      // Make it fit is the escape hatch: always open the preview for review.
+      // DOM measure has false-blocked tip+Specials sheets that still show empty
+      // column gaps (Charles flow221). Staff Save/Discard after looking.
       if (!EBMenuPrint.measurePrintFit) {
         openOk(html);
         return;
       }
       EBMenuPrint.measurePrintFit(html, { timeoutMs: 4500 }).then(function (probe) {
-        if (probe && probe.clipped) {
-          release();
-          result.plan.fit = 'over';
-          result.plan.makeFit = true;
-          showOverflowGate_(result);
-          return;
-        }
         openOk((probe && probe.html) || html);
       }, function () { openOk(html); });
     }
@@ -5117,13 +5113,9 @@
                     });
                     var fitHtml = EBMenuPrint.build(menu, result.dishes, fitPlan);
                     return EBMenuPrint.measurePrintFit(fitHtml, { timeoutMs: 4500 }).then(function (probe3) {
-                      if (probe3 && probe3.clipped) {
-                        // Remember Make it fit already ran so the gate does not loop.
-                        result.plan.makeFit = true;
-                        if (result.plan.layout) result.plan.layout.makeFit = true;
-                        blockClipped();
-                        return;
-                      }
+                      // Auto Make it fit always opens preview — same escape hatch as
+                      // the button. False DOM clip was blocking sheets with empty
+                      // Burgers / Sides column gaps (flow221).
                       layout = fitLayout;
                       result.plan = fitPlan;
                       openOk((probe3 && probe3.html) || fitHtml);
