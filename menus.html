@@ -473,9 +473,9 @@
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
     <div id="editor"></div>
   </main>
-  <script src="menus.js?v=20261010-flow216"></script>
-  <script src="menus-print.js?v=20261010-flow216"></script>
-  <script src="menus-ingest.js?v=20261010-flow216"></script>
+  <script src="menus.js?v=20261011-flow217"></script>
+  <script src="menus-print.js?v=20261011-flow217"></script>
+  <script src="menus-ingest.js?v=20261011-flow217"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -4409,18 +4409,15 @@
         'background:#fffaf4;color:#1c1610;max-width:520px;width:100%;border-radius:16px;padding:22px 24px;box-shadow:0 18px 40px rgba(0,0,0,.25)');
       var html = '<div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#5a534a;margin-bottom:8px;font-family:system-ui,sans-serif">Before print</div>';
       html += '<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:8px">Too much content to fit on this sheet</div>';
-      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Food or boxes would clip outside the printable area (even after dropping optional feature panels). Please deselect something, then Generate again — never open a half-cut preview.</p>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">Selected food would clip outside the printable area even after omitting feature panels and compressing spacing. Feature panels only fill leftover space — they never block Generate. Please untick a drop-in menu or remove dishes, then Generate again — never open a half-cut preview.</p>';
       var culprits = [];
       var ticked = tickedDropIns_();
       ticked.forEach(function (m) { culprits.push(dropInLabel_(m)); });
       var sheetRules = (result && result.plan && result.plan.sectionLayout) || effectiveSectionLayout(menuId) || {};
       var tipOn = !!(sheetRules.Sandwiches && sheetRules.Sandwiches.tip);
       if (tipOn) culprits.push('Sandwiches tip');
-      var layoutFillers = (result && result.plan && result.plan.layout && result.plan.layout.fillers) || [];
-      var namesSip = layoutFillers.some(function (f) { return /Sip|Paint|feature panel|Gatherings|Stay a While|Pub Quiz/i.test(String(f || '')); });
-      if (namesSip || (result && result.plan && result.plan.promos && result.plan.promos.length)) {
-        culprits.push('feature panels (Sip & Paint / Gatherings / …)');
-      }
+      // Never suggest deselecting feature panels — they auto-omit and cannot
+      // cause won't-fit (Sip & Paint / Gatherings are leftover-only chrome).
       if (culprits.length) {
         html += '<p style="font-family:system-ui,sans-serif;font-size:13px;margin:0 0 12px;color:#5a2a2a"><strong>Try deselecting:</strong> ' +
           escapeAttr(culprits.join(' · ')) + '</p>';
@@ -4437,12 +4434,14 @@
         }
         html += '</div></div>';
       } else {
-        html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">No dropped-in menus are ticked. Remove some dishes from this sheet, then Generate.</p>';
+        html += '<p style="font-family:system-ui,sans-serif;font-size:14px;margin:0 0 12px">No dropped-in menus are ticked. Feature panels were already omitted. Remove some dishes from this sheet, then Generate.</p>';
       }
       html += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
-      html += '<button type="button" id="overflowSaveTicks" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Update ticks</button>';
+      html += '<button type="button" id="overflowMakeFit" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:0;border-radius:999px;background:#1c1610;color:#f4eae3;cursor:pointer">Make it fit</button>';
+      html += '<button type="button" id="overflowSaveTicks" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Update ticks</button>';
       html += '<button type="button" id="overflowCancel" style="font:600 14px system-ui,sans-serif;padding:10px 16px;border:1px solid #1c1610;border-radius:999px;background:#fff;cursor:pointer">Close</button>';
       html += '</div>';
+      html += '<p style="font-family:system-ui,sans-serif;font-size:12px;margin:12px 0 0;color:#5a534a">Make it fit keeps every selected dish, compresses spacing below the usual minimum (still readable), and opens a preview to review before export.</p>';
       card.innerHTML = html;
       overlay.appendChild(card);
       document.body.appendChild(overlay);
@@ -4450,6 +4449,10 @@
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       }
       document.getElementById('overflowCancel').onclick = closeGate;
+      document.getElementById('overflowMakeFit').onclick = function () {
+        closeGate();
+        generateMenuWithMakeFit_();
+      };
       document.getElementById('overflowSaveTicks').onclick = function () {
         if (!includes[menuId]) includes[menuId] = {};
         overlay.querySelectorAll('[data-overflow-include]').forEach(function (box) {
@@ -4467,6 +4470,65 @@
         closeGate();
         render();
       };
+    }
+
+    /** Compact spacing below the usual gap minimum; preserves all selected content. */
+    function generateMenuWithMakeFit_() {
+      spellGatePassed_ = true;
+      var result = composed();
+      var menu = EBMenus.menuById(menuId);
+      if (menu.kind !== 'long' || !EBMenuPrint.planFluidLayout) {
+        showOverflowGate_(result);
+        return;
+      }
+      var promos = pickedPromosForSheet();
+      var sheetLayout = effectiveSectionLayout(menuId);
+      var layout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
+        promos: promos,
+        sectionLayout: sheetLayout,
+        includes: hostIncludes(),
+        makeFit: true
+      });
+      result.plan.layout = layout;
+      result.plan.fit = layout.fit;
+      result.plan.text = layout.summary;
+      result.plan.promos = promos;
+      result.plan.includes = hostIncludes();
+      result.plan.makeFit = true;
+      result.plan.sectionLayout = sheetLayout;
+      if (layout.fit === 'over') {
+        showOverflowGate_(result);
+        return;
+      }
+      var btn = document.getElementById('doGenerate');
+      var hint = document.getElementById('doPrintHint');
+      if (btn) { btn.disabled = true; btn.textContent = 'Making it fit…'; }
+      if (hint) hint.disabled = true;
+      result.plan.meta = metaBook[menuId] || EBMenus.emptyMeta();
+      var html = EBMenuPrint.build(menu, result.dishes, result.plan);
+      function release() {
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate menu'; }
+        if (hint) hint.disabled = false;
+      }
+      function openOk(finalHtml) {
+        release();
+        var opened = EBMenuPrint.openPrintHtml && EBMenuPrint.openPrintHtml(finalHtml || html);
+        if (!opened) alert('Allow pop-ups to open the menu preview, then Save or Discard.');
+        else commitAutoPromoDeck_(promos);
+      }
+      if (!EBMenuPrint.measurePrintFit) {
+        openOk(html);
+        return;
+      }
+      EBMenuPrint.measurePrintFit(html, { timeoutMs: 4500 }).then(function (probe) {
+        if (probe && probe.clipped) {
+          release();
+          result.plan.fit = 'over';
+          showOverflowGate_(result);
+          return;
+        }
+        openOk((probe && probe.html) || html);
+      }, function () { openOk(html); });
     }
 
     function showDropInOfferGate_(result, thenGenerate) {
@@ -4992,13 +5054,50 @@
               }
               retryPlan.layout = lay;
               retryPlan.forceColumnFill = null;
+              // Hard food-only rebuild: feature panels never decide won't-fit.
+              retryPlan.omitFeaturePanels = true;
+              retryPlan.promos = [];
               var retryHtml = EBMenuPrint.build(menu, result.dishes, retryPlan);
               return EBMenuPrint.measurePrintFit(retryHtml, { timeoutMs: 4200 }).then(function (probe2) {
-                if (probe2 && probe2.clipped) {
-                  blockClipped();
+                if (probe2 && !probe2.clipped) {
+                  openOk((probe2 && probe2.html) || retryHtml);
                   return;
                 }
-                openOk((probe2 && probe2.html) || retryHtml);
+                // Auto Make it fit before blocking — compact gaps, keep all food.
+                if (!result.plan.makeFit && EBMenuPrint.planFluidLayout) {
+                  var fitLayout = EBMenuPrint.planFluidLayout(menu, result.dishes, {
+                    promos: promos,
+                    sectionLayout: result.plan.sectionLayout || effectiveSectionLayout(menuId),
+                    includes: hostIncludes(),
+                    makeFit: true
+                  });
+                  if (fitLayout && fitLayout.fit !== 'over') {
+                    var fitPlan = Object.assign({}, result.plan, {
+                      layout: fitLayout, makeFit: true, fit: fitLayout.fit
+                    });
+                    if (fitPlan.layout.p1) {
+                      fitPlan.layout.p1 = Object.assign({}, fitPlan.layout.p1, {
+                        footPromos: false, columnPromos: false, rooms: false, footLogo: false
+                      });
+                    }
+                    if (fitPlan.layout.p2) {
+                      fitPlan.layout.p2 = Object.assign({}, fitPlan.layout.p2, {
+                        footPromos: false, columnPromos: false, rooms: false, footLogo: false
+                      });
+                    }
+                    var fitHtml = EBMenuPrint.build(menu, result.dishes, fitPlan);
+                    return EBMenuPrint.measurePrintFit(fitHtml, { timeoutMs: 4500 }).then(function (probe3) {
+                      if (probe3 && probe3.clipped) {
+                        blockClipped();
+                        return;
+                      }
+                      layout = fitLayout;
+                      result.plan = fitPlan;
+                      openOk((probe3 && probe3.html) || fitHtml);
+                    });
+                  }
+                }
+                blockClipped();
               });
             }
             openOk((probe && probe.html) || html);

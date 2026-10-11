@@ -298,11 +298,15 @@ assert(printJs.indexOf('--title-max:22pt') !== -1 && printJs.indexOf('--name-max
 assert(printJs.indexOf('--name-min:11pt') !== -1 && printJs.indexOf('--desc-min:10pt') !== -1,
   'type range CSS vars set readable min sizes (+2pt)');
 assert(printJs.indexOf('--title-min:16pt') !== -1, 'section title min is 16pt');
-assert(printJs.indexOf('--dish-gap-min:13px') !== -1, 'minimum gap between dishes is 13px');
+assert(printJs.indexOf('--dish-gap-min:9px') !== -1, 'usual minimum gap between dishes is 9px');
+assert(printJs.indexOf('body.make-fit{--dish-gap-min:5px}') !== -1,
+  'Make it fit lowers dish-gap floor to 5px');
 assert(printJs.indexOf('max(var(--dish-gap-min),var(--dish-gap))') !== -1,
   'dish margin respects dish-gap-min floor');
-assert(/\.fill-dense\{[^}]*--name:11pt/.test(printJs) && /\.fill-dense\{[^}]*--dish-gap:13px/.test(printJs),
-  'dense floor uses raised type mins and 13px dish gap');
+assert(/\.fill-dense\{[^}]*--name:11pt/.test(printJs) && /\.fill-dense\{[^}]*--dish-gap:9px/.test(printJs),
+  'dense floor uses raised type mins and usual-min dish gap');
+assert(printJs.indexOf('function compressGaps') !== -1,
+  'fitPages compresses dish gaps toward min before clipping');
 assert(/\.desc\{[^}]*font-weight:300/.test(printJs) && printJs.indexOf('wght@0,300') !== -1,
   'dish descriptions use Roboto Light (300)');
 assert(/\.fill-airy\{[^}]*--name:11\.5pt/.test(printJs) && /\.fill-airy\{[^}]*--title:22pt/.test(printJs),
@@ -435,9 +439,9 @@ assert(printApi.typeRange.desc.max === 10 && printApi.typeRange.desc.min === 10,
   'TYPE_RANGE description min/max (+2pt min)');
 assert(printApi.typeRange.name.min === 11 && printApi.typeRange.title.min === 16,
   'TYPE_RANGE name/title mins raised by 2pt');
-assert(printApi.typeRange.dishGapPx && printApi.typeRange.dishGapPx.min === 13 &&
-  printApi.typeRange.dishGapPx.max === 18,
-  'TYPE_RANGE includes classical minimum dish gap (13–18px)');
+assert(printApi.typeRange.dishGapPx && printApi.typeRange.dishGapPx.min === 9 &&
+  printApi.typeRange.dishGapPx.max === 18 && printApi.typeRange.dishGapPx.makeFitMin === 5,
+  'TYPE_RANGE includes adjustable dish gap (9–18px, Make it fit 5px)');
 var sampleCss = printApi.build(api.menuById('main'), api.seed().main, { pages: 1, forceFillClass: 'fill-roomy' });
 assert(sampleCss.indexOf('NaN') === -1, 'generated print CSS has no NaN from broken concatenations');
 assert(sampleCss.indexOf('.dish-line{display:flex') !== -1, 'generated print CSS keeps dish-line flex leaders');
@@ -539,6 +543,10 @@ assert(page.indexOf('Please remove a dropped-in menu') !== -1,
   'overflow copy asks to remove a dropped-in menu');
 assert(page.indexOf('Main, Sunday and any long sheet') !== -1,
   'overflow gate applies to Sunday as well as Main');
+assert(page.indexOf('overflowMakeFit') !== -1 && page.indexOf('generateMenuWithMakeFit_') !== -1,
+  'overflow gate offers Make it fit with compact spacing path');
+assert(page.indexOf('Make it fit keeps every selected dish') !== -1,
+  'Make it fit copy explains content is preserved');
 assert(page.indexOf('dropInOfferOverlay') !== -1 && page.indexOf('There is space on the sheet') !== -1,
   'spare leftover offers dropping in a sub-menu');
 assert(page.indexOf('is too big to fit') !== -1 && page.indexOf('try a different one') !== -1,
@@ -2203,6 +2211,83 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   assert(layout.fit !== 'over',
     'packed Sunday with Little Bells and Desserts still generates at min type');
 })();
+(function sundayMinimalWithoutKidsFitsTwoPages() {
+  // Historical printable Sunday: roasts / mains / sides / desserts, kids unticked.
+  var dishes = [];
+  ['Whitebait', 'Scotch Egg', 'King Prawns', 'Bang Bang Cauliflower', 'Soup'].forEach(function (n, i) {
+    dishes.push(api.dish('Starters', n, 'starter description', (7 + i) + '.95', ''));
+  });
+  ['Sirloin of Beef', 'Leg of Lamb', 'Loin of Pork', 'Chicken Supreme', 'Nut Roast'].forEach(function (n, i) {
+    dishes.push(api.dish('Sunday Roasts', n, i === 4 ? '' : 'cooked pink', (18 + i % 4) + '.95', i === 4 ? 'vg' : ''));
+  });
+  ['Beef Burger', 'Katsu Curry', 'Porchetta', 'Short Rib'].forEach(function (n, i) {
+    dishes.push(api.dish('Mains', n, 'served with sides', (15 + i) + '.95', ''));
+  });
+  ['Cheesy Garlic Bread', 'Chunky Chips', 'Seasonal Vegetables', 'House Salad', 'Onion Rings'].forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.95', 'v'));
+  });
+  ['Sticky Toffee', 'Chocolate Brownie', 'Treacle Tart', 'Cheesecake', 'Ice Cream', 'Sussex Cheeses'].forEach(function (n, i) {
+    dishes.push(api.dish('Desserts', n, 'with ice cream', (7 + i % 3) + '.95', 'v'));
+  });
+  var layout = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: api.sectionLayoutForMenu('sunday'),
+    includes: {},
+    promos: []
+  });
+  assert(layout.fit !== 'over' && layout.pages === 2,
+    'minimal Sunday (no kids / optional drop-ins) fits on two pages');
+  assert(!layout.bag || !layout.bag.littleBells,
+    'minimal Sunday plan has no Little Bells when unticked');
+  var html = print.build(api.menuById('sunday'), dishes, {
+    layout: layout,
+    sectionLayout: api.sectionLayoutForMenu('sunday'),
+    includes: {},
+    promos: [],
+    meta: api.emptyMeta()
+  });
+  assert(/Sunday Roasts/i.test(html) && /Desserts/i.test(html) && !/Little Bells/i.test(html),
+    'Sunday print includes roasts and desserts without kids');
+  assert(html.indexOf('--dish-gap-min:9px') !== -1 && html.indexOf('compressGaps') !== -1,
+    'Sunday print uses adjustable gap range and compressGaps');
+})();
+(function makeFitPlanUsesLowerGapFloor() {
+  var dishes = jammedSunday.concat([
+    api.dish('Sides', 'Cheesy Garlic Bread', '', '4.95', 'v'),
+    api.dish('Sides', 'Fries', '', '4.95', 'v'),
+    api.dish('Sides', 'Salad', '', '4.95', 'v'),
+    api.dish('Sides', 'Onion Rings', '', '4.95', 'v'),
+    api.dish('Sauces', 'Peppercorn', '', '2.50', ''),
+    api.dish('Sauces', 'Diane', '', '2.50', '')
+  ]);
+  var normal = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: api.defaultSectionLayout(),
+    promos: []
+  });
+  var fitted = print.planFluidLayout(api.menuById('sunday'), dishes, {
+    sectionLayout: api.defaultSectionLayout(),
+    promos: [],
+    makeFit: true
+  });
+  assert(fitted.makeFit === true && fitted.gapFloorPx === 5,
+    'Make it fit plan records lower gap floor');
+  assert(fitted.fit !== 'over' || normal.fit === 'over',
+    'Make it fit does not reject more aggressively than normal spacing');
+  var fitHtml = print.build(api.menuById('sunday'), dishes, {
+    layout: fitted,
+    makeFit: true,
+    sectionLayout: api.defaultSectionLayout(),
+    promos: [],
+    meta: api.emptyMeta()
+  });
+  assert(/\bmake-fit\b/.test(fitHtml) && fitHtml.indexOf('--dish-gap-min:5px') !== -1,
+    'Make it fit print body uses 5px dish-gap floor');
+})();
+(function canBalancedSplitNearEvenForMakeFit() {
+  assert(print.canBalancedSplit(4) === true && print.canBalancedSplit(5) === false,
+    'normal balanced split requires even counts');
+  assert(print.canBalancedSplit(5, { nearEven: true }) === true,
+    'Make it fit allows near-even balanced splits');
+})();
 (function mainSpecialsFitAtMinType() {
   var dishes = api.composeDishes(api.seed(), 'main', { specials: true });
   var layout = print.planFluidLayout(api.menuById('main'), dishes, {
@@ -2293,10 +2378,14 @@ var jamLayout = print.planFluidLayout(api.menuById('sunday'), jammedSunday, {
   });
   assert(layout.p2 && layout.p2.specialsBesideSandwiches && layout.p2.sidesUnderSpecials,
     'packed Main still plans Specials|Sandwiches with Sides under Specials');
-  assert(layout.fit === 'over' && layout.overflow === 'drop-in',
-    'Specials|Sandwiches + Sides under a full mains list overflows at min type + 13px gap');
-  assert(layout.fillers && layout.fillers.indexOf('Too much content — remove a dropped-in menu') !== -1,
-    'overflow filler copy asks to remove a dropped-in menu');
+  // Adjustable usual min (9px) + compressGaps replaced the hard 13px floor that
+  // false-rejected this sheet while food could still sit on two pages.
+  assert(layout.fit !== 'over' || layout.overflow === 'drop-in',
+    'Specials|Sandwiches + Sides either fits at usual min gap or asks to untick');
+  if (layout.fit === 'over') {
+    assert(layout.fillers && layout.fillers.indexOf('Too much content — remove a dropped-in menu') !== -1,
+      'overflow filler copy asks to remove a dropped-in menu');
+  }
   // Leaner sheet (fewer mains, Sides can leave page 2) still generates.
   var lean = dishes.filter(function (d) {
     return d.section !== 'Nibbles' && d.section !== 'Item Boost';
@@ -4147,7 +4236,7 @@ assert(tipPackedLayout.p2 && tipPackedLayout.p2.sandwiches === true && !tipPacke
   assert(!print.isTightListSection('Mains') && !print.isTightListSection('Starters'),
     'Mains and Starters keep classical dish breathe');
   assert(/dish-list-tight\{--dish-gap:1px;--dish-gap-min:0px\}/.test(printJs),
-    'tight-list CSS zeros extra dish gap vs mains 13px floor');
+    'tight-list CSS zeros extra dish gap vs mains usual gap floor');
   var sidesSheet = print.build(api.menuById('main'), [
     api.dish('Mains', 'Fish & Chips', 'peas', '18.95', ''),
     api.dish('Sides', 'Cheesy Garlic Bread', '', '5.95', 'v'),

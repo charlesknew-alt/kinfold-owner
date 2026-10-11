@@ -1551,9 +1551,11 @@
     desc: { min: 10, max: 10 },
     title: { min: 16, max: 22 },
     promo: { min: 11, max: 11.5 },
-    /** Floor for vertical space between dishes — never collapse tighter.
-     *  Classical Word menus breathe; 8px packed like a modern wall. */
-    dishGapPx: { min: 13, max: 18 }
+    /**
+     * Dish gap range (px): Generate walks generous → usual min via fill steps +
+     * compressGaps. Make it fit may compress further to makeFitMin. Never clip.
+     */
+    dishGapPx: { min: 9, max: 18, makeFitMin: 5 }
   };
   // One page only with clear headroom at min type — unit model under-counts
   // scalloped boxes / full-width mains vs real browser height.
@@ -1753,9 +1755,18 @@
     }
     layout.spareRoom = Math.max(0, onePage ? p1left : Math.min(p1left, p2left));
     layout.canOfferDropIn = layout.fit !== 'over' && layout.spareRoom >= 24;
-    if (layout.fit === 'over' && layout.fillers &&
-        layout.fillers.indexOf('Too much content — remove a dropped-in menu') === -1) {
-      layout.fillers.push('Too much content — remove a dropped-in menu');
+    if (layout.fit === 'over' && layout.fillers) {
+      var dropInMsg = 'Too much content — remove a dropped-in menu';
+      var foodMsg = 'Too much content — selected food will not fit at minimum spacing';
+      if (layout.overflow === 'food') {
+        if (layout.fillers.indexOf(foodMsg) === -1 &&
+            layout.fillers.indexOf(dropInMsg) === -1) {
+          layout.fillers.push(foodMsg);
+        }
+      } else if (layout.fillers.indexOf(dropInMsg) === -1 &&
+          layout.fillers.indexOf(foodMsg) === -1) {
+        layout.fillers.push(dropInMsg);
+      }
     }
     return layout;
   }
@@ -1768,6 +1779,7 @@
    */
   function planFluidLayout(menu, dishes, opts) {
     opts = opts || {};
+    var makeFit = !!opts.makeFit;
     var promos = Array.isArray(opts.promos) ? opts.promos : null;
     // Empty array from the host means “auto” — fall back to seed wording bank.
     if (promos && !promos.length && root.EBMenus && root.EBMenus.seedPromoBank) {
@@ -2456,19 +2468,27 @@
       if (foodOverPage || p2Load > CLIP) dropTipOnlyForFood_();
       // Overflow only after tip + panels are dropped. Named Sandwiches still crowd
       // mains+desserts; food drop-ins (Specials) print if they sit at min type.
-      var wouldOverflow = sandwichCrowdsMains || p1used > PAGE + 10 ||
-        p2used > PAGE + 14 || foodOverPage;
+      // Feature panels never cause won't-fit — they were already omitted above.
+      // Make it fit: more unit headroom — DOM compressGaps is the hard gate.
+      var p1OverLimit = makeFit ? PAGE + 14 : PAGE + 10;
+      var p2OverLimit = makeFit ? PAGE + 18 : PAGE + 14;
+      var wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
+        p2used > p2OverLimit || foodOverPage;
       if ((foodOverPage || sandwichCrowdsMains) && dropTipOnlyForFood_()) {
-        wouldOverflow = sandwichCrowdsMains || p1used > PAGE + 10 ||
-          p2used > PAGE + 14 || foodOverPage;
+        wouldOverflow = sandwichCrowdsMains || p1used > p1OverLimit ||
+          p2used > p2OverLimit || foodOverPage;
       }
       if (wouldOverflow) {
         layout.fit = 'over';
-        layout.overflow = layout.overflow || 'drop-in';
+        var dropInFood = (dishes || []).some(function (d) { return d && d.fromMenu; });
+        layout.overflow = layout.overflow || (dropInFood ? 'drop-in' : 'food');
+        var overMsg = dropInFood
+          ? 'Too much content — remove a dropped-in menu'
+          : 'Too much content — selected food will not fit at minimum spacing';
         if ((sandwichCrowdsMains || foodOverPage) &&
-            layout.fillers.indexOf(
-            'Too much content — remove a dropped-in menu') === -1) {
-          layout.fillers.push('Too much content — remove a dropped-in menu');
+            layout.fillers.indexOf(overMsg) === -1 &&
+            layout.fillers.indexOf('Too much content — remove a dropped-in menu') === -1) {
+          layout.fillers.push(overMsg);
         }
       }
       // applyDropInCapacity_ adds outside notes itself — pass load without noteTax.
@@ -2515,10 +2535,12 @@
     layout.summary =
       (layout.fit === 'one' ? 'One A4 — food fits at minimum type, so type can open toward the maximum.' :
         layout.fit === 'two' ? 'Two A4 pages — would clip at minimum type on one page; same type on both pages, opening toward the maximum; never a third page.' :
-          'Too much content to fit on one page. Please remove a dropped-in menu, then Generate.') +
+          (layout.overflow === 'food'
+            ? 'Too much content to fit — selected food will not sit on two pages even at minimum spacing (feature panels are omitted automatically).'
+            : 'Too much content to fit on one page. Please remove a dropped-in menu, then Generate.')) +
       typeNote +
       ' Columns start and finish level (food first, then feature panels).' +
-      ' When capacity is tight, omit or relocate foot/column feature panels so food drop-ins (Specials, etc.) can print — overflow only if food + tip + min gaps still will not fit.' +
+      ' Feature panels only fill leftover space after food — they never block Generate; omit them when tight. Overflow only if food + tip + min gaps still will not fit.' +
       ' Long Specials (and similar hosts) may split across two even columns like Sides only when the dish count is even (no 3|2 hole); tip-only chrome is omitted if leftover cannot hold it.' +
       ' Sides, Sauces and Little Bells use compact item gaps; mains keep the classical dish breathe.' +
       (layout.pages === 2 ? ' Content spread evenly across both pages with one shared type size.' : '') +
@@ -2626,7 +2648,8 @@
       return columnSoloSection(title, dishes, rule, {
         promos: opts.promos,
         excludeTitles: opts.excludeTitles,
-        skipPromos: opts.skipPromos,
+        skipPromos: !!opts.skipPromos || !!opts.omitFeaturePanels,
+        omitFeaturePanels: !!opts.omitFeaturePanels,
         pageLeftover: opts.pageLeftover,
         dataSpecials: key
       });
@@ -2751,7 +2774,8 @@
         excludeTitles: opts.excludeTitles,
         force: opts.force,
         shortOnly: true,
-        skipPromos: !!opts.skipPromos,
+        skipPromos: !!opts.skipPromos || !!opts.omitFeaturePanels,
+        omitFeaturePanels: !!opts.omitFeaturePanels,
         pageLeftover: opts.pageLeftover,
         secClass: 'specials-sand-row',
         dataSpecials: 'Special Mains'
@@ -2787,7 +2811,8 @@
       excludeTitles: opts.excludeTitles,
       force: opts.force,
       shortOnly: !!opts.shortOnly,
-      skipPromos: !!opts.skipPromos,
+      skipPromos: !!opts.skipPromos || !!opts.omitFeaturePanels,
+      omitFeaturePanels: !!opts.omitFeaturePanels,
       pageLeftover: opts.pageLeftover,
       leftTitle: left.hideTitle ? '' : (left.title || ''),
       rightTitle: right.hideTitle ? '' : (right.title || ''),
@@ -2941,16 +2966,17 @@
     // Empty partner: a panel that fits WITHIN the food column height does not
     // grow the page — allow the attempt even when page leftover is tight.
     // pageBudget = food height refuses oversized Sip & Paint (the screenshot bug).
-    if (skipForLeftover && blankPartner) skipForLeftover = false;
-    // In-pair leveling under a known tall envelope (opts.force from Little Bells
-    // | Desserts when desserts tower over kids): a panel under the short column
-    // does not grow past the tall side — allow it even when page leftover is
-    // under COL_PROMO_MIN. Near-even kids|sides on a packed Sunday still omit
-    // Gatherings (unit math underestimates real height → allergy clip).
+    // omitFeaturePanels is a hard food-only measure pass — never plant chrome.
+    if (skipForLeftover && blankPartner && !opts.omitFeaturePanels) skipForLeftover = false;
+    // In-pair leveling is optional leftover chrome only. Never bypass leftover
+    // or skipPromos for it — panels must not trip Generate won't-fit (Charles:
+    // feature panels only drop into leftover; if they do not fit, omit them).
     var inPairLevelFill = !!(opts.shortOnly && opts.force &&
       !isBlankFoodInner(leftInner) && !isBlankFoodInner(rightInner));
-    if (skipForLeftover && inPairLevelFill) skipForLeftover = false;
-    var skipPromosNow = !!opts.skipPromos && !inPairLevelFill;
+    // skipPromos / omitFeaturePanels are absolute. Do not re-plant leveling
+    // panels when the planner already said column chrome is off (packed Sunday
+    // kids|desserts was planting Gatherings via inPairLevelFill bypass).
+    var skipPromosNow = !!opts.skipPromos || !!opts.omitFeaturePanels;
     if (!skipPromosNow && !skipForLeftover) {
       var remaining = filterUnusedPromos(opts.promos || [], opts.excludeTitles || []);
       var fillOpts = {
@@ -3053,7 +3079,8 @@
     var leveled = levelOppositeColumns(inner, units, '&nbsp;', 0, {
       promos: opts.promos,
       excludeTitles: opts.excludeTitles,
-      skipPromos: !!opts.skipPromos,
+      skipPromos: !!opts.skipPromos || !!opts.omitFeaturePanels,
+      omitFeaturePanels: !!opts.omitFeaturePanels,
       pageLeftover: opts.pageLeftover,
       secClass: 'column-solo-row' + (opts.dataSpecials ? ' specials-col-row' : ''),
       colsClass: 'column-solo-cols',
@@ -3169,7 +3196,8 @@
       shortOnly: true,
       force: opts.force,
       pageLeftover: opts.pageLeftover,
-      skipPromos: !!opts.skipPromos
+      skipPromos: !!opts.skipPromos || !!opts.omitFeaturePanels,
+      omitFeaturePanels: !!opts.omitFeaturePanels
     };
     // Food first: pair with Desserts when Blocks allows Column / Best fit.
     var dessertsAllowColumn = !!(dessRule && wantsColumn(dessRule));
@@ -3282,8 +3310,22 @@
     var bag = layout.bag || pickSections(dishes);
     var promos = (plan && plan.promos) || layout.promos || [];
     bag.promos = promos;
+    var omitPanels = !!(plan && plan.omitFeaturePanels);
     var p1opts = layout.p1 || {};
     var p2opts = layout.p2;
+    // Food-only measure / retry: strip all optional feature-panel chrome so
+    // won't-fit means food (never Sip & Paint / Gatherings leftover fill).
+    if (omitPanels) {
+      p1opts = Object.assign({}, p1opts, {
+        rooms: false, footPromos: false, columnPromos: false, footLogo: false
+      });
+      if (p2opts) {
+        p2opts = Object.assign({}, p2opts, {
+          rooms: false, footPromos: false, columnPromos: false, footLogo: false
+        });
+      }
+      promos = [];
+    }
     var sidesPrint = sidesForPrint(bag);
     var hideDate = menu.id === 'party' || menu.kind === 'party';
     var fill1 = (plan && plan.forceFillClass) || 'fill-roomy';
@@ -3836,7 +3878,8 @@
           promos: promos,
           excludeTitles: usedPromoTitles,
           pageLeftover: layout.leftover && layout.leftover.p1,
-          skipPromos: p1opts.columnPromos === false
+          skipPromos: omitPanels || p1opts.columnPromos === false,
+          omitFeaturePanels: omitPanels
         });
         usedPromoTitles = usedPromoTitles.concat(soloSpec1.usedPromoTitles || []);
         p1 += soloSpec1.html || '';
@@ -3848,7 +3891,8 @@
           promos: promos,
           excludeTitles: usedPromoTitles,
           pageLeftover: layout.leftover && layout.leftover.p1,
-          skipPromos: layout.p1 && layout.p1.columnPromos === false
+          skipPromos: omitPanels || (layout.p1 && layout.p1.columnPromos === false),
+          omitFeaturePanels: omitPanels
         }
       );
       usedPromoTitles = usedPromoTitles.concat(littleP1.usedPromoTitles || []);
@@ -3978,7 +4022,8 @@
         nestSides: nest2,
         nestUnderTip: nestUnderTip2,
         nestSauces: nestSauces2,
-        skipPromos: p2opts.columnPromos === false,
+        skipPromos: omitPanels || p2opts.columnPromos === false,
+        omitFeaturePanels: omitPanels,
         pageLeftover: layout.leftover && layout.leftover.p2
       });
       usedPromoTitles = usedPromoTitles.concat(pairSpec2.usedTitles || []);
@@ -3996,7 +4041,8 @@
         promos: promos,
         excludeTitles: usedPromoTitles,
         pageLeftover: layout.leftover && layout.leftover.p2,
-        skipPromos: p2opts.columnPromos === false
+        skipPromos: omitPanels || p2opts.columnPromos === false,
+        omitFeaturePanels: omitPanels
       });
       usedPromoTitles = usedPromoTitles.concat(soloSpec2.usedPromoTitles || []);
       p2 += soloSpec2.html || '';
@@ -4009,7 +4055,8 @@
         excludeTitles: usedPromoTitles,
         force: littleFoodPartner ? p2Force : null,
         pageLeftover: layout.leftover && layout.leftover.p2,
-        skipPromos: p2opts.columnPromos === false
+        skipPromos: omitPanels || p2opts.columnPromos === false,
+        omitFeaturePanels: omitPanels
       }
     );
     usedPromoTitles = usedPromoTitles.concat(littleP2.usedPromoTitles || []);
@@ -4112,12 +4159,12 @@
         var tipOnlyPair = !!(p2opts.sandwiches && layout.sandwichTipOnly);
         var pairHole = Math.abs((sideU || 0) - (rightU || 0));
         var forcePairFill = null;
-        if (tipOnlyPair && bothColsHaveFood && pairHole > 1.2) {
+        if (!omitPanels && tipOnlyPair && bothColsHaveFood && pairHole > 1.2) {
           forcePairFill = {
             shorter: (sideU || 0) < (rightU || 0) ? 'left' : 'right',
             panels: pairHole > 9 ? 2 : 1
           };
-        } else if (!sideList.length && p2opts.sandwiches && p2opts.columnPromos !== false) {
+        } else if (!omitPanels && !sideList.length && p2opts.sandwiches && p2opts.columnPromos !== false) {
           forcePairFill = { shorter: 'left', panels: rightU > 12 ? 2 : 1 };
         }
         // Always gate on page leftover — empty partner opposite Sides must NOT
@@ -4126,9 +4173,10 @@
           promos: remainingPromos,
           excludeTitles: usedPromoTitles,
           shortOnly: tipOnlyPair || bothColsHaveFood,
-          // columnPromos:false still allows empty-partner fill (panel ≤ food height).
-          // bothColsHaveFood leveling is what we skip when chrome is off.
-          skipPromos: p2opts.columnPromos === false && bothColsHaveFood && !forcePairFill,
+          // omitFeaturePanels / columnPromos:false: never plant leftover chrome.
+          // Empty-partner fill only when chrome is still allowed.
+          skipPromos: omitPanels || (p2opts.columnPromos === false && bothColsHaveFood && !forcePairFill),
+          omitFeaturePanels: omitPanels,
           pageLeftover: layout.leftover && layout.leftover.p2,
           force: littleFoodPartner ? null : (p2Force || forcePairFill),
           leftTitle: sideList.length ? ((sidesPrint && sidesPrint.name) || 'Sides') : '',
@@ -4288,7 +4336,8 @@
       ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
         '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
         '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
-        '--dish-gap-min:13px;--dish-gap-max:18px}' +
+        '--dish-gap-min:9px;--dish-gap-max:18px}' +
+      'body.make-fit{--dish-gap-min:5px}' +
       '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:50;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
       '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
@@ -4581,13 +4630,13 @@
       '.lb-ice{font-family:var(--serif);font-weight:700;font-size:13px}' +
       '.lb-price{font-family:var(--serif);font-weight:700;font-size:16px;margin:5px 0}' +
       /* Density ladder — capped to TYPE_RANGE (adult pub, not kids’-menu giant type).
-         airy = max; dense = min. Dish gap never drops below --dish-gap-min (13px). */
+         airy = max gap; dense = usual min (9px). Make it fit may compress to 5px. */
       '.fill-airy{--dish-gap:18px;--sec-gap:18px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt}' +
       '.fill-roomy{--dish-gap:16px;--sec-gap:16px;--name:11.35pt;--desc:10pt;--title:20pt;--promo:11.35pt}' +
-      '.fill-normal{--dish-gap:15px;--sec-gap:15px;--name:11.2pt;--desc:10pt;--title:18pt;--promo:11.2pt}' +
-      '.fill-tight{--dish-gap:14px;--sec-gap:13px;--name:11.1pt;--desc:10pt;--title:17pt;--promo:11.1pt}' +
-      '.fill-compact{--dish-gap:13px;--sec-gap:12px;--name:11.05pt;--desc:10pt;--title:16.5pt;--promo:11.05pt}' +
-      '.fill-dense{--dish-gap:13px;--sec-gap:11px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
+      '.fill-normal{--dish-gap:14px;--sec-gap:14px;--name:11.2pt;--desc:10pt;--title:18pt;--promo:11.2pt}' +
+      '.fill-tight{--dish-gap:12px;--sec-gap:12px;--name:11.1pt;--desc:10pt;--title:17pt;--promo:11.1pt}' +
+      '.fill-compact{--dish-gap:10px;--sec-gap:11px;--name:11.05pt;--desc:10pt;--title:16.5pt;--promo:11.05pt}' +
+      '.fill-dense{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.fill-compact .scallop,.fill-dense .scallop{border-width:10px;border-image-width:10px;margin-bottom:5px}' +
       '.fill-dense .scallop{border-width:9px;border-image-width:9px}' +
       /* Tip platter keeps the oval asset — density must not re-enable border-image. */
@@ -4625,9 +4674,9 @@
       /* A5 density — same name/desc floors as A4; titles slightly smaller on the half-sheet */
       '.a5-face.fill-airy{--dish-gap:16px;--sec-gap:15px;--name:11.5pt;--desc:10pt;--title:18pt;--promo:11.5pt}' +
       '.a5-face.fill-roomy{--dish-gap:14px;--sec-gap:13px;--name:11.35pt;--desc:10pt;--title:17pt;--promo:11.35pt}' +
-      '.a5-face.fill-normal{--dish-gap:13px;--sec-gap:12px;--name:11.2pt;--desc:10pt;--title:16pt;--promo:11.2pt}' +
-      '.a5-face.fill-tight{--dish-gap:13px;--sec-gap:11px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
-      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:13px;--sec-gap:11px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
+      '.a5-face.fill-normal{--dish-gap:12px;--sec-gap:12px;--name:11.2pt;--desc:10pt;--title:16pt;--promo:11.2pt}' +
+      '.a5-face.fill-tight{--dish-gap:10px;--sec-gap:11px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
+      '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
       '.a5-face .party-logo{width:72px}' +
       '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
@@ -4797,6 +4846,9 @@
     else if (menu.kind === 'party' && meta.paper === 'a5') defaultPaper = 'a5';
     else if (plan.defaultPaper === 'a5') defaultPaper = 'a5';
     var bodyClass = 'paper-' + defaultPaper;
+    if (plan.makeFit || (plan.layout && plan.layout.makeFit)) {
+      bodyClass += ' make-fit';
+    }
     var layout = null;
     if (menu.kind === 'long') {
       // Honour a layout already planned + Gemini-adjusted. Re-planning here
@@ -4887,10 +4939,10 @@
         (landscape ? '<span class="hint">Card menu — two identical copies on landscape A4 for the guillotine.</span>' :
           '<label class="paper-opt"><input type="radio" name="paper" value="a4"' +
             (defaultPaper === 'a4' ? ' checked' : '') +
-            ' onchange="document.body.className=\'paper-a4\'"> A4 (fill page)</label>' +
+            ' onchange="document.body.className=(document.body.classList.contains(\'make-fit\')?\'paper-a4 make-fit\':\'paper-a4\')"> A4 (fill page)</label>' +
           '<label class="paper-opt"><input type="radio" name="paper" value="a5"' +
             (defaultPaper === 'a5' ? ' checked' : '') +
-            ' onchange="document.body.className=\'paper-a5\'"> 2×A5 on A4 (guillotine)</label>') +
+            ' onchange="document.body.className=(document.body.classList.contains(\'make-fit\')?\'paper-a5 make-fit\':\'paper-a5\')"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint" id="printHint">' + esc(dateHint) +
         ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.' +
         esc(decidedHint) + '</span>' +
@@ -5050,9 +5102,14 @@
           'if(foot&&foot.parentNode){foot.parentNode.removeChild(foot);return true;}' +
           'var logo=page.querySelector(".foot-logo");' +
           'if(logo&&logo.style.display!=="none"){logo.style.display="none";return true;}' +
-          'var bodyPromos=[].slice.call(page.querySelectorAll(".col-promo .col-body > .scallop,.col-promo > .scallop"));' +
+          'var bodyPromos=[].slice.call(page.querySelectorAll(".col-promo .col-body > .scallop,.col-promo > .scallop,.col-promo .scallop"));' +
           'bodyPromos=bodyPromos.filter(isPromoOnlyScallop);' +
           'if(bodyPromos.length){var bp=bodyPromos[bodyPromos.length-1];if(bp.parentNode){bp.parentNode.removeChild(bp);return true;}}' +
+          'var emptyPromo=page.querySelector(".col-promo");' +
+          'if(emptyPromo&&!emptyPromo.querySelector(".dish,.dish-list-tight,.sandwich-tip-only,.sec-title")&&emptyPromo.querySelector(".promo")){' +
+            'var promoBox=emptyPromo.querySelector(".scallop,.promo");' +
+            'if(promoBox&&promoBox.parentNode){promoBox.parentNode.removeChild(promoBox);return true;}' +
+          '}' +
           'var optional=[].slice.call(page.querySelectorAll(".col-feature:not(.col-feature-level) .scallop"));' +
           'if(optional.length){var o=optional[optional.length-1];if(o.parentNode){o.parentNode.removeChild(o);return true;}}' +
           'var level=[].slice.call(page.querySelectorAll(".col-feature-level .scallop,.col-feature .scallop"));' +
@@ -5098,7 +5155,7 @@
           'var cs=getComputedStyle(page);' +
           'var dish=parseFloat(cs.getPropertyValue("--dish-gap"))||15;' +
           'var sec=parseFloat(cs.getPropertyValue("--sec-gap"))||16;' +
-          'var dishMin=parseFloat(cs.getPropertyValue("--dish-gap-min"))||13;' +
+          'var dishMin=parseFloat(cs.getPropertyValue("--dish-gap-min"))||9;' +
           'var dishMax=parseFloat(cs.getPropertyValue("--dish-gap-max"))||18;' +
           'if(dish<dishMin)dish=dishMin;' +
           'var baseDish=dish,baseSec=sec;' +
@@ -5115,6 +5172,24 @@
               'break;' +
             '}' +
           '}' +
+        '}' +
+        // When tight after spread/chrome, compress dish gaps toward --dish-gap-min
+        // before declaring clipped. Make it fit lowers that min to 5px.
+        'function compressGaps(page){' +
+          'if(!overflows(page))return false;' +
+          'var cs=getComputedStyle(page);' +
+          'var dish=parseFloat(cs.getPropertyValue("--dish-gap"))||15;' +
+          'var sec=parseFloat(cs.getPropertyValue("--sec-gap"))||16;' +
+          'var dishMin=parseFloat(cs.getPropertyValue("--dish-gap-min"))||9;' +
+          'var changed=false;' +
+          'while(overflows(page)&&dish>dishMin+0.05){' +
+            'dish=Math.max(dishMin,dish-1);' +
+            'sec=Math.max(8,sec-1);' +
+            'page.style.setProperty("--dish-gap",dish+"px");' +
+            'page.style.setProperty("--sec-gap",sec+"px");' +
+            'changed=true;' +
+          '}' +
+          'return changed;' +
         '}' +
         'function spreadPage(page){' +
           'clearSpread(page);' +
@@ -5155,6 +5230,12 @@
           'a5.forEach(spreadPage);' +
           'keepContentOnPage(a4);' +
           'keepContentOnPage(a5);' +
+          'a4.forEach(compressGaps);' +
+          'a5.forEach(compressGaps);' +
+          'keepContentOnPage(a4);' +
+          'keepContentOnPage(a5);' +
+          'a4.forEach(compressGaps);' +
+          'a5.forEach(compressGaps);' +
           'markClippedIfNeeded(a4.concat(a5));' +
           'fitPreviewToScreen();' +
         '}' +
@@ -6614,13 +6695,16 @@
         try {
           var b = doc.body;
           if (b && b.getAttribute('data-clipped') != null) {
-            var clippedEarly = b.getAttribute('data-clipped') === '1' || pageStillClips_();
-            // Wait past fitPages boot (30/80/400/1200) before accepting green.
-            if (clippedEarly || tries >= 10) {
+            var clippedNow = b.getAttribute('data-clipped') === '1' || pageStillClips_();
+            // Wait past fitPages boot (30/80/400/1200) before accepting EITHER
+            // result. Early clipped=1 often still has feature panels that
+            // keepContentOnPage drops on a later pass — accepting red early
+            // falsely blocked core Sunday with no drop-ins.
+            if (tries >= 10) {
               clearTimeout(watch);
               var out = html;
               try { out = '<!DOCTYPE html>' + doc.documentElement.outerHTML; } catch (e2) {}
-              done({ ok: !clippedEarly, clipped: clippedEarly, html: out });
+              done({ ok: !clippedNow, clipped: clippedNow, html: out });
               return;
             }
           }
