@@ -1,6 +1,10 @@
-# Varlo Price Query
+# Varlo Price Query (legacy)
 
-Shared **Drink Pricing / Price Query** for Eight Bells and Windmill managers.
+**Retired for manager tiles.** Live Drink Pricing is now  
+`https://app.varlo.co.uk/drinks-pricing?venue=eightbells|windmill`  
+(BAR STAFF TOOL on the Varlo app). Keep this project only if you still need the Sheets **Price Query History** logger.
+
+Was: shared **Drink Pricing / Price Query** for Eight Bells and Windmill managers.
 
 ## What it does
 

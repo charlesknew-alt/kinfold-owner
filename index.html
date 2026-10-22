@@ -603,8 +603,10 @@
       // Manager hubs (daily/weekly) — no shell=owner
       'hub-eightbells': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec',
       'hub-windmill': 'https://script.google.com/macros/s/AKfycbxgzF9DVJQ2sBPVGMWCfXsaAn5-3SUzWXuURGbu4lE__ccPowt0vWmQKqY43qtyGXgP/exec',
-      'pricequery-eightbells': 'https://script.google.com/macros/s/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec?venue=eightbells',
-      'pricequery-windmill': 'https://script.google.com/macros/s/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec?venue=windmill',
+      // Real calc: BAR STAFF TOOL on app.varlo.co.uk (not Apps Script Price Query).
+      // Venue via ?venue= — app requires Varlo login; account may also scope venue.
+      'pricequery-eightbells': 'https://app.varlo.co.uk/drinks-pricing?venue=eightbells',
+      'pricequery-windmill': 'https://app.varlo.co.uk/drinks-pricing?venue=windmill',
       'cardtakings-eb-manager': 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec?page=cardday',
       // Staff gift-card portal on the pub site. Password: VOUCHER_STAFF_PASSWORD in Vercel (not in git).
       'giftcards-eightbells': 'https://www.eightbellsbolney.com/staff/vouchers',

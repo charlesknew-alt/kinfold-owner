@@ -1,22 +1,14 @@
-# eightbells-manager
+# Eight Bells manager portal
 
-GitHub Pages site for **manager.eightbellsbolney.com** — Eight Bells manager landing menu.
+Canonical copy for `manager.eightbellsbolney.com` (`charlesknew-alt/eightbells-manager`).
 
-Canonical source in this monorepo: `manager-portals/eightbells/index.html`.
+## Tiles
 
-## Landing tiles
+- **Paperwork** → EB takings `/exec` (no `shell=owner`)
+- **Menus** → owner.kinfoldinns.co.uk staff menus
+- **Card Takings** → EB `page=cardday`
+- **Drink Pricing** → `https://app.varlo.co.uk/drinks-pricing?venue=eightbells`  
+  (real BAR STAFF TOOL — not Apps Script Price Query, not `page=kegcosting`)
+- **Gift cards** → eightbellsbolney.com staff vouchers
 
-- Paperwork, Menus, Card Takings
-- **Drink Pricing** → shared Varlo Price Query  
-  `…/exec?venue=eightbells` (not `page=kegcosting`)
-- **Gift cards** → `https://www.eightbellsbolney.com/staff/vouchers`  
-  Staff sign-in password is **`VOUCHER_STAFF_PASSWORD`** in Vercel (pub site).  
-  Do not commit that password here.
-
-## Deploy
-
-Cloud agents get **403** pushing `charlesknew-alt/eightbells-manager`. Charles: run
-`bash manager-portals/CHARLES_DEPLOY.sh` from a machine with push access, or see
-`manager-portals/README.md`.
-
-Until then, use https://owner.kinfoldinns.co.uk/manager-portals/eightbells/
+Deploy: see `../CHARLES_DEPLOY.sh` / `../README.md`.

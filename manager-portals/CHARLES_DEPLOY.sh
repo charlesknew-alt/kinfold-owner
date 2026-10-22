@@ -22,7 +22,7 @@ deploy_one() {
     echo "No changes for $repo (already up to date)."
     return 0
   fi
-  git commit -m "Drink Pricing → Varlo Price Query (venue-scoped shared /exec)"
+  git commit -m "Drink Pricing → app.varlo.co.uk/drinks-pricing (venue-scoped)"
   git push origin HEAD
   echo "Pushed $repo"
 }
@@ -30,3 +30,4 @@ deploy_one() {
 deploy_one eightbells-manager eightbells index.html
 deploy_one windmill-manager windmill index.html theme.js
 echo "Done. Hard-refresh manager.eightbellsbolney.com and manager.windmilllittleworth.com"
+echo "Expect Drink Pricing → https://app.varlo.co.uk/drinks-pricing?venue=…"

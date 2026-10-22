@@ -1,20 +1,15 @@
-# windmill-manager
+# Windmill manager portal
 
-GitHub Pages site for **manager.windmilllittleworth.com** — Windmill manager landing menu.
+Canonical copy for `manager.windmilllittleworth.com` (`charlesknew-alt/windmill-manager`).
 
-Canonical source in this monorepo: `manager-portals/windmill/` (`index.html` + `theme.js`).
+## Tiles
 
-## Landing tiles
+- **Paperwork** → WM takings `/exec` (no `shell=owner`)
+- **Menus** → owner staff menus (`venue=windmill`)
+- **Rooms** → rooms.windmilllittleworth.com
+- **Card Takings** → owner `card-takings.html?venue=windmill`
+- **Drink Pricing** → `https://app.varlo.co.uk/drinks-pricing?venue=windmill`  
+  (real BAR STAFF TOOL — not Apps Script Price Query)
+- **Gift cards** → windmilllittleworth.com staff vouchers
 
-- Paperwork, Menus, Rooms, Card Takings
-- **Drink Pricing** → shared Varlo Price Query  
-  `…/exec?venue=windmill`
-- Gift cards → pub staff vouchers
-
-## Deploy
-
-Cloud agents get **403** pushing `charlesknew-alt/windmill-manager`. Charles: run
-`bash manager-portals/CHARLES_DEPLOY.sh` from a machine with push access, or see
-`manager-portals/README.md`.
-
-Until then, use https://owner.kinfoldinns.co.uk/manager-portals/windmill/
+Deploy: see `../CHARLES_DEPLOY.sh` / `../README.md`.

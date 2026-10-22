@@ -74,32 +74,30 @@ loads the latest staff UI from owner without a per-release flow pin on manager.
 
 The locked wavy-box PDFs on eightbellsbolney.com are not updated from this page yet.
 
-## Drink Pricing / Price Query (unified)
+## Drink Pricing (real calc)
 
-Both managers use the same **Varlo Price Query** web app (not PubSystem `page=kegcosting`).
+Both managers open **BAR STAFF TOOL** on the Varlo app (not Apps Script Price Query, not `page=kegcosting`):
 
-Live `/exec`: `https://script.google.com/macros/s/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec`  
-(`?venue=eightbells` or `?venue=windmill`)
+`https://app.varlo.co.uk/drinks-pricing?venue=eightbells`  
+`https://app.varlo.co.uk/drinks-pricing?venue=windmill`
 
 | Where | Status |
 |---|---|
-| Owner hub + `manager-portals/*` on owner.kinfoldinns.co.uk | Live — correct `?venue=` |
-| manager.eightbellsbolney.com | Stale — still `page=kegcosting` (agent **403** on push) |
-| manager.windmilllittleworth.com | Stale — no Drink Pricing tile (agent **403** on push) |
+| Owner hub + `manager-portals/*` on owner.kinfoldinns.co.uk | Wired to drinks-pricing + `?venue=` |
+| manager.eightbellsbolney.com | Needs Charles push (agent often **403**) |
+| manager.windmilllittleworth.com | Needs Charles push (agent often **403**) |
 
-Owner history: Invoice Management spreadsheet → **Price Query History**.  
-Source: `apps-script/varlo-price-query/`. PubSystemLib **v91** redirects hub Price Query tiles.
+**Venue selection:** query param `?venue=eightbells|windmill`. The page requires Varlo login; account membership may also scope the pub. (Path segments like `/drinks-pricing/eightbells` are not used — they 404.)
 
-### Charles checklist (managers live on dedicated domains)
+Legacy Apps Script `apps-script/varlo-price-query/` is retired for manager tiles. PubSystemLib kegcosting/`pricequery` redirects should target drinks-pricing (same `?venue=`).
 
-1. **Authorize Price Query** (blocks everyone until done): as charlesknew@gmail.com open  
-   `…/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec?venue=eightbells`  
-   → **Review Permissions** → Allow Sheets. Deploy access = **Anyone**.
-2. Copy/push portals — `bash manager-portals/CHARLES_DEPLOY.sh` or see `manager-portals/README.md`,  
+### Charles checklist (dedicated manager domains)
+
+1. Copy/push portals — `bash manager-portals/CHARLES_DEPLOY.sh` or see `manager-portals/README.md`,  
    **or** grant Cursor push on `eightbells-manager` + `windmill-manager`.
-3. Confirm a “Save query for owner” row on **Price Query History**.
-4. Re-pin **Eight Bells Takings** + **Windmill Inn Takings** to PubSystemLib **v91**.
-5. Hard-refresh both manager hubs; confirm Drink Pricing URL has `venue=` not `kegcosting`.
+2. Ensure manager staff have Varlo logins that can open drinks-pricing for their pub.
+3. Re-pin **Eight Bells Takings** + **Windmill Inn Takings** to a PubSystemLib version whose `VARLO_PRICE_QUERY_URL` is `https://app.varlo.co.uk/drinks-pricing` (so paperwork hub Price Query tiles match).
+4. Hard-refresh both manager hubs; confirm Drink Pricing → `app.varlo.co.uk/drinks-pricing?venue=…`.
 
 ## Varlo Auth Apps Script
 
