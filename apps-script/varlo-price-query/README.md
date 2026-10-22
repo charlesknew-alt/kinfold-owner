@@ -16,8 +16,9 @@ After deploy, the `/exec` URL is stored in manager portals and PubSystemLib redi
 
 ## Charles: first-time auth
 
-1. Open the Apps Script project **Varlo Price Query**
-2. Run `getPriceQueryCategories` once from the editor → Allow Drive/Sheets access
+1. Open the Apps Script project **Varlo Price Query** while signed in as **charlesknew@gmail.com**
+2. Open the live `/exec?venue=eightbells` URL in that browser → **Review Permissions** → Allow Sheets  
+   (Until this is done, anonymous users get Google “Access Denied” / 403.)
 3. Deploy → Manage deployments → Web app → **New version** (execute as you, access Anyone)
 4. Confirm a test query appears on **Price Query History** in  
    [Kinfold Inns — Invoice Management System](https://docs.google.com/spreadsheets/d/1GTsuJrbhrKRSP0tUMfnOPkaDX-b5UCfT4Xt0slZui3w/edit)

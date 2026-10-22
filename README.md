@@ -81,10 +81,25 @@ Both managers use the same **Varlo Price Query** web app (not PubSystem `page=ke
 Live `/exec`: `https://script.google.com/macros/s/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec`  
 (`?venue=eightbells` or `?venue=windmill`)
 
+| Where | Status |
+|---|---|
+| Owner hub + `manager-portals/*` on owner.kinfoldinns.co.uk | Live — correct `?venue=` |
+| manager.eightbellsbolney.com | Stale — still `page=kegcosting` (agent **403** on push) |
+| manager.windmilllittleworth.com | Stale — no Drink Pricing tile (agent **403** on push) |
+
 Owner history: Invoice Management spreadsheet → **Price Query History**.  
 Source: `apps-script/varlo-price-query/`. PubSystemLib **v91** redirects hub Price Query tiles.
 
-Charles: authorize the web app once (run `getPriceQueryCategories` in the editor), then re-pin EB+WM takings to PubSystemLib v91.
+### Charles checklist (managers live on dedicated domains)
+
+1. **Authorize Price Query** (blocks everyone until done): as charlesknew@gmail.com open  
+   `…/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec?venue=eightbells`  
+   → **Review Permissions** → Allow Sheets. Deploy access = **Anyone**.
+2. Copy/push portals — `bash manager-portals/CHARLES_DEPLOY.sh` or see `manager-portals/README.md`,  
+   **or** grant Cursor push on `eightbells-manager` + `windmill-manager`.
+3. Confirm a “Save query for owner” row on **Price Query History**.
+4. Re-pin **Eight Bells Takings** + **Windmill Inn Takings** to PubSystemLib **v91**.
+5. Hard-refresh both manager hubs; confirm Drink Pricing URL has `venue=` not `kegcosting`.
 
 ## Varlo Auth Apps Script
 

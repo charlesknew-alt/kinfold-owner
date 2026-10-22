@@ -15,6 +15,9 @@ assert(index.indexOf(PRICE) !== -1, 'index.html uses Varlo Price Query /exec');
 assert(index.indexOf('venue=eightbells') !== -1, 'Eight Bells venue param');
 assert(index.indexOf('venue=windmill') !== -1, 'Windmill venue param');
 assert(index.indexOf('page=kegcosting') === -1, 'no kegcosting on index');
+assert(index.indexOf("openApp('pricequery-eightbells'") !== -1, 'EB manager home Drink Pricing tile');
+assert(index.indexOf("openApp('pricequery-windmill'") !== -1, 'WM manager home Drink Pricing tile');
+assert(/windmill:\s*\[[^\]]*pricequery-windmill/.test(index), 'WM MANAGER_APPS lists pricequery-windmill');
 
 var eb = read('manager-portals/eightbells/index.html');
 assert(eb.indexOf(PRICE) !== -1, 'EB manager portal uses Varlo Price Query');

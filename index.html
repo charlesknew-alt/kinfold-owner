@@ -573,6 +573,11 @@
               <span class="link-label">Card takings<small>Teya CSV — by machine</small></span>
               <span class="link-arrow">›</span>
             </a>
+            <a class="pub-link cardtakings" href="#" onclick="openApp('pricequery-windmill','Windmill Inn');return false;">
+              <span class="link-icon">🍺</span>
+              <span class="link-label">Drink Pricing<small>Bar sell prices</small></span>
+              <span class="link-arrow">›</span>
+            </a>
           </div>
         </div>
       </div>
@@ -647,7 +652,7 @@
     /** Tools each manager role may open from their home menu. */
     var MANAGER_APPS = {
       eightbells: ['hub-eightbells', 'menus-eightbells', 'pricequery-eightbells', 'cardtakings-eb-manager', 'giftcards-eightbells'],
-      windmill: ['hub-windmill', 'rooms-windmill', 'cardtakings-windmill']
+      windmill: ['hub-windmill', 'rooms-windmill', 'cardtakings-windmill', 'pricequery-windmill']
     };
 
     var currentSystem = null;
