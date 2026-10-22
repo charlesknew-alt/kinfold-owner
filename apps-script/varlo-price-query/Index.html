@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Varlo · Price Query</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Inter+Tight:wght@400;500;600;700&display=swap');
+    :root {
+      --paint: #DFC2AF; --paint-deep: #A79283; --paint-pale: #E7D1C3; --paint-wash: #F4EAE3;
+      --ink: #1c1610; --ink-soft: #3d3429; --ink-quiet: #6E665A; --ink-faint: #B5AC9C;
+      --white-warm: #fbf7f0; --cream: #f6f0e6; --line: #d8cfc0; --line-soft: #ECE3CD;
+      --ok: #2D5530; --serif: 'Newsreader', Georgia, serif; --sans: 'Inter Tight', system-ui, sans-serif;
+      --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --r: 4px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; height: 100%; }
+    body {
+      font-family: var(--sans); background: var(--cream); color: var(--ink);
+      font-size: 14.5px; line-height: 1.55; min-height: 100%; min-height: 100dvh;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    .ps-main { max-width: 720px; margin: 0 auto; padding: var(--s5) var(--s4); }
+    .ps-hero {
+      background: var(--paint-wash); border: 1px solid var(--paint-pale);
+      border-radius: var(--r); padding: var(--s5); margin-bottom: var(--s5);
+    }
+    .ps-hero-eyebrow {
+      font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em;
+      color: var(--ink-quiet); text-transform: uppercase; margin-bottom: var(--s3);
+    }
+    .ps-hero-title {
+      font-family: var(--serif); font-size: 28px; font-weight: 400;
+      line-height: 1.05; letter-spacing: -0.015em; margin-bottom: var(--s2);
+    }
+    .ps-hero-subtitle { font-size: 12.5px; color: var(--ink-quiet); font-weight: 500; }
+    .ps-card {
+      background: var(--white-warm); border: 1px solid var(--line);
+      border-radius: var(--r); padding: var(--s5); margin-bottom: var(--s4);
+    }
+    .ps-card-head {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: var(--s4); padding-bottom: var(--s3); border-bottom: 1px solid var(--line-soft);
+    }
+    .ps-card-title { font-family: var(--serif); font-weight: 500; font-size: 17px; }
+    .ps-field { margin-bottom: var(--s4); }
+    .ps-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); margin-bottom: var(--s4); }
+    .ps-label {
+      display: block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em;
+      color: var(--ink-quiet); text-transform: uppercase; margin-bottom: 6px;
+    }
+    .ps-input, .ps-select {
+      width: 100%; background: var(--white-warm); border: 1px solid var(--line);
+      border-radius: var(--r); padding: 12px 14px; font-family: var(--sans);
+      font-size: 16px; color: var(--ink); font-feature-settings: 'tnum';
+    }
+    .ps-input:focus, .ps-select:focus { outline: 0; border-color: var(--ink); background: var(--paint-wash); }
+    .ps-hint { font-size: 11.5px; color: var(--ink-quiet); margin-top: 4px; }
+    .ps-input-with-prefix { position: relative; }
+    .ps-input-prefix {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--ink-quiet); font-weight: 500; pointer-events: none;
+    }
+    .ps-input-with-prefix .ps-input { padding-left: 28px; }
+    .ps-eyebrow-label {
+      font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em;
+      color: var(--ink-quiet); text-transform: uppercase; margin: 0 0 var(--s2);
+    }
+    .ps-figures {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: var(--line); border: 1px solid var(--line); border-radius: var(--r);
+      margin-bottom: var(--s5); overflow: hidden;
+    }
+    .ps-figure { background: var(--white-warm); padding: var(--s4); }
+    .ps-figure-label {
+      font-size: 10.5px; letter-spacing: 0.1em; color: var(--ink-quiet);
+      text-transform: uppercase; margin-bottom: var(--s2); font-weight: 600;
+    }
+    .ps-figure-value {
+      font-family: var(--serif); font-size: 22px; font-weight: 500;
+      color: var(--ink); line-height: 1.05; font-feature-settings: 'tnum';
+    }
+    .ps-figure-meta { font-size: 11.5px; color: var(--ink-quiet); margin-top: 3px; font-weight: 500; }
+    .kc-blended { background: var(--paint-wash) !important; }
+    .kc-blended .ps-figure-value { color: var(--paint-deep); }
+    .kc-star { color: var(--paint-deep); font-size: 0.9em; }
+    .kc-muted .ps-figure-value { color: var(--ink-faint); }
+    .kc-pack-row[hidden] { display: none !important; }
+    .ps-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; padding: 14px 18px; border-radius: var(--r);
+      font-size: 14px; font-weight: 700; letter-spacing: 0.04em;
+      border: 1px solid var(--ink); background: var(--ink); color: var(--paint);
+      text-transform: uppercase;
+    }
+    .ps-btn:disabled { opacity: 0.45; cursor: default; }
+    .ps-btn.saved { background: var(--ok); border-color: var(--ok); color: #fff; }
+    .status-line { font-size: 12px; color: var(--ink-quiet); margin-top: 8px; text-align: center; min-height: 1.2em; }
+    .config-pip {
+      display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 2px 7px; border-radius: 2px;
+      background: var(--paint-pale); color: var(--ink-soft); margin-left: 8px;
+    }
+    html.iframed body { padding-top: 8px; }
+    @media (max-width: 600px) {
+      .ps-field-row { grid-template-columns: 1fr; }
+      .ps-figures { grid-template-columns: 1fr; }
+      .ps-hero-title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+<script>
+  try { if (window.self !== window.top) document.documentElement.classList.add('iframed'); }
+  catch (e) { document.documentElement.classList.add('iframed'); }
+</script>
+
+<main class="ps-main">
+  <div class="ps-hero">
+    <div class="ps-hero-eyebrow">Price Query · <?= venueLabel ?></div>
+    <h1 class="ps-hero-title">Bar sell pricing</h1>
+    <p class="ps-hero-subtitle">
+      Enter the pack cost and category for suggested sell prices.
+      Each query is saved for the owner in Invoicing history.
+      <span class="config-pip" id="configPip">Loading targets…</span>
+    </p>
+  </div>
+
+  <section class="ps-card">
+    <div class="ps-card-head"><h2 class="ps-card-title">Product details</h2></div>
+
+    <div class="ps-field">
+      <label class="ps-label" for="kcName">Product name</label>
+      <input class="ps-input" type="text" id="kcName" placeholder="e.g. Peroni / Gordon's / Coke" autocomplete="off">
+    </div>
+
+    <div class="ps-field-row">
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcCat">Category</label>
+        <select class="ps-select" id="kcCat" onchange="kcCatChange()">
+          <option value="" selected disabled>Select…</option>
+          <optgroup label="Draught" id="ogDraught"></optgroup>
+          <optgroup label="Bottle &amp; measure" id="ogBottle"></optgroup>
+        </select>
+      </div>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcCost">Pack cost (ex VAT)</label>
+        <div class="ps-input-with-prefix">
+          <span class="ps-input-prefix">£</span>
+          <input class="ps-input" type="number" inputmode="decimal" step="0.01" id="kcCost" placeholder="0.00" oninput="kcCalc()">
+        </div>
+        <div class="ps-hint">The figure on the invoice.</div>
+      </div>
+    </div>
+
+    <div class="ps-field-row kc-pack-row" id="kcRowDraught">
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcSize">Pack size</label>
+        <input class="ps-input" type="number" inputmode="decimal" step="0.01" id="kcSize" placeholder="e.g. 11" oninput="kcCalc()">
+      </div>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcUnit">Unit</label>
+        <select class="ps-select" id="kcUnit" onchange="kcCalc()">
+          <option value="gal" selected>Gallons</option>
+          <option value="L">Litres</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="ps-field-row kc-pack-row" id="kcRowSpirit" hidden>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcBottleMl">Bottle size</label>
+        <select class="ps-select" id="kcBottleMl" onchange="kcCalc()">
+          <option value="700" selected>70cl (700ml)</option>
+          <option value="1000">1L (1000ml)</option>
+          <option value="500">50cl (500ml)</option>
+          <option value="350">35cl (350ml)</option>
+        </select>
+      </div>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label">Serve</label>
+        <input class="ps-input" type="text" value="25ml single" disabled>
+      </div>
+    </div>
+
+    <div class="ps-field-row kc-pack-row" id="kcRowWine" hidden>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcWineBottle">Bottle size (ml)</label>
+        <input class="ps-input" type="number" inputmode="decimal" step="1" id="kcWineBottle" value="750" oninput="kcCalc()">
+      </div>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcGlassMl">Glass size</label>
+        <select class="ps-select" id="kcGlassMl" onchange="kcCalc()">
+          <option value="125">125ml</option>
+          <option value="175" selected>175ml</option>
+          <option value="250">250ml</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="ps-field-row kc-pack-row" id="kcRowEach" hidden>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcUnits">Units in pack</label>
+        <input class="ps-input" type="number" inputmode="decimal" step="1" id="kcUnits" placeholder="e.g. 24" oninput="kcCalc()">
+      </div>
+      <div></div>
+    </div>
+
+    <div class="ps-field-row" style="margin-bottom:0; margin-top: var(--s3);">
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label" for="kcVat">VAT %</label>
+        <input class="ps-input" type="number" inputmode="decimal" step="0.5" id="kcVat" value="20" oninput="kcCalc()">
+      </div>
+      <div class="ps-field" style="margin-bottom:0;">
+        <label class="ps-label">House targets</label>
+        <div class="ps-hint" id="kcTargetsHint" style="margin-top:8px;">Pick a category to load GP% / cash.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ps-eyebrow-label">How that breaks down</div>
+  <div class="ps-figures">
+    <div class="ps-figure">
+      <div class="ps-figure-label" id="servesLabel">Serves in pack</div>
+      <div class="ps-figure-value" id="servesOut">—</div>
+    </div>
+    <div class="ps-figure">
+      <div class="ps-figure-label">Wastage</div>
+      <div class="ps-figure-value" id="wastageOut">—</div>
+    </div>
+    <div class="ps-figure">
+      <div class="ps-figure-label" id="cpsLabel">Cost per serve</div>
+      <div class="ps-figure-value" id="cpsOut">—</div>
+    </div>
+  </div>
+
+  <div class="ps-eyebrow-label">Suggested sell prices</div>
+  <div class="ps-figures">
+    <div class="ps-figure">
+      <div class="ps-figure-label">At GP target</div>
+      <div class="ps-figure-value" id="gpPrice">—</div>
+      <div class="ps-figure-meta">incl. VAT</div>
+    </div>
+    <div class="ps-figure" id="cashPillar">
+      <div class="ps-figure-label">At cash target</div>
+      <div class="ps-figure-value" id="cashPrice">—</div>
+      <div class="ps-figure-meta">incl. VAT</div>
+    </div>
+    <div class="ps-figure kc-blended">
+      <div class="ps-figure-label"><span class="kc-star">★</span> Blended</div>
+      <div class="ps-figure-value" id="blendPrice">—</div>
+      <div class="ps-figure-meta">Recommended</div>
+    </div>
+  </div>
+
+  <div class="ps-eyebrow-label">At the blended price, you'd earn</div>
+  <div class="ps-figures">
+    <div class="ps-figure">
+      <div class="ps-figure-label">GP% achieved</div>
+      <div class="ps-figure-value" id="gpAch">—</div>
+    </div>
+    <div class="ps-figure">
+      <div class="ps-figure-label" id="cashServeLabel">Cash per serve</div>
+      <div class="ps-figure-value" id="cashServe">—</div>
+    </div>
+    <div class="ps-figure">
+      <div class="ps-figure-label" id="cashPackLabel">Cash per pack</div>
+      <div class="ps-figure-value" id="cashPack">—</div>
+    </div>
+  </div>
+
+  <button type="button" class="ps-btn" id="logBtn" disabled onclick="logCurrentQuery()">Save query for owner</button>
+  <div class="status-line" id="statusLine"></div>
+</main>
+
+<script>
+  var VENUE_KEY = <?!= JSON.stringify(venueKey) ?>;
+  var VENUE_LABEL = <?!= JSON.stringify(venueLabel) ?>;
+  var CATS = {};
+  var LAST = null;
+  var DEFAULT_VAT = 0.20;
+  var PINTS_PER_GAL = 8;
+  var LITRES_PER_PINT = 0.568261;
+  var SPIRIT_MEASURE_ML = 25;
+  var DRAUGHT = ['Cask','Lager','Cider','Craft Keg','Draught Alcoholic','Draught Soft'];
+  var BOTTLE = ['Spirits','Wines','Bottled Beer & Cider','Soft Drinks','Snacks & Sundries'];
+
+  function ceil5(x){ return Math.ceil(x * 20 - 1e-6) / 20; }
+  function gbp(x, dp){ if (dp == null) dp = 2; return '£' + x.toFixed(dp); }
+  function setText(id, v){ var el = document.getElementById(id); if (el) el.textContent = v; }
+  function showRow(id, on){
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (on) el.removeAttribute('hidden'); else el.setAttribute('hidden', '');
+  }
+  var OUT_IDS = ['servesOut','wastageOut','cpsOut','gpPrice','cashPrice','blendPrice','gpAch','cashServe','cashPack'];
+  function dash(){
+    OUT_IDS.forEach(function(id){ setText(id, '—'); });
+    LAST = null;
+    document.getElementById('logBtn').disabled = true;
+  }
+
+  function labelsFor(mode){
+    if (mode === 'draught') return { serves: 'Pints in pack', cps: 'Cost per pint', cashServe: 'Cash per pint', cashPack: 'Cash per keg' };
+    if (mode === 'spirit') return { serves: '25ml measures', cps: 'Cost per measure', cashServe: 'Cash per 25ml', cashPack: 'Cash per bottle' };
+    if (mode === 'wine') return { serves: 'Glasses in bottle', cps: 'Cost per glass', cashServe: 'Cash per glass', cashPack: 'Cash per bottle' };
+    return { serves: 'Units in pack', cps: 'Cost per unit', cashServe: 'Cash per unit', cashPack: 'Cash per pack' };
+  }
+  function applyLabels(mode){
+    var L = labelsFor(mode);
+    setText('servesLabel', L.serves);
+    setText('cpsLabel', L.cps);
+    setText('cashServeLabel', L.cashServe);
+    setText('cashPackLabel', L.cashPack);
+  }
+  function showPackRows(mode){
+    showRow('kcRowDraught', mode === 'draught');
+    showRow('kcRowSpirit',  mode === 'spirit');
+    showRow('kcRowWine',    mode === 'wine');
+    showRow('kcRowEach',    mode === 'each');
+  }
+
+  function rawServes(c){
+    if (c.mode === 'draught') {
+      var size = parseFloat(document.getElementById('kcSize').value);
+      var unit = document.getElementById('kcUnit').value;
+      if (!isFinite(size) || size <= 0) return NaN;
+      return (unit === 'gal') ? size * PINTS_PER_GAL : size / LITRES_PER_PINT;
+    }
+    if (c.mode === 'spirit') {
+      var bottle = parseFloat(document.getElementById('kcBottleMl').value);
+      if (!isFinite(bottle) || bottle <= 0) return NaN;
+      return bottle / SPIRIT_MEASURE_ML;
+    }
+    if (c.mode === 'wine') {
+      var b = parseFloat(document.getElementById('kcWineBottle').value);
+      var g = parseFloat(document.getElementById('kcGlassMl').value);
+      if (!isFinite(b) || b <= 0 || !isFinite(g) || g <= 0) return NaN;
+      return b / g;
+    }
+    var units = parseFloat(document.getElementById('kcUnits').value);
+    if (!isFinite(units) || units <= 0) return NaN;
+    return units;
+  }
+
+  function fillCategorySelect(){
+    var ogD = document.getElementById('ogDraught');
+    var ogB = document.getElementById('ogBottle');
+    ogD.innerHTML = '';
+    ogB.innerHTML = '';
+    Object.keys(CATS).forEach(function(key){
+      var opt = document.createElement('option');
+      opt.value = key; opt.textContent = key;
+      if (DRAUGHT.indexOf(key) >= 0 || (CATS[key].mode === 'draught')) ogD.appendChild(opt);
+      else ogB.appendChild(opt);
+    });
+  }
+
+  function kcCatChange(){
+    var key = document.getElementById('kcCat').value;
+    var c = CATS[key];
+    if (!c){ dash(); return; }
+    showPackRows(c.mode);
+    applyLabels(c.mode);
+    if (c.mode === 'draught' && c.unit) document.getElementById('kcUnit').value = c.unit;
+    var hint = 'GP ' + (c.gp * 100).toFixed(1).replace(/\.0$/, '') + '%';
+    if (c.cash > 0) hint += ' · Cash £' + c.cash.toFixed(2);
+    else hint += ' · Cash n/a (GP only)';
+    if (c.wastage > 0) hint += ' · Waste ' + (c.wastage * 100).toFixed(0) + '%';
+    setText('kcTargetsHint', hint);
+    var cashPillar = document.getElementById('cashPillar');
+    if (cashPillar) {
+      if (c.cash > 0) cashPillar.classList.remove('kc-muted');
+      else cashPillar.classList.add('kc-muted');
+    }
+    kcCalc();
+  }
+
+  function kcCalc(){
+    var key = document.getElementById('kcCat').value;
+    var c = CATS[key];
+    var cost = parseFloat(document.getElementById('kcCost').value);
+    var vatP = parseFloat(document.getElementById('kcVat').value);
+    var vat  = isFinite(vatP) ? vatP / 100 : DEFAULT_VAT;
+    if (!c || !isFinite(cost) || cost <= 0){ dash(); return; }
+    var serves = rawServes(c);
+    if (!isFinite(serves) || serves <= 0){ dash(); return; }
+    var sellable = serves * (1 - c.wastage);
+    if (sellable <= 0){ dash(); return; }
+    var cps = cost / sellable;
+    var gpEx = cps / (1 - c.gp);
+    var cashEx = c.cash > 0 ? (cps + c.cash) : 0;
+    var blendEx = (c.cash > 0) ? ((gpEx + cashEx) / 2) : gpEx;
+    var gpP    = ceil5(gpEx * (1 + vat));
+    var cashP  = c.cash > 0 ? ceil5(cashEx * (1 + vat)) : 0;
+    var blendP = ceil5(blendEx * (1 + vat));
+    var blendExActual = blendP / (1 + vat);
+    var gpAch    = (blendExActual - cps) / blendExActual;
+    var cashServe = blendExActual - cps;
+    var cashPack  = cashServe * sellable;
+
+    setText('servesOut',   serves.toFixed(1).replace(/\.0$/, ''));
+    setText('wastageOut',  (c.wastage * 100).toFixed(1) + '%');
+    setText('cpsOut',      gbp(cps, 3));
+    setText('gpPrice',     gbp(gpP));
+    setText('cashPrice',   c.cash > 0 ? gbp(cashP) : '—');
+    setText('blendPrice',  gbp(blendP));
+    setText('gpAch',       (gpAch * 100).toFixed(1) + '%');
+    setText('cashServe',   gbp(cashServe));
+    setText('cashPack',    '£' + Math.round(cashPack));
+
+    LAST = {
+      venueKey: VENUE_KEY,
+      venueLabel: VENUE_LABEL,
+      productName: document.getElementById('kcName').value.trim(),
+      category: key,
+      packCostExVat: cost,
+      vatPct: isFinite(vatP) ? vatP : 20,
+      serves: serves,
+      costPerServe: Math.round(cps * 1000) / 1000,
+      suggestedGp: gpP,
+      suggestedCash: cashP || '',
+      suggestedBlended: blendP,
+      gpAchievedPct: Math.round(gpAch * 1000) / 10,
+      role: 'manager'
+    };
+    document.getElementById('logBtn').disabled = false;
+    document.getElementById('logBtn').classList.remove('saved');
+    document.getElementById('logBtn').textContent = 'Save query for owner';
+    document.getElementById('statusLine').textContent = '';
+  }
+
+  function logCurrentQuery(){
+    if (!LAST) return;
+    LAST.productName = document.getElementById('kcName').value.trim();
+    var btn = document.getElementById('logBtn');
+    var status = document.getElementById('statusLine');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    google.script.run
+      .withSuccessHandler(function(){
+        btn.classList.add('saved');
+        btn.textContent = 'Saved for owner';
+        status.textContent = 'Logged to Invoicing → Price Query History';
+        setTimeout(function(){ btn.disabled = false; }, 800);
+      })
+      .withFailureHandler(function(err){
+        btn.disabled = false;
+        btn.textContent = 'Save query for owner';
+        status.textContent = 'Could not save: ' + (err && err.message ? err.message : err);
+      })
+      .logPriceQuery(LAST);
+  }
+
+  function boot(){
+    showPackRows('draught');
+    applyLabels('draught');
+    dash();
+    google.script.run
+      .withSuccessHandler(function(res){
+        CATS = (res && res.categories) || {};
+        fillCategorySelect();
+        var pip = document.getElementById('configPip');
+        if (res && res.configSource === 'invoice-category-config') {
+          pip.textContent = 'Category Config';
+        } else {
+          pip.textContent = 'House defaults';
+        }
+      })
+      .withFailureHandler(function(err){
+        document.getElementById('configPip').textContent = 'Defaults (config offline)';
+        document.getElementById('statusLine').textContent = 'Category Config unavailable — using house defaults. ' + (err && err.message ? err.message : '');
+        // Minimal offline fallback so managers can still price
+        CATS = {
+          'Cask': { mode:'draught', gp:0.675, cash:3.50, wastage:0.10, unit:'gal' },
+          'Lager': { mode:'draught', gp:0.675, cash:3.50, wastage:0.05, unit:'L' },
+          'Cider': { mode:'draught', gp:0.700, cash:3.50, wastage:0.05, unit:'L' },
+          'Craft Keg': { mode:'draught', gp:0.675, cash:3.50, wastage:0.05, unit:'L' },
+          'Draught Alcoholic': { mode:'draught', gp:0.700, cash:3.50, wastage:0.07, unit:'L' },
+          'Draught Soft': { mode:'draught', gp:0.650, cash:0, wastage:0.03, unit:'L' },
+          'Spirits': { mode:'spirit', gp:0.750, cash:3.00, wastage:0.02 },
+          'Wines': { mode:'wine', gp:0.680, cash:0, wastage:0 },
+          'Bottled Beer & Cider': { mode:'each', gp:0.650, cash:0, wastage:0 },
+          'Soft Drinks': { mode:'each', gp:0.650, cash:0, wastage:0 },
+          'Snacks & Sundries': { mode:'each', gp:0.550, cash:0, wastage:0 }
+        };
+        fillCategorySelect();
+      })
+      .getPriceQueryCategories();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+</script>
+</body>
+</html>

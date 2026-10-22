@@ -74,6 +74,18 @@ loads the latest staff UI from owner without a per-release flow pin on manager.
 
 The locked wavy-box PDFs on eightbellsbolney.com are not updated from this page yet.
 
+## Drink Pricing / Price Query (unified)
+
+Both managers use the same **Varlo Price Query** web app (not PubSystem `page=kegcosting`).
+
+Live `/exec`: `https://script.google.com/macros/s/AKfycbwNucEJW1QJA1-UEUJrKcZ43geuFoatcwgOINfPaN39uYEowEIgpHru_9Du6rhk9i1rLA/exec`  
+(`?venue=eightbells` or `?venue=windmill`)
+
+Owner history: Invoice Management spreadsheet → **Price Query History**.  
+Source: `apps-script/varlo-price-query/`. PubSystemLib **v91** redirects hub Price Query tiles.
+
+Charles: authorize the web app once (run `getPriceQueryCategories` in the editor), then re-pin EB+WM takings to PubSystemLib v91.
+
 ## Varlo Auth Apps Script
 
 Standalone project in `apps-script/varlo-auth/`. JSONP `doGet` actions: `ping`, `login`, `set`, `status`. It is **not** a venue page router.
