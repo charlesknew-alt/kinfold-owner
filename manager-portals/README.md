@@ -1,25 +1,11 @@
-# Manager portal deploy copies
+# Manager portals (GitHub Pages)
 
-Ready-to-copy HTML for the dedicated manager sites.
+Canonical copies of the venue manager hubs. Drink Pricing on both venues
+opens the shared **Varlo Price Query** web app:
 
-## Eight Bells — `eightbells/index.html`
+- Eight Bells: `…/exec?venue=eightbells`
+- Windmill: `…/exec?venue=windmill`
 
-Copy into **[charlesknew-alt/eightbells-manager](https://github.com/charlesknew-alt/eightbells-manager)** as `index.html` (GitHub Pages → `manager.eightbellsbolney.com`).
-
-Cursor cannot push to that repo from this environment — paste/push from your PC, or merge a PR you open there.
-
-### Gift cards tile
-
-- Opens `https://www.eightbellsbolney.com/staff/vouchers`
-- Staff password is **`VOUCHER_STAFF_PASSWORD`** in Vercel on the pub site  
-- Do **not** commit that password into git
-
-### Menus tile
-
-Point the Menus iframe at the **stable** staff entry on owner (no flow pin):
-
-`https://owner.kinfoldinns.co.uk/menus-staff.html`
-
-That page reads the current `flowNNN` from `menus.html` and opens staff mode.
-After this one manager change, future Menus ships only need **kinfold-owner** —
-manager auto-follows. Do not bump `?v=flow…` in eightbells-manager again.
+Live Pages repos (`eightbells-manager`, `windmill-manager`) should match
+these files. This cloud agent can push `kinfold-owner` but not always the
+standalone manager repos — Charles: merge/copy or grant push, then Pages deploy.
