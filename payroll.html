@@ -50,6 +50,10 @@ body{font-family:'Source Sans 3','Segoe UI',sans-serif;background:var(--bg);colo
 .table-count{font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:3px 10px;border-radius:12px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead th{text-align:left;padding:9px 12px;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);background:var(--surface-2);border-bottom:1px solid var(--border)}
+thead th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+thead th.sortable:hover{color:var(--text)}
+thead th.sortable .sort-ind{display:inline-block;min-width:1em;margin-left:3px;font-size:9px;opacity:.45;font-weight:700;text-transform:none;letter-spacing:0}
+thead th.sortable.is-sorted .sort-ind{opacity:1;color:var(--accent)}
 tbody td{padding:9px 12px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:12px}
 tbody td.name-col{font-family:'DM Sans',sans-serif;font-weight:500;font-size:13px}
 tbody tr:last-child td{border-bottom:none}
@@ -367,9 +371,12 @@ tbody tr.zero-net-row td{background:var(--amber-bg)!important}
   <div class="table-wrapper" id="tableWrapper" style="display:none">
     <div class="table-header"><div class="table-title" id="tableTitle">Payments</div><div class="table-count" id="tableCount">0</div></div>
     <div style="overflow-x:auto;"><table><thead><tr>
-      <th>Employee</th><th>Sort Code</th><th>Account No.</th>
-      <th style="text-align:right">Gross (£) <span style="font-weight:400;text-transform:none;font-size:9px;opacity:.5">click to edit</span></th>
-      <th>Deduction</th><th style="text-align:right">Net Pay (£)</th><th class="actions-head"></th>
+      <th class="sortable" data-sort="name" onclick="toggleTableSort('name')" title="Sort A–Z / Z–A (display only)">Employee <span class="sort-ind" id="sortInd-name"></span></th>
+      <th>Sort Code</th><th>Account No.</th>
+      <th class="sortable" data-sort="gross" onclick="toggleTableSort('gross')" style="text-align:right" title="Sort by gross (display only)">Gross (£) <span class="sort-ind" id="sortInd-gross"></span> <span style="font-weight:400;text-transform:none;font-size:9px;opacity:.5">click amount to edit</span></th>
+      <th>Deduction</th>
+      <th class="sortable" data-sort="net" onclick="toggleTableSort('net')" style="text-align:right" title="Sort by net (display only)">Net Pay (£) <span class="sort-ind" id="sortInd-net"></span></th>
+      <th class="actions-head"></th>
     </tr></thead><tbody id="tableBody"></tbody></table></div>
     <div class="total-row"><span class="total-label">Wise batch total<span class="total-details" id="totalDetails"></span></span><span class="total-amount" id="totalAmount">£0.00</span></div>
     <div class="validation-bar"><label>Expected Xero net pay total £</label><input type="text" id="expectedTotal" placeholder="0.00"><span class="validation-result" id="validationResult"></span></div>
@@ -448,6 +455,8 @@ tbody tr.zero-net-row td{background:var(--amber-bg)!important}
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbyPc3fWNKaGp3IAtrxz3P8340T8TxgMyErKi9PMYDs-9OcsBAaN2YoYotwdZ7pFZYtwpA/exec';
 let employees=[],loadedFileNames=[],currentEntity='windmill',staffDirectory=[],excludedStaff=[];
+// Display-only table sort. Never mutates `employees` — Wise CSV / logPayments keep import order.
+let tableSort={col:null,dir:'asc'}; // col: 'name'|'gross'|'net'|null
 // People from BACS/Xero who never entered the payments table (excluded list, skipped, £0, etc.)
 let sourceDropouts=[];
 // After Download Wise CSV: who was left out of that file (names + amounts + reasons)
@@ -723,12 +732,59 @@ function updateWiseExclusionPanel(){
 function renderFileChips(){$('loadedFiles').innerHTML=loadedFileNames.map((n,i)=>`<div class="file-chip">📄 ${n} <span class="remove-file" onclick="removeFile(${i})">✕</span></div>`).join('');}
 function removeFile(i){loadedFileNames.splice(i,1);renderFileChips();}
 
+function toggleTableSort(col){
+  if(tableSort.col===col){
+    if(tableSort.dir==='asc')tableSort.dir='desc';
+    else{tableSort.col=null;tableSort.dir='asc';} // third click returns to default order
+  }else{
+    tableSort.col=col;
+    tableSort.dir='asc';
+  }
+  renderTable();
+}
+
+function updateSortIndicators(){
+  ['name','gross','net'].forEach(function(col){
+    const th=document.querySelector('th.sortable[data-sort="'+col+'"]');
+    const ind=$('sortInd-'+col);
+    if(!th||!ind)return;
+    const on=tableSort.col===col;
+    th.classList.toggle('is-sorted',on);
+    ind.textContent=on?(tableSort.dir==='asc'?'▲':'▼'):'';
+  });
+}
+
+/** Display order only — never reorder `employees` (Wise export uses that array as-is). */
+function getDisplayEmployeeIndexes(){
+  const idxs=employees.map(function(_,i){return i;});
+  if(!tableSort.col)return idxs;
+  const dir=tableSort.dir==='desc'?-1:1;
+  idxs.sort(function(ai,bi){
+    const a=employees[ai],b=employees[bi];
+    let cmp=0;
+    if(tableSort.col==='name'){
+      cmp=String(a.name||'').localeCompare(String(b.name||''),undefined,{sensitivity:'base',numeric:true});
+    }else if(tableSort.col==='gross'){
+      cmp=(Number(a.amount)||0)-(Number(b.amount)||0);
+    }else if(tableSort.col==='net'){
+      cmp=getNetPay(a)-getNetPay(b);
+    }
+    if(cmp!==0)return cmp*dir;
+    return ai-bi; // stable: keep original relative order on ties
+  });
+  return idxs;
+}
+
 function renderTable(){
   if(!employees.length){$('tableWrapper').style.display='none';$('manualSection').style.display='none';$('actionsBar').style.display='none';updateWiseExclusionPanel();updateSteps(1);return;}
   $('tableWrapper').style.display='block';$('manualSection').style.display='block';$('actionsBar').style.display='flex';
   $('tableTitle').textContent=`${currentEntity==='windmill'?'Windmill':'Eight Bells'} — Payments`;
   $('tableCount').textContent=`${employees.length} employee${employees.length!==1?'s':''}`;
-  $('tableBody').innerHTML=employees.map((e,i)=>{
+  updateSortIndicators();
+  // Map display rows via indexes into `employees` so edit/remove/deduction keep working,
+  // while Wise download continues to walk `employees` / `payable` in original order.
+  $('tableBody').innerHTML=getDisplayEmployeeIndexes().map(function(i){
+    const e=employees[i];
     const dedTotal=getDeductionTotal(e),net=getNetPay(e),hasDed=dedTotal>0;
     const missingBank=!hasValidBankDetails(e);
     const zeroNet=net<=0;
@@ -1082,7 +1138,7 @@ $('downloadBtn').addEventListener('click',async()=>{
   }
 });
 
-$('clearBtn').addEventListener('click',()=>{employees=[];loadedFileNames=[];sourceDropouts=[];lastDownloadLeftOut=null;$('expectedTotal').value='';$('validationResult').style.display='none';$('excludedNotice').style.display='none';renderFileChips();renderTable();updateSteps(1);showToast('Cleared','success');});
+$('clearBtn').addEventListener('click',()=>{employees=[];loadedFileNames=[];sourceDropouts=[];lastDownloadLeftOut=null;tableSort={col:null,dir:'asc'};$('expectedTotal').value='';$('validationResult').style.display='none';$('excludedNotice').style.display='none';renderFileChips();renderTable();updateSteps(1);showToast('Cleared','success');});
 
 function updateSteps(c){for(let i=1;i<=4;i++){const el=$('step'+i);el.classList.remove('active','done');if(i<c)el.classList.add('done');else if(i===c)el.classList.add('active');}}
 function showToast(m,t='success'){const el=$('toast');el.textContent=(t==='success'?'✓ ':'⚠ ')+m;el.className='toast '+t+' show';clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3000);}
