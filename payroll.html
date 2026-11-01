@@ -8,7 +8,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
-<meta name="payroll-build" content="20261101-advances-step">
+<meta name="payroll-build" content="20261101-advances-key-fix">
 <script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -1327,11 +1327,21 @@ function getAdvancesKey_() {
   catch (e) { return ''; }
 }
 function setAdvancesKey_(value) {
+  // Always trim before persist — pasted keys often carry trailing newlines/spaces.
   const v = String(value || '').trim();
   try {
     if (v) localStorage.setItem(ADVANCES_KEY_LS, v);
     else localStorage.removeItem(ADVANCES_KEY_LS);
   } catch (e) { /* private mode */ }
+  return v;
+}
+/** Keep the password field in sync with localStorage without wiping while the user is typing. */
+function syncAdvancesKeyInput_() {
+  const keyInput = $('advancesKeyInput');
+  if (!keyInput) return;
+  if (document.activeElement === keyInput) return;
+  const stored = getAdvancesKey_();
+  if (keyInput.value !== stored) keyInput.value = stored;
 }
 function normalizePersonName_(name) {
   return String(name || '')
@@ -1404,16 +1414,19 @@ function renderAdvancesPanel() {
     return;
   }
   const key = getAdvancesKey_();
+  // keyNeeded only means “no key stored” — never flip this on a server rejection while the key remains in localStorage.
+  advancesState.keyNeeded = !key;
+  const keyNeeded = !key;
+  syncAdvancesKeyInput_();
   const keyBox = $('advancesKeyBox');
   const clearBtn = $('advancesKeyClearBtn');
-  const keyNeeded = !key || advancesState.keyNeeded;
   panel.classList.toggle('is-key-needed', keyNeeded);
   if (keyBox) keyBox.style.display = 'flex';
   if (clearBtn) clearBtn.style.display = key ? 'inline-flex' : 'none';
   if ($('advancesKeyHint')) {
     $('advancesKeyHint').textContent = keyNeeded
       ? 'Key needed — paste the Staff Hub advances key once. Stored only in this browser’s localStorage (never committed).'
-      : 'Key saved in this browser only. Clear it on a shared computer.';
+      : 'Key saved in this browser only (trimmed). It is kept even if Staff Hub rejects a request — edit and Save to update.';
   }
   const status = $('advancesStatus');
   const list = $('advancesList');
@@ -1422,7 +1435,7 @@ function renderAdvancesPanel() {
     if (list) list.innerHTML = '';
     return;
   }
-  if (keyNeeded && !key) {
+  if (keyNeeded) {
     if (status) { status.className = 'advances-status is-error'; status.textContent = 'Enter the Advances key to load Wise + Barclays advances for this batch.'; }
     if (list) list.innerHTML = '';
     return;
@@ -1486,6 +1499,10 @@ async function loadStaffAdvances(opts) {
     return;
   }
   ensureAdvancesDateDefaults_();
+  // Prefer whatever is currently in the input (trimmed), then fall back to localStorage.
+  const keyInput = $('advancesKeyInput');
+  const typed = keyInput ? String(keyInput.value || '').trim() : '';
+  if (typed) setAdvancesKey_(typed);
   const key = getAdvancesKey_();
   if (!key) {
     advancesState.keyNeeded = true;
@@ -1503,14 +1520,22 @@ async function loadStaffAdvances(opts) {
   const controller = new AbortController();
   const timer = setTimeout(function() { controller.abort(); }, 90000);
   try {
-    // Dedicated fetch — do not reuse fetchStaffHubJson (shares Xero abort + throws on any data.error).
-    const url = STAFF_HUB_API +
-      '?action=staffAdvances' +
-      '&venue=' + encodeURIComponent(currentEntity) +
-      '&from=' + encodeURIComponent(from) +
-      '&to=' + encodeURIComponent(to) +
-      '&key=' + encodeURIComponent(key);
-    const r = await fetch(url, { signal: controller.signal, credentials: 'omit' });
+    // GET query params only (not a header) so the Apps Script 302 → googleusercontent redirect keeps them.
+    // Param name must match Staff Hub: key=
+    const params = new URLSearchParams();
+    params.set('action', 'staffAdvances');
+    params.set('venue', String(currentEntity || ''));
+    params.set('from', String(from || ''));
+    params.set('to', String(to || ''));
+    params.set('key', key);
+    const url = STAFF_HUB_API + '?' + params.toString();
+    const r = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      credentials: 'omit',
+      cache: 'no-store'
+    });
     const text = await r.text();
     let data;
     try {
@@ -1518,16 +1543,14 @@ async function loadStaffAdvances(opts) {
     } catch (parseErr) {
       throw new Error('Staff Hub returned non-JSON for staffAdvances');
     }
-    const errText = data && (data.error || data.message) ? String(data.error || data.message) : '';
-    if ((data && data.ok === false) || /unauthor/i.test(errText) || r.status === 401) {
-      advancesState.keyNeeded = /unauthor/i.test(errText) || r.status === 401 || !errText;
-      advancesState.lastError = advancesState.keyNeeded
-        ? 'Key needed — Staff Hub rejected the advances key. Paste the current key and try again.'
-        : (errText || 'Advances request failed');
+    const errText = data && (data.error || data.message) ? String(data.error || data.message).trim() : '';
+    // Never wipe localStorage on rejection — keep the key and surface Staff Hub's exact error.
+    if (!r.ok || (data && data.ok === false)) {
+      advancesState.lastError = errText
+        ? ('Staff Hub: ' + errText)
+        : ('Staff Hub HTTP ' + r.status);
       advancesState.items = [];
-    } else if (!r.ok) {
-      advancesState.lastError = errText || ('Staff Hub HTTP ' + r.status);
-      advancesState.items = [];
+      advancesState.keyNeeded = false; // key remains saved; show the specific error above
     } else {
       advancesState.items = extractAdvancesItems_(data);
       advancesState.keyNeeded = false;
@@ -1538,12 +1561,11 @@ async function loadStaffAdvances(opts) {
     const msg = (err && err.message) ? String(err.message) : String(err);
     if (err && err.name === 'AbortError') {
       advancesState.lastError = 'Timed out loading advances from Staff Hub';
-    } else if (/unauthor/i.test(msg)) {
-      advancesState.keyNeeded = true;
-      advancesState.lastError = 'Key needed — could not authorise Staff Hub advances.';
     } else {
       advancesState.lastError = 'Could not load advances: ' + msg;
     }
+    // Keep the stored key; do not set keyNeeded on transport errors.
+    advancesState.keyNeeded = false;
     advancesState.items = [];
   } finally {
     clearTimeout(timer);
@@ -1577,10 +1599,11 @@ function initAdvancesUi_() {
   const refreshBtn = $('advancesRefreshBtn');
   const keyInput = $('advancesKeyInput');
   if (saveBtn) saveBtn.addEventListener('click', function() {
-    const v = keyInput ? keyInput.value : '';
-    if (!String(v || '').trim()) { showToast('Paste the Advances key first', 'error'); return; }
-    setAdvancesKey_(v);
-    if (keyInput) keyInput.value = '';
+    const v = String((keyInput && keyInput.value) || '').trim();
+    if (!v) { showToast('Paste the Advances key first', 'error'); return; }
+    const saved = setAdvancesKey_(v);
+    // Keep the trimmed key visible in the field (masked) — do not empty it after save.
+    if (keyInput) keyInput.value = saved;
     advancesState.keyNeeded = false;
     advancesState.lastError = '';
     showToast('Advances key saved on this device', 'success');
@@ -1588,6 +1611,7 @@ function initAdvancesUi_() {
   });
   if (clearBtn) clearBtn.addEventListener('click', function() {
     setAdvancesKey_('');
+    if (keyInput) keyInput.value = '';
     advancesState.keyNeeded = true;
     advancesState.items = [];
     advancesState.lastError = '';
@@ -1599,6 +1623,7 @@ function initAdvancesUi_() {
   if (keyInput) keyInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); if (saveBtn) saveBtn.click(); }
   });
+  syncAdvancesKeyInput_();
   renderAdvancesPanel();
 }
 window.applyAdvanceDeduction = applyAdvanceDeduction;
