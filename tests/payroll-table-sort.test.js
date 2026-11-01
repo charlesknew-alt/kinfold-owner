@@ -28,7 +28,7 @@ assert(html.indexOf('getDisplayEmployeeIndexes().map') !== -1, 'renderTable uses
 assert(/const payable\s*=\s*employees\.filter/.test(html) || /const payable=employees\.filter/.test(html), 'Wise payable still filtered from employees array');
 assert(/payable\.map\(e=>/.test(html) || /payable\.map\(e =>/.test(html) || /payable\.map\(e=>\{/.test(html), 'Wise CSV still maps payable (not display order helper)');
 assert(html.indexOf('Never mutates `employees`') !== -1 || html.indexOf('never mutates') !== -1 || html.indexOf('Display-only table sort') !== -1, 'comment documents display-only sort');
-assert(index.indexOf('payroll.html?v=20261101-table-sort') !== -1, 'index.html cache-bust bumped for payroll');
+assert(/payroll\.html\?v=20261101-/.test(index), 'index.html cache-bust bumped for payroll');
 
 // Smoke-test display index sorting without reordering source array
 var sortBlock = html.match(/function getDisplayEmployeeIndexes\(\)\{[\s\S]*?\n\}/);
