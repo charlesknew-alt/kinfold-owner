@@ -3,8 +3,9 @@
 
 /**
  * Menu AI shared-state sync — local mocks only (never hits production Apps Script).
- * Covers: stale conflict, seed/empty Main guard, no auto-push on pull/sync,
- * per-menu save isolation, Little Bells print-history menuId.
+ * Covers: stale conflict, seed/empty guard on every menu, legacy whole-book
+ * merge safety, no auto-push on pull/sync, per-menu save isolation,
+ * Little Bells print-history menuId.
  */
 
 var fs = require('fs');
@@ -30,12 +31,16 @@ function dish(section, name) {
   return { id: 'd-' + name.replace(/\s+/g, '-'), section: section, name: name, description: '', price: '10', tags: '' };
 }
 
-function fullMain() {
+function fullMenu(section, prefix, n) {
   var out = [];
-  for (var i = 0; i < 12; i++) {
-    out.push(dish('Mains', 'Live Dish ' + (i + 1)));
+  for (var i = 0; i < (n || 12); i++) {
+    out.push(dish(section, prefix + ' ' + (i + 1)));
   }
   return out;
+}
+
+function fullMain() {
+  return fullMenu('Mains', 'Live Dish', 12);
 }
 
 function baseState() {
@@ -44,6 +49,7 @@ function baseState() {
     book: {
       main: fullMain(),
       sunday: [dish('Sunday Roasts', 'Sirloin of Beef')],
+      specials: fullMenu('Special Mains', 'Special Dish', 10),
       'little-bells': [dish('Little Bells', 'Fish Fingers')]
     },
     metaBook: {},
@@ -55,7 +61,7 @@ function baseState() {
     dishCatalogue: [],
     extraMenus: [],
     extraSections: [],
-    menuVersions: { main: 5, sunday: 2, 'little-bells': 1 }
+    menuVersions: { main: 5, sunday: 2, specials: 1, 'little-bells': 1 }
   };
 }
 
@@ -91,12 +97,12 @@ function baseState() {
     'successful Main save leaves other menu versions untouched');
 })();
 
-// —— 2. Seed / near-empty Main cannot replace a full Main ——
+// —— 2. Seed / near-empty cannot replace any full menu ——
 (function () {
   var current = baseState();
   var seedOnly = [dish('Mains', '10oz Sirloin Steak')];
-  assert(sync.isNearEmptyOrSeedMain(seedOnly) === true,
-    'single seed steak counts as near-empty/seed Main');
+  assert(sync.isNearEmptyOrSeedMenu(seedOnly) === true,
+    'single seed steak counts as near-empty/seed');
   var result = sync.applyMenuSave(current, {
     menuId: 'main',
     expectedVersion: 5,
@@ -104,7 +110,7 @@ function baseState() {
   });
   assert(result.ok === false && result.rejected === true,
     'seed Main save is rejected');
-  assert(result.error === 'seed_or_empty_main', 'reject error is seed_or_empty_main');
+  assert(result.error === 'seed_or_empty_menu', 'reject error is seed_or_empty_menu');
   assert(result.state.book.main.length === 12,
     'rejected seed save leaves the full Main intact');
 })();
@@ -122,15 +128,116 @@ function baseState() {
 
 (function () {
   var current = baseState();
+  var result = sync.applyMenuSave(current, {
+    menuId: 'specials',
+    expectedVersion: 1,
+    dishes: [dish('Special Mains', '10oz Sirloin Steak')]
+  });
+  assert(result.ok === false && result.rejected === true,
+    'seed/near-empty Specials cannot replace a full Specials');
+  assert(result.state.book.specials.length === 10,
+    'rejected Specials save leaves the full Specials intact');
+})();
+
+(function () {
+  var current = baseState();
   var whole = sync.applyWholeBookSave(current, {
     book: {
       main: [dish('Mains', '10oz Sirloin Steak')],
-      sunday: current.book.sunday
+      sunday: current.book.sunday,
+      specials: current.book.specials,
+      'little-bells': current.book['little-bells']
     },
-    updatedAt: Date.now()
+    // Client clock ahead (old page bumped updatedAt) — Main still protected by seed guard.
+    updatedAt: 99999
   });
   assert(whole.ok === false && whole.rejected === true,
-    'legacy whole-book save also refuses seed Main over full Main');
+    'legacy whole-book save refuses seed Main over full Main');
+  assert(whole.error === 'seed_or_empty_menu', 'legacy seed reject uses seed_or_empty_menu');
+})();
+
+(function () {
+  var current = baseState();
+  var whole = sync.applyWholeBookSave(current, {
+    book: {
+      main: current.book.main,
+      sunday: current.book.sunday,
+      specials: [dish('Special Mains', 'Lonely leftover')],
+      'little-bells': current.book['little-bells']
+    },
+    updatedAt: 99999
+  });
+  assert(whole.ok === false && whole.rejected === true,
+    'legacy whole-book save refuses near-empty Specials over full Specials');
+})();
+
+// —— 2b. Legacy saveMenusState must not clobber newer per-menu edits ——
+(function () {
+  // New device already version-saved Main to v5. Old cached page bumps updatedAt
+  // and pushes a whole book with an older Main + a real Specials edit.
+  var current = baseState(); // main:5, specials:1
+  var oldMain = fullMenu('Mains', 'Old Cache Dish', 12);
+  var newSpecials = fullMenu('Special Mains', 'Phone Special', 10);
+  var whole = sync.applyWholeBookSave(current, {
+    book: {
+      main: oldMain,
+      sunday: current.book.sunday,
+      specials: newSpecials,
+      'little-bells': current.book['little-bells']
+    },
+    updatedAt: 99999 // old client always bumps — must not unlock Main
+  });
+  assert(whole.ok === true, 'legacy save merges non-stale diffs');
+  assert(whole.merged && whole.merged.indexOf('specials') !== -1,
+    'legacy save applies the Specials edit (still at baseline v1)');
+  assert(whole.skippedStale && whole.skippedStale.indexOf('main') !== -1,
+    'legacy save skips Main which is already past baseline version');
+  assert(whole.state.book.main[0].name === 'Live Dish 1',
+    'legacy save does not clobber newer Main with old cache');
+  assert(whole.state.book.specials[0].name === 'Phone Special 1',
+    'legacy save does update Specials');
+  assert(whole.state.menuVersions.main === 5 && whole.state.menuVersions.specials === 2,
+    'legacy save only bumps the merged menu version');
+})();
+
+(function () {
+  // Client pulled an older book clock — every differing menu is stale → conflict.
+  var current = baseState();
+  current.updatedAt = 5000;
+  var whole = sync.applyWholeBookSave(current, {
+    book: {
+      main: fullMenu('Mains', 'Stale Main', 12),
+      sunday: current.book.sunday,
+      specials: fullMenu('Special Mains', 'Stale Special', 10),
+      'little-bells': current.book['little-bells']
+    },
+    updatedAt: 1000 // older than server
+  });
+  assert(whole.ok === false && whole.conflict === true,
+    'legacy save conflicts when client updatedAt is older than server');
+  assert(whole.state.book.main[0].name === 'Live Dish 1',
+    'conflict leaves server Main untouched');
+})();
+
+(function () {
+  // expectedVersions on legacy path: stale Main, fresh Specials.
+  var current = baseState();
+  var whole = sync.applyWholeBookSave(current, {
+    book: {
+      main: fullMenu('Mains', 'Wrong Main', 12),
+      sunday: current.book.sunday,
+      specials: fullMenu('Special Mains', 'Ok Special', 10),
+      'little-bells': current.book['little-bells']
+    },
+    updatedAt: 99999,
+    expectedVersions: { main: 4, specials: 1 } // main stale (server 5), specials ok
+  });
+  assert(whole.ok === true && whole.merged.indexOf('specials') !== -1,
+    'legacy save with expectedVersions merges only non-stale menus');
+  assert(whole.skippedStale.indexOf('main') !== -1,
+    'legacy save with expectedVersions skips stale Main');
+  assert(whole.state.book.main[0].name === 'Live Dish 1',
+    'stale expectedVersion does not overwrite Main');
 })();
 
 // —— 3. Open / focus / Sync must not auto-push the local cache ——
@@ -208,8 +315,12 @@ var ingestJs = fs.readFileSync(path.join(root, 'menus-ingest.js'), 'utf8');
 assert(ingestJs.indexOf("action === 'saveMenuState'") !== -1 &&
   ingestJs.indexOf('stale_menu_version') !== -1,
   'cloud verify detects per-menu conflict after no-cors write');
-assert(ingestJs.indexOf('seed_or_empty_main') !== -1,
+assert(ingestJs.indexOf('seed_or_empty_menu') !== -1,
   'cloud verify reports seed/empty reject when version did not advance');
+assert(aiGs.indexOf('seed_or_empty_menu') !== -1 ||
+  fs.readFileSync(path.join(root, 'apps-script/menu-ai/MenusSyncLogic.js'), 'utf8')
+    .indexOf('seedGuardMenu') !== -1,
+  'server seed guard applies via seedGuardMenu for every menu');
 assert(aiGs.indexOf('saveMenuState_') !== -1 &&
   aiGs.indexOf('menusBackupBeforeWrite_') !== -1,
   'Apps Script has per-menu save and backup-before-write');

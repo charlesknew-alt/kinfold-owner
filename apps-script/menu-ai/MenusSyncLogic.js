@@ -4,7 +4,8 @@
  *
  * Goals:
  * - Per-menu saves with version conflict checks
- * - Reject seed / near-empty Main overwriting a full Main
+ * - Reject seed / near-empty overwrites of any full menu
+ * - Legacy whole-book saves merge only non-stale diffs (rollout-safe)
  * - Coerce Little Bells print-history menuId mismatches
  */
 (function (root) {
@@ -14,17 +15,19 @@
   var NEAR_EMPTY_MAX = 2;
   var FULL_MENU_MIN = 8;
   var MENUS_BACKUP_SLOTS = 5;
+  /** After ensureMenuVersions, untouched menus sit at 1. Versioned saves go to 2+. */
+  var LEGACY_BASELINE_VERSION = 1;
 
   function dishCount_(list) {
     return Array.isArray(list) ? list.length : 0;
   }
 
-  /** True when a Main payload is empty, tiny, or the known seed-steak incident shape. */
-  function isNearEmptyOrSeedMain(dishes) {
+  /** True when a menu payload is empty, tiny, or the known seed-steak incident shape. */
+  function isNearEmptyOrSeedMenu(dishes) {
     var n = dishCount_(dishes);
     if (n <= 0) return true;
     if (n <= NEAR_EMPTY_MAX) return true;
-    // Incident: Main contained only the sample seed dish "10oz Sirloin Steak"
+    // Incident: menu contained only the sample seed dish "10oz Sirloin Steak"
     // (sometimes with one or two leftover seed nibbles).
     if (n <= 3) {
       var hasSteak = false;
@@ -42,19 +45,30 @@
     return false;
   }
 
+  /** @deprecated use isNearEmptyOrSeedMenu */
+  function isNearEmptyOrSeedMain(dishes) {
+    return isNearEmptyOrSeedMenu(dishes);
+  }
+
   /**
-   * Reject replacing a full Main with a near-empty / seed book.
+   * Reject replacing a full menu with a near-empty / seed payload.
    * @return {{reject:boolean, reason?:string}}
    */
-  function seedGuardMain(existingDishes, incomingDishes) {
+  function seedGuardMenu(menuId, existingDishes, incomingDishes) {
+    var id = String(menuId || 'menu');
     var existN = dishCount_(existingDishes);
     if (existN < FULL_MENU_MIN) return { reject: false };
-    if (!isNearEmptyOrSeedMain(incomingDishes)) return { reject: false };
+    if (!isNearEmptyOrSeedMenu(incomingDishes)) return { reject: false };
     return {
       reject: true,
-      reason: 'Refusing to replace a full Main (' + existN +
-        ' dishes) with a near-empty or seed Main (' + dishCount_(incomingDishes) + ' dishes).'
+      reason: 'Refusing to replace a full ' + id + ' (' + existN +
+        ' dishes) with a near-empty or seed menu (' + dishCount_(incomingDishes) + ' dishes).'
     };
+  }
+
+  /** @deprecated use seedGuardMenu */
+  function seedGuardMain(existingDishes, incomingDishes) {
+    return seedGuardMenu('main', existingDishes, incomingDishes);
   }
 
   function ensureMenuVersions_(state) {
@@ -78,6 +92,40 @@
     } catch (e) {
       return value;
     }
+  }
+
+  function dishesEqual_(a, b) {
+    try {
+      return JSON.stringify(Array.isArray(a) ? a : []) ===
+        JSON.stringify(Array.isArray(b) ? b : []);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Is a legacy/per-menu write stale for this menuId?
+   * - expectedVersions[id] present → must match server version
+   * - else (old whole-book client): stale if client's updatedAt is older than
+   *   the server book clock, OR this menu has already been version-saved past
+   *   the migrate baseline (so a bumped local updatedAt cannot clobber it)
+   */
+  function isMenuStaleForLegacy_(menuId, state, raw) {
+    var serverV = Number(state.menuVersions && state.menuVersions[menuId]) || 0;
+    var expectedMap = raw && raw.expectedVersions && typeof raw.expectedVersions === 'object'
+      ? raw.expectedVersions
+      : null;
+    if (expectedMap && Object.prototype.hasOwnProperty.call(expectedMap, menuId)) {
+      var expV = Number(expectedMap[menuId]) || 0;
+      return serverV > 0 && expV !== serverV;
+    }
+    var clientAt = Number(raw && raw.updatedAt) || 0;
+    var serverAt = Number(state.updatedAt) || 0;
+    if (clientAt && serverAt && clientAt < serverAt) return true;
+    // Blind whole-book write without expectedVersions: protect menus already
+    // advanced by a versioned save (or a prior successful merge bump past 1).
+    if (serverV > LEGACY_BASELINE_VERSION) return true;
+    return false;
   }
 
   /**
@@ -138,20 +186,18 @@
       };
     }
 
-    if (menuId === 'main') {
-      var guard = seedGuardMain(state.book.main, patch.dishes);
-      if (guard.reject) {
-        return {
-          ok: false,
-          rejected: true,
-          error: 'seed_or_empty_main',
-          message: guard.reason,
-          state: state,
-          version: currentVersion,
-          updatedAt: Number(state.updatedAt) || 0,
-          menuVersions: state.menuVersions
-        };
-      }
+    var guard = seedGuardMenu(menuId, state.book[menuId], patch.dishes);
+    if (guard.reject) {
+      return {
+        ok: false,
+        rejected: true,
+        error: 'seed_or_empty_menu',
+        message: guard.reason,
+        state: state,
+        version: currentVersion,
+        updatedAt: Number(state.updatedAt) || 0,
+        menuVersions: state.menuVersions
+      };
     }
 
     state.book[menuId] = cloneJson_(patch.dishes);
@@ -196,8 +242,9 @@
   }
 
   /**
-   * Whole-book save (legacy). Still seed-guards Main and bumps all touched versions.
-   * Prefer applyMenuSave for normal edits.
+   * Whole-book save (legacy old-page clients).
+   * Merges only menus that differ and are not stale; seed-guards every menu.
+   * Never blindly replaces the whole book.
    */
   function applyWholeBookSave(current, raw) {
     raw = raw && typeof raw === 'object' ? raw : {};
@@ -218,70 +265,148 @@
       extraSections: [],
       menuVersions: {}
     });
+    if (!state.book || typeof state.book !== 'object') state.book = {};
+    if (!state.metaBook || typeof state.metaBook !== 'object') state.metaBook = {};
+    if (!state.includes || typeof state.includes !== 'object') state.includes = {};
+    if (!state.promoTicks || typeof state.promoTicks !== 'object') state.promoTicks = {};
+    if (!state.sectionLayout || typeof state.sectionLayout !== 'object') state.sectionLayout = {};
+    if (!state.menuVersions || typeof state.menuVersions !== 'object') state.menuVersions = {};
 
-    var guard = seedGuardMain(state.book && state.book.main, raw.book.main);
-    if (guard.reject) {
+    var incomingBook = raw.book;
+    var ids = {};
+    Object.keys(state.book).forEach(function (id) { ids[id] = true; });
+    Object.keys(incomingBook).forEach(function (id) { ids[id] = true; });
+
+    var merged = [];
+    var skippedSame = [];
+    var skippedStale = [];
+    var skippedSeed = [];
+    var idList = Object.keys(ids);
+
+    for (var i = 0; i < idList.length; i++) {
+      var menuId = idList[i];
+      var serverDishes = state.book[menuId];
+      var incomingDishes = Object.prototype.hasOwnProperty.call(incomingBook, menuId)
+        ? incomingBook[menuId]
+        : undefined;
+
+      // Menu only on server — keep it (old client must not delete menus by omission
+      // when the payload is a partial/corrupt book). If incoming explicitly sends
+      // the key, incomingDishes is defined (possibly []).
+      if (!Object.prototype.hasOwnProperty.call(incomingBook, menuId)) {
+        skippedSame.push(menuId);
+        continue;
+      }
+      if (!Array.isArray(incomingDishes)) incomingDishes = [];
+
+      if (dishesEqual_(serverDishes, incomingDishes)) {
+        skippedSame.push(menuId);
+        continue;
+      }
+
+      // Seed/near-empty guard first — even if the menu is also "stale", never
+      // treat a shrink attempt as a successful no-op merge path.
+      var guard = seedGuardMenu(menuId, serverDishes, incomingDishes);
+      if (guard.reject) {
+        skippedSeed.push(menuId);
+        continue;
+      }
+
+      if (isMenuStaleForLegacy_(menuId, state, raw)) {
+        skippedStale.push(menuId);
+        continue;
+      }
+
+      state.book[menuId] = cloneJson_(incomingDishes);
+      if (raw.metaBook && typeof raw.metaBook === 'object' && raw.metaBook[menuId]) {
+        state.metaBook[menuId] = cloneJson_(raw.metaBook[menuId]);
+      }
+      if (raw.includes && typeof raw.includes === 'object' && raw.includes[menuId]) {
+        state.includes[menuId] = cloneJson_(raw.includes[menuId]);
+      }
+      if (raw.promoTicks && typeof raw.promoTicks === 'object' && raw.promoTicks[menuId]) {
+        state.promoTicks[menuId] = cloneJson_(raw.promoTicks[menuId]);
+      }
+      if (raw.sectionLayout && typeof raw.sectionLayout === 'object' &&
+          raw.sectionLayout[menuId]) {
+        state.sectionLayout[menuId] = cloneJson_(raw.sectionLayout[menuId]);
+      }
+      var curV = Number(state.menuVersions[menuId]) || 0;
+      state.menuVersions[menuId] = curV + 1;
+      merged.push(menuId);
+    }
+
+    // Nothing applicable: seed reject and/or stale conflict.
+    if (merged.length === 0) {
+      if (skippedSeed.length && !skippedStale.length) {
+        return {
+          ok: false,
+          rejected: true,
+          error: 'seed_or_empty_menu',
+          message: 'Refusing near-empty or seed overwrite for: ' + skippedSeed.join(', '),
+          state: state,
+          menuVersions: state.menuVersions,
+          skippedSeed: skippedSeed
+        };
+      }
+      if (skippedStale.length) {
+        return {
+          ok: false,
+          conflict: true,
+          error: 'stale_menu_version',
+          message: 'Server has newer edits for: ' + skippedStale.join(', ') +
+            '. Reload and try again.',
+          state: state,
+          menuVersions: state.menuVersions,
+          skippedStale: skippedStale,
+          skippedSeed: skippedSeed
+        };
+      }
+      if (skippedSeed.length) {
+        return {
+          ok: false,
+          rejected: true,
+          error: 'seed_or_empty_menu',
+          message: 'Refusing near-empty or seed overwrite for: ' + skippedSeed.join(', '),
+          state: state,
+          menuVersions: state.menuVersions,
+          skippedSeed: skippedSeed
+        };
+      }
+      // Identical book — treat as success no-op (old Sync may re-push same cache).
       return {
-        ok: false,
-        rejected: true,
-        error: 'seed_or_empty_main',
-        message: guard.reason,
-        state: state
+        ok: true,
+        state: state,
+        updatedAt: Number(state.updatedAt) || 0,
+        menuVersions: state.menuVersions,
+        merged: [],
+        skippedSame: skippedSame
       };
     }
 
-    // Optional whole-book expectedVersions map — any mismatch → conflict.
-    var expectedMap = raw.expectedVersions && typeof raw.expectedVersions === 'object'
-      ? raw.expectedVersions
-      : null;
-    if (expectedMap) {
-      var ids = Object.keys(expectedMap);
-      for (var i = 0; i < ids.length; i++) {
-        var id = ids[i];
-        var curV = Number(state.menuVersions[id]) || 0;
-        var expV = Number(expectedMap[id]) || 0;
-        if (curV > 0 && expV !== curV) {
-          return {
-            ok: false,
-            conflict: true,
-            error: 'stale_menu_version',
-            message: 'A newer version of menu "' + id + '" exists on the server.',
-            state: state,
-            menuVersions: state.menuVersions
-          };
-        }
-      }
+    // Shared fields only when at least one menu merged (deliberate legacy save).
+    if (Array.isArray(raw.promoBank)) state.promoBank = cloneJson_(raw.promoBank);
+    if (raw.promoDeck && typeof raw.promoDeck === 'object') {
+      state.promoDeck = cloneJson_(raw.promoDeck);
+    }
+    if (Array.isArray(raw.dishCatalogue)) {
+      state.dishCatalogue = cloneJson_(raw.dishCatalogue);
+    }
+    if (Array.isArray(raw.extraMenus)) state.extraMenus = cloneJson_(raw.extraMenus);
+    if (Array.isArray(raw.extraSections)) {
+      state.extraSections = cloneJson_(raw.extraSections);
     }
 
-    state.book = cloneJson_(raw.book);
-    state.metaBook = raw.metaBook && typeof raw.metaBook === 'object'
-      ? cloneJson_(raw.metaBook) : (state.metaBook || {});
-    state.includes = raw.includes && typeof raw.includes === 'object'
-      ? cloneJson_(raw.includes) : (state.includes || {});
-    state.promoBank = Array.isArray(raw.promoBank) ? cloneJson_(raw.promoBank) : (state.promoBank || []);
-    state.promoTicks = raw.promoTicks && typeof raw.promoTicks === 'object'
-      ? cloneJson_(raw.promoTicks) : (state.promoTicks || {});
-    state.promoDeck = raw.promoDeck && typeof raw.promoDeck === 'object'
-      ? cloneJson_(raw.promoDeck) : (state.promoDeck || { order: [], used: [] });
-    state.sectionLayout = raw.sectionLayout && typeof raw.sectionLayout === 'object'
-      ? cloneJson_(raw.sectionLayout) : (state.sectionLayout || {});
-    state.dishCatalogue = Array.isArray(raw.dishCatalogue)
-      ? cloneJson_(raw.dishCatalogue) : (state.dishCatalogue || []);
-    state.extraMenus = Array.isArray(raw.extraMenus)
-      ? cloneJson_(raw.extraMenus) : (state.extraMenus || []);
-    state.extraSections = Array.isArray(raw.extraSections)
-      ? cloneJson_(raw.extraSections) : (state.extraSections || []);
-
-    Object.keys(state.book).forEach(function (id) {
-      var v = Number(state.menuVersions[id]) || 0;
-      state.menuVersions[id] = v + 1;
-    });
-    state.updatedAt = Number(raw.updatedAt) || Date.now();
+    state.updatedAt = Date.now();
     return {
       ok: true,
       state: state,
       updatedAt: state.updatedAt,
-      menuVersions: state.menuVersions
+      menuVersions: state.menuVersions,
+      merged: merged,
+      skippedSame: skippedSame,
+      skippedStale: skippedStale,
+      skippedSeed: skippedSeed
     };
   }
 
@@ -387,7 +512,10 @@
     NEAR_EMPTY_MAX: NEAR_EMPTY_MAX,
     FULL_MENU_MIN: FULL_MENU_MIN,
     MENUS_BACKUP_SLOTS: MENUS_BACKUP_SLOTS,
+    LEGACY_BASELINE_VERSION: LEGACY_BASELINE_VERSION,
+    isNearEmptyOrSeedMenu: isNearEmptyOrSeedMenu,
     isNearEmptyOrSeedMain: isNearEmptyOrSeedMain,
+    seedGuardMenu: seedGuardMenu,
     seedGuardMain: seedGuardMain,
     ensureMenuVersions: ensureMenuVersions_,
     applyMenuSave: applyMenuSave,

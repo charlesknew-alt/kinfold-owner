@@ -2417,8 +2417,8 @@ function saveMenuState_(body) {
 }
 
 /**
- * Legacy whole-book save. Still seed-guards Main and backs up first.
- * Prefer saveMenuState_ for normal device edits.
+ * Legacy whole-book save (old cached pages). Merges only non-stale diffs,
+ * seed-guards every menu, backs up first. Prefer saveMenuState_.
  */
 function saveMenusState_(raw) {
   if (!raw || typeof raw !== 'object') {
@@ -2442,7 +2442,9 @@ function saveMenusState_(raw) {
         error: (result && result.error) || 'save_failed',
         message: (result && result.message) || '',
         state: (result && result.state) || current,
-        menuVersions: (result && result.menuVersions) || (current && current.menuVersions) || {}
+        menuVersions: (result && result.menuVersions) || (current && current.menuVersions) || {},
+        skippedStale: result && result.skippedStale,
+        skippedSeed: result && result.skippedSeed
       };
     }
     menusBackupBeforeWrite_(currentText);
@@ -2452,20 +2454,43 @@ function saveMenusState_(raw) {
       source: 'props',
       updatedAt: result.updatedAt,
       menuVersions: result.menuVersions,
-      state: result.state
+      state: result.state,
+      merged: result.merged,
+      skippedStale: result.skippedStale,
+      skippedSeed: result.skippedSeed
     };
   }
 
-  // Fallback without MenusSyncLogic — still refuse seed Main over full Main.
-  var existMain = (current && current.book && current.book.main) || [];
-  var incomingMain = raw.book.main || [];
-  if (Array.isArray(existMain) && existMain.length >= 8 &&
-      Array.isArray(incomingMain) && incomingMain.length <= 2) {
+  // Fallback without MenusSyncLogic — refuse near-empty overwrite of any full menu.
+  var curBook = (current && current.book) || {};
+  var inBook = raw.book || {};
+  var blocked = [];
+  Object.keys(curBook).forEach(function (id) {
+    var exist = curBook[id];
+    var incoming = inBook[id];
+    if (!Array.isArray(exist) || exist.length < 8) return;
+    if (!Object.prototype.hasOwnProperty.call(inBook, id)) return;
+    if (!Array.isArray(incoming) || incoming.length > 2) return;
+    blocked.push(id);
+  });
+  if (blocked.length) {
     return {
       ok: false,
       rejected: true,
-      error: 'seed_or_empty_main',
-      message: 'Refusing to replace a full Main with a near-empty Main.',
+      error: 'seed_or_empty_menu',
+      message: 'Refusing to replace a full menu with a near-empty menu: ' + blocked.join(', '),
+      state: current
+    };
+  }
+  // Without MenusSyncLogic, refuse whole replace when client clock is behind server.
+  var clientAt = Number(raw.updatedAt) || 0;
+  var serverAt = Number(current && current.updatedAt) || 0;
+  if (clientAt && serverAt && clientAt < serverAt) {
+    return {
+      ok: false,
+      conflict: true,
+      error: 'stale_menu_version',
+      message: 'Server has a newer shared book. Reload and try again.',
       state: current
     };
   }

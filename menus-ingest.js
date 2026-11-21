@@ -358,7 +358,7 @@
             return {
               ok: false,
               rejected: true,
-              error: 'seed_or_empty_main',
+              error: 'seed_or_empty_menu',
               message: 'Server did not accept that menu save (near-empty/seed guard or write failed). Reloaded the shared copy.',
               version: gotV,
               updatedAt: updatedAt,
