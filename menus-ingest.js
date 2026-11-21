@@ -119,6 +119,43 @@
     return attempt_(1);
   }
 
+  /**
+   * no-cors POST cannot read the Apps Script JSON. Poll the status GET until
+   * the script has stored a result for this Save.
+   */
+  function pollPublishStatus_(id, attempt) {
+    return cloudGet('publishMenuStatus', { id: id }).then(function (data) {
+      if (data && data.found && data.status) {
+        var st = data.status;
+        if (st.published) {
+          return {
+            ok: true,
+            published: true,
+            message: st.message || 'Live on the website'
+          };
+        }
+        if (st.skipped) {
+          return {
+            ok: true,
+            published: false,
+            skipped: true,
+            message: st.message || 'Website publishing is not set up yet.'
+          };
+        }
+        throw new Error(st.error || st.message ||
+          'Could not publish this menu to the website. The sheet is still saved in Print history.');
+      }
+      if (attempt < 10) {
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            pollPublishStatus_(id, attempt + 1).then(resolve, reject);
+          }, 350 * attempt);
+        });
+      }
+      throw new Error('Saved in Print history, but the website did not confirm. Try Save again.');
+    });
+  }
+
   /** Fast GET path — works with Apps Script CORS. Retry once (Script can 302/flake). */
   function cloudGet(action, params) {
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
@@ -371,6 +408,28 @@
           });
         }
         return verifyHtml_(1);
+      });
+    }
+    // Website publish. Probe first: an old Menu AI deployment answers the
+    // status GET without publish:true — do not POST into Gemini by mistake.
+    if (action === 'publishSavedMenu') {
+      var pubId = String(body.id || '');
+      if (!pubId) {
+        return Promise.reject(new Error(
+          'Missing sheet id for website publish. The sheet is still saved in Print history.'));
+      }
+      return cloudGet('publishMenuStatus', { id: 'probe' }).then(function (probe) {
+        if (!probe || probe.publish !== true) {
+          return {
+            ok: true,
+            published: false,
+            skipped: true,
+            message: 'Saved in Print history. Website publishing is not live on Menu AI yet.'
+          };
+        }
+        return cloudWrite_(body).then(function () {
+          return pollPublishStatus_(pubId, 1);
+        });
       });
     }
     return cloudWriteAndVerify_(body);

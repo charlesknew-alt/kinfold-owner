@@ -135,6 +135,14 @@ function doPost(e) {
     if (action === 'emailPrintHistory') {
       return json_(emailPrintHistory_(body));
     }
+    // Website publish — after a successful Print-history Save. Failure here
+    // must not roll back that Save (the client already stored the sheet).
+    if (action === 'publishSavedMenu') {
+      return json_(publishSavedMenu_(body));
+    }
+    if (action === 'publishMenuStatus') {
+      return json_(publishMenuStatus_(body.id));
+    }
     // Shared live menu book (dishes, blurbs, wording, layout) across devices.
     if (action === 'getMenusState') {
       return json_(getMenusState_());
@@ -181,6 +189,10 @@ function doGet(e) {
   if (action === 'emailPrintHistory') {
     return json_(emailPrintHistory_({ id: p.id, to: p.to }));
   }
+  // Read-only. Publishing itself is POST publishSavedMenu (needs the dish list).
+  if (action === 'publishMenuStatus') {
+    return json_(publishMenuStatus_(p.id));
+  }
   // Emergency: free Script Properties when print HTML blew the 500KB cap.
   if (action === 'purgeHistory') {
     return json_(purgeHistoryProps_());
@@ -192,7 +204,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, hasPrintHistory, deletePrintHistory, emailPrintHistory, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
+    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, hasPrintHistory, deletePrintHistory, emailPrintHistory, publishSavedMenu, publishMenuStatus, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
     mailQuota: (function () {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
@@ -213,6 +225,8 @@ function bridgeApi(action, body) {
     if (action === 'hasPrintHistory') return hasPrintHistory_(body.id || (body.entry && body.entry.id));
     if (action === 'deletePrintHistory') return deletePrintHistory_(body.id);
     if (action === 'emailPrintHistory') return emailPrintHistory_(body);
+    if (action === 'publishSavedMenu') return publishSavedMenu_(body);
+    if (action === 'publishMenuStatus') return publishMenuStatus_(body.id);
     if (action === 'getMenusState') return getMenusState_();
     if (action === 'saveMenusState') return saveMenusState_(body.state || body);
     if (action === 'reviewLayout') return reviewLayoutWithGemini_(body);
@@ -1848,6 +1862,255 @@ function menuHtmlToPdfBlob_(html, filenamePdf) {
   var pdf = out.getAs(MimeType.PDF);
   pdf.setName(String(filenamePdf || 'menu.pdf'));
   return pdf;
+}
+
+/**
+ * Website publish status for one Save (small JSON, not the PDF).
+ * Keyed by the print-history id. Not part of MENUS_* / getMenusState_.
+ */
+function publishStatusRead_(id) {
+  var key = historySafeId_(id);
+  if (!key) return null;
+  var raw = propRead_('MENUPUB');
+  if (!raw) return null;
+  try {
+    var all = JSON.parse(raw);
+    if (!all || typeof all !== 'object') return null;
+    return all[key] || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function publishStatusWrite_(id, row) {
+  var key = historySafeId_(id);
+  if (!key) return;
+  var lock = null;
+  try {
+    lock = LockService.getScriptLock();
+    lock.waitLock(8000);
+  } catch (eLock) {
+    lock = null;
+  }
+  try {
+    var all = {};
+    try {
+      all = JSON.parse(propRead_('MENUPUB') || '{}') || {};
+    } catch (e) {
+      all = {};
+    }
+    if (!all || typeof all !== 'object' || Array.isArray(all)) all = {};
+    all[key] = {
+      at: Date.now(),
+      published: !!row.published,
+      skipped: !!row.skipped,
+      message: String(row.message || '').slice(0, 240),
+      error: String(row.error || '').slice(0, 400)
+    };
+    var keys = Object.keys(all);
+    if (keys.length > 24) {
+      keys.sort(function (a, b) { return (all[a].at || 0) - (all[b].at || 0); });
+      keys.slice(0, keys.length - 24).forEach(function (k) { delete all[k]; });
+    }
+    propWrite_('MENUPUB', JSON.stringify(all));
+  } finally {
+    try { lock.releaseLock(); } catch (eRel) {}
+  }
+}
+
+/** Short, secret-free line when the website answers non-2xx. */
+function publishRejectMessage_(code, raw, secret) {
+  var snippet = String(raw || '');
+  if (secret) snippet = snippet.split(secret).join('');
+  snippet = snippet.replace(/\s+/g, ' ').trim();
+  if (snippet.length > 140 || snippet.indexOf('<') !== -1) snippet = '';
+  var msg = 'The website rejected this menu (HTTP ' + code + '). The sheet is still saved in Print history.';
+  if (snippet) msg += ' ' + snippet;
+  return msg.slice(0, 320);
+}
+
+function menusPublishApi_() {
+  if (typeof EBMenusPublish !== 'undefined' && EBMenusPublish && EBMenusPublish.websiteMenuId) {
+    return EBMenusPublish;
+  }
+  try {
+    if (typeof globalThis !== 'undefined' && globalThis.EBMenusPublish &&
+        globalThis.EBMenusPublish.websiteMenuId) {
+      return globalThis.EBMenusPublish;
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * POST the saved sheet to the public website.
+ * PDF is menuHtmlToPdfBlob_ — the same converter Email uses.
+ * Save already succeeded; this only records a status the Menus page can read.
+ * Never logs the bearer token.
+ */
+function publishSavedMenu_(body) {
+  body = body || {};
+  var id = historySafeId_(body.id || '');
+  function finish_(row) {
+    if (id) {
+      try { publishStatusWrite_(id, row); } catch (eW) {}
+    }
+    return {
+      ok: true,
+      published: !!row.published,
+      skipped: !!row.skipped,
+      message: row.message || '',
+      error: row.error || ''
+    };
+  }
+  if (!id) {
+    return { ok: false, published: false, error: 'Missing sheet id' };
+  }
+  try {
+    var api = menusPublishApi_();
+    if (!api) {
+      return finish_({
+        published: false,
+        skipped: true,
+        message: 'Saved in Print history. Website publishing is not live on Menu AI yet.'
+      });
+    }
+    var menu = {
+      id: body.menuId,
+      name: body.menuName,
+      kind: body.menuKind || body.kind || ''
+    };
+    if (!api.websiteMenuId(menu)) {
+      return finish_({
+        published: false,
+        skipped: true,
+        message: 'This menu is not published to the website.'
+      });
+    }
+    var props = PropertiesService.getScriptProperties();
+    var secret = String(props.getProperty('MENU_PUBLISH_SECRET') || '').trim();
+    if (!secret) {
+      return finish_({
+        published: false,
+        skipped: true,
+        message: 'Website publishing is not set up yet.'
+      });
+    }
+    var origin = String(props.getProperty('MENU_PUBLISH_URL') || '').trim();
+    var endpoint = api.publishEndpoint(origin || api.DEFAULT_ORIGIN || 'https://www.eightbellsbolney.com');
+    if (!endpoint) {
+      return finish_({
+        published: false,
+        skipped: true,
+        message: 'Website publishing is not set up yet.'
+      });
+    }
+    var got = getPrintHistory_(id);
+    var html = got && got.ok && got.entry ? String(got.entry.html || '') : '';
+    if (!html) {
+      return finish_({
+        published: false,
+        error: 'Saved in Print history, but the sheet HTML was not there to turn into a PDF. Try Save again.'
+      });
+    }
+    var version = String(body.version || body.roman || (got.entry && got.entry.roman) || '').trim();
+    if (!version) {
+      return finish_({
+        published: false,
+        error: 'Missing the Roman version, so this was not sent to the website. The sheet is still saved in Print history.'
+      });
+    }
+    var savedAt = String(body.savedAt || '').trim();
+    if (!savedAt && got.entry && got.entry.generatedAt) {
+      try { savedAt = new Date(Number(got.entry.generatedAt)).toISOString(); } catch (eDt) { savedAt = ''; }
+    }
+    var payload = api.buildPublishBody({
+      menu: menu,
+      title: body.title || body.menuName || (got.entry && got.entry.menuName) || '',
+      version: version,
+      savedAt: savedAt,
+      dishes: body.dishes || [],
+      highlights: body.highlights || []
+    });
+    if (!payload) {
+      return finish_({
+        published: false,
+        skipped: true,
+        message: 'This menu is not published to the website.'
+      });
+    }
+    var pdfName = String(payload.menu || 'menu') + (version ? '-' + version : '') + '.pdf';
+    var pdf;
+    try {
+      pdf = menuHtmlToPdfBlob_(html, pdfName);
+    } catch (pdfErr) {
+      return finish_({
+        published: false,
+        error: 'Could not build the website PDF. The sheet is still saved in Print history.'
+      });
+    }
+    var bytes = [];
+    try { bytes = pdf.getBytes() || []; } catch (eBytes) { bytes = []; }
+    if (!bytes.length) {
+      return finish_({
+        published: false,
+        error: 'Could not build the website PDF. The sheet is still saved in Print history.'
+      });
+    }
+    payload.pdfBase64 = Utilities.base64Encode(bytes);
+    var res;
+    try {
+      res = UrlFetchApp.fetch(endpoint, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { Authorization: 'Bearer ' + secret },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true,
+        followRedirects: true
+      });
+    } catch (netErr) {
+      return finish_({
+        published: false,
+        error: 'Could not reach the website. The sheet is still saved in Print history.'
+      });
+    }
+    var code = 0;
+    try { code = res.getResponseCode(); } catch (eCode) { code = 0; }
+    if (code < 200 || code >= 300) {
+      var raw = '';
+      try { raw = res.getContentText() || ''; } catch (eTxt) { raw = ''; }
+      return finish_({
+        published: false,
+        error: publishRejectMessage_(code, raw, secret)
+      });
+    }
+    return finish_({
+      published: true,
+      message: 'Live on the website'
+    });
+  } catch (err) {
+    return finish_({
+      published: false,
+      error: 'Could not publish this menu to the website. The sheet is still saved in Print history.'
+    });
+  }
+}
+
+/** Polled after the no-cors publish POST. publish:true means this deployment can publish. */
+function publishMenuStatus_(id) {
+  var row = publishStatusRead_(id);
+  if (!row) return { ok: true, publish: true, found: false };
+  return {
+    ok: true,
+    publish: true,
+    found: true,
+    status: {
+      published: !!row.published,
+      skipped: !!row.skipped,
+      message: String(row.message || ''),
+      error: String(row.error || '')
+    }
+  };
 }
 
 function getMenusState_() {

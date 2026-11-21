@@ -5034,6 +5034,14 @@
     return html;
   }
 
+  /** JSON for an inline preview script — keep </script> from breaking out. */
+  function embedJsonForScript_(value) {
+    return JSON.stringify(value == null ? null : value)
+      .replace(/</g, '\\u003c')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+  }
+
   function build(menu, dishes, plan) {
     plan = plan || {};
     // Preview shows the next Roman without burning it — Save to menus stamps it.
@@ -5117,6 +5125,30 @@
       a5Stack = '<div class="sheet-stack mode-panel mode-a5">' + wrapGuillotine(body) + '</div>';
     }
 
+    var websiteMenu = '';
+    var publishDishes = [];
+    var publishTitle = '';
+    try {
+      if (root.EBMenusPublish && root.EBMenusPublish.websiteMenuId) {
+        websiteMenu = root.EBMenusPublish.websiteMenuId({
+          id: menu && menu.id,
+          name: menu && menu.name,
+          kind: menu && menu.kind
+        }) || '';
+        if (websiteMenu && root.EBMenusPublish.dishesForPublish) {
+          publishDishes = root.EBMenusPublish.dishesForPublish(dishes);
+          publishTitle = (meta && meta.title && String(meta.title).trim()) || (menu && menu.name) || '';
+        }
+      }
+    } catch (ePub) {
+      websiteMenu = '';
+      publishDishes = [];
+      publishTitle = '';
+    }
+    var publishTick = websiteMenu
+      ? '<label class="paper-opt" id="publishOpt"><input type="checkbox" id="publishToWebsite" checked> Publish to website</label>'
+      : '';
+
     var dateHint = ver.hideDate ? ('print ' + ver.roman) : (ver.week + ' · print ' + ver.roman);
     var fillerHint = layout && layout.fillers && layout.fillers.length
       ? ' Auto: ' + layout.fillers.join(' · ') + '.'
@@ -5144,6 +5176,7 @@
       '</style></head><body class="' + bodyClass + '">' +
       '<div class="toolbar" id="previewToolbar">' +
         '<button type="button" id="saveToMenus">Save</button>' +
+        publishTick +
         '<button type="button" id="discardPreview">Discard</button>' +
         (landscape ? '<span class="hint">Card menu — two identical copies on landscape A4 for the guillotine.</span>' :
           '<label class="paper-opt"><input type="radio" name="paper" value="a4"' +
@@ -5154,6 +5187,7 @@
             ' onchange="document.body.className=(document.body.classList.contains(\'make-fit\')?\'paper-a5 make-fit\':\'paper-a5\')"> 2×A5 on A4 (guillotine)</label>') +
         '<span class="hint" id="printHint">' + esc(dateHint) +
         ' — preview only. Save to stamp this version into Print history, or Discard to edit the menu.' +
+        (websiteMenu ? ' Publish to website is ticked — untick it for an in-house sheet only.' : '') +
         esc(decidedHint) + '</span>' +
       '</div>' +
       '<div class="preview-clip">' + a4Stack + a5Stack + '</div>' +
@@ -5478,14 +5512,20 @@
         'window.addEventListener("beforeprint",function(){document.body.classList.add("is-printing");fitPages();});' +
         'window.addEventListener("afterprint",function(){document.body.classList.remove("is-printing");fitPages();});' +
         'window.addEventListener("resize",fitPreviewToScreen);' +
-        'var SAVE_META=' + JSON.stringify({
+        'var SAVE_META=' + embedJsonForScript_({
           menuId: menu.id,
           menuName: menu.name,
+          menuKind: menu.kind || '',
+          title: publishTitle,
+          websiteMenu: websiteMenu,
           week: ver.week,
           weekKey: ver.weekKey,
           hideDate: !!ver.hideDate,
           landscape: !!landscape
         }) + ';' +
+        // Dishes on THIS preview (including drop-ins). Later edits in the
+        // Menus tab must not change what a Save publishes.
+        'var SAVE_DISHES=' + embedJsonForScript_(publishDishes) + ';' +
         // History / reopen sheets get a Print toolbar (preview itself is Save or Discard only).
         'function bindPrintButton(){' +
           'var pb=document.getElementById("printSheet");' +
@@ -5564,6 +5604,9 @@
           'var api=window.opener.EBMenuPrint;' +
           'sb.disabled=true;sb.textContent="Saving…";' +
           'var disc=document.getElementById("discardPreview");if(disc)disc.disabled=true;' +
+          // Read the tick before the toolbar is replaced. Absent = this menu never publishes.
+          'var pubBox=document.getElementById("publishToWebsite");' +
+          'var doPublish=!!(SAVE_META.websiteMenu&&pubBox&&pubBox.checked);' +
           // Always stamp THIS preview’s menu (SAVE_META), never opener.lastBuildMeta.
           'var ver=api.commitPrintVersion(SAVE_META.menuId);' +
           'if(SAVE_META.hideDate)ver.hideDate=true;' +
@@ -5586,8 +5629,15 @@
             'roman:ver.roman,n:ver.n,week:ver.week||SAVE_META.week,weekKey:ver.weekKey||SAVE_META.weekKey,' +
             'hideDate:!!ver.hideDate,html:html' +
           '}).then(function(saved){' +
+            'var savedInfo=Object.assign({},saved||{menuId:SAVE_META.menuId,roman:ver.roman});' +
+            'savedInfo.publish=doPublish;' +
+            'savedInfo.request=doPublish?{' +
+              'id:saveId,menuId:SAVE_META.menuId,menuName:SAVE_META.menuName,' +
+              'menuKind:SAVE_META.menuKind||"",title:SAVE_META.title||SAVE_META.menuName,' +
+              'roman:ver.roman,savedAt:new Date(saveAt).toISOString(),dishes:SAVE_DISHES' +
+            '}:null;' +
             'try{if(typeof window.opener.EBMenusOnPrintSaved==="function"){' +
-              'window.opener.EBMenusOnPrintSaved(saved||{menuId:SAVE_META.menuId,roman:ver.roman});' +
+              'window.opener.EBMenusOnPrintSaved(savedInfo);' +
             '}}catch(e2){}' +
             'window.close();' +
           '}).catch(function(){sb.disabled=false;sb.textContent="Save";' +
@@ -7020,6 +7070,46 @@
    * Email a saved sheet via Menu AI Apps Script (MailApp) — one click, no
    * mail-client popup. Defaults to pub@eightbellsbolney.com.
    */
+  /**
+   * After Print history has the sheet: ask Menu AI to POST Kate’s print PDF
+   * and the dish list. Generate / Discard never call this.
+   * Resolves { published:true } or { skipped:true, message }. Rejects on a
+   * website failure — the sheet is already saved.
+   */
+  function publishSavedSheet(req) {
+    req = req || {};
+    var mapper = root.EBMenusPublish;
+    if (!mapper || typeof mapper.websiteMenuId !== 'function') {
+      return Promise.reject(new Error(
+        'Saved in Print history. Website publishing did not run (mapping not loaded).'));
+    }
+    var menu = { id: req.menuId, name: req.menuName, kind: req.menuKind };
+    if (!mapper.websiteMenuId(menu)) {
+      return Promise.resolve({
+        ok: true,
+        published: false,
+        skipped: true,
+        message: 'This menu is not published to the website.'
+      });
+    }
+    if (!root.EBMenuIngest || typeof root.EBMenuIngest.cloudPost !== 'function') {
+      return Promise.reject(new Error(
+        'Saved in Print history. Could not reach Menu AI to publish.'));
+    }
+    return root.EBMenuIngest.cloudPost({
+      action: 'publishSavedMenu',
+      id: req.id,
+      menuId: req.menuId,
+      menuName: req.menuName || '',
+      menuKind: req.menuKind || '',
+      title: req.title || req.menuName || '',
+      version: req.roman || req.version || '',
+      savedAt: req.savedAt || '',
+      dishes: req.dishes || [],
+      highlights: req.highlights || []
+    });
+  }
+
   function emailPrintHtml(entry, opts) {
     opts = opts || {};
     if (!entry || !entry.html) return Promise.reject(new Error('missing_html'));
@@ -7131,6 +7221,7 @@
     sanitizePrintHtml: sanitizePrintHtml,
     downloadPrintHtml: downloadPrintHtml,
     emailPrintHtml: emailPrintHtml,
+    publishSavedSheet: publishSavedSheet,
     historyCloudUrl: historyCloudUrl,
     measureOppositeColumns: measureOppositeColumns,
     planPromoFill: planPromoFill,
