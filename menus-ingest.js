@@ -313,16 +313,74 @@
   function cloudWriteAndVerify_(body) {
     var action = String((body && body.action) || '');
     return cloudWrite_(body).then(function () {
+      // Per-menu save: no-cors cannot read the POST body, so re-GET and compare
+      // versions. Conflict / seed reject leave the server version unchanged or ahead.
+      if (action === 'saveMenuState') {
+        var menuId = String(body.menuId || '');
+        var expected = Number(body.expectedVersion) || 0;
+        function verifyMenuSave_(attempt) {
+          return cloudGet('getMenusState').then(function (data) {
+            var state = data && data.state;
+            var versions = (state && state.menuVersions) || {};
+            var gotV = Number(versions[menuId]) || 0;
+            var updatedAt = state ? (Number(state.updatedAt) || 0) : 0;
+            if (gotV === expected + 1) {
+              return {
+                ok: true,
+                source: 'props',
+                via: 'no-cors',
+                menuId: menuId,
+                version: gotV,
+                updatedAt: updatedAt,
+                menuVersions: versions,
+                state: state
+              };
+            }
+            // Server is ahead of what we based the edit on — stale device.
+            if (gotV > expected) {
+              return {
+                ok: false,
+                conflict: true,
+                error: 'stale_menu_version',
+                message: 'A newer version of this menu exists on the server. Reloaded the shared copy.',
+                version: gotV,
+                updatedAt: updatedAt,
+                menuVersions: versions,
+                state: state
+              };
+            }
+            // Version unchanged — seed/empty reject, or write still committing.
+            if (attempt < 5) {
+              return new Promise(function (resolve) {
+                setTimeout(function () { resolve(verifyMenuSave_(attempt + 1)); }, 350 * attempt);
+              });
+            }
+            return {
+              ok: false,
+              rejected: true,
+              error: 'seed_or_empty_menu',
+              message: 'Server did not accept that menu save (near-empty/seed guard or write failed). Reloaded the shared copy.',
+              version: gotV,
+              updatedAt: updatedAt,
+              menuVersions: versions,
+              state: state
+            };
+          });
+        }
+        return verifyMenuSave_(1);
+      }
       if (action === 'saveMenusState') {
         var want = Number((body.state && body.state.updatedAt) || 0);
         return cloudGet('getMenusState').then(function (data) {
           var got = data && data.state && Number(data.state.updatedAt || 0);
           if (want && got && got >= want) {
-            return { ok: true, source: 'props', updatedAt: got, via: 'no-cors' };
+            return { ok: true, source: 'props', updatedAt: got, via: 'no-cors',
+              menuVersions: (data.state && data.state.menuVersions) || {}, state: data.state };
           }
           // Script may still be committing — accept write, soft-verify.
           if (data && data.state) {
-            return { ok: true, source: 'props', updatedAt: got || want, via: 'no-cors' };
+            return { ok: true, source: 'props', updatedAt: got || want, via: 'no-cors',
+              menuVersions: (data.state && data.state.menuVersions) || {}, state: data.state };
           }
           throw new Error('cloud_write_not_visible');
         });

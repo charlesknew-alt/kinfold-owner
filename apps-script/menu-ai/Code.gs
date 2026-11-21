@@ -243,6 +243,9 @@ function doPost(e) {
     if (action === 'getMenusState') {
       return json_(getMenusState_());
     }
+    if (action === 'saveMenuState') {
+      return json_(saveMenuState_(body));
+    }
     if (action === 'saveMenusState') {
       return json_(saveMenusState_(body.state || body));
     }
@@ -300,7 +303,7 @@ function doGet(e) {
   return json_({
     ok: true,
     service: 'eight-bells-menu-ai',
-    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, hasPrintHistory, deletePrintHistory, emailPrintHistory, publishSavedMenu, publishMenuStatus, getMenusState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
+    hint: 'GET/POST actions: listPrintHistory, pruneOrphanPrintHistory, savePrintHistory, getPrintHistory, hasPrintHistory, deletePrintHistory, emailPrintHistory, publishSavedMenu, publishMenuStatus, getMenusState, saveMenuState, saveMenusState, reviewLayout, reviewSpelling; or ?bridge=1',
     mailQuota: (function () {
       try { return MailApp.getRemainingDailyQuota(); } catch (err) { return null; }
     })()
@@ -324,6 +327,7 @@ function bridgeApi(action, body) {
     if (action === 'publishSavedMenu') return publishSavedMenu_(body);
     if (action === 'publishMenuStatus') return publishMenuStatus_(body.id);
     if (action === 'getMenusState') return getMenusState_();
+    if (action === 'saveMenuState') return saveMenuState_(body);
     if (action === 'saveMenusState') return saveMenusState_(body.state || body);
     if (action === 'reviewLayout') return reviewLayoutWithGemini_(body);
     if (action === 'reviewSpelling') return reviewSpellingWithGemini_(body);
@@ -1250,6 +1254,21 @@ function historyRepairBulkNowStamps_(list) {
 }
 
 function historyMetaFromHtmlTitle_(id, html) {
+  // Prefer shared logic (Little Bells must not fall through to menuId "main").
+  var logic = (typeof EBMenusSyncLogic !== 'undefined') ? EBMenusSyncLogic : null;
+  var base = logic && logic.historyMetaFromHtmlTitle
+    ? logic.historyMetaFromHtmlTitle(id, html)
+    : null;
+  // Never Date.now() on rebuild — that rewrote every stamp to 14:19 (flow178 hole).
+  var stamp = historyRecoverStamp_(id, html);
+  if (!stamp) stamp = 1; // sort-stable placeholder; client repair / next save can improve
+  if (base) {
+    base.generatedAt = stamp;
+    base.createdAt = stamp;
+    base.dayKey = '';
+    return base;
+  }
+  // Fallback if MenusSyncLogic.js is not loaded in this deployment yet.
   var title = '';
   var m = String(html || '').match(/<title>([^<]*)<\/title>/i);
   if (m) title = String(m[1] || '').trim();
@@ -1261,6 +1280,9 @@ function historyMetaFromHtmlTitle_(id, html) {
   if (/\bsunday\b/i.test(title)) {
     menuId = 'sunday';
     menuName = 'Sunday';
+  } else if (/little\s*bells/i.test(title)) {
+    menuId = 'little-bells';
+    menuName = 'Little Bells';
   } else if (/dessert/i.test(title)) {
     menuId = 'desserts';
     menuName = 'Desserts';
@@ -1275,6 +1297,10 @@ function historyMetaFromHtmlTitle_(id, html) {
     menuName = 'Sandwiches';
   } else if (title) {
     menuName = title.replace(/\s+—\s*[IVXLCDM]+\s*$/, '').replace(/\s+(?:Wk|Sun)\b.*$/i, '').trim() || menuName;
+    if (/little\s*bells/i.test(menuName)) {
+      menuId = 'little-bells';
+      menuName = 'Little Bells';
+    }
   }
   // Prefer "Sunday 4th October" / "Week of …" — never "Sunday Sun 4th Oct"
   // (that doubled into "Sunday Sunday Sun …" in the UI label).
@@ -1288,9 +1314,6 @@ function historyMetaFromHtmlTitle_(id, html) {
       week = 'Sunday ' + sm[1] + ' ' + sm[2] + (sm[3] ? ' ' + sm[3] : '');
     }
   }
-  // Never Date.now() on rebuild — that rewrote every stamp to 14:19 (flow178 hole).
-  var stamp = historyRecoverStamp_(id, html);
-  if (!stamp) stamp = 1; // sort-stable placeholder; client repair / next save can improve
   return {
     id: id,
     menuId: menuId,
@@ -1379,10 +1402,21 @@ function historyMetaOnly_(entry) {
   entry = entry || {};
   var generatedAt = Number(entry.generatedAt || entry.createdAt || 0) || Date.now();
   var createdAt = Number(entry.createdAt || entry.generatedAt || 0) || generatedAt;
+  var menuId = String(entry.menuId || 'main');
+  var menuName = String(entry.menuName || entry.menuId || 'Menu');
+  // Fix Little Bells (and similar) stored as menuId "main" with the right name.
+  if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.coercePrintMenuId) {
+    var coerced = EBMenusSyncLogic.coercePrintMenuId(menuId, menuName);
+    menuId = coerced.menuId;
+    menuName = coerced.menuName;
+  } else if (/little\s*bells/i.test(menuName) && menuId === 'main') {
+    menuId = 'little-bells';
+    menuName = 'Little Bells';
+  }
   return {
     id: String(entry.id || ''),
-    menuId: String(entry.menuId || 'main'),
-    menuName: String(entry.menuName || entry.menuId || 'Menu'),
+    menuId: menuId,
+    menuName: menuName,
     roman: String(entry.roman || ''),
     n: entry.n || 0,
     week: String(entry.week || ''),
@@ -2260,14 +2294,71 @@ function publishMenuStatus_(id) {
   };
 }
 
-function getMenusState_() {
+/** Read raw MENUS JSON object (or null). Does not filter empty stubs. */
+function menusStateRaw_() {
   var raw = propRead_('MENUS');
-  if (!raw) return { ok: true, source: 'props', state: null };
+  if (!raw) return null;
   try {
     var parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') {
-      return { ok: true, source: 'props', state: null };
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.ensureMenuVersions) {
+      return EBMenusSyncLogic.ensureMenuVersions(parsed);
     }
+    if (!parsed.menuVersions || typeof parsed.menuVersions !== 'object') {
+      parsed.menuVersions = {};
+    }
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Rotate MENUS backups before a successful write.
+ * Keeps MENUS_BAK_0 (newest) … MENUS_BAK_(n-1). Script Properties size is limited,
+ * so we keep a small ring and skip backup if the previous snapshot is identical.
+ */
+function menusBackupBeforeWrite_(currentRawText) {
+  var slots = 5;
+  if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.MENUS_BACKUP_SLOTS) {
+    slots = EBMenusSyncLogic.MENUS_BACKUP_SLOTS;
+  }
+  var text = String(currentRawText || '');
+  if (!text) return { ok: true, skipped: true, reason: 'empty' };
+  try {
+    var newest = propRead_('MENUS_BAK_0');
+    if (newest && newest === text) return { ok: true, skipped: true, reason: 'unchanged' };
+  } catch (e0) {}
+  // Shift older slots upward (highest index dropped).
+  for (var i = slots - 1; i >= 1; i--) {
+    try {
+      var prev = propRead_('MENUS_BAK_' + (i - 1));
+      if (prev) propWrite_('MENUS_BAK_' + i, prev);
+      else propDelete_('MENUS_BAK_' + i);
+    } catch (eShift) {}
+  }
+  try {
+    propWrite_('MENUS_BAK_0', text);
+    try {
+      PropertiesService.getScriptProperties().setProperty(
+        'MENUS_BAK_AT',
+        String(Date.now())
+      );
+    } catch (eAt) {}
+    return { ok: true, skipped: false };
+  } catch (eWrite) {
+    // Backup failure must not block the save — log and continue.
+    return {
+      ok: false,
+      error: String(eWrite && eWrite.message ? eWrite.message : eWrite)
+    };
+  }
+}
+
+function getMenusState_() {
+  var parsed = menusStateRaw_();
+  if (!parsed) return { ok: true, source: 'props', state: null };
+  try {
     // Ignore empty stub so a fresh phone does not wipe local dishes.
     var book = parsed.book || {};
     var hasDish = false;
@@ -2281,12 +2372,127 @@ function getMenusState_() {
   }
 }
 
+/**
+ * Per-menu save: only the edited menu is merged. Version check + seed guard.
+ * Body: { menuId, expectedVersion, dishes, meta?, includes?, promoTicks?,
+ *   sectionLayout?, promoBank?, promoDeck?, dishCatalogue?, extraMenus?, extraSections? }
+ */
+function saveMenuState_(body) {
+  body = body && typeof body === 'object' ? body : {};
+  var logic = (typeof EBMenusSyncLogic !== 'undefined') ? EBMenusSyncLogic : null;
+  if (!logic || typeof logic.applyMenuSave !== 'function') {
+    return { ok: false, error: 'MenusSyncLogic.js not loaded — redeploy Menu AI Apps Script' };
+  }
+  var current = menusStateRaw_();
+  var currentText = '';
+  try { currentText = propRead_('MENUS') || ''; } catch (eR) { currentText = ''; }
+
+  var result = logic.applyMenuSave(current, body);
+  if (!result || !result.ok) {
+    // Conflict / seed reject — return current server state so the client can reload.
+    return {
+      ok: false,
+      conflict: !!(result && result.conflict),
+      rejected: !!(result && result.rejected),
+      error: (result && result.error) || 'save_failed',
+      message: (result && result.message) || '',
+      state: (result && result.state) || current,
+      version: result && result.version,
+      updatedAt: result && result.updatedAt,
+      menuVersions: (result && result.menuVersions) || (current && current.menuVersions) || {}
+    };
+  }
+
+  menusBackupBeforeWrite_(currentText);
+  propWrite_('MENUS', JSON.stringify(result.state));
+  return {
+    ok: true,
+    source: 'props',
+    menuId: result.menuId,
+    version: result.version,
+    updatedAt: result.updatedAt,
+    menuVersions: result.menuVersions,
+    state: result.state
+  };
+}
+
+/**
+ * Legacy whole-book save (old cached pages). Merges only non-stale diffs,
+ * seed-guards every menu, backs up first. Prefer saveMenuState_.
+ */
 function saveMenusState_(raw) {
   if (!raw || typeof raw !== 'object') {
     return { ok: false, error: 'Missing state' };
   }
   if (!raw.book || typeof raw.book !== 'object') {
     return { ok: false, error: 'Missing state.book' };
+  }
+  var logic = (typeof EBMenusSyncLogic !== 'undefined') ? EBMenusSyncLogic : null;
+  var current = menusStateRaw_();
+  var currentText = '';
+  try { currentText = propRead_('MENUS') || ''; } catch (eR) { currentText = ''; }
+
+  if (logic && typeof logic.applyWholeBookSave === 'function') {
+    var result = logic.applyWholeBookSave(current, raw);
+    if (!result || !result.ok) {
+      return {
+        ok: false,
+        conflict: !!(result && result.conflict),
+        rejected: !!(result && result.rejected),
+        error: (result && result.error) || 'save_failed',
+        message: (result && result.message) || '',
+        state: (result && result.state) || current,
+        menuVersions: (result && result.menuVersions) || (current && current.menuVersions) || {},
+        skippedStale: result && result.skippedStale,
+        skippedSeed: result && result.skippedSeed
+      };
+    }
+    menusBackupBeforeWrite_(currentText);
+    propWrite_('MENUS', JSON.stringify(result.state));
+    return {
+      ok: true,
+      source: 'props',
+      updatedAt: result.updatedAt,
+      menuVersions: result.menuVersions,
+      state: result.state,
+      merged: result.merged,
+      skippedStale: result.skippedStale,
+      skippedSeed: result.skippedSeed
+    };
+  }
+
+  // Fallback without MenusSyncLogic — refuse near-empty overwrite of any full menu.
+  var curBook = (current && current.book) || {};
+  var inBook = raw.book || {};
+  var blocked = [];
+  Object.keys(curBook).forEach(function (id) {
+    var exist = curBook[id];
+    var incoming = inBook[id];
+    if (!Array.isArray(exist) || exist.length < 8) return;
+    if (!Object.prototype.hasOwnProperty.call(inBook, id)) return;
+    if (!Array.isArray(incoming) || incoming.length > 2) return;
+    blocked.push(id);
+  });
+  if (blocked.length) {
+    return {
+      ok: false,
+      rejected: true,
+      error: 'seed_or_empty_menu',
+      message: 'Refusing to replace a full menu with a near-empty menu: ' + blocked.join(', '),
+      state: current
+    };
+  }
+  // Without MenusSyncLogic, refuse whole replace when client clock is behind server.
+  var clientAt = Number(raw.updatedAt) || 0;
+  var serverAt = Number(current && current.updatedAt) || 0;
+  if (clientAt && serverAt && clientAt < serverAt) {
+    return {
+      ok: false,
+      conflict: true,
+      error: 'stale_menu_version',
+      message: 'Server has a newer shared book. Reload and try again.',
+      state: current
+    };
   }
   var updatedAt = Number(raw.updatedAt) || Date.now();
   var state = {
@@ -2296,14 +2502,14 @@ function saveMenusState_(raw) {
     includes: raw.includes && typeof raw.includes === 'object' ? raw.includes : {},
     promoBank: Array.isArray(raw.promoBank) ? raw.promoBank : [],
     promoTicks: raw.promoTicks && typeof raw.promoTicks === 'object' ? raw.promoTicks : {},
-    // Auto-pick deck (order + used ids) so every Generate cycles the bank without replacement.
     promoDeck: raw.promoDeck && typeof raw.promoDeck === 'object' ? raw.promoDeck : { order: [], used: [] },
     sectionLayout: raw.sectionLayout && typeof raw.sectionLayout === 'object' ? raw.sectionLayout : {},
-    // Shared dish catalogue (deduped titles + price history) for autocomplete.
     dishCatalogue: Array.isArray(raw.dishCatalogue) ? raw.dishCatalogue : [],
     extraMenus: Array.isArray(raw.extraMenus) ? raw.extraMenus : [],
-    extraSections: Array.isArray(raw.extraSections) ? raw.extraSections : []
+    extraSections: Array.isArray(raw.extraSections) ? raw.extraSections : [],
+    menuVersions: (current && current.menuVersions) || {}
   };
+  menusBackupBeforeWrite_(currentText);
   propWrite_('MENUS', JSON.stringify(state));
-  return { ok: true, source: 'props', updatedAt: updatedAt };
+  return { ok: true, source: 'props', updatedAt: updatedAt, menuVersions: state.menuVersions };
 }
