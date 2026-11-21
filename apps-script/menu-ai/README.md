@@ -37,11 +37,50 @@ The same web app stores staff data for PC ↔ phone:
 - `HISTIDX` — print history index (metadata only)
 - Print HTML — **Google Drive** folder `Eight Bells Menu Print History` (preferred). If Drive is not authorised yet, sheets are stored **gzip’d in Script Properties** (`HISTGZ_{id}_*`) so owner/manager still share one list. Run `AUTHORIZE_DRIVE_PRINT_HISTORY` once for the full archive.
 - `?action=driveStatus` — diagnose Drive auth (`canWrite: true` when OK)
+- `publishSavedMenu` / `publishMenuStatus` — after Save, optional POST of that sheet to the public website (see below). `getMenusState` is unchanged.
 
 Actions: `getMenusState`, `saveMenusState`, `listPrintHistory`, `savePrintHistory`, `getPrintHistory`, `deletePrintHistory`, `emailPrintHistory` (MailApp → `pub@eightbellsbolney.com` with a **printable PDF**; **Reply-To** your `@kinfoldinns.co.uk` alias. From-alias is off by default — see below).
 
 After pulling, push with `clasp push` from this folder, then update the live web-app deployment
 (`clasp deploy -i <deploymentId> -d "…"`). Local browser storage remains a backup / offline cache.
+
+### Publish a saved sheet to the website
+
+Save on the print preview stamps Print history, then (when **Publish to website** is ticked) POSTs that sheet to the public site. The tick is on by default. Generate and in-progress edits do not publish. Untick for an in-house-only sheet. If the website step fails, the sheet stays in Print history and Kate sees the error.
+
+**Menu AI tab → website `menu` id** (see `MenuPublish.js`):
+
+| Menu AI | Website id |
+|---|---|
+| Main menu (`main`) | `main` |
+| Sunday (`sunday`) | `sunday` |
+| Desserts (`desserts`) | `desserts` |
+| Little Bells (`little-bells`) | `little-bells` |
+| Specials (`specials`) | `specials` |
+| Breakfast (custom tab, id `breakfast`) | `breakfast` |
+
+Section names (Nibbles, Starters, Sunday Roasts, Sandwiches, …) stay on `dishes[].section`. A Desserts block included on Main is part of menu `main`, not a second publish. Saving the Desserts card publishes `desserts`.
+
+No tick, never POSTed: Party / Christmas, anything with buffet in the name, Main (upcoming), Sandwiches, Lunch club, other custom tabs.
+
+The PDF is the same Apps Script conversion Email uses (`menuHtmlToPdfBlob_`).
+
+Script properties (do not put the secret in git):
+
+- `MENU_PUBLISH_SECRET` — bearer token. If this is missing, Save still works and Kate sees “Website publishing is not set up yet.”
+- `MENU_PUBLISH_URL` — optional site origin. Default `https://www.eightbellsbolney.com`. Must be `https`. The script POSTs `{origin}/api/menus/publish`.
+
+Go-live is a separate step from this repo. Do not `clasp push` until Charles says so. Live deployment id (same `/exec` the Menus page already calls):
+
+`AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw`
+
+```bash
+cd apps-script/menu-ai
+clasp push
+clasp deploy -i AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw -d "Publish saved menus to the website"
+```
+
+Access stays **Anyone**. `getMenusState` is unchanged. No new OAuth scope (`script.external_request` is already on the manifest). Set the script properties before relying on the tick. Until that deploy, a ticked Save still saves and tells Kate that website publishing is not live on Menu AI yet.
 
 ### One-time Drive authorisation (phone Download / Print PDF)
 
