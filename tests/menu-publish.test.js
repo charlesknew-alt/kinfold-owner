@@ -134,13 +134,26 @@ assert(aiGs.indexOf("Authorization: 'Bearer ' + secret") !== -1, 'bearer header 
 assert(aiGs.indexOf('Website publishing is not set up yet.') !== -1,
   'missing secret skips with a clear message');
 assert(aiGs.indexOf('Live on the website') !== -1, 'success message is Live on the website');
-assert(aiGs.indexOf('menuHtmlToPdfBlob_') !== -1, 'website PDF uses the Email converter');
+assert(aiGs.indexOf('function menuHtmlToPdfBlob_') !== -1, 'Email PDF converter kept');
+assert(aiGs.indexOf('function menuHtmlToWebsitePdfBlob_') !== -1, 'website has its own PDF converter');
+assert(aiGs.indexOf('@page{size:A5;margin:0}') !== -1, 'website card PDF uses A5 page size');
 (function () {
   var fn = aiGs.split('function publishSavedMenu_')[1] || '';
   fn = fn.split('function publishMenuStatus_')[0] || fn;
   assert(fn.indexOf('Logger.log') === -1, 'publish path does not log (secret stays out of the logs)');
   assert(fn.indexOf('getMenusState_') === -1, 'publish does not touch getMenusState');
+  assert(fn.indexOf('menuHtmlToWebsitePdfBlob_') !== -1, 'publish uses the website PDF converter');
+  assert(fn.indexOf('menuHtmlToPdfBlob_') === -1, 'publish does not use the Email two-up converter');
 })();
+(function () {
+  var emailFn = aiGs.split('function emailPrintHistory_')[1] || '';
+  emailFn = emailFn.split('function menuHtmlPdfParts_')[0] ||
+    emailFn.split('function menuHtmlToPdfBlob_')[0] || emailFn;
+  assert(emailFn.indexOf('menuHtmlToPdfBlob_') !== -1, 'Email still attaches via menuHtmlToPdfBlob_');
+  assert(emailFn.indexOf('menuHtmlToWebsitePdfBlob_') === -1, 'Email does not use the website A5 converter');
+})();
+assert(typeof pub.isCardTwoUpHtml === 'function' && typeof pub.prepareWebsitePdfHtml === 'function',
+  'website PDF HTML prep is on EBMenusPublish');
 (function () {
   var saveFn = aiGs.split('function savePrintHistory_')[1].split('function hasPrintHistory_')[0];
   assert(saveFn.indexOf('publishSavedMenu_') === -1 && saveFn.indexOf('UrlFetchApp') === -1,
@@ -196,6 +209,55 @@ api.addCustomMenu({ name: 'Buffet', kind: 'card' });
 var buffet = api.MENUS.filter(function (m) { return m.name === 'Buffet'; })[0];
 var buffetHtml = print.build(buffet, [api.dish('Buffet', 'Carvery', '', '18', '')], {});
 assert(buffetHtml.indexOf('id="publishToWebsite"') === -1, 'Buffet preview has no publish tick');
+
+// Website PDF: card menus → one A5 face; print HTML stays two-up; long menus stay A4.
+function countCardFaces_(html) {
+  var body = String(html || '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  return (body.match(/<article\b[^>]*\bclass="[^"]*\bcard-face\b/g) || []).length;
+}
+[
+  { id: 'specials', name: 'Specials', section: 'Special Mains', dish: 'Rib' },
+  { id: 'desserts', name: 'Desserts', section: 'Desserts', dish: 'Brownie' },
+  { id: 'little-bells', name: 'Little Bells', section: 'Little Bells', dish: 'Fish fingers' },
+  { id: 'breakfast', name: 'Breakfast', section: 'Breakfast', dish: 'Eggs' }
+].forEach(function (row) {
+  var menu = api.menuById(row.id);
+  assert(menu && menu.kind === 'card', row.name + ' is a card menu');
+  var sheet = print.build(menu, [api.dish(row.section, row.dish, '', '9', '')], {});
+  assert(countCardFaces_(sheet) === 2, row.name + ' print preview still has two identical faces');
+  assert(/Card menu — two identical copies on landscape A4/.test(sheet),
+    row.name + ' print hint stays two-up for the guillotine');
+  assert(pub.isCardTwoUpHtml(sheet) === true, row.name + ' is detected as card two-up HTML');
+  var web = pub.prepareWebsitePdfHtml(sheet);
+  assert(web.pageSize === 'A5', row.name + ' website PDF page size is A5');
+  assert(countCardFaces_(web.html) === 1, row.name + ' website PDF keeps one card face only');
+  assert(countCardFaces_(sheet) === 2, row.name + ' original print HTML is not mutated');
+});
+[
+  { id: 'sandwiches', section: 'Sandwiches', dish: 'Ham' },
+  { id: 'lunch-club', section: 'Mains', dish: 'Pie' }
+].forEach(function (row) {
+  var menu = api.menuById(row.id);
+  var sheet = print.build(menu, [api.dish(row.section, row.dish, '', '8', '')], {});
+  assert(countCardFaces_(sheet) === 2, row.id + ' print stays two-up (print-only card)');
+  assert(pub.websiteMenuId(menu) === '', row.id + ' is not published to the website');
+  var web = pub.prepareWebsitePdfHtml(sheet);
+  assert(web.pageSize === 'A5' && countCardFaces_(web.html) === 1,
+    row.id + ' would still become single A5 if ever converted for web');
+});
+['main', 'sunday'].forEach(function (id) {
+  var menu = api.menuById(id);
+  var sheet = print.build(menu, [
+    api.dish(id === 'sunday' ? 'Sunday Roasts' : 'Mains', 'Pie', 'gravy', '16.50', 'gf')
+  ], {});
+  assert(pub.isCardTwoUpHtml(sheet) === false, id + ' is not card two-up HTML');
+  var web = pub.prepareWebsitePdfHtml(sheet);
+  assert(web.pageSize === 'A4', id + ' website PDF stays A4');
+  assert(web.html === sheet, id + ' website prep leaves long-menu HTML unchanged');
+  assert(/class="page\b/.test(sheet) && !/class="sheet landscape"/.test(
+    sheet.replace(/<style[\s\S]*?<\/style>/gi, '')
+  ), id + ' print layout is long A4 pages, not card faces');
+});
 
 // Drive auth help (live v114) must stay in the repo so a deploy cannot drop it.
 assert(/function driveAuthUrl_\(\)/.test(aiGs), 'driveAuthUrl_ kept');

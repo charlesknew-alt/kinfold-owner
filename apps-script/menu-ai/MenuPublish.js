@@ -224,8 +224,75 @@
   }
 
   /**
+   * True when saved print HTML is a card menu: two identical A5 faces on
+   * landscape A4 (Specials, Desserts, Little Bells, Breakfast, Sandwiches, …).
+   * Long menus (Main/Sunday) use .page blocks, not .sheet.landscape.
+   */
+  function isCardTwoUpHtml(html) {
+    var raw = String(html || '');
+    if (!/class="sheet landscape"/.test(raw)) return false;
+    return /<article\b[^>]*\bclass="[^"]*\bcard-face\b/.test(raw);
+  }
+
+  /**
+   * Keep only the first .card-face article inside each .sheet-inner.
+   * Print/email keep both faces; the website PDF shows one A5 page.
+   * Depth-walks divs so nested </div> inside a face does not truncate early.
+   */
+  function keepFirstCardFaces_(html) {
+    var raw = String(html || '');
+    var openRe = /<div\b[^>]*\bsheet-inner\b[^>]*>/gi;
+    var out = '';
+    var cursor = 0;
+    var match;
+    while ((match = openRe.exec(raw))) {
+      var openStart = match.index;
+      var openEnd = openStart + match[0].length;
+      var depth = 1;
+      var finder = /<\/?div\b[^>]*>/gi;
+      finder.lastIndex = openEnd;
+      var tag;
+      var closeEnd = -1;
+      while ((tag = finder.exec(raw))) {
+        if (/^<\//.test(tag[0])) depth -= 1;
+        else depth += 1;
+        if (depth === 0) {
+          closeEnd = tag.index + tag[0].length;
+          break;
+        }
+      }
+      if (closeEnd < 0) break;
+      var inner = raw.slice(openEnd, tag.index);
+      var faceRe = /<article\b[^>]*\bclass="[^"]*\bcard-face\b[^"]*"[^>]*>[\s\S]*?<\/article>/i;
+      var first = faceRe.exec(inner);
+      out += raw.slice(cursor, openEnd);
+      out += first ? first[0] : inner;
+      out += raw.slice(tag.index, closeEnd);
+      cursor = closeEnd;
+      openRe.lastIndex = closeEnd;
+    }
+    out += raw.slice(cursor);
+    return out;
+  }
+
+  /**
+   * Rewrite saved print-sheet HTML for the website PDF only.
+   * Card two-up → one A5 face. Long menus unchanged (still A4).
+   * Does not alter Print history HTML, print preview, or email attachments.
+   * @param {string} html
+   * @return {{html:string,pageSize:string}}
+   */
+  function prepareWebsitePdfHtml(html) {
+    var raw = String(html || '');
+    if (!raw) return { html: '', pageSize: 'A4' };
+    if (!isCardTwoUpHtml(raw)) return { html: raw, pageSize: 'A4' };
+    return { html: keepFirstCardFaces_(raw), pageSize: 'A5' };
+  }
+
+  /**
    * Contract body, or null when this menu must not publish.
-   * pdfBase64 may be '' here; Apps Script fills it from the Email PDF path.
+   * pdfBase64 may be '' here; Apps Script fills it for the website POST
+   * (card menus: single A5; long menus: same A4 converter Email uses).
    */
   function buildPublishBody(input) {
     input = input || {};
@@ -269,7 +336,9 @@
     dishesForPublish: dishesForPublish,
     highlightsForPublish: highlightsForPublish,
     publishEndpoint: publishEndpoint,
-    buildPublishBody: buildPublishBody
+    buildPublishBody: buildPublishBody,
+    isCardTwoUpHtml: isCardTwoUpHtml,
+    prepareWebsitePdfHtml: prepareWebsitePdfHtml
   };
 
   root.EBMenusPublish = api;

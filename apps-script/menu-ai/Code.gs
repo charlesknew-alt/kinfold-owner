@@ -1910,10 +1910,10 @@ function emailPrintHistory_(body) {
 }
 
 /**
- * Turn a saved print-sheet HTML into a PDF blob for email attachment.
- * Scripts/toolbars stripped so the PDF is the printable menu only.
+ * Strip scripts/handlers and pull <style> + <body> from a saved print sheet.
+ * Shared by Email (two-up) and website PDF conversion.
  */
-function menuHtmlToPdfBlob_(html, filenamePdf) {
+function menuHtmlPdfParts_(html) {
   var raw = String(html || '');
   var styles = '';
   raw.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function (_m, css) {
@@ -1927,7 +1927,17 @@ function menuHtmlToPdfBlob_(html, filenamePdf) {
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/\son\w+="[^"]*"/gi, '')
     .replace(/\son\w+='[^']*'/gi, '');
-  styles +=
+  return { styles: styles, bodyHtml: bodyHtml };
+}
+
+/**
+ * Turn a saved print-sheet HTML into a PDF blob for email attachment.
+ * Scripts/toolbars stripped so the PDF is the printable menu only.
+ * Card menus stay two identical copies on landscape A4 (guillotine).
+ */
+function menuHtmlToPdfBlob_(html, filenamePdf) {
+  var parts = menuHtmlPdfParts_(html);
+  var styles = parts.styles +
     '@page{size:A4;margin:0}' +
     'html,body{background:#fff!important;margin:0;padding:0}' +
     '.toolbar,#previewToolbar{display:none!important}' +
@@ -1938,9 +1948,63 @@ function menuHtmlToPdfBlob_(html, filenamePdf) {
     '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
     styles +
     '</style></head><body>' +
-    bodyHtml +
+    parts.bodyHtml +
     '</body></html>';
   var out = HtmlService.createHtmlOutput(page).setWidth(794).setHeight(1123);
+  var pdf = out.getAs(MimeType.PDF);
+  pdf.setName(String(filenamePdf || 'menu.pdf'));
+  return pdf;
+}
+
+/**
+ * Website publish PDF. Card menus (Specials, Desserts, Little Bells,
+ * Breakfast, …): one A5 page with a single face. Long menus (Main,
+ * Sunday): same A4 conversion Email uses. Print preview / Email stay
+ * on menuHtmlToPdfBlob_ (two-up for cards).
+ */
+function menuHtmlToWebsitePdfBlob_(html, filenamePdf) {
+  var prepared = { html: String(html || ''), pageSize: 'A4' };
+  try {
+    var api = menusPublishApi_();
+    if (api && typeof api.prepareWebsitePdfHtml === 'function') {
+      prepared = api.prepareWebsitePdfHtml(html) || prepared;
+    }
+  } catch (ePrep) {
+    prepared = { html: String(html || ''), pageSize: 'A4' };
+  }
+  var pageSize = String(prepared.pageSize || 'A4').toUpperCase() === 'A5' ? 'A5' : 'A4';
+  var parts = menuHtmlPdfParts_(prepared.html || html);
+  var styles = parts.styles;
+  var width = 794;
+  var height = 1123;
+  if (pageSize === 'A5') {
+    // One card face — A5 portrait (148mm × 210mm).
+    styles +=
+      '@page{size:A5;margin:0}' +
+      'html,body{background:#fff!important;margin:0;padding:0}' +
+      '.toolbar,#previewToolbar{display:none!important}' +
+      '.preview-clip{margin:0;padding:0}' +
+      '.sheet.landscape{width:148mm!important;height:210mm!important;margin:0!important;box-shadow:none!important}' +
+      '.sheet-inner{display:block!important;grid-template-columns:none!important;height:100%!important}' +
+      '.card-face{border-right:0!important;width:148mm!important;height:210mm!important;box-sizing:border-box}';
+    width = 559;
+    height = 794;
+  } else {
+    styles +=
+      '@page{size:A4;margin:0}' +
+      'html,body{background:#fff!important;margin:0;padding:0}' +
+      '.toolbar,#previewToolbar{display:none!important}' +
+      '.sheet-stack.mode-a5{display:none!important}' +
+      'body.paper-a5 .mode-a5{display:block!important}body.paper-a5 .mode-a4{display:none!important}' +
+      'body.paper-a4 .mode-a5{display:none!important}body.paper-a4 .mode-a4{display:block!important}';
+  }
+  var page =
+    '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+    styles +
+    '</style></head><body>' +
+    parts.bodyHtml +
+    '</body></html>';
+  var out = HtmlService.createHtmlOutput(page).setWidth(width).setHeight(height);
   var pdf = out.getAs(MimeType.PDF);
   pdf.setName(String(filenamePdf || 'menu.pdf'));
   return pdf;
@@ -2026,7 +2090,8 @@ function menusPublishApi_() {
 
 /**
  * POST the saved sheet to the public website.
- * PDF is menuHtmlToPdfBlob_ — the same converter Email uses.
+ * PDF is menuHtmlToWebsitePdfBlob_ (card menus → single A5; long menus → A4).
+ * Email still uses menuHtmlToPdfBlob_ (cards stay two-up for the guillotine).
  * Save already succeeded; this only records a status the Menus page can read.
  * Never logs the bearer token.
  */
@@ -2124,7 +2189,7 @@ function publishSavedMenu_(body) {
     var pdfName = String(payload.menu || 'menu') + (version ? '-' + version : '') + '.pdf';
     var pdf;
     try {
-      pdf = menuHtmlToPdfBlob_(html, pdfName);
+      pdf = menuHtmlToWebsitePdfBlob_(html, pdfName);
     } catch (pdfErr) {
       return finish_({
         published: false,
