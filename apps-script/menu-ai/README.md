@@ -46,7 +46,7 @@ After pulling, push with `clasp push` from this folder, then update the live web
 
 ### Publish a saved sheet to the website
 
-Save on the print preview stamps Print history, then (when **Publish to website** is ticked) POSTs that sheet to the public site. The tick is on by default. Generate and in-progress edits do not publish. Untick for an in-house-only sheet. If the website step fails, the sheet stays in Print history and Kate sees the error.
+Save on the print preview stamps Print history, then (when **Publish to website** is ticked) POSTs that sheet to the public site once the sheet is confirmed in shared Print history. If the first upload confirmation fails, a background retry can still land the sheet — the Menus page then publishes once and shows a lasting success or failure banner. The tick is on by default. Generate and in-progress edits do not publish. Untick for an in-house-only sheet. If the website step fails, the sheet stays in Print history and Kate sees the error.
 
 **Menu AI tab → website `menu` id** (see `MenuPublish.js`):
 

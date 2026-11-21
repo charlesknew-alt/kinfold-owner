@@ -872,9 +872,9 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow223') !== -1, 'menus page cache-bust is flow223');
-assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow223') !== -1,
-  'hub menus link cache-bust is flow223');
+assert(page.indexOf('flow225') !== -1, 'menus page cache-bust is flow225');
+assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow225') !== -1,
+  'hub menus link cache-bust is flow225');
 assert(page.indexOf('Make it fit is the escape hatch') !== -1 &&
   page.indexOf('always open the preview') !== -1,
   'Make it fit always opens preview (never second overflow block)');
