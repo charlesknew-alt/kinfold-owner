@@ -63,7 +63,7 @@ Section names (Nibbles, Starters, Sunday Roasts, Sandwiches, …) stay on `dishe
 
 No tick, never POSTed: Party / Christmas, anything with buffet in the name, Main (upcoming), Sandwiches, Lunch club, other custom tabs.
 
-The PDF is the same Apps Script conversion Email uses (`menuHtmlToPdfBlob_`).
+The website PDF uses `menuHtmlToWebsitePdfBlob_`: card menus (Specials, Desserts, Little Bells, Breakfast) are a **single A5 page** (one copy). Long menus (Main, Sunday) stay A4. Email attachments and Kate’s print preview still use `menuHtmlToPdfBlob_` — card menus remain two identical copies on landscape A4 for the guillotine.
 
 Script properties (do not put the secret in git):
 

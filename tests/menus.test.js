@@ -1226,6 +1226,8 @@ assert(aiGs.indexOf('emailPrintHistory_') !== -1 && aiGs.indexOf('MailApp.sendEm
   'Menu AI Apps Script can email a saved print sheet');
 assert(aiGs.indexOf('menuHtmlToPdfBlob_') !== -1 && aiGs.indexOf('MimeType.PDF') !== -1,
   'Email converts the print sheet to a PDF attachment');
+assert(aiGs.indexOf('menuHtmlToWebsitePdfBlob_') !== -1 && aiGs.indexOf('prepareWebsitePdfHtml') !== -1,
+  'Website publish PDF can use single-A5 for card menus');
 assert(aiGs.indexOf('resolveMenuEmailFrom_') !== -1 && aiGs.indexOf('kinfoldinns.co.uk') !== -1,
   'Email can use a kinfoldinns.co.uk address as Reply-To');
 assert(aiGs.indexOf('MENU_EMAIL_USE_FROM') !== -1 && aiGs.indexOf('menuEmailUseFromAlias_') !== -1,
