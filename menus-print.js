@@ -6439,10 +6439,21 @@
     var generatedAt = Number(raw.generatedAt || raw.createdAt || 0) || Date.now();
     var createdAt = Number(raw.createdAt || raw.generatedAt || 0) || generatedAt;
     var html = embedHistoryStamp_(String(raw.html), generatedAt);
+    var menuId = String(raw.menuId || 'main');
+    var menuName = String(raw.menuName || raw.menuId || 'Menu');
+    // Little Bells (and similar) must not be stored as menuId "main".
+    if (root.EBMenusSyncLogic && typeof root.EBMenusSyncLogic.coercePrintMenuId === 'function') {
+      var coerced = root.EBMenusSyncLogic.coercePrintMenuId(menuId, menuName);
+      menuId = coerced.menuId;
+      menuName = coerced.menuName;
+    } else if (/little\s*bells/i.test(menuName) && menuId === 'main') {
+      menuId = 'little-bells';
+      menuName = 'Little Bells';
+    }
     return {
       id: raw.id || ('p' + generatedAt.toString(36)),
-      menuId: String(raw.menuId || 'main'),
-      menuName: String(raw.menuName || raw.menuId || 'Menu'),
+      menuId: menuId,
+      menuName: menuName,
       roman: String(raw.roman || ''),
       n: raw.n || 0,
       week: String(raw.week || ''),

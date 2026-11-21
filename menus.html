@@ -471,7 +471,7 @@
       <button type="button" class="soft" data-view="panels" id="viewPanels">Feature panels</button>
       <button type="button" class="soft" data-view="catalogue" id="viewCatalogue">All dishes</button>
       <button type="button" class="soft" data-view="history" id="viewHistory">Print history</button>
-      <button type="button" class="soft" id="doSyncNow" title="Reload shared menus from the cloud">Sync now</button>
+      <button type="button" class="soft" id="doSyncNow" title="Reload shared menus from the server (never uploads this device’s cache)">Sync now</button>
       <a class="soft" href="menus-guide.html" target="_blank" rel="noopener" id="viewGuide" style="text-decoration:none;display:inline-flex;align-items:center">Quick guide</a>
     </div>
     <div class="menus no-print" id="menuPicker" role="tablist" aria-label="Which menu"></div>
@@ -479,9 +479,10 @@
     <div id="editor"></div>
   </main>
   <script src="apps-script/menu-ai/MenuPublish.js?v=20261121-flow223"></script>
-  <script src="menus.js?v=20261121-flow223"></script>
-  <script src="menus-print.js?v=20261121-flow223"></script>
-  <script src="menus-ingest.js?v=20261121-flow223"></script>
+  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261121-flow224"></script>
+  <script src="menus.js?v=20261121-flow224"></script>
+  <script src="menus-print.js?v=20261121-flow224"></script>
+  <script src="menus-ingest.js?v=20261121-flow224b"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -500,6 +501,7 @@
     var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1';
     var EXTRAS_STORAGE = 'eb-menus-extras-v1';
     var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at';
+    var MENU_VERSIONS_KEY = 'eb-menus-cloud-versions';
     applyExtrasFromStorage();
     var book = load();
     var metaBook = loadMeta();
@@ -532,9 +534,18 @@
       try { return parseInt(localStorage.getItem(CLOUD_AT_KEY) || '0', 10) || 0; }
       catch (e) { return 0; }
     })();
+    var menuVersions = (function () {
+      try {
+        var raw = JSON.parse(localStorage.getItem(MENU_VERSIONS_KEY) || '{}');
+        return (raw && typeof raw === 'object') ? raw : {};
+      } catch (e) { return {}; }
+    })();
     var cloudPushTimer = null;
     var cloudSyncNote = '';
     var cloudPullDone = false;
+    // Server is the single source of truth. localStorage is an offline cache only —
+    // never auto-push it on open / focus / Sync (including when local looks newer).
+    var cloudAutoPushEnabled = false;
 
     function showPublishNote_(kind, text) {
       var el = document.getElementById('publishNote');
@@ -701,7 +712,7 @@
     }
     function saveSectionLayout() {
       localStorage.setItem(LAYOUT_STORAGE, JSON.stringify(layoutBook));
-      queueCloudPush();
+      queueMenuCloudSave(menuId);
     }
 
     function loadPromoBank() {
@@ -721,7 +732,7 @@
     }
     function savePromoBank() {
       localStorage.setItem(PROMO_STORAGE, JSON.stringify(promoBank));
-      queueCloudPush();
+      queueMenuCloudSave(menuId);
     }
     function loadPromoTicks() {
       try { return JSON.parse(localStorage.getItem(PROMO_TICKS) || '{}') || {}; }
@@ -729,7 +740,7 @@
     }
     function savePromoTicks() {
       localStorage.setItem(PROMO_TICKS, JSON.stringify(promoTicks));
-      queueCloudPush();
+      queueMenuCloudSave(menuId);
     }
     function hostPromoTicks() {
       return (promoTicks[menuId] && typeof promoTicks[menuId] === 'object') ? promoTicks[menuId] : {};
@@ -773,7 +784,7 @@
       var ids = eligible.map(function (p) { return p.id; });
       promoDeck = EBMenus.markPromosUsed(promoDeck, promos || [], ids);
       savePromoDeck();
-      queueCloudPush();
+      queueMenuCloudSave(menuId);
     }
     function load() {
       try {
@@ -828,9 +839,15 @@
         localStorage.setItem(EXTRAS_STORAGE, JSON.stringify(currentExtrasState()));
       } catch (eEx) {}
       try { localStorage.setItem(CLOUD_AT_KEY, String(cloudUpdatedAt || 0)); } catch (e) {}
+      try { localStorage.setItem(MENU_VERSIONS_KEY, JSON.stringify(menuVersions || {})); } catch (eV) {}
     }
-    function save() {
-      cloudUpdatedAt = Date.now();
+    /**
+     * Persist edits: local cache always, then push ONLY the edited menu to the
+     * shared server (never the whole book). Does not bump a fake local
+     * updatedAt — the server’s version / updatedAt are the source of truth.
+     */
+    function save(optMenuId) {
+      var targetId = optMenuId || menuId;
       // Every menu save upserts dishes into the shared catalogue (deduped by title).
       if (EBMenus.upsertDishCatalogueFromBook) {
         dishCatalogue = EBMenus.upsertDishCatalogueFromBook(dishCatalogue, book, {
@@ -838,23 +855,7 @@
         });
       }
       saveLocalOnly();
-      queueCloudPush();
-    }
-    function buildCloudState() {
-      return {
-        updatedAt: cloudUpdatedAt || Date.now(),
-        book: book,
-        metaBook: metaBook,
-        includes: includes,
-        promoBank: promoBank,
-        promoTicks: promoTicks,
-        promoDeck: promoDeck || { order: [], used: [] },
-        // Per-menu Blocks book (main / sunday / …). Legacy flat maps migrate on load.
-        sectionLayout: layoutBook,
-        dishCatalogue: dishCatalogue || [],
-        extraMenus: (currentExtrasState().menus) || [],
-        extraSections: (currentExtrasState().sections) || []
-      };
+      queueMenuCloudSave(targetId);
     }
     function applyCloudState(state) {
       if (!state || !state.book || typeof state.book !== 'object') return false;
@@ -895,13 +896,18 @@
       layoutBook = EBMenus.normalizeSectionLayoutBook
         ? EBMenus.normalizeSectionLayoutBook(state.sectionLayout)
         : (state.sectionLayout && typeof state.sectionLayout === 'object' ? state.sectionLayout : layoutBook);
-      // Merge remote catalogue with local so neither side wipes the other.
-      if (EBMenus.mergeDishCatalogues) {
+      // Server catalogue wins on pull (shared SoT). Merge only when remote is empty.
+      if (Array.isArray(state.dishCatalogue) && state.dishCatalogue.length) {
+        dishCatalogue = EBMenus.normalizeDishCatalogue
+          ? EBMenus.normalizeDishCatalogue(state.dishCatalogue)
+          : state.dishCatalogue;
+      } else if (EBMenus.mergeDishCatalogues) {
         dishCatalogue = EBMenus.mergeDishCatalogues(dishCatalogue, state.dishCatalogue || []);
-      } else if (Array.isArray(state.dishCatalogue)) {
-        dishCatalogue = state.dishCatalogue;
       }
-      cloudUpdatedAt = Number(state.updatedAt) || Date.now();
+      cloudUpdatedAt = Number(state.updatedAt) || cloudUpdatedAt || Date.now();
+      if (state.menuVersions && typeof state.menuVersions === 'object') {
+        menuVersions = state.menuVersions;
+      }
       ensureExtraMenuStores();
       saveLocalOnly();
       // Keep the selected tab even when the new menu is still empty (e.g. Breakfast
@@ -912,24 +918,86 @@
       dishId = (dishes()[0] && dishes()[0].id) || '';
       return true;
     }
-    function queueCloudPush() {
+
+    function buildMenuSavePayload_(targetId) {
+      var extras = currentExtrasState();
+      return {
+        action: 'saveMenuState',
+        menuId: targetId,
+        expectedVersion: Number(menuVersions[targetId]) || 0,
+        dishes: book[targetId] || [],
+        meta: metaBook[targetId] || {},
+        includes: (includes && includes[targetId]) || {},
+        promoTicks: (promoTicks && promoTicks[targetId]) || {},
+        sectionLayout: (layoutBook && layoutBook[targetId]) || {},
+        promoBank: promoBank,
+        promoDeck: promoDeck || { order: [], used: [] },
+        dishCatalogue: dishCatalogue || [],
+        extraMenus: (extras && extras.menus) || [],
+        extraSections: (extras && extras.sections) || []
+      };
+    }
+
+    /** Debounced per-menu cloud save after a deliberate local edit. */
+    function queueMenuCloudSave(targetId) {
+      targetId = targetId || menuId;
       if (cloudPushTimer) clearTimeout(cloudPushTimer);
       cloudPushTimer = setTimeout(function () {
         cloudPushTimer = null;
-        pushMenusToCloud();
+        pushMenuToCloud(targetId);
       }, 600);
     }
-    function pushMenusToCloud() {
+
+    // Kept name for older call sites / tests — must NOT whole-book push.
+    function queueCloudPush() {
+      queueMenuCloudSave(menuId);
+    }
+
+    /**
+     * Push one menu only. On conflict / seed reject, reload the server book and
+     * do not overwrite the newer server menu.
+     */
+    function pushMenuToCloud(targetId) {
+      targetId = targetId || menuId;
       if (!window.EBMenuIngest || typeof EBMenuIngest.cloudPost !== 'function') {
         return Promise.resolve(false);
       }
-      cloudSyncNote = 'Saving to cloud…';
-      return EBMenuIngest.cloudPost({
-        action: 'saveMenusState',
-        state: buildCloudState()
-      }).then(function (data) {
+      cloudSyncNote = 'Saving ' + targetId + ' to cloud…';
+      return EBMenuIngest.cloudPost(buildMenuSavePayload_(targetId)).then(function (data) {
+        if (data && data.conflict) {
+          cloudSyncNote = 'Someone else saved this menu — reloaded the shared copy';
+          if (data.state) applyCloudState(data.state);
+          else return pullMenusFromCloud();
+          render();
+          return false;
+        }
+        if (data && data.rejected) {
+          cloudSyncNote = (data.message) || 'Server refused that save (near-empty or seed Main)';
+          if (data.state) {
+            applyCloudState(data.state);
+            render();
+          }
+          return false;
+        }
+        if (data && data.ok === false) {
+          cloudSyncNote = (data.message || data.error) || 'Could not save to cloud';
+          if (data.state) {
+            applyCloudState(data.state);
+            render();
+          }
+          return false;
+        }
+        if (data && data.menuVersions) menuVersions = data.menuVersions;
+        else if (data && data.version != null) {
+          menuVersions[targetId] = Number(data.version) || menuVersions[targetId];
+        }
         if (data && data.updatedAt) cloudUpdatedAt = Number(data.updatedAt) || cloudUpdatedAt;
-        try { localStorage.setItem(CLOUD_AT_KEY, String(cloudUpdatedAt || 0)); } catch (e) {}
+        if (data && data.state) {
+          // Keep shared fields / versions from the acknowledged save.
+          if (data.state.menuVersions) menuVersions = data.state.menuVersions;
+          cloudUpdatedAt = Number(data.state.updatedAt) || cloudUpdatedAt;
+        }
+        saveLocalOnly();
         cloudSyncNote = 'Menus synced across devices';
         return true;
       }).catch(function () {
@@ -937,6 +1005,20 @@
         return false;
       });
     }
+
+    /** @deprecated whole-book push — disabled; use pushMenuToCloud. */
+    function pushMenusToCloud() {
+      // Never auto-push the whole local cache (open / focus / Sync / newer local).
+      if (!cloudAutoPushEnabled) {
+        return Promise.resolve(false);
+      }
+      return pushMenuToCloud(menuId);
+    }
+
+    /**
+     * Always load the shared server copy. localStorage is cache only —
+     * never upload on pull, even when the local timestamp looks newer.
+     */
     function pullMenusFromCloud() {
       if (!window.EBMenuIngest || typeof EBMenuIngest.cloudPost !== 'function') {
         cloudPullDone = true;
@@ -945,10 +1027,7 @@
       cloudSyncNote = 'Loading shared menus…';
       return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
         var remote = data && data.state;
-        var remoteAt = remote ? (Number(remote.updatedAt) || 0) : 0;
-        // Last-write-wins by updatedAt — so Save on this device is not wiped
-        // by an older cloud copy a moment later (focus / Sync / tab return).
-        if (remote && remoteAt > cloudUpdatedAt) {
+        if (remote) {
           if (applyCloudState(remote)) {
             cloudSyncNote = 'Menus synced across devices';
             cloudPullDone = true;
@@ -956,22 +1035,7 @@
             return true;
           }
         }
-        if (remote && remoteAt && remoteAt < cloudUpdatedAt) {
-          // This device has newer edits — push them so phone/PC stay aligned.
-          return pushMenusToCloud().then(function () {
-            cloudSyncNote = 'Uploaded this device’s latest edits';
-            cloudPullDone = true;
-            return true;
-          });
-        }
-        if ((!remote || !remoteAt) && cloudUpdatedAt > 0) {
-          // Empty cloud — seed once from this device.
-          return pushMenusToCloud().then(function () {
-            cloudPullDone = true;
-            return true;
-          });
-        }
-        cloudSyncNote = remoteAt ? 'Menus synced across devices' : 'Shared menus ready';
+        cloudSyncNote = remote ? 'Shared menus ready' : 'No shared menus on server yet';
         cloudPullDone = true;
         return false;
       }).catch(function () {
@@ -989,7 +1053,7 @@
       else render();
     }
 
-    /** Force every device onto the same cloud book + print history. */
+    /** Pull shared menus + print history. Never auto-pushes the local menu cache. */
     function syncNowFromCloud() {
       cloudSyncNote = 'Syncing shared menus…';
       cloudPullDone = false;
@@ -1002,45 +1066,38 @@
       } else if (viewMode !== 'history') {
         render();
       }
-      return pullMenusFromCloud().then(function (pulled) {
-        var uploadMenus = Promise.resolve(pulled);
-        // If cloud is still empty, upload this device’s book so others can see it.
-        if (!pulled && (book.sunday || book.main || book.specials)) {
-          cloudUpdatedAt = Date.now();
-          uploadMenus = pushMenusToCloud().then(function () { return true; });
+      return pullMenusFromCloud().then(function () {
+        // Print history may still upload phone-only leftovers (sheets), but
+        // the menu book is pull-only here — never pushMenusToCloud / seed.
+        if (!EBMenuPrint || typeof EBMenuPrint.syncPrintHistoryToCloud !== 'function') {
+          return { uploaded: 0 };
         }
-        return uploadMenus.then(function () {
-          // Phone has Sunday sheets locally — push them so the pub PC can see them.
-          if (!EBMenuPrint || typeof EBMenuPrint.syncPrintHistoryToCloud !== 'function') {
-            return { uploaded: 0 };
-          }
-          cloudSyncNote = 'Sharing print history across devices…';
-          if (viewMode !== 'history') render();
-          return EBMenuPrint.syncPrintHistoryToCloud();
-        }).then(function (hist) {
-          var n = (hist && hist.uploaded) || 0;
-          var repaired = (hist && hist.repaired) || 0;
-          var dropped = (hist && hist.orphansDropped) || 0;
-          if (n > 0) {
-            cloudSyncNote = 'Shared ' + n + ' print sheet' + (n === 1 ? '' : 's') +
-              (repaired ? ' (repaired ' + repaired + ' for download)' : '') +
-              (dropped ? '; cleared ' + dropped + ' incomplete' : '') +
-              ' — same list on every device';
-          } else if (dropped > 0) {
-            cloudSyncNote = 'Print history cleaned (' + dropped +
-              ' incomplete sheet' + (dropped === 1 ? '' : 's') +
-              ' removed) — same list on every device';
-          } else {
-            cloudSyncNote = 'Menus and print history synced across devices';
-          }
-          refreshAfterSync_();
-          return true;
-        }).catch(function (err) {
-          cloudSyncNote = 'Could not sync — try Sync now again (' +
-            (err && err.message ? err.message : 'error') + ')';
-          refreshAfterSync_();
-          return false;
-        });
+        cloudSyncNote = 'Sharing print history across devices…';
+        if (viewMode !== 'history') render();
+        return EBMenuPrint.syncPrintHistoryToCloud();
+      }).then(function (hist) {
+        var n = (hist && hist.uploaded) || 0;
+        var repaired = (hist && hist.repaired) || 0;
+        var dropped = (hist && hist.orphansDropped) || 0;
+        if (n > 0) {
+          cloudSyncNote = 'Shared ' + n + ' print sheet' + (n === 1 ? '' : 's') +
+            (repaired ? ' (repaired ' + repaired + ' for download)' : '') +
+            (dropped ? '; cleared ' + dropped + ' incomplete' : '') +
+            ' — same list on every device';
+        } else if (dropped > 0) {
+          cloudSyncNote = 'Print history cleaned (' + dropped +
+            ' incomplete sheet' + (dropped === 1 ? '' : 's') +
+            ' removed) — same list on every device';
+        } else {
+          cloudSyncNote = 'Menus and print history synced across devices';
+        }
+        refreshAfterSync_();
+        return true;
+      }).catch(function (err) {
+        cloudSyncNote = 'Could not sync — try Sync now again (' +
+          (err && err.message ? err.message : 'error') + ')';
+        refreshAfterSync_();
+        return false;
       });
     }
     function loadIncludes() {
@@ -1665,7 +1722,7 @@
           });
       list.push(clone);
       if (EBMenus.sortDishesBySection) book[tid] = EBMenus.sortDishesBySection(list);
-      save();
+      save(tid);
       return {
         ok: true,
         menuId: tid,

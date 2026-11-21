@@ -513,7 +513,7 @@ assert(printJs.indexOf('saveToMenus') !== -1 && printJs.indexOf('discardPreview'
   'preview Save stamps history (not every generate); Discard closes without saving');
 assert(printJs.indexOf('peekPrintVersion') !== -1 && printJs.indexOf('commitPrintVersion') !== -1,
   'version numbers are peeked on preview and committed on Save');
-assert(page.indexOf('pullMenusFromCloud') !== -1 && page.indexOf('saveMenusState') !== -1,
+assert(page.indexOf('pullMenusFromCloud') !== -1 && page.indexOf('saveMenuState') !== -1,
   'live menu book syncs to cloud for all devices');
 assert(page.indexOf('sync on every phone and PC') !== -1 || page.indexOf('Menus synced across devices') !== -1,
   'UI mentions menus stay in sync across devices');
@@ -936,8 +936,11 @@ assert(page.indexOf('Keep exactly what staff typed') !== -1 || page.indexOf('typ
   'Adjust/Save keeps the typed dish name (Vegan Katsu Curry)');
 assert(page.indexOf('under the name field') !== -1 && page.indexOf('dishSuggest') !== -1,
   'past-dish suggestions sit under the name field');
-assert(page.indexOf('Last-write-wins') !== -1 || page.indexOf('remoteAt > cloudUpdatedAt') !== -1,
-  'cloud pull does not wipe a newer local Save');
+assert(page.indexOf('saveMenuState') !== -1 && page.indexOf('cloudAutoPushEnabled = false') !== -1,
+  'cloud uses per-menu save; local cache is never auto-pushed');
+assert(page.indexOf('Menus synced across devices') !== -1 &&
+  page.indexOf('function pullMenusFromCloud') !== -1,
+  'cloud pull loads the shared server copy onto every device');
 assert(/return orderDishesForSell\(list\)/.test(fs.readFileSync(path.join(root, 'menus.js'), 'utf8')),
   'composeDishes groups sections like the PDF (no split categories in preview)');
 assert(page.indexOf('sortDishesBySection(dishes())') !== -1,
