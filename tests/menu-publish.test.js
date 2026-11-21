@@ -174,9 +174,16 @@ assert(printJs.indexOf('id="publishToWebsite" checked') !== -1,
 assert(printJs.indexOf('websiteMenu') !== -1 && printJs.indexOf('SAVE_DISHES') !== -1,
   'preview snapshots the sheet dishes at Generate, not the live editor');
 assert(printJs.indexOf('publishSavedSheet') !== -1, 'publish runs from the Save click');
+assert(printJs.indexOf('handlePrintSavedForWebsite') !== -1 &&
+  printJs.indexOf('confirmWebsitePublishReady') !== -1,
+  'Save can wait for Print history then publish once');
+assert(page.indexOf('handlePrintSavedForWebsite') !== -1 &&
+  page.indexOf('showPublishNote_') !== -1,
+  'Menus Save uses lasting #publishNote for publish status');
 assert(page.indexOf('MenuPublish.js') !== -1 && page.indexOf('id="publishNote"') !== -1,
   'Menus page loads the mapper and has a publish note');
-assert(page.indexOf('Live on the website') !== -1, 'success toast copy is in the Menus page');
+assert(printJs.indexOf('Live on the website') !== -1 || page.indexOf('Live on the website') !== -1,
+  'success toast copy is in the Menus client');
 assert(ingestJs.indexOf("action === 'publishSavedMenu'") !== -1 &&
   ingestJs.indexOf('publish !== true') !== -1,
   'client checks the script can publish before POSTing');

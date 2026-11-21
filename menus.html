@@ -478,11 +478,11 @@
     <div id="publishNote" class="publish-note no-print" hidden role="status"></div>
     <div id="editor"></div>
   </main>
-  <script src="apps-script/menu-ai/MenuPublish.js?v=20261121-flow223"></script>
-  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261121-flow224"></script>
-  <script src="menus.js?v=20261121-flow224"></script>
-  <script src="menus-print.js?v=20261121-flow224"></script>
-  <script src="menus-ingest.js?v=20261121-flow224b"></script>
+  <script src="apps-script/menu-ai/MenuPublish.js?v=20261121-flow225"></script>
+  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261121-flow225"></script>
+  <script src="menus.js?v=20261121-flow225"></script>
+  <script src="menus-print.js?v=20261121-flow225"></script>
+  <script src="menus-ingest.js?v=20261121-flow225"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -557,32 +557,22 @@
     }
 
     // Preview Save → stamp history, then jump here so staff can Print PDF / Email.
-    // Publish runs only when Kate left “Publish to website” ticked. A failure
-    // here does not undo the Save.
+    // Publish runs only when Kate left “Publish to website” ticked. If the first
+    // Print-history upload confirmation fails, we wait for the background retry
+    // to land the sheet, then publish once — lasting status stays on #publishNote
+    // (Menus tab), not only inside the closing preview. A failure does not undo Save.
     window.EBMenusOnPrintSaved = function (info) {
       viewMode = 'history';
       lastHistoryPaintKey_ = '';
       try { window.focus(); } catch (e) {}
       render();
       if (!info || !info.publish || !info.request) return;
-      if (info.cloudSynced === false || info.source === 'local') {
-        showPublishNote_('err',
-          'Saved on this phone, but the sheet did not reach Print history, so it was not published to the website.');
-        return;
-      }
-      if (!window.EBMenuPrint || typeof EBMenuPrint.publishSavedSheet !== 'function') {
+      if (!window.EBMenuPrint || typeof EBMenuPrint.handlePrintSavedForWebsite !== 'function') {
         showPublishNote_('err',
           'Saved in Print history. Website publishing did not run — reload Menus and Save again.');
         return;
       }
-      showPublishNote_('info', 'Publishing to the website…');
-      EBMenuPrint.publishSavedSheet(info.request).then(function (res) {
-        if (res && res.published) {
-          showPublishNote_('ok', (res.message) || 'Live on the website');
-          return;
-        }
-        showPublishNote_('info', (res && res.message) || 'Website publishing is not set up yet.');
-      }).catch(function (err) {
+      EBMenuPrint.handlePrintSavedForWebsite(info, showPublishNote_).catch(function (err) {
         var msg = (err && err.message) ? String(err.message) : '';
         showPublishNote_('err', msg ||
           'Could not publish this menu to the website. The sheet is still saved in Print history.');

@@ -5913,6 +5913,10 @@
 
   var pendingUploadTimer_ = null;
   var pendingUploadBusy_ = false;
+  /** Queued website publishes waiting on Print history (id → row). */
+  var websitePublishById_ = {};
+  var websitePublishWaitMs_ = 3 * 60 * 1000;
+  var websitePublishFn_ = null;
 
   /**
    * Upload phone-only sheets using a fresh cloud index. Does not re-enter
@@ -5933,6 +5937,12 @@
       });
       return purgeLocalDeleted(deleted).then(function () {
         return migrateLocalToCloud(known, deleted, items);
+      }).then(function (stats) {
+        // First Save may have failed hasPrintHistory verify while the write
+        // still landed — settle any queued website publishes once HTML exists.
+        return settlePendingWebsitePublishes_().then(function () {
+          return stats;
+        });
       });
     }).then(function (stats) {
       pendingUploadBusy_ = false;
@@ -5943,6 +5953,13 @@
     });
   }
 
+  function hasPendingWebsitePublishes_() {
+    return Object.keys(websitePublishById_).some(function (id) {
+      var row = websitePublishById_[id];
+      return row && row.status === 'pending';
+    });
+  }
+
   /** Keep retrying phone-only sheets until they land in the shared cloud. */
   function schedulePendingPrintUploads() {
     if (pendingUploadTimer_ || pendingUploadBusy_) return;
@@ -5950,7 +5967,10 @@
       pendingUploadTimer_ = null;
       flushPendingPrintUploads_().then(function (stats) {
         // Still have leftovers — try again later.
-        if (stats && stats.attempted > stats.uploaded) schedulePendingPrintUploads();
+        // Also keep polling while a website publish is waiting on Print history.
+        if ((stats && stats.attempted > stats.uploaded) || hasPendingWebsitePublishes_()) {
+          schedulePendingPrintUploads();
+        }
       }).catch(function () {
         schedulePendingPrintUploads();
       });
@@ -6009,6 +6029,8 @@
               if (ok) {
                 uploaded += 1;
                 if (isRepair) stampRepaired += 1;
+                // Background retry landed the sheet — run a queued website publish.
+                return confirmWebsitePublishReady(meta.id).catch(function () {});
               }
             });
           });
@@ -7121,6 +7143,194 @@
     });
   }
 
+  /**
+   * Website publish may need to wait for Print history. If the first Save
+   * upload confirmation fails (no-cors / hasPrintHistory lag), Kate still
+   * ticked Publish — queue the request and run it once the sheet is confirmed
+   * in shared history (including after schedulePendingPrintUploads).
+   * Never publish when the tick was off; never publish the same id twice after
+   * a successful publish in this page session.
+   */
+  function clearWebsitePublishTimer_(row) {
+    if (row && row.timer) {
+      try { clearTimeout(row.timer); } catch (eT) {}
+      row.timer = null;
+    }
+  }
+
+  function notifyWebsitePublish_(row, kind, message) {
+    if (!row || typeof row.onStatus !== 'function') return;
+    try { row.onStatus(kind, message); } catch (eN) {}
+  }
+
+  function websitePublishStatus(id) {
+    var row = websitePublishById_[String(id || '')];
+    return row ? String(row.status || '') : '';
+  }
+
+  function setWebsitePublishWaitMs(ms) {
+    var n = Number(ms);
+    if (n > 0 && isFinite(n)) websitePublishWaitMs_ = n;
+    return websitePublishWaitMs_;
+  }
+
+  /** Test hook: replace publishSavedSheet for mocked network. */
+  function setWebsitePublishFn(fn) {
+    websitePublishFn_ = typeof fn === 'function' ? fn : null;
+  }
+
+  function resetWebsitePublishState() {
+    Object.keys(websitePublishById_).forEach(function (id) {
+      clearWebsitePublishTimer_(websitePublishById_[id]);
+    });
+    websitePublishById_ = {};
+    websitePublishFn_ = null;
+    websitePublishWaitMs_ = 3 * 60 * 1000;
+    cancelPendingPrintUploads();
+  }
+
+  function cancelPendingPrintUploads() {
+    if (pendingUploadTimer_) {
+      try { clearTimeout(pendingUploadTimer_); } catch (eU) {}
+      pendingUploadTimer_ = null;
+    }
+  }
+
+  function callWebsitePublish_(req) {
+    if (websitePublishFn_) return Promise.resolve(websitePublishFn_(req));
+    return publishSavedSheet(req);
+  }
+
+  function finishWebsitePublishRow_(row, res) {
+    if (!row) return res;
+    if (res && res.published) {
+      row.status = 'published';
+      notifyWebsitePublish_(row, 'ok', (res.message) || 'Live on the website');
+      return res;
+    }
+    // Skipped (not set up / not a website menu) — do not retry.
+    row.status = 'published';
+    notifyWebsitePublish_(row, 'info',
+      (res && res.message) || 'Website publishing is not set up yet.');
+    return res;
+  }
+
+  function failWebsitePublishRow_(row, err) {
+    if (!row) return;
+    row.status = 'failed';
+    var msg = (err && err.message) ? String(err.message) : '';
+    notifyWebsitePublish_(row, 'err', msg ||
+      'Could not publish this menu to the website. The sheet is still saved in Print history.');
+  }
+
+  function runWebsitePublishOnce_(id) {
+    var row = websitePublishById_[id];
+    if (!row || !row.request) return Promise.resolve(null);
+    if (row.status === 'published') {
+      return Promise.resolve({ skipped: true, already: true });
+    }
+    if (row.status === 'publishing') {
+      return Promise.resolve({ skipped: true, inFlight: true });
+    }
+    row.status = 'publishing';
+    clearWebsitePublishTimer_(row);
+    return callWebsitePublish_(row.request).then(function (res) {
+      return finishWebsitePublishRow_(row, res);
+    }).catch(function (err) {
+      failWebsitePublishRow_(row, err);
+      return Promise.reject(err);
+    });
+  }
+
+  /**
+   * After Save from the preview: publish now if Print history already has the
+   * sheet, otherwise queue and wait for confirmWebsitePublishReady / settle.
+   * onStatus(kind, text) updates the lasting Menus-tab banner (#publishNote).
+   */
+  function handlePrintSavedForWebsite(info, onStatus) {
+    info = info || {};
+    if (!info.publish || !info.request || !info.request.id) {
+      return Promise.resolve({ skipped: true, reason: 'not_ticked' });
+    }
+    var id = String(info.request.id);
+    var existing = websitePublishById_[id];
+    if (existing && existing.status === 'published') {
+      return Promise.resolve({ skipped: true, already: true });
+    }
+    if (existing && existing.status === 'publishing') {
+      return Promise.resolve({ skipped: true, inFlight: true });
+    }
+    var row = {
+      request: info.request,
+      status: 'pending',
+      onStatus: typeof onStatus === 'function' ? onStatus : null,
+      timer: null
+    };
+    websitePublishById_[id] = row;
+
+    var synced = info.cloudSynced !== false && info.source !== 'local';
+    if (!synced) {
+      notifyWebsitePublish_(row, 'info',
+        'Saved on this phone. Waiting for Print history before publishing to the website…');
+      row.timer = setTimeout(function () {
+        if (!websitePublishById_[id] || websitePublishById_[id] !== row) return;
+        if (row.status !== 'pending') return;
+        row.status = 'failed';
+        row.timer = null;
+        notifyWebsitePublish_(row, 'err',
+          'Saved on this phone, but the sheet did not reach Print history, so it was not published to the website.');
+      }, websitePublishWaitMs_);
+      try { schedulePendingPrintUploads(); } catch (eSch) {}
+      return Promise.resolve({ waiting: true, id: id });
+    }
+
+    notifyWebsitePublish_(row, 'info', 'Publishing to the website…');
+    return runWebsitePublishOnce_(id);
+  }
+
+  /**
+   * Print history confirmed this sheet id (upload verify or hasPrintHistory).
+   * Runs a queued website publish at most once.
+   */
+  function confirmWebsitePublishReady(id) {
+    id = String(id || '');
+    if (!id) return Promise.resolve(null);
+    var row = websitePublishById_[id];
+    if (!row) return Promise.resolve(null);
+    if (row.status === 'published') {
+      return Promise.resolve({ skipped: true, already: true });
+    }
+    if (row.status === 'publishing') {
+      return Promise.resolve({ skipped: true, inFlight: true });
+    }
+    if (row.status !== 'pending') return Promise.resolve(null);
+    notifyWebsitePublish_(row, 'info', 'Publishing to the website…');
+    return runWebsitePublishOnce_(id);
+  }
+
+  /**
+   * After a background flush: for each queued publish, check hasPrintHistory
+   * and publish when the sheet is actually fetchable.
+   */
+  function settlePendingWebsitePublishes_() {
+    var ids = Object.keys(websitePublishById_).filter(function (id) {
+      var row = websitePublishById_[id];
+      return row && row.status === 'pending';
+    });
+    if (!ids.length) return Promise.resolve();
+    var chain = Promise.resolve();
+    ids.forEach(function (id) {
+      chain = chain.then(function () {
+        return historyCloudPost({ action: 'hasPrintHistory', id: id }).then(function (data) {
+          if (data && data.exists === true) {
+            return confirmWebsitePublishReady(id).catch(function () {});
+          }
+        }).catch(function () { /* keep waiting */ });
+      });
+    });
+    return chain;
+  }
+
   function emailPrintHtml(entry, opts) {
     opts = opts || {};
     if (!entry || !entry.html) return Promise.reject(new Error('missing_html'));
@@ -7233,6 +7443,13 @@
     downloadPrintHtml: downloadPrintHtml,
     emailPrintHtml: emailPrintHtml,
     publishSavedSheet: publishSavedSheet,
+    handlePrintSavedForWebsite: handlePrintSavedForWebsite,
+    confirmWebsitePublishReady: confirmWebsitePublishReady,
+    websitePublishStatus: websitePublishStatus,
+    setWebsitePublishWaitMs: setWebsitePublishWaitMs,
+    setWebsitePublishFn: setWebsitePublishFn,
+    resetWebsitePublishState: resetWebsitePublishState,
+    cancelPendingPrintUploads: cancelPendingPrintUploads,
     historyCloudUrl: historyCloudUrl,
     measureOppositeColumns: measureOppositeColumns,
     planPromoFill: planPromoFill,
