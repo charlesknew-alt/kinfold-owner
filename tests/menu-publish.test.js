@@ -197,6 +197,15 @@ var buffet = api.MENUS.filter(function (m) { return m.name === 'Buffet'; })[0];
 var buffetHtml = print.build(buffet, [api.dish('Buffet', 'Carvery', '', '18', '')], {});
 assert(buffetHtml.indexOf('id="publishToWebsite"') === -1, 'Buffet preview has no publish tick');
 
+// Drive auth help (live v114) must stay in the repo so a deploy cannot drop it.
+assert(/function driveAuthUrl_\(\)/.test(aiGs), 'driveAuthUrl_ kept');
+assert(/function driveAuthHelp_\(/.test(aiGs), 'driveAuthHelp_ kept');
+assert(/function historyHtmlFolderCreateOrOpen_\(/.test(aiGs), 'historyHtmlFolderCreateOrOpen_ kept');
+assert(/authUrl: driveAuthUrl_\(\)/.test(aiGs), 'driveStatus reports authUrl');
+assert(/AUTH LINK/.test(aiGs) && /throw new Error\(driveAuthHelp_\(driveErr, authUrl\)\)/.test(aiGs),
+  'AUTHORIZE_DRIVE_PRINT_HISTORY logs auth link and step-by-step help');
+assert(/function publishSavedMenu_|publishSavedMenu/.test(aiGs), 'publish-to-website code still present');
+
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
   process.exit(1);
