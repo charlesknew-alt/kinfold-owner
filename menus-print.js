@@ -4731,7 +4731,7 @@
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
       /* Windmill official vertical mark in a thick framed block — EB hanging-sign mass. */
       '.logo-tr-frame{display:block;margin-left:auto;width:196px;max-width:100%;box-sizing:border-box;' +
-        'padding:16px 14px 14px;background:#f6f0e6;border:4px solid ' + WM_GREEN + ';' +
+        'padding:16px 14px 14px;background:#f6f0e6;border:2px solid ' + WM_GREEN + ';' +
         '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
       '.logo-tr-frame .logo-tr.logo-tr-wm{width:100%!important;max-width:100%;margin:0;height:auto;display:block;' +
         'opacity:.92}' +
@@ -4988,7 +4988,7 @@
       '.a5-face.fill-tight{--dish-gap:10px;--sec-gap:11px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
       '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
-      '.a5-face .logo-tr-frame{width:118px;padding:10px 9px 9px;border-width:3px}' +
+      '.a5-face .logo-tr-frame{width:118px;padding:10px 9px 9px;border-width:2px}' +
       '.a5-face .logo-tr-frame .logo-tr.logo-tr-wm{width:100%!important}' +
       '.a5-face .party-logo{width:72px}' +
       '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
