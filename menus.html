@@ -549,6 +549,16 @@
     var windmillCloudReady = !isWindmillVenue;
     var windmillPreviewOnly = false;
 
+    /**
+     * Visible tab / staff label for a menu. Windmill kids tab shows “Little Ones”;
+     * Eight Bells keeps “Little Bells”. Id stays little-bells (book/print key unchanged).
+     */
+    function menuTabLabel(menu) {
+      if (!menu) return '';
+      if (menu.id === 'little-bells' && isWindmillVenue) return 'Little Ones';
+      return menu.name || '';
+    }
+
     (function brandVenueHeader_() {
       var eye = document.getElementById('psVenueEyebrow');
       if (eye) {
@@ -1976,7 +1986,7 @@
         b.type = 'button';
         b.setAttribute('role', 'tab');
         b.setAttribute('aria-selected', menu.id === menuId ? 'true' : 'false');
-        b.textContent = menu.name;
+        b.textContent = menuTabLabel(menu);
         b.className = menu.id === menuId ? 'on' : '';
         b.onclick = function () {
           menuId = menu.id;
@@ -2006,7 +2016,7 @@
       html += renderFlowRail(menu, list);
 
       // —— 1. Dishes ——
-      html += flowStepShell(1, 'Dishes', menu.name,
+      html += flowStepShell(1, 'Dishes', menuTabLabel(menu),
         list.length
           ? (list.length + ' dish' + (list.length === 1 ? '' : 'es') + ' · ' + sectionCount(list) +
             ' sections · ' + includeTicksSummary_(menuId))
@@ -2273,7 +2283,9 @@
           // Staff: same menus they can open as tabs (incl. Little Bells kids on Main/Sunday)
           if (isStaffMode && !staffCanSeeMenu(m)) return;
           var on = !!(includes[menuId] && includes[menuId][m.id]);
-          var label = m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
+          var label = m.id === 'little-bells'
+            ? (isWindmillVenue ? 'Little Ones (kids)' : 'Little Bells (kids)')
+            : m.name;
           html += '<label><input type="checkbox" data-include="' + m.id + '"' + (on ? ' checked' : '') + '> ' + escapeAttr(label) + '</label>';
         });
         html += '</div>';
@@ -4645,7 +4657,10 @@
     }
 
     function dropInLabel_(m) {
-      return m.id === 'little-bells' ? 'Little Bells (kids)' : m.name;
+      if (m.id === 'little-bells') {
+        return isWindmillVenue ? 'Little Ones (kids)' : 'Little Bells (kids)';
+      }
+      return m.name;
     }
 
     function showOverflowGate_(result) {

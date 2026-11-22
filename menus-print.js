@@ -24,19 +24,26 @@
     }
   }
 
-  /** Active print venue — mirrors EBMenuIngest cloud venue / ?venue=. */
+  /** Active print venue — mirrors EBMenuIngest cloud venue / ?venue= / ?pub=. */
   function printVenueId() {
     try {
       if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
-        return root.EBMenuIngest.getCloudVenue() || 'eightbells';
+        var cv = root.EBMenuIngest.getCloudVenue();
+        if (cv === 'windmill') return 'windmill';
+        if (cv === 'eightbells' || cv === 'eight-bells') return 'eightbells';
       }
     } catch (e) {}
     try {
-      if (typeof location !== 'undefined' &&
-          /(?:\?|&)venue=windmill(?:&|$)/i.test(String(location.search || ''))) {
-        return 'windmill';
+      if (typeof location !== 'undefined') {
+        var q = String(location.search || '');
+        if (/(?:\?|&)(?:venue|pub)=windmill(?:&|$)/i.test(q)) return 'windmill';
+        if (/(?:\?|&)pub=eight-bells(?:&|$)/i.test(q)) return 'eightbells';
       }
     } catch (e2) {}
+    try {
+      var ds = root.document && root.document.documentElement && root.document.documentElement.dataset;
+      if (ds && (ds.previewPub === 'windmill' || ds.menusVenue === 'windmill')) return 'windmill';
+    } catch (e3) {}
     return 'eightbells';
   }
 
