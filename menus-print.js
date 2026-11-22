@@ -4611,26 +4611,29 @@
     var guillotine = !!opts.guillotine;
     var wm = isWindmillPrint();
     // Eight Bells Canva PDFs: Roboto dishes, Trajan-like Cinzel titles, Crimson Text allergy.
-    // Windmill (live site): Outfit dishes, Cormorant Garamond titles.
+    // Windmill Word-sample print: Crimson Text SemiBold dishes/tags, Roboto Light
+    // section titles / prices / descriptions; dietary green #538135.
     // Fonts are loaded via <link> in build() — @import often fails before print.
     var serifStack = wm
-      ? '"Cormorant Garamond",Georgia,"Times New Roman",serif'
+      ? '"Crimson Text",Georgia,"Times New Roman",serif'
       : '"Cinzel",Georgia,"Times New Roman",serif';
-    var sansStack = wm
-      ? '"Outfit",Helvetica,Arial,sans-serif'
-      : '"Roboto",Helvetica,Arial,sans-serif';
-    var allergyStack = wm
-      ? '"Cormorant Garamond",Georgia,"Times New Roman",serif'
-      : '"Crimson Text",Georgia,"Times New Roman",serif';
-    var accent = wm ? WM_GREEN : GREEN;
+    var sansStack = '"Roboto",Helvetica,Arial,sans-serif';
+    var allergyStack = '"Crimson Text",Georgia,"Times New Roman",serif';
+    // Tags/footer green matches the Word sample (#538135) for both pubs.
+    var accent = GREEN;
     var toolbarBg = wm ? '#24362c' : '#1c1610';
     var toolbarFg = wm ? '#f6f0e6' : '#f4eae3';
     var toolbarBtnBg = wm ? '#f6f0e6' : '#f4eae3';
+    var typeRoot = wm
+      ? '--dish-gap:14px;--sec-gap:14px;--name:16pt;--desc:12pt;--title:16pt;--promo:12pt;' +
+        '--name-min:14pt;--name-max:16pt;--desc-min:11pt;--desc-max:12pt;--title-min:14pt;--title-max:16pt;' +
+        '--dish-gap-min:8px;--dish-gap-max:16px'
+      : '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
+        '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
+        '--dish-gap-min:9px;--dish-gap-max:18px';
     return (
       ':root{--ink:' + INK + ';--green:' + accent + ';--serif:' + serifStack + ';--sans:' + sansStack + ';--allergy:' + allergyStack + ';' +
-        '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
-        '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
-        '--dish-gap-min:9px;--dish-gap-max:18px}' +
+        typeRoot + '}' +
       'body.make-fit{--dish-gap-min:5px}' +
       '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:' + (wm ? '#cfc8bb' : '#d9d3c8') + ';color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:50;background:' + toolbarBg + ';color:' + toolbarFg + ';padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
@@ -4732,6 +4735,26 @@
       '.foot-logo img{width:96px;height:auto}' +
       (wm ? '.foot-logo img{width:110px;opacity:.9}' : '') +
       '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:160px!important}' +
+      /* Windmill Word-sample type — Crimson SemiBold dishes/tags, Roboto Light chrome. */
+      (wm
+        ? '.sec-title,.sec-title.soft,.sec-title.soft-left,.sec-title.under,.scallop .sec-title,' +
+          '.top-left .sec-title,.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,' +
+          '.col-promo .sec-title,.specials-beside .sec-title.specials-beside-title{' +
+            'font-family:var(--sans)!important;font-weight:300!important;font-size:16pt!important;' +
+            'letter-spacing:normal;text-transform:none;text-decoration:underline;text-underline-offset:3px;' +
+            'color:#000;text-align:center!important;line-height:1.2}' +
+          '.dish-name,.dish-c .dish-name{font-family:var(--serif)!important;font-weight:600!important;' +
+            'font-size:16pt!important;color:#000;letter-spacing:normal}' +
+          '.price{font-family:var(--sans)!important;font-weight:300!important;font-size:12pt!important;color:#000}' +
+          '.desc,.dish .desc,.promo .desc,.sandwich-promo .desc{font-family:var(--sans)!important;' +
+            'font-weight:300!important;font-size:12pt!important;color:#000}' +
+          '.tags{font-family:var(--serif)!important;font-weight:600!important;font-style:italic;' +
+            'font-size:14pt!important;color:#538135}' +
+          '.allergy,.allergy-lc{font-family:var(--allergy)!important;font-weight:600!important;' +
+            'font-style:italic;color:#538135;font-size:11pt}' +
+          '.sec-note{font-family:var(--sans);font-weight:300;color:#000}' +
+        ''
+        : '') +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
       /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
@@ -5273,7 +5296,7 @@
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       (printVenue === 'windmill'
-        ? '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">'
+        ? '<link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,600;1,600&family=Roboto:ital,wght@0,300;1,300&display=swap" rel="stylesheet">'
         : '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">') +
       '<style>' + css({ landscape: landscape, guillotine: guillotine || defaultPaper === 'a5' }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +

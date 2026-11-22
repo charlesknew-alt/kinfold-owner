@@ -151,8 +151,9 @@ assert(printJs.indexOf('venuePending') !== -1 &&
 assert(printJs.indexOf('function venueLogoFile') !== -1 &&
   printJs.indexOf('windmill-logo.png') !== -1,
   'print uses venueLogoFile → windmill-logo.png');
-assert(printJs.indexOf('Cormorant Garamond') !== -1 && printJs.indexOf('Outfit') !== -1,
-  'print loads Windmill fonts for venue=windmill');
+assert(printJs.indexOf('Crimson Text') !== -1 && printJs.indexOf('Roboto') !== -1 &&
+  printJs.indexOf('family=Crimson+Text') !== -1 && printJs.indexOf('family=Roboto') !== -1,
+  'print loads Windmill Word-sample fonts (Crimson Text + Roboto)');
 assert(printJs.indexOf("printVenue !== 'windmill'") !== -1 ||
   printJs.indexOf("printVenue === 'windmill'") !== -1,
   'print preview hides Publish to website for Windmill');
