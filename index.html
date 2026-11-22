@@ -585,9 +585,11 @@
   </div>
 
   <script>
-    // Owner PIN is a last-resort fallback if the auth web app is unreachable.
     // Manager passwords are NOT stored here — they live in Apps Script.
-    var OWNER_PIN_FALLBACK = '1232';
+    // The owner door code is not in this file. If that Google service is down
+    // or not set up, sign-in asks app.varlo.co.uk. It compares the typed code
+    // with a Vercel environment variable and sets a short-lived HTTP-only cookie.
+    var DOOR_URL = 'https://app.varlo.co.uk/api/portal-door';
 
     // Standalone Varlo Auth /exec (not a venue paperwork router).
     var AUTH_URL = 'https://script.google.com/macros/s/AKfycbyghJc5aFAK7pqBo5_ih5IGILWungoJnhwWxy_9MImlcH13sKmpfGU6a4NIt0CjLgvN/exec';
@@ -720,17 +722,38 @@
       var role = sessionStorage.getItem('varlo_app_role');
       if (role === 'eightbells' && sessionStorage.getItem('eightbells_auth') === 'yes') {
         showManager('eightbells');
-        return;
+        return true;
       }
       if (role === 'windmill' && sessionStorage.getItem('windmill_auth') === 'yes') {
         showManager('windmill');
-        return;
+        return true;
       }
       if (sessionStorage.getItem('varlo_owner_auth') === 'yes' || sessionStorage.getItem('kinfold_owner_auth') === 'yes') {
         showOwnerHome();
-        return;
+        return true;
       }
-      showLogin();
+      return false;
+    }
+
+    function doorRequest(body) {
+      return fetch(DOOR_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function(res) {
+        return res.json().catch(function() { return {}; });
+      });
+    }
+
+    function doorStatus(gate) {
+      return fetch(DOOR_URL + '?gate=' + encodeURIComponent(gate), {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      }).then(function(res) {
+        return res.json().catch(function() { return {}; });
+      });
     }
 
     function rememberRole(role, password) {
@@ -754,6 +777,7 @@
       sessionStorage.removeItem('windmill_auth');
       lastOwnerPassword = '';
       sessionRole = null;
+      doorRequest({ gate: 'owner', logout: true }).catch(function() {});
       document.getElementById('appFrame').src = 'about:blank';
       history.replaceState({ view: 'login' }, '', '#');
       showLogin();
@@ -813,6 +837,25 @@
       el.classList.add('show');
     }
 
+    function askOwnerDoor(password) {
+      return doorRequest({ gate: 'owner', pin: password }).then(function(data) {
+        if (data && data.ok && data.unlocked) {
+          rememberRole('owner', password);
+          enterRole('owner');
+          return { opened: true };
+        }
+        return { opened: false, error: (data && data.error) || '' };
+      }, function() {
+        return { opened: false, error: '' };
+      });
+    }
+
+    function rejectLogin(message) {
+      setLoginError(message);
+      document.getElementById('pw').value = '';
+      document.getElementById('pw').focus();
+    }
+
     function checkPw() {
       var password = document.getElementById('pw').value.trim();
       var btn = document.getElementById('loginBtn');
@@ -830,28 +873,21 @@
             enterRole(selectedRole);
             return;
           }
-          if (data && data.error === 'not_configured' && selectedRole === 'owner' && password === OWNER_PIN_FALLBACK) {
-            rememberRole('owner', password);
-            enterRole('owner');
-            return;
+          if (data && data.error === 'not_configured' && selectedRole === 'owner') {
+            return askOwnerDoor(password).then(function(result) {
+              if (!result.opened) rejectLogin(result.error || 'This sign-in is not set up yet');
+            });
           }
-          setLoginError(data && data.error === 'not_configured'
-            ? 'This sign-in is not set up yet'
-            : 'Incorrect password');
-          document.getElementById('pw').value = '';
-          document.getElementById('pw').focus();
+          rejectLogin('Incorrect password');
         })
         .catch(function() {
-          if (selectedRole === 'owner' && password === OWNER_PIN_FALLBACK) {
-            rememberRole('owner', password);
-            enterRole('owner');
+          if (selectedRole !== 'owner') {
+            rejectLogin('Cannot reach the password service. Try again in a moment.');
             return;
           }
-          setLoginError(selectedRole === 'owner'
-            ? 'Incorrect password'
-            : 'Cannot reach the password service. Try again in a moment.');
-          document.getElementById('pw').value = '';
-          document.getElementById('pw').focus();
+          return askOwnerDoor(password).then(function(result) {
+            if (!result.opened) rejectLogin(result.error || 'Incorrect password');
+          });
         })
         .then(function() {
           btn.disabled = false;
@@ -944,8 +980,21 @@
     var qRole = (location.search.match(/[?&]role=([^&]+)/) || [])[1];
     if (qRole) setRole(decodeURIComponent(qRole).toLowerCase());
 
-    restoreSession();
-    restoreFromHash();
+    if (restoreSession()) {
+      restoreFromHash();
+    } else {
+      doorStatus('owner').then(function(data) {
+        if (data && data.unlocked) {
+          rememberRole('owner', '');
+          showOwnerHome();
+        } else {
+          showLogin();
+        }
+        restoreFromHash();
+      }, function() {
+        showLogin();
+      });
+    }
 
     // Paperwork / Card Takings use the same Apps Scripts as the manager hubs.
     // Keep shell=owner on every load of those scripts, including iframe
