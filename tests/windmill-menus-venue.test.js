@@ -383,6 +383,101 @@ assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')),
     'Eight Bells print does not reference windmill-logo.png');
 })();
 
+// —— 6. Windmill print never renders Eight Bells kids names or copy ——
+(function windmillNeverRendersEightBellsKidsCopy() {
+  global.document = {
+    documentElement: { dataset: { menusVenue: 'windmill', previewPub: 'windmill' } }
+  };
+  global.location = { search: '?venue=windmill', href: 'http://localhost/menus.html?venue=windmill' };
+  delete require.cache[require.resolve(path.join(root, 'menus.js'))];
+  delete require.cache[require.resolve(path.join(root, 'menus-print.js'))];
+  require(path.join(root, 'menus.js'));
+  require(path.join(root, 'menus-print.js'));
+  var api = global.EBMenus;
+  var print = global.EBMenuPrint;
+  assert(print.isWindmillPrint() === true, 'kids-isolation fixture runs as Windmill print');
+
+  // Windmill book dishes (own prices). Layout only sets width/frame so
+  // normalizeSectionLayout would otherwise fill Eight Bells Little Bells defaults.
+  var dishes = [
+    api.dish('Starters', 'Soup of the Day', 'warm crusty bread', '7.00', 'v'),
+    api.dish('Mains', 'Beer Battered Haddock', 'chunky chips, crushed peas, tartare', '17.50', ''),
+    api.dish('Mains', 'Wild Mushroom Risotto', 'parmesan, truffle oil', '16.50', 'gf, v'),
+    api.dish('Mains', 'Windmill Burger', 'bacon, cheddar, fries, slaw', '16.50', ''),
+    api.dish('Little Bells', 'Pasta with Tomato Sauce', '', '7.50', 'v'),
+    api.dish('Little Bells', 'Sausage & Mash', '', '7.50', ''),
+    api.dish('Little Bells', 'Fish Fingers & Chips', '', '7.50', ''),
+    api.dish('Sides', 'Chunky Chips', '', '4.50', 'v'),
+    api.dish('Desserts', 'Sticky Toffee Pudding', 'toffee sauce, vanilla ice cream', '7.50', 'v')
+  ];
+  var layoutMap = api.normalizeSectionLayout({
+    Starters: { width: 'full', frame: false },
+    Mains: { width: 'full', frame: false },
+    Burgers: { width: 'column', frame: false },
+    'Little Bells': { width: 'column', frame: true },
+    Sides: { width: 'column', frame: false },
+    Desserts: { width: 'column', frame: false }
+  });
+  // Prove the EB defaults were what normalize would inject (pre-scrub).
+  assert(/Little Bells on Sunday/i.test(layoutMap['Little Bells'].below || '') ||
+    /Little Bells on Sunday/i.test(layoutMap['Little Bells'].note || ''),
+    'fixture starts from Eight Bells kids layout defaults (the leak source)');
+  assert(/All\s*£\s*9\.50/i.test(layoutMap['Little Bells'].above || '') ||
+    /All\s*£\s*9\.50/i.test(layoutMap['Little Bells'].note || ''),
+    'fixture starts from Eight Bells £9.50 kids offer default');
+
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false, 'little-bells': true },
+    promos: []
+  });
+  var sheet = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false, 'little-bells': true },
+    layout: planned,
+    promos: []
+  });
+  var body = sheet.replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '');
+
+  assert(/Little Ones/i.test(body), 'Windmill print shows Little Ones heading');
+  assert(!/Little Bells/i.test(body),
+    'Windmill print never renders the Eight Bells “Little Bells” name');
+  assert(!/Little Bells on Sunday/i.test(body) &&
+    !/half the price of the adults/i.test(body),
+    'Windmill print never renders Eight Bells Sunday kids copy');
+  assert(!/All\s*£\s*9\.50/i.test(body),
+    'Windmill print never renders Eight Bells £9.50 kids offer');
+  assert(!/Bells Lunch Club/i.test(body),
+    'Windmill print never renders Eight Bells Lunch Club section name');
+  assert(/Pasta with Tomato Sauce/.test(body) &&
+    /Sausage &(?:amp;)? Mash/.test(body) &&
+    /Fish Fingers &(?:amp;)? Chips/.test(body),
+    'Windmill kids dishes from the Windmill book still print');
+
+  // Eight Bells still keeps Little Bells + stock kids chrome.
+  global.document.documentElement.dataset = {};
+  global.location = { search: '', href: 'http://localhost/menus.html' };
+  delete require.cache[require.resolve(path.join(root, 'menus-print.js'))];
+  require(path.join(root, 'menus-print.js'));
+  var printEb = global.EBMenuPrint;
+  assert(printEb.isWindmillPrint() === false, 'Eight Bells venue for kids chrome check');
+  var ebPlan = printEb.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false, 'little-bells': true },
+    promos: []
+  });
+  var ebSheet = printEb.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false, 'little-bells': true },
+    layout: ebPlan,
+    promos: []
+  });
+  var ebBody = ebSheet.replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(/Little Bells/i.test(ebBody), 'Eight Bells print still shows Little Bells');
+  assert(!/Little Ones/i.test(ebBody), 'Eight Bells print does not show Little Ones');
+})();
+
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
   process.exit(1);

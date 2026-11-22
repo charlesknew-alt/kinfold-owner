@@ -1041,7 +1041,8 @@
       var dessRuleM = null;
       var sideRuleM = null;
       if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
-        littleRuleM = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout);
+        littleRuleM = kidsRuleForPrint_(
+          root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout));
         dessRuleM = root.EBMenus.sectionLayoutFor('Desserts', plan && plan.sectionLayout);
         sideRuleM = root.EBMenus.sectionLayoutFor('Sides', plan && plan.sectionLayout);
       }
@@ -1071,7 +1072,7 @@
         rightFood: Math.round(right2 * 10) / 10,
         gap: Math.round(gap2 * 10) / 10,
         shorter: Math.abs(gap2) <= 2.5 ? 'even' : (gap2 > 0 ? 'left' : 'right'),
-        leftLabel: kidsCol ? 'Little Bells / Sides' : 'Sides / sauces',
+        leftLabel: kidsCol ? (kidsPrintTitle() + ' / Sides') : 'Sides / sauces',
         rightLabel: layout.p2.sandwiches ? 'Sandwiches' : (kidsCol ? 'Desserts / Sides / events' : 'Events')
       };
     }
@@ -1533,7 +1534,40 @@
     return /sunday\s*roasts?|^roasts?$/i.test(String(name || '').trim());
   }
   function isLittleBells(name) {
-    return /little\s*bells|kids?\s*menu|children.?s/i.test(String(name || '').trim());
+    // Id stays little-bells; Windmill display name is Little Ones.
+    return /little\s*(bells|ones)|kids?\s*menu|children.?s/i.test(String(name || '').trim());
+  }
+
+  /** Printed kids heading — Windmill never shows the Eight Bells “Little Bells” name. */
+  function kidsPrintTitle() {
+    return isWindmillPrint() ? 'Little Ones' : 'Little Bells';
+  }
+
+  /**
+   * Scrub Eight Bells kids chrome from a section-layout rule when printing Windmill.
+   * Keeps Windmill-book wording; drops stock EB “Little Bells on Sunday…” / £9.50 spiel
+   * unless the book set its own non-EB text.
+   */
+  function kidsRuleForPrint_(rule) {
+    rule = rule && typeof rule === 'object' ? Object.assign({}, rule) : {};
+    if (!isWindmillPrint()) return rule;
+    function scrub(t) {
+      t = String(t == null ? '' : t).replace(/\r\n/g, '\n').trim();
+      if (!t) return '';
+      // Stock Eight Bells Sunday kids line — never print on Windmill.
+      if (/little\s*bells/i.test(t) && /on\s+sunday|half\s+(the\s+)?price/i.test(t)) return '';
+      if (/on\s+sundays?,?\s*little\s*bells/i.test(t)) return '';
+      // Stock Eight Bells £9.50 kids offer (with or without scoop spiel).
+      if (/all\s*£\s*9\.50/i.test(t)) return '';
+      t = t.replace(/little\s*bells/gi, 'Little Ones');
+      return t.trim();
+    }
+    rule.above = scrub(rule.above);
+    rule.below = scrub(rule.below);
+    rule.note = scrub(rule.note);
+    // If cardOutsideSlots later re-splits note, keep note empty when slots cleared.
+    if (!rule.above && !rule.below) rule.note = '';
+    return rule;
   }
   /** Sides / Sauces / Little Bells — compact stack, not classical 13px dish breath. */
   function isTightListSection(name) {
@@ -1727,7 +1761,7 @@
         bag.sundayRoasts = { name: 'Sunday Roasts', dishes: (s.dishes || []).slice() };
       } else if (isMains(s.name) && !bag.mains) bag.mains = s;
       else if (isLittleBells(s.name) && !bag.littleBells) {
-        bag.littleBells = { name: 'Little Bells', dishes: (s.dishes || []).slice() };
+        bag.littleBells = { name: kidsPrintTitle(), dishes: (s.dishes || []).slice() };
       } else if (isDessert(s.name) && !bag.desserts) bag.desserts = s;
       else if (isSides(s.name) && !bag.sides) bag.sides = s;
       else if (isSandwich(s.name) && !bag.sandwiches) bag.sandwiches = s;
@@ -1762,10 +1796,16 @@
   }
 
   function layoutRule_(name, sl) {
+    var rule;
     if (root.EBMenus && typeof root.EBMenus.sectionLayoutFor === 'function') {
-      return root.EBMenus.sectionLayoutFor(name, sl) || {};
+      rule = root.EBMenus.sectionLayoutFor(name, sl) || {};
+    } else {
+      rule = (sl && sl[name]) || {};
     }
-    return (sl && sl[name]) || {};
+    if (name === 'Little Bells' || isLittleBells(name)) {
+      rule = kidsRuleForPrint_(rule);
+    }
+    return rule;
   }
 
   /** Above/below boxes (Little Bells on Sunday) or a single Blocks note. */
@@ -2530,9 +2570,10 @@
       // tax. Above/below notes still pack leftover so Gatherings is omitted.
       var littleRulePlan = { width: 'column', frame: true };
       if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
-        littleRulePlan = root.EBMenus.sectionLayoutFor('Little Bells', opts.sectionLayout) || littleRulePlan;
+        littleRulePlan = kidsRuleForPrint_(
+          root.EBMenus.sectionLayoutFor('Little Bells', opts.sectionLayout) || littleRulePlan);
       } else if (opts.sectionLayout && opts.sectionLayout['Little Bells']) {
-        littleRulePlan = opts.sectionLayout['Little Bells'];
+        littleRulePlan = kidsRuleForPrint_(opts.sectionLayout['Little Bells']);
       }
       var kidsSidesPair = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
         layout.p2.sidesOnP2 && bag.sides && bag.sides.dishes && bag.sides.dishes.length &&
@@ -3157,6 +3198,9 @@
     if (overrides && overrides[key]) {
       rule = Object.assign({}, rule, { width: overrides[key] });
     }
+    if (key === 'Little Bells' || isLittleBells(key)) {
+      rule = kidsRuleForPrint_(rule);
+    }
     return rule;
   }
 
@@ -3698,12 +3742,19 @@
     if (kidsFromBurgers.length) {
       if (bag.littleBells && bag.littleBells.dishes) {
         bag.littleBells = {
-          name: 'Little Bells',
+          name: kidsPrintTitle(),
           dishes: bag.littleBells.dishes.concat(kidsFromBurgers)
         };
       } else {
-        bag.littleBells = { name: 'Little Bells', dishes: kidsFromBurgers };
+        bag.littleBells = { name: kidsPrintTitle(), dishes: kidsFromBurgers };
       }
+    }
+    // Always re-title kids for the active venue (never leave EB wording on Windmill).
+    if (bag.littleBells) {
+      bag.littleBells = {
+        name: kidsPrintTitle(),
+        dishes: (bag.littleBells.dishes || []).slice()
+      };
     }
     if (split.sandwiches.length) {
       if (bag.sandwiches && bag.sandwiches.dishes) {
@@ -4576,16 +4627,25 @@
             );
           }).join('');
       } else if (menu.id === 'little-bells') {
+        title = kidsPrintTitle();
         var lbRule = { note: '', sell: '', above: '', below: '' };
         if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
           lbRule = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout) || lbRule;
         } else if (plan && plan.sectionLayout && plan.sectionLayout['Little Bells']) {
           lbRule = plan.sectionLayout['Little Bells'];
         }
+        lbRule = kidsRuleForPrint_(lbRule);
         var lbSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
           ? root.EBMenus.cardOutsideSlots(lbRule)
           : { above: lbRule.above || '', aboveKind: lbRule.aboveKind || 'heading',
               below: lbRule.below || '', belowKind: lbRule.belowKind || 'text' };
+        // Scrub again after cardOutsideSlots in case EB defaults were re-joined.
+        lbSlots = {
+          above: kidsRuleForPrint_({ above: lbSlots.above }).above,
+          aboveKind: lbSlots.aboveKind || 'heading',
+          below: kidsRuleForPrint_({ below: lbSlots.below }).below,
+          belowKind: lbSlots.belowKind || 'text'
+        };
         offerAbove = cardBlurbHtml(lbSlots.above, lbSlots.aboveKind, 'above');
         outsideBelow = cardBlurbHtml(lbSlots.below, lbSlots.belowKind, 'below');
         inner = scallop(dishes.map(function (d) { return dishCentered(d, { hidePrice: true, hideLunch: true }); }).join(''));
