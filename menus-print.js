@@ -6,6 +6,8 @@
 
   var GREEN = '#538135';
   var INK = '#1c1610';
+  /** Windmill print accent — forest from windmill-manager / live site. */
+  var WM_GREEN = '#24362c';
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -20,6 +22,43 @@
     } catch (e) {
       return 'images/' + name;
     }
+  }
+
+  /** Active print venue — mirrors EBMenuIngest cloud venue / ?venue=. */
+  function printVenueId() {
+    try {
+      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
+        return root.EBMenuIngest.getCloudVenue() || 'eightbells';
+      }
+    } catch (e) {}
+    try {
+      if (typeof location !== 'undefined' &&
+          /(?:\?|&)venue=windmill(?:&|$)/i.test(String(location.search || ''))) {
+        return 'windmill';
+      }
+    } catch (e2) {}
+    return 'eightbells';
+  }
+
+  function isWindmillPrint() {
+    return printVenueId() === 'windmill';
+  }
+
+  /**
+   * Real Windmill logo from www.windmilllittleworth.com/images/logo-dark.png
+   * (Organization schema logo). Eight Bells keeps eight-bells-logo.png.
+   */
+  function venueLogoFile() {
+    return isWindmillPrint() ? 'windmill-logo.png' : 'eight-bells-logo.png';
+  }
+
+  function venueLogoAlt() {
+    return isWindmillPrint() ? 'The Windmill Inn' : 'The Eight Bells';
+  }
+
+  function venueLogoImg(cls) {
+    var c = cls ? (' class="' + cls + '"') : '';
+    return '<img' + c + ' src="' + esc(asset(venueLogoFile())) + '" alt="' + esc(venueLogoAlt()) + '">';
   }
 
   function toRoman(n) {
@@ -3493,7 +3532,7 @@
       return sandwichesBlock(bag, opts);
     }
     if (which === 'logo') {
-      return '<div class="foot-logo"><img src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      return '<div class="foot-logo">' + venueLogoImg() + '</div>';
     }
     return '';
   }
@@ -3629,12 +3668,12 @@
         p1 += sectionBlock(bag.starters.name, bag.starters.dishes, startRule, 'wide');
       }
       p1 += '</div>';
-      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '<div class="top-right">' + venueLogoImg('logo-tr') + '</div>';
       p1 += '</div>';
     } else if (!showColBlock || !classicsAsColumn) {
       p1 += '<div class="top-band top-band-logo">';
       p1 += '<div class="top-left"></div>';
-      p1 += '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+      p1 += '<div class="top-right">' + venueLogoImg('logo-tr') + '</div>';
       p1 += '</div>';
     }
     // Starters under nibbles: full width so they stay prominent
@@ -3878,8 +3917,7 @@
         p1 += '<section class="sec classics-block">';
         if (!logoInTop) {
           p1 += '<div class="top-band top-band-logo"><div class="top-left"></div>' +
-            '<div class="top-right"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) +
-            '" alt="The Eight Bells"></div></div>';
+            '<div class="top-right">' + venueLogoImg('logo-tr') + '</div></div>';
         }
         if (shareInLeft) {
           // Best fit / split: two even columns only when dish count is even
@@ -3970,7 +4008,7 @@
       // RIGHT — Logo only if not already in top-band; then Burgers + Pub Classics
       p1 += '<div class="col col-food">';
       if (!logoInTop) {
-        p1 += '<div class="col-logo"><img class="logo-tr" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells"></div>';
+        p1 += '<div class="col-logo">' + venueLogoImg('logo-tr') + '</div>';
       }
       p1 += '<div class="col-body">';
       if (burgerDishes.length) {
@@ -4510,7 +4548,7 @@
         '<article class="' + faceCls + '">' +
           '<div class="card-top">' +
             trackerBar(ver) +
-            '<img class="logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="">' +
+            venueLogoImg('logo') +
             (menu.id === 'lunch-club' ? '' : '<h1>' + esc(title) + '</h1>') +
           '</div>' +
           offerAbove +
@@ -4527,19 +4565,33 @@
     opts = opts || {};
     var landscape = !!opts.landscape;
     var guillotine = !!opts.guillotine;
-    // Match Eight Bells Canva website PDFs: Roboto dishes, Trajan-like Cinzel
-    // titles, Crimson Text allergy. Logo ~180px on A4; type steps down to fit the page.
+    var wm = isWindmillPrint();
+    // Eight Bells Canva PDFs: Roboto dishes, Trajan-like Cinzel titles, Crimson Text allergy.
+    // Windmill (live site): Outfit dishes, Cormorant Garamond titles.
     // Fonts are loaded via <link> in build() — @import often fails before print.
+    var serifStack = wm
+      ? '"Cormorant Garamond",Georgia,"Times New Roman",serif'
+      : '"Cinzel",Georgia,"Times New Roman",serif';
+    var sansStack = wm
+      ? '"Outfit",Helvetica,Arial,sans-serif'
+      : '"Roboto",Helvetica,Arial,sans-serif';
+    var allergyStack = wm
+      ? '"Cormorant Garamond",Georgia,"Times New Roman",serif'
+      : '"Crimson Text",Georgia,"Times New Roman",serif';
+    var accent = wm ? WM_GREEN : GREEN;
+    var toolbarBg = wm ? '#24362c' : '#1c1610';
+    var toolbarFg = wm ? '#f6f0e6' : '#f4eae3';
+    var toolbarBtnBg = wm ? '#f6f0e6' : '#f4eae3';
     return (
-      ':root{--ink:' + INK + ';--green:' + GREEN + ';--serif:"Cinzel",Georgia,"Times New Roman",serif;--sans:"Roboto",Helvetica,Arial,sans-serif;--allergy:"Crimson Text",Georgia,"Times New Roman",serif;' +
+      ':root{--ink:' + INK + ';--green:' + accent + ';--serif:' + serifStack + ';--sans:' + sansStack + ';--allergy:' + allergyStack + ';' +
         '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
         '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
         '--dish-gap-min:9px;--dish-gap-max:18px}' +
       'body.make-fit{--dish-gap-min:5px}' +
-      '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:#d9d3c8;color:var(--ink);font-family:var(--sans)}' +
-      '.toolbar{position:sticky;top:0;z-index:50;background:#1c1610;color:#f4eae3;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
-      '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:#f4eae3;color:#1c1610}' +
-      '.toolbar label.paper-opt{display:inline-flex;align-items:center;gap:6px;background:#3a342c;color:#f4eae3}' +
+      '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:' + (wm ? '#cfc8bb' : '#d9d3c8') + ';color:var(--ink);font-family:var(--sans)}' +
+      '.toolbar{position:sticky;top:0;z-index:50;background:' + toolbarBg + ';color:' + toolbarFg + ';padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
+      '.toolbar button,.toolbar label.paper-opt{font:600 13px var(--sans);padding:8px 14px;border:0;border-radius:999px;cursor:pointer;background:' + toolbarBtnBg + ';color:#1c1610}' +
+      '.toolbar label.paper-opt{display:inline-flex;align-items:center;gap:6px;background:#3a342c;color:' + toolbarFg + '}' +
       '.toolbar label.paper-opt input{margin:0}' +
       '.toolbar .hint{font-size:12.5px;opacity:.9;max-width:640px}' +
       '.page,.sheet,.cut-sheet{background:#fff;margin:14px auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}' +
@@ -4979,7 +5031,7 @@
     var html = '<div class="page party-page party-theme-' + occasion + ' fill-page fill-airy">';
     html += trackerBar(ver, { hideDate: true });
     html += '<div class="page-body">';
-    html += '<img class="logo party-logo" src="' + esc(asset('eight-bells-logo.png')) + '" alt="The Eight Bells">';
+    html += venueLogoImg('logo party-logo');
     html += partyBlurbBlock(title, meta.topKind || 'title', 'top');
     if (prices) html += '<div class="party-prices">' + esc(prices) + '</div>';
 
@@ -5128,15 +5180,8 @@
     var websiteMenu = '';
     var publishDishes = [];
     var publishTitle = '';
-    // Windmill Specials must not offer “Publish to website” (that POSTs to Eight Bells).
-    var printVenue = 'eightbells';
-    try {
-      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
-        printVenue = root.EBMenuIngest.getCloudVenue() || 'eightbells';
-      } else if (typeof location !== 'undefined' && /(?:\?|&)venue=windmill(?:&|$)/i.test(String(location.search || ''))) {
-        printVenue = 'windmill';
-      }
-    } catch (eVen) { printVenue = 'eightbells'; }
+    // Windmill must not offer “Publish to website” (that POSTs to Eight Bells).
+    var printVenue = printVenueId();
     try {
       if (printVenue !== 'windmill' && root.EBMenusPublish && root.EBMenusPublish.websiteMenuId) {
         websiteMenu = root.EBMenusPublish.websiteMenuId({
@@ -5178,7 +5223,9 @@
       '<title>' + esc(printSheetLabel(menu.name, ver)) + '</title>' +
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
-      '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">' +
+      (printVenue === 'windmill'
+        ? '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">'
+        : '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">') +
       '<style>' + css({ landscape: landscape, guillotine: guillotine || defaultPaper === 'a5' }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
       'body.paper-a4 .mode-a5{display:none}body.paper-a4 .mode-a4{display:block}' +

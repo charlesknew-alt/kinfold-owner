@@ -7,7 +7,9 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Eight Bells UI: Fraunces + Source Sans 3. Windmill UI swaps to Cormorant Garamond + Outfit (live windmilllittleworth.com). -->
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -17,11 +19,23 @@
       --serif: 'Fraunces', Georgia, serif;
       --sans: 'Source Sans 3', sans-serif;
     }
+    /* Windmill brand from www.windmilllittleworth.com — Cormorant Garamond + Outfit, forest/brass. */
+    html.venue-windmill {
+      --paint: #d8e0d4; --paint-deep: #8d6824; --paint-wash: #eef2ea;
+      --ink: #1c1610; --ink-soft: #3d3429; --line: #d8cfc0;
+      --white-warm: #f6f0e6; --green: #24362c;
+      --serif: 'Cormorant Garamond', Georgia, serif;
+      --sans: 'Outfit', 'Segoe UI', sans-serif;
+    }
     body { font-family: var(--sans); background: var(--white-warm); color: var(--ink); line-height: 1.45; }
     .ps-header { background: var(--paint); border-bottom: 1px solid var(--paint-deep); padding: 14px 20px; }
-    .ps-header-inner { max-width: 960px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .ps-header-inner { max-width: 960px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .ps-venue-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .ps-venue-logo { display: none; height: 42px; width: auto; flex: 0 0 auto; }
+    html.venue-windmill .ps-venue-logo { display: block; }
     .ps-venue-eyebrow { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
     .ps-venue-name { font-family: var(--serif); font-size: 22px; font-weight: 500; }
+    html.venue-windmill .ps-venue-name { font-weight: 600; letter-spacing: -0.02em; }
     html.iframed .ps-header { display: none; } /* HARD: never restore display:block for iframed/varlo-header */
     html.staff-mode h1::after {
       content: ' · Floor';
@@ -446,11 +460,14 @@
 </head>
 <body>
   <header class="ps-header">
-    <div class="ps-header-inner">
-      <div>
-        <div class="ps-venue-eyebrow" id="psVenueEyebrow">The Eight Bells · Bolney</div>
-        <div class="ps-venue-name">Menus</div>
-      </div>
+      <div class="ps-header-inner">
+        <div class="ps-venue-brand">
+          <img class="ps-venue-logo" id="psVenueLogo" src="images/windmill-logo.png" alt="The Windmill Inn" width="146" height="72" decoding="async">
+          <div>
+            <div class="ps-venue-eyebrow" id="psVenueEyebrow">The Eight Bells · Bolney</div>
+            <div class="ps-venue-name">Menus</div>
+          </div>
+        </div>
     </div>
   </header>
   <main>
@@ -478,17 +495,17 @@
     <div id="publishNote" class="publish-note no-print" hidden role="status"></div>
     <div id="editor"></div>
   </main>
-  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-flow226"></script>
-  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-flow226"></script>
-  <script src="menus.js?v=20261122-flow226"></script>
-  <script src="menus-print.js?v=20261122-flow226"></script>
-  <script src="menus-ingest.js?v=20261122-flow226"></script>
+  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-flow227"></script>
+  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-flow227"></script>
+  <script src="menus.js?v=20261122-flow227"></script>
+  <script src="menus-print.js?v=20261122-flow227"></script>
+  <script src="menus-ingest.js?v=20261122-flow227"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
     // Staff / manager entry: menus-staff.html (stable URL) → menus.html?mode=staff&v=<flow from these tags>.
     // Eight Bells manager hub opens staff mode — same cloud book, shorter UI.
-    // Windmill: ?venue=windmill → separate Menu AI book (MENUS_WINDMILL), Specials only.
+    // Windmill: ?venue=windmill → separate Menu AI book (MENUS_WINDMILL) for every menu type + catalogue.
     var isStaffMode = /(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''));
     if (isStaffMode) document.documentElement.classList.add('staff-mode');
 
@@ -517,13 +534,21 @@
           ? 'The Windmill Inn · Littleworth'
           : 'The Eight Bells · Bolney';
       }
+      document.title = isWindmillVenue
+        ? 'Varlo · The Windmill — Menus'
+        : 'Varlo · Eight Bells — Menus';
       if (isWindmillVenue) {
         var lede = document.getElementById('pageLede');
         if (lede) {
           lede.textContent = isStaffMode
-            ? 'Windmill Specials — separate from Eight Bells. Upload or edit, then generate.'
-            : 'Windmill Specials live in their own Menu AI book. Eight Bells menus are unchanged.';
+            ? 'Windmill menus — separate dish book from Eight Bells. Upload or edit, then generate.'
+            : 'Windmill menus and dish catalogue live in their own Menu AI book. Eight Bells is unchanged.';
         }
+        var logo = document.getElementById('psVenueLogo');
+        if (logo) logo.hidden = false;
+      } else {
+        var logoOff = document.getElementById('psVenueLogo');
+        if (logoOff) logoOff.hidden = true;
       }
     })();
 
@@ -548,15 +573,21 @@
     var promoDeck = loadPromoDeck();
     var layoutBook = loadSectionLayoutBook();
     var dishCatalogue = loadDishCatalogue();
-    // Windmill entry always opens on Specials (its own book). EB staff too; EB owner → main.
+    // Staff (both pubs) and Windmill open on Specials; EB owner → main.
     var menuId = (isStaffMode || isWindmillVenue) ? 'specials' : 'main';
     if (isWindmillVenue) {
       if (!book || typeof book !== 'object') book = {};
-      if (!Array.isArray(book.specials)) book.specials = [];
-      // Drop any accidental EB menus from a mis-keyed cache — Windmill Specials only.
-      Object.keys(book).forEach(function (k) {
-        if (k !== 'specials') delete book[k];
+      // Ensure every core menu key exists as an empty array — never seed from EB.
+      var wmEmpty = (window.EBMenusSyncLogic && EBMenusSyncLogic.emptyWindmillState)
+        ? EBMenusSyncLogic.emptyWindmillState().book
+        : {
+            main: [], 'main-next': [], sunday: [], party: [], sandwiches: [],
+            specials: [], desserts: [], 'little-bells': [], 'lunch-club': []
+          };
+      Object.keys(wmEmpty).forEach(function (k) {
+        if (!Array.isArray(book[k])) book[k] = [];
       });
+      if (!Array.isArray(dishCatalogue)) dishCatalogue = [];
     }
     var mode = 'complete';
     var dishId = '';
@@ -628,10 +659,8 @@
 
     // Manager: day-to-day printables (owner keeps Party / Lunch club).
     // Little Bells is included so Sunday/Main can tick the kids menu onto the sheet.
-    // Windmill Specials are a separate book — only the Specials tab for now.
-    var STAFF_MENU_IDS = isWindmillVenue
-      ? ['specials']
-      : ['specials', 'main', 'main-next', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
+    // Windmill uses the same staff set — each menu is its own empty book in MENUS_WINDMILL.
+    var STAFF_MENU_IDS = ['specials', 'main', 'main-next', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
 
     var FLOW_STEPS = isStaffMode
       ? [
@@ -647,7 +676,6 @@
 
     function visibleMenus() {
       return EBMenus.MENUS.filter(function (m) {
-        if (isWindmillVenue) return m.id === 'specials';
         if (!isStaffMode) return true;
         if (STAFF_MENU_IDS.indexOf(m.id) !== -1) return true;
         return !!(m.custom && m.kind !== 'party' && m.staff !== false);
@@ -1020,7 +1048,7 @@
       // Until Menu AI is redeployed with venue support, never write Windmill into MENUS.
       if (isWindmillVenue && !windmillCloudReady) {
         cloudSyncNote = windmillPreviewOnly
-          ? 'Preview only — Windmill Specials are separate; not saving to the live Eight Bells book'
+          ? 'Preview only — Windmill menus are separate; not saving to the live Eight Bells book'
           : 'Windmill cloud save waiting for Menu AI venue deploy';
         saveLocalOnly();
         return Promise.resolve(false);
@@ -1096,22 +1124,29 @@
           if (gotVenue !== 'windmill') {
             windmillCloudReady = false;
             windmillPreviewOnly = true;
-            book = { specials: [] };
+            var emptyPending = (window.EBMenusSyncLogic && EBMenusSyncLogic.emptyWindmillState)
+              ? EBMenusSyncLogic.emptyWindmillState()
+              : { book: { specials: [] }, dishCatalogue: [], menuVersions: { specials: 1 } };
+            book = emptyPending.book || { specials: [] };
             metaBook = {};
-            menuVersions = { specials: 1 };
+            dishCatalogue = [];
+            menuVersions = emptyPending.menuVersions || { specials: 1 };
             cloudUpdatedAt = 0;
             saveLocalOnly();
-            cloudSyncNote = 'Preview: Windmill Specials are separate from Eight Bells (Menu AI venue deploy still pending — not writing the live book)';
+            cloudSyncNote = 'Preview: Windmill menus are separate from Eight Bells (Menu AI venue deploy still pending — not writing the live book)';
             cloudPullDone = true;
             render();
             return true;
           }
           windmillCloudReady = true;
           windmillPreviewOnly = false;
-          if (applyCloudState(remote || { book: { specials: [] }, venue: 'windmill' }, { allowEmpty: true })) {
+          var emptyWm = (window.EBMenusSyncLogic && EBMenusSyncLogic.emptyWindmillState)
+            ? EBMenusSyncLogic.emptyWindmillState()
+            : { book: { specials: [] }, dishCatalogue: [], venue: 'windmill' };
+          if (applyCloudState(remote || emptyWm, { allowEmpty: true })) {
             cloudSyncNote = data && data.empty
-              ? 'Windmill Specials — empty book ready (separate from Eight Bells)'
-              : 'Windmill Specials synced';
+              ? 'Windmill menus — empty book ready (separate from Eight Bells)'
+              : 'Windmill menus synced';
             cloudPullDone = true;
             render();
             return true;
@@ -1135,7 +1170,7 @@
           // Offline / unreachable: keep venue-scoped cache only (never EB keys).
           windmillPreviewOnly = true;
           windmillCloudReady = false;
-          cloudSyncNote = 'Windmill Specials on this device only (cloud unreachable)';
+          cloudSyncNote = 'Windmill menus on this device only (cloud unreachable)';
         } else {
           cloudSyncNote = 'Using menus on this device (cloud unreachable)';
         }

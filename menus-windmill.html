@@ -3,25 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Stable Windmill Specials entry — resolves cache-bust from menus.html, keeps venue=windmill. -->
+  <!-- Stable Windmill Menus entry — resolves cache-bust from menus.html, keeps venue=windmill. -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <title>Windmill Menus</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Outfit:wght@400&display=swap" rel="stylesheet">
   <style>
     html, body { height: 100%; margin: 0; }
     body {
       display: flex;
       align-items: center;
       justify-content: center;
-      font: 15px/1.4 Georgia, "Times New Roman", serif;
-      color: #1c2a22;
-      background: #eef4f8;
+      font: 15px/1.4 Outfit, "Segoe UI", sans-serif;
+      color: #1c1610;
+      background: #f6f0e6;
     }
-    p { margin: 0; opacity: 0.75; }
+    p { margin: 0; opacity: 0.75; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 18px; }
   </style>
 </head>
 <body>
-  <p id="status">Loading Windmill Specials…</p>
+  <p id="status">Loading Windmill menus…</p>
   <script>
     (function () {
       var statusEl = document.getElementById('status');
@@ -43,7 +44,7 @@
           openWindmill(m ? m[1] : '');
         })
         .catch(function () {
-          fail('Could not load Menus. Opening Windmill Specials…');
+          fail('Could not load Menus. Opening Windmill…');
           setTimeout(function () { openWindmill(String(Date.now())); }, 400);
         });
     })();

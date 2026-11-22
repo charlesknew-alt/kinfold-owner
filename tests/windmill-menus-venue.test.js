@@ -2,11 +2,12 @@
 'use strict';
 
 /**
- * Windmill Specials venue isolation — local mocks only.
+ * Windmill full menu system — venue isolation (local mocks only).
  * Never hits live Apps Script, never writes Script Properties.
  *
  * Proves: Windmill uses MENUS_WINDMILL; Eight Bells stays on MENUS;
- * getMenusState returns a venue key; empty Windmill does not inherit EB dishes.
+ * empty Windmill has every menu type + empty catalogue; branding assets
+ * and print venue logo/fonts are wired; never inherits EB dishes.
  */
 
 var fs = require('fs');
@@ -42,10 +43,15 @@ assert(sync.menusBackupPrefix('eightbells') === 'MENUS_BAK_',
   'Eight Bells backup prefix unchanged');
 
 var emptyWm = sync.emptyWindmillState();
-assert(emptyWm.venue === 'windmill' && Array.isArray(emptyWm.book.specials) &&
-  emptyWm.book.specials.length === 0,
-  'empty Windmill state has venue + empty specials');
-assert(!emptyWm.book.main, 'empty Windmill state has no main menu');
+assert(emptyWm.venue === 'windmill', 'empty Windmill state has venue');
+assert(Array.isArray(emptyWm.dishCatalogue) && emptyWm.dishCatalogue.length === 0,
+  'empty Windmill catalogue starts empty');
+['main', 'main-next', 'sunday', 'party', 'sandwiches', 'specials', 'desserts',
+  'little-bells', 'lunch-club'].forEach(function (id) {
+  assert(Array.isArray(emptyWm.book[id]) && emptyWm.book[id].length === 0,
+    'empty Windmill book has empty ' + id);
+  assert(emptyWm.menuVersions[id] === 1, 'empty Windmill menuVersions has ' + id);
+});
 assert(JSON.stringify(emptyWm).indexOf('Korean') === -1 &&
   JSON.stringify(emptyWm).indexOf('Szechuan') === -1,
   'empty Windmill state does not embed Eight Bells specials names');
@@ -61,9 +67,8 @@ assert(aiGs.indexOf("venues: ['eightbells', 'windmill']") !== -1,
   'getMenusState advertises both venues');
 assert(aiGs.indexOf("venue === 'windmill'") !== -1 &&
   aiGs.indexOf('emptyWindmillState') !== -1,
-  'missing Windmill book returns empty Specials, not null EB stub');
+  'missing Windmill book returns empty venue state, not null EB stub');
 
-// Windmill save must write MENUS_WINDMILL and must not hardcode propWrite_('MENUS') alone in saveMenuState_
 (function () {
   var saveFn = aiGs.split('function saveMenuState_')[1].split('function saveMenusState_')[0];
   assert(saveFn.indexOf('menusPropKey_') !== -1 && saveFn.indexOf('propWrite_(propKey') !== -1,
@@ -87,7 +92,6 @@ assert(aiGs.indexOf("venue === 'windmill'") !== -1 &&
     'publishSavedMenu_ refuses Windmill → Eight Bells website publish');
 })();
 
-// Eight Bells default path still exists (prop key MENUS for eightbells).
 assert(aiGs.indexOf("=== 'windmill' ? 'MENUS_WINDMILL' : 'MENUS'") !== -1 ||
   aiGs.indexOf("menusPropKey_(venue)") !== -1,
   'Eight Bells still maps to MENUS');
@@ -99,17 +103,24 @@ assert(page.indexOf("storageSuffix = isWindmillVenue ? '-wm' : ''") !== -1,
   'Windmill uses separate localStorage keys');
 assert(page.indexOf('The Windmill Inn · Littleworth') !== -1,
   'Windmill brands the Menus header');
+assert(page.indexOf('Cormorant Garamond') !== -1 && page.indexOf('Outfit') !== -1,
+  'Windmill UI loads Cormorant Garamond + Outfit');
+assert(page.indexOf('images/windmill-logo.png') !== -1,
+  'Windmill UI references the Windmill logo asset');
+assert(page.indexOf('html.venue-windmill') !== -1,
+  'Windmill venue CSS class scopes branding');
 assert(page.indexOf("venue: menuVenue") !== -1, 'client save payload includes venue');
 assert(page.indexOf("gotVenue !== 'windmill'") !== -1,
   'client refuses to apply an old non-venue (Eight Bells) book when venue=windmill');
 assert(page.indexOf('windmillCloudReady') !== -1 &&
   page.indexOf('not saving to the live Eight Bells book') !== -1,
   'client blocks Windmill cloud writes until Menu AI returns venue=windmill');
-assert(page.indexOf("isWindmillVenue\n      ? ['specials']") !== -1 ||
-  /STAFF_MENU_IDS = isWindmillVenue\s*\n?\s*\? \['specials'\]/.test(page),
-  'Windmill staff menus are Specials-only');
+assert(page.indexOf("STAFF_MENU_IDS = ['specials', 'main', 'main-next', 'sunday'") !== -1,
+  'Windmill staff sees full day-to-day menu set (not Specials-only)');
+assert(page.indexOf('if (isWindmillVenue) return m.id === \'specials\'') === -1,
+  'visibleMenus no longer Specials-only for Windmill');
 assert(page.indexOf('allowEmpty') !== -1,
-  'applyCloudState can apply an empty Windmill Specials book');
+  'applyCloudState can apply an empty Windmill book');
 
 assert(ingest.indexOf('setCloudVenue') !== -1 && ingest.indexOf('getCloudVenue') !== -1,
   'menus-ingest exposes setCloudVenue / getCloudVenue');
@@ -119,10 +130,18 @@ assert(ingest.indexOf("action === 'getMenusState'") !== -1 &&
 assert(ingest.indexOf('withCloudVenue_') !== -1,
   'menu-book cloud writes attach venue');
 
-assert(printJs.indexOf("printVenue !== 'windmill'") !== -1,
+assert(printJs.indexOf('function venueLogoFile') !== -1 &&
+  printJs.indexOf('windmill-logo.png') !== -1,
+  'print uses venueLogoFile → windmill-logo.png');
+assert(printJs.indexOf('Cormorant Garamond') !== -1 && printJs.indexOf('Outfit') !== -1,
+  'print loads Windmill fonts for venue=windmill');
+assert(printJs.indexOf("printVenue !== 'windmill'") !== -1 ||
+  printJs.indexOf("printVenue === 'windmill'") !== -1,
   'print preview hides Publish to website for Windmill');
 assert(printJs.indexOf('Windmill website publish is not wired yet') !== -1,
   'publishSavedSheet skips Windmill → Eight Bells site');
+assert(printJs.indexOf("asset('eight-bells-logo.png')") === -1,
+  'print no longer hardcodes eight-bells-logo outside venueLogoFile');
 
 var wmEntry = fs.readFileSync(path.join(root, 'menus-windmill.html'), 'utf8');
 assert(wmEntry.indexOf('venue=windmill') !== -1 && wmEntry.indexOf('mode=staff') !== -1,
@@ -130,6 +149,14 @@ assert(wmEntry.indexOf('venue=windmill') !== -1 && wmEntry.indexOf('mode=staff')
 assert(fs.readFileSync(path.join(root, 'manager-portals/windmill/index.html'), 'utf8')
   .indexOf('menus-windmill.html') !== -1,
   'Windmill manager portal Menus tile uses menus-windmill.html');
+
+// Brand assets present (copied from live windmilllittleworth.com — not invented).
+assert(fs.existsSync(path.join(root, 'images/windmill-logo.png')),
+  'images/windmill-logo.png exists');
+assert(fs.existsSync(path.join(root, 'images/windmill-logo-header.png')),
+  'images/windmill-logo-header.png exists');
+assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')),
+  'Eight Bells logo still present');
 
 // —— 4. Isolation scenario (pure logic) ——
 (function () {
@@ -139,17 +166,24 @@ assert(fs.readFileSync(path.join(root, 'manager-portals/windmill/index.html'), '
       specials: [
         { id: 'eb1', section: 'Special Mains', name: 'Korean Crispy Chilli Beef', price: '16' },
         { id: 'eb2', section: 'Special Mains', name: 'Szechuan Chilli Pork Noodles', price: '15' }
+      ],
+      main: [
+        { id: 'ebm1', section: 'Mains', name: 'Eight Bells Sirloin', price: '24' }
       ]
     },
-    menuVersions: { specials: 9 }
+    dishCatalogue: [
+      { name: 'Korean Crispy Chilli Beef', price: '16' }
+    ],
+    menuVersions: { specials: 9, main: 4 }
   };
   var wm = sync.emptyWindmillState();
   assert(wm.book.specials.length === 0, 'Windmill starts with zero specials');
+  assert(wm.book.main.length === 0, 'Windmill starts with zero main dishes');
+  assert(wm.dishCatalogue.length === 0, 'Windmill catalogue starts empty');
   assert(eb.book.specials.length === 2, 'Eight Bells fixture still has its specials');
   assert(sync.menusPropKey('windmill') !== sync.menusPropKey('eightbells'),
     'venues do not share a Script Properties key');
 
-  // Saving Windmill specials must not mutate the EB fixture object.
   var ebBefore = JSON.stringify(eb);
   var saved = sync.applyMenuSave(wm, {
     menuId: 'specials',
@@ -161,11 +195,25 @@ assert(fs.readFileSync(path.join(root, 'manager-portals/windmill/index.html'), '
   assert(saved.ok === true, 'Windmill specials first save succeeds');
   assert(saved.state.book.specials[0].name === 'Windmill Pie of the Day',
     'Windmill save stores Windmill dish');
+  assert(saved.state.book.main.length === 0, 'Windmill main stays empty after specials save');
   assert(JSON.stringify(eb) === ebBefore,
     'Eight Bells fixture untouched by Windmill applyMenuSave');
   assert(saved.state.book.specials.every(function (d) {
     return !/Korean|Szechuan/i.test(d.name || '');
   }), 'Windmill book does not contain Eight Bells specials names');
+
+  var savedMain = sync.applyMenuSave(saved.state, {
+    menuId: 'main',
+    expectedVersion: 1,
+    dishes: [
+      { id: 'wm2', section: 'Mains', name: 'Windmill Seabass', price: '21' }
+    ]
+  });
+  assert(savedMain.ok === true, 'Windmill main first save succeeds');
+  assert(savedMain.state.book.main[0].name === 'Windmill Seabass',
+    'Windmill main stores Windmill dish');
+  assert(JSON.stringify(eb) === ebBefore,
+    'Eight Bells fixture untouched by Windmill main save');
 })();
 
 if (failed) {
