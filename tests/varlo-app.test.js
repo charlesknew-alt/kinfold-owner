@@ -82,6 +82,20 @@ assert(html.indexOf("Fraunces") !== -1 && html.indexOf('Source Sans 3') !== -1, 
 
 assert(html.indexOf('1106') === -1, 'Eight Bells manager PIN is not in the page');
 assert(html.indexOf('1978') === -1, 'Windmill manager PIN is not in the page');
+assert(html.indexOf('OWNER_PIN_FALLBACK') === -1, 'owner door code is not in the page');
+assert(html.indexOf('https://app.varlo.co.uk/api/portal-door') !== -1, 'owner sign-in asks app.varlo.co.uk');
+assert(html.indexOf("action: 'login'") !== -1, 'owner still asks the Google password service first');
+
+function assertDoorPage(file, label) {
+  var text = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+  assert(text.indexOf('OWNER_PIN_FALLBACK') === -1, label + ' has no OWNER_PIN_FALLBACK');
+  assert(!/var PIN\s*=\s*['"]?\d/.test(text), label + ' has no var PIN = a number');
+  assert(text.indexOf('https://app.varlo.co.uk/api/portal-door') !== -1, label + ' asks app.varlo.co.uk');
+  assert(text.indexOf('credentials: \'include\'') !== -1, label + ' sends the door cookie');
+}
+assertDoorPage('index.html', 'owner page');
+assertDoorPage('manager-portals/eightbells/index.html', 'Eight Bells portal');
+assertDoorPage('manager-portals/windmill/index.html', 'Windmill portal');
 assert(html.indexOf('Manager passwords') !== -1, 'owner panel exists');
 assert(html.indexOf("data-role=\"owner\"") !== -1, 'unified login has owner role');
 assert(html.indexOf("data-role=\"eightbells\"") !== -1, 'unified login has Eight Bells role');

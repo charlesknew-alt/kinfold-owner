@@ -193,7 +193,11 @@
   </div>
 
   <script>
-    var PIN = '1978';
+    // The expected code is not in this file. Sign-in asks app.varlo.co.uk,
+    // which compares the typed code with a Vercel environment variable and
+    // sets a short-lived HTTP-only cookie.
+    var DOOR_URL = 'https://app.varlo.co.uk/api/portal-door';
+    var DOOR_GATE = 'windmill';
     var DEPTS = [
       {
         id: 'paperwork',
@@ -293,23 +297,52 @@
       currentId = null;
     }
 
+    function doorRequest(body) {
+      return fetch(DOOR_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function(res) {
+        return res.json().catch(function() { return {}; });
+      });
+    }
+
     function checkPw() {
       var input = document.getElementById('pw');
-      if (input.value.trim() === PIN) {
-        sessionStorage.setItem('windmill_auth', 'yes');
-        input.value = '';
-        document.getElementById('err').classList.remove('show');
-        showHome();
-        history.replaceState({ view: 'home' }, '', '#home');
-      } else {
-        document.getElementById('err').classList.add('show');
-        input.value = '';
-        input.focus();
+      var err = document.getElementById('err');
+      var pin = input.value.trim();
+      var btn = document.getElementById('loginBtn');
+      if (!pin) {
+        err.textContent = 'Enter a PIN';
+        err.classList.add('show');
+        return;
       }
+      if (btn) btn.disabled = true;
+      doorRequest({ gate: DOOR_GATE, pin: pin }).then(function(data) {
+        input.value = '';
+        if (data && data.ok && data.unlocked) {
+          sessionStorage.setItem('windmill_auth', 'yes');
+          err.classList.remove('show');
+          showHome();
+          history.replaceState({ view: 'home' }, '', '#home');
+          return;
+        }
+        err.textContent = (data && data.error) || 'Incorrect PIN';
+        err.classList.add('show');
+        input.focus();
+      }, function() {
+        err.textContent = 'Cannot reach sign-in. Try again in a moment.';
+        err.classList.add('show');
+        input.focus();
+      }).then(function() {
+        if (btn) btn.disabled = false;
+      });
     }
 
     function signOut() {
       sessionStorage.removeItem('windmill_auth');
+      doorRequest({ gate: DOOR_GATE, logout: true }).catch(function() {});
       document.getElementById('appFrame').src = 'about:blank';
       currentId = null;
       history.replaceState({ view: 'login' }, '', '#');
@@ -358,16 +391,31 @@
       history.replaceState({ view: authed() ? 'home' : 'login' }, '', location.pathname + (authed() ? '#home' : ''));
     }
 
-    if (authed()) {
-      var hashId = String(location.hash || '').replace(/^#/, '');
-      if (deptById(hashId)) openDept(hashId, { replace: true });
-      else {
-        showHome();
-        if (location.hash !== '#home') history.replaceState({ view: 'home' }, '', '#home');
+    function finishBoot(unlocked) {
+      if (unlocked) sessionStorage.setItem('windmill_auth', 'yes');
+      if (authed()) {
+        var hashId = String(location.hash || '').replace(/^#/, '');
+        if (deptById(hashId)) openDept(hashId, { replace: true });
+        else {
+          showHome();
+          if (location.hash !== '#home') history.replaceState({ view: 'home' }, '', '#home');
+        }
+      } else {
+        showLogin();
       }
-    } else {
-      showLogin();
     }
+
+    fetch(DOOR_URL + '?gate=' + encodeURIComponent(DOOR_GATE), {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    }).then(function(res) {
+      return res.json().catch(function() { return {}; });
+    }).then(function(data) {
+      finishBoot(data && data.unlocked);
+    }, function() {
+      finishBoot(false);
+    });
 
     window.addEventListener('message', function(e) {
       if (!e.data || e.data.type !== 'navigate' || !e.data.url) return;

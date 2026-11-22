@@ -386,7 +386,11 @@
   </div>
 
   <script>
-    var PIN = '1106';
+    // The expected code is not in this file. Sign-in asks app.varlo.co.uk,
+    // which compares the typed code with a Vercel environment variable and
+    // sets a short-lived HTTP-only cookie.
+    var DOOR_URL = 'https://app.varlo.co.uk/api/portal-door';
+    var DOOR_GATE = 'eightbells';
     var HUB = 'https://script.google.com/macros/s/AKfycbz4Q-UMy3o8Z6bjYrQMsWbRB4mSs1iHqz2CHAgYhT9QvakBY0pnutRbyQ2YUwpFnYtIww/exec';
     var DEPTS = {
       paperwork: {
@@ -430,23 +434,52 @@
       document.getElementById('landing').classList.add('show');
     }
 
+    function doorRequest(body) {
+      return fetch(DOOR_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function(res) {
+        return res.json().catch(function() { return {}; });
+      });
+    }
+
     function checkPw(event) {
       if (event) event.preventDefault();
       var input = document.getElementById('pw');
-      if (input.value.trim() === PIN) {
-        sessionStorage.setItem('eightbells_auth', 'yes');
-        input.value = '';
-        document.getElementById('err').classList.remove('show');
-        showHome();
-      } else {
-        document.getElementById('err').classList.add('show');
-        input.value = '';
-        input.focus();
+      var err = document.getElementById('err');
+      var pin = input.value.trim();
+      var btn = document.querySelector('#login button[type="submit"]');
+      if (!pin) {
+        err.textContent = 'Enter a PIN';
+        err.classList.add('show');
+        return;
       }
+      if (btn) btn.disabled = true;
+      doorRequest({ gate: DOOR_GATE, pin: pin }).then(function(data) {
+        input.value = '';
+        if (data && data.ok && data.unlocked) {
+          sessionStorage.setItem('eightbells_auth', 'yes');
+          err.classList.remove('show');
+          showHome();
+          return;
+        }
+        err.textContent = (data && data.error) || 'Incorrect PIN';
+        err.classList.add('show');
+        input.focus();
+      }, function() {
+        err.textContent = 'Cannot reach sign-in. Try again in a moment.';
+        err.classList.add('show');
+        input.focus();
+      }).then(function() {
+        if (btn) btn.disabled = false;
+      });
     }
 
     function signOut() {
       sessionStorage.removeItem('eightbells_auth');
+      doorRequest({ gate: DOOR_GATE, logout: true }).catch(function() {});
       currentDept = null;
       document.getElementById('appFrame').src = 'about:blank';
       document.getElementById('err').classList.remove('show');
@@ -531,8 +564,23 @@
       loadFrame(prepareNavUrl(e.data.url));
     });
 
-    if (sessionStorage.getItem('eightbells_auth') === 'yes') showHome();
-    else showLogin();
+    function finishBoot(unlocked) {
+      if (unlocked) sessionStorage.setItem('eightbells_auth', 'yes');
+      if (sessionStorage.getItem('eightbells_auth') === 'yes') showHome();
+      else showLogin();
+    }
+
+    fetch(DOOR_URL + '?gate=' + encodeURIComponent(DOOR_GATE), {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store'
+    }).then(function(res) {
+      return res.json().catch(function() { return {}; });
+    }).then(function(data) {
+      finishBoot(data && data.unlocked);
+    }, function() {
+      finishBoot(false);
+    });
   </script>
 </body>
 </html>
