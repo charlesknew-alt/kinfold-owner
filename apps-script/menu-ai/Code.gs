@@ -240,8 +240,9 @@ function doPost(e) {
       return json_(publishMenuStatus_(body.id));
     }
     // Shared live menu book (dishes, blurbs, wording, layout) across devices.
+    // Optional body.venue: eightbells (default) | windmill — separate Script Properties.
     if (action === 'getMenusState') {
-      return json_(getMenusState_());
+      return json_(getMenusState_(body.venue));
     }
     if (action === 'saveMenuState') {
       return json_(saveMenuState_(body));
@@ -283,7 +284,7 @@ function doGet(e) {
   if (action === 'hasPrintHistory') return json_(hasPrintHistory_(p.id));
   if (action === 'deletePrintHistory') return json_(deletePrintHistory_(p.id));
   if (action === 'driveStatus') return json_(historyDriveStatus_());
-  if (action === 'getMenusState') return json_(getMenusState_());
+  if (action === 'getMenusState') return json_(getMenusState_(p.venue));
   // Email by id — HTML is in Drive / legacy props.
   if (action === 'emailPrintHistory') {
     return json_(emailPrintHistory_({ id: p.id, to: p.to }));
@@ -326,7 +327,7 @@ function bridgeApi(action, body) {
     if (action === 'emailPrintHistory') return emailPrintHistory_(body);
     if (action === 'publishSavedMenu') return publishSavedMenu_(body);
     if (action === 'publishMenuStatus') return publishMenuStatus_(body.id);
-    if (action === 'getMenusState') return getMenusState_();
+    if (action === 'getMenusState') return getMenusState_(body.venue);
     if (action === 'saveMenuState') return saveMenuState_(body);
     if (action === 'saveMenusState') return saveMenusState_(body.state || body);
     if (action === 'reviewLayout') return reviewLayoutWithGemini_(body);
@@ -2148,6 +2149,14 @@ function publishSavedMenu_(body) {
     return { ok: false, published: false, error: 'Missing sheet id' };
   }
   try {
+    // Windmill Specials must never POST to the Eight Bells website publish API.
+    if (normalizeMenusVenue_(body.venue) === 'windmill') {
+      return finish_({
+        published: false,
+        skipped: true,
+        message: 'Windmill website publish is not wired yet. The sheet stayed in Print history.'
+      });
+    }
     var api = menusPublishApi_();
     if (!api) {
       return finish_({
@@ -2294,19 +2303,50 @@ function publishMenuStatus_(id) {
   };
 }
 
-/** Read raw MENUS JSON object (or null). Does not filter empty stubs. */
-function menusStateRaw_() {
-  var raw = propRead_('MENUS');
+/** Normalize venue → eightbells | windmill. Unknown / omitted → eightbells. */
+function normalizeMenusVenue_(venue) {
+  if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.normalizeVenue) {
+    return EBMenusSyncLogic.normalizeVenue(venue);
+  }
+  var v = String(venue == null ? '' : venue).toLowerCase().trim();
+  if (v === 'windmill' || v === 'wm') return 'windmill';
+  return 'eightbells';
+}
+
+function menusPropKey_(venue) {
+  if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.menusPropKey) {
+    return EBMenusSyncLogic.menusPropKey(venue);
+  }
+  return normalizeMenusVenue_(venue) === 'windmill' ? 'MENUS_WINDMILL' : 'MENUS';
+}
+
+function menusBackupPrefix_(venue) {
+  if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.menusBackupPrefix) {
+    return EBMenusSyncLogic.menusBackupPrefix(venue);
+  }
+  return normalizeMenusVenue_(venue) === 'windmill' ? 'MENUS_WINDMILL_BAK_' : 'MENUS_BAK_';
+}
+
+/**
+ * Read raw menus JSON object for a venue (or null).
+ * Eight Bells → MENUS. Windmill → MENUS_WINDMILL. Never cross-reads.
+ */
+function menusStateRaw_(venue) {
+  var propKey = menusPropKey_(venue);
+  var raw = propRead_(propKey);
   if (!raw) return null;
   try {
     var parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
     if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.ensureMenuVersions) {
-      return EBMenusSyncLogic.ensureMenuVersions(parsed);
-    }
-    if (!parsed.menuVersions || typeof parsed.menuVersions !== 'object') {
+      parsed = EBMenusSyncLogic.ensureMenuVersions(parsed);
+    } else if (!parsed.menuVersions || typeof parsed.menuVersions !== 'object') {
       parsed.menuVersions = {};
     }
+    if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.stampVenue) {
+      return EBMenusSyncLogic.stampVenue(parsed, venue);
+    }
+    parsed.venue = normalizeMenusVenue_(venue);
     return parsed;
   } catch (e) {
     return null;
@@ -2314,34 +2354,35 @@ function menusStateRaw_() {
 }
 
 /**
- * Rotate MENUS backups before a successful write.
- * Keeps MENUS_BAK_0 (newest) … MENUS_BAK_(n-1). Script Properties size is limited,
- * so we keep a small ring and skip backup if the previous snapshot is identical.
+ * Rotate venue-scoped backups before a successful write.
+ * Eight Bells: MENUS_BAK_0…  Windmill: MENUS_WINDMILL_BAK_0…
+ * Never rotates one venue's backups into the other's slots.
  */
-function menusBackupBeforeWrite_(currentRawText) {
+function menusBackupBeforeWrite_(currentRawText, venue) {
   var slots = 5;
   if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.MENUS_BACKUP_SLOTS) {
     slots = EBMenusSyncLogic.MENUS_BACKUP_SLOTS;
   }
+  var prefix = menusBackupPrefix_(venue);
   var text = String(currentRawText || '');
   if (!text) return { ok: true, skipped: true, reason: 'empty' };
   try {
-    var newest = propRead_('MENUS_BAK_0');
+    var newest = propRead_(prefix + '0');
     if (newest && newest === text) return { ok: true, skipped: true, reason: 'unchanged' };
   } catch (e0) {}
   // Shift older slots upward (highest index dropped).
   for (var i = slots - 1; i >= 1; i--) {
     try {
-      var prev = propRead_('MENUS_BAK_' + (i - 1));
-      if (prev) propWrite_('MENUS_BAK_' + i, prev);
-      else propDelete_('MENUS_BAK_' + i);
+      var prev = propRead_(prefix + (i - 1));
+      if (prev) propWrite_(prefix + i, prev);
+      else propDelete_(prefix + i);
     } catch (eShift) {}
   }
   try {
-    propWrite_('MENUS_BAK_0', text);
+    propWrite_(prefix + '0', text);
     try {
       PropertiesService.getScriptProperties().setProperty(
-        'MENUS_BAK_AT',
+        prefix + 'AT',
         String(Date.now())
       );
     } catch (eAt) {}
@@ -2355,59 +2396,141 @@ function menusBackupBeforeWrite_(currentRawText) {
   }
 }
 
-function getMenusState_() {
-  var parsed = menusStateRaw_();
-  if (!parsed) return { ok: true, source: 'props', state: null };
+/**
+ * Shared live menu book for one venue.
+ * Response always includes `venue` and `venues` so clients can tell Windmill
+ * apart from Eight Bells. Windmill with no MENUS_WINDMILL yet returns an empty
+ * Specials book (not null) so the UI never falls back to Eight Bells dishes.
+ */
+function getMenusState_(venue) {
+  venue = normalizeMenusVenue_(venue);
   try {
-    // Ignore empty stub so a fresh phone does not wipe local dishes.
-    var book = parsed.book || {};
-    var hasDish = false;
-    Object.keys(book).forEach(function (k) {
-      if (Array.isArray(book[k]) && book[k].length) hasDish = true;
-    });
-    if (!hasDish) return { ok: true, source: 'props', state: null };
-    return { ok: true, source: 'props', state: parsed };
+    var parsed = menusStateRaw_(venue);
+    if (!parsed) {
+      if (venue === 'windmill') {
+        var emptyWm = (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.emptyWindmillState)
+          ? EBMenusSyncLogic.emptyWindmillState()
+          : {
+              venue: 'windmill',
+              updatedAt: 0,
+              book: { specials: [] },
+              metaBook: {},
+              includes: {},
+              promoBank: [],
+              promoTicks: {},
+              promoDeck: { order: [], used: [] },
+              sectionLayout: {},
+              dishCatalogue: [],
+              extraMenus: [],
+              extraSections: [],
+              menuVersions: { specials: 1 }
+            };
+        return {
+          ok: true,
+          source: 'props',
+          venue: 'windmill',
+          venues: ['eightbells', 'windmill'],
+          state: emptyWm,
+          empty: true
+        };
+      }
+      return {
+        ok: true,
+        source: 'props',
+        venue: 'eightbells',
+        venues: ['eightbells', 'windmill'],
+        state: null
+      };
+    }
+    // Eight Bells: ignore empty stub so a fresh phone does not wipe local dishes.
+    // Windmill: keep the (possibly empty) Specials book — empty is intentional.
+    if (venue !== 'windmill') {
+      var book = parsed.book || {};
+      var hasDish = false;
+      Object.keys(book).forEach(function (k) {
+        if (Array.isArray(book[k]) && book[k].length) hasDish = true;
+      });
+      if (!hasDish) {
+        return {
+          ok: true,
+          source: 'props',
+          venue: venue,
+          venues: ['eightbells', 'windmill'],
+          state: null
+        };
+      }
+    }
+    if (typeof EBMenusSyncLogic !== 'undefined' && EBMenusSyncLogic.stampVenue) {
+      parsed = EBMenusSyncLogic.stampVenue(parsed, venue);
+    } else {
+      parsed.venue = venue;
+    }
+    return {
+      ok: true,
+      source: 'props',
+      venue: venue,
+      venues: ['eightbells', 'windmill'],
+      state: parsed
+    };
   } catch (e) {
-    return { ok: false, error: 'Could not read shared menus state: ' + String(e && e.message ? e.message : e) };
+    return {
+      ok: false,
+      venue: venue,
+      venues: ['eightbells', 'windmill'],
+      error: 'Could not read shared menus state: ' + String(e && e.message ? e.message : e)
+    };
   }
 }
 
 /**
  * Per-menu save: only the edited menu is merged. Version check + seed guard.
- * Body: { menuId, expectedVersion, dishes, meta?, includes?, promoTicks?,
+ * Body: { venue?, menuId, expectedVersion, dishes, meta?, includes?, promoTicks?,
  *   sectionLayout?, promoBank?, promoDeck?, dishCatalogue?, extraMenus?, extraSections? }
+ * venue=windmill writes MENUS_WINDMILL only — never touches the Eight Bells MENUS book.
  */
 function saveMenuState_(body) {
   body = body && typeof body === 'object' ? body : {};
+  var venue = normalizeMenusVenue_(body.venue);
+  var propKey = menusPropKey_(venue);
   var logic = (typeof EBMenusSyncLogic !== 'undefined') ? EBMenusSyncLogic : null;
   if (!logic || typeof logic.applyMenuSave !== 'function') {
-    return { ok: false, error: 'MenusSyncLogic.js not loaded — redeploy Menu AI Apps Script' };
+    return { ok: false, error: 'MenusSyncLogic.js not loaded — redeploy Menu AI Apps Script', venue: venue };
   }
-  var current = menusStateRaw_();
+  var current = menusStateRaw_(venue);
+  if (!current && venue === 'windmill' && logic.emptyWindmillState) {
+    current = logic.emptyWindmillState();
+  }
   var currentText = '';
-  try { currentText = propRead_('MENUS') || ''; } catch (eR) { currentText = ''; }
+  try { currentText = propRead_(propKey) || ''; } catch (eR) { currentText = ''; }
 
   var result = logic.applyMenuSave(current, body);
   if (!result || !result.ok) {
     // Conflict / seed reject — return current server state so the client can reload.
+    var failState = (result && result.state) || current;
+    if (failState && logic.stampVenue) failState = logic.stampVenue(failState, venue);
     return {
       ok: false,
+      venue: venue,
       conflict: !!(result && result.conflict),
       rejected: !!(result && result.rejected),
       error: (result && result.error) || 'save_failed',
       message: (result && result.message) || '',
-      state: (result && result.state) || current,
+      state: failState,
       version: result && result.version,
       updatedAt: result && result.updatedAt,
       menuVersions: (result && result.menuVersions) || (current && current.menuVersions) || {}
     };
   }
 
-  menusBackupBeforeWrite_(currentText);
-  propWrite_('MENUS', JSON.stringify(result.state));
+  if (logic.stampVenue) result.state = logic.stampVenue(result.state, venue);
+  else result.state.venue = venue;
+
+  menusBackupBeforeWrite_(currentText, venue);
+  propWrite_(propKey, JSON.stringify(result.state));
   return {
     ok: true,
     source: 'props',
+    venue: venue,
     menuId: result.menuId,
     version: result.version,
     updatedAt: result.updatedAt,
@@ -2419,6 +2542,7 @@ function saveMenuState_(body) {
 /**
  * Legacy whole-book save (old cached pages). Merges only non-stale diffs,
  * seed-guards every menu, backs up first. Prefer saveMenuState_.
+ * venue=windmill writes MENUS_WINDMILL only — never touches Eight Bells MENUS.
  */
 function saveMenusState_(raw) {
   if (!raw || typeof raw !== 'object') {
@@ -2427,31 +2551,42 @@ function saveMenusState_(raw) {
   if (!raw.book || typeof raw.book !== 'object') {
     return { ok: false, error: 'Missing state.book' };
   }
+  var venue = normalizeMenusVenue_(raw.venue);
+  var propKey = menusPropKey_(venue);
   var logic = (typeof EBMenusSyncLogic !== 'undefined') ? EBMenusSyncLogic : null;
-  var current = menusStateRaw_();
+  var current = menusStateRaw_(venue);
+  if (!current && venue === 'windmill' && logic && logic.emptyWindmillState) {
+    current = logic.emptyWindmillState();
+  }
   var currentText = '';
-  try { currentText = propRead_('MENUS') || ''; } catch (eR) { currentText = ''; }
+  try { currentText = propRead_(propKey) || ''; } catch (eR) { currentText = ''; }
 
   if (logic && typeof logic.applyWholeBookSave === 'function') {
     var result = logic.applyWholeBookSave(current, raw);
     if (!result || !result.ok) {
+      var failState2 = (result && result.state) || current;
+      if (failState2 && logic.stampVenue) failState2 = logic.stampVenue(failState2, venue);
       return {
         ok: false,
+        venue: venue,
         conflict: !!(result && result.conflict),
         rejected: !!(result && result.rejected),
         error: (result && result.error) || 'save_failed',
         message: (result && result.message) || '',
-        state: (result && result.state) || current,
+        state: failState2,
         menuVersions: (result && result.menuVersions) || (current && current.menuVersions) || {},
         skippedStale: result && result.skippedStale,
         skippedSeed: result && result.skippedSeed
       };
     }
-    menusBackupBeforeWrite_(currentText);
-    propWrite_('MENUS', JSON.stringify(result.state));
+    if (logic.stampVenue) result.state = logic.stampVenue(result.state, venue);
+    else result.state.venue = venue;
+    menusBackupBeforeWrite_(currentText, venue);
+    propWrite_(propKey, JSON.stringify(result.state));
     return {
       ok: true,
       source: 'props',
+      venue: venue,
       updatedAt: result.updatedAt,
       menuVersions: result.menuVersions,
       state: result.state,
@@ -2476,6 +2611,7 @@ function saveMenusState_(raw) {
   if (blocked.length) {
     return {
       ok: false,
+      venue: venue,
       rejected: true,
       error: 'seed_or_empty_menu',
       message: 'Refusing to replace a full menu with a near-empty menu: ' + blocked.join(', '),
@@ -2488,6 +2624,7 @@ function saveMenusState_(raw) {
   if (clientAt && serverAt && clientAt < serverAt) {
     return {
       ok: false,
+      venue: venue,
       conflict: true,
       error: 'stale_menu_version',
       message: 'Server has a newer shared book. Reload and try again.',
@@ -2496,6 +2633,7 @@ function saveMenusState_(raw) {
   }
   var updatedAt = Number(raw.updatedAt) || Date.now();
   var state = {
+    venue: venue,
     updatedAt: updatedAt,
     book: raw.book,
     metaBook: raw.metaBook && typeof raw.metaBook === 'object' ? raw.metaBook : {},
@@ -2509,7 +2647,7 @@ function saveMenusState_(raw) {
     extraSections: Array.isArray(raw.extraSections) ? raw.extraSections : [],
     menuVersions: (current && current.menuVersions) || {}
   };
-  menusBackupBeforeWrite_(currentText);
-  propWrite_('MENUS', JSON.stringify(state));
-  return { ok: true, source: 'props', updatedAt: updatedAt, menuVersions: state.menuVersions };
+  menusBackupBeforeWrite_(currentText, venue);
+  propWrite_(propKey, JSON.stringify(state));
+  return { ok: true, source: 'props', venue: venue, updatedAt: updatedAt, menuVersions: state.menuVersions };
 }

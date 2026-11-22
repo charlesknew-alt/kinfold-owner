@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Stable Windmill Specials entry — resolves cache-bust from menus.html, keeps venue=windmill. -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <title>Windmill Menus</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 15px/1.4 Georgia, "Times New Roman", serif;
+      color: #1c2a22;
+      background: #eef4f8;
+    }
+    p { margin: 0; opacity: 0.75; }
+  </style>
+</head>
+<body>
+  <p id="status">Loading Windmill Specials…</p>
+  <script>
+    (function () {
+      var statusEl = document.getElementById('status');
+      function fail(msg) {
+        if (statusEl) statusEl.textContent = msg;
+      }
+      function openWindmill(bust) {
+        var q = 'mode=staff&venue=windmill';
+        if (bust) q += '&v=' + encodeURIComponent(bust);
+        location.replace('menus.html?' + q);
+      }
+      fetch('menus.html?_=' + Date.now(), { cache: 'no-store' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('menus.html ' + res.status);
+          return res.text();
+        })
+        .then(function (html) {
+          var m = String(html || '').match(/menus\.js\?v=([^"'&\s]+)/i);
+          openWindmill(m ? m[1] : '');
+        })
+        .catch(function () {
+          fail('Could not load Menus. Opening Windmill Specials…');
+          setTimeout(function () { openWindmill(String(Date.now())); }, 400);
+        });
+    })();
+  </script>
+</body>
+</html>

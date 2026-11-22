@@ -18,6 +18,67 @@
   /** After ensureMenuVersions, untouched menus sit at 1. Versioned saves go to 2+. */
   var LEGACY_BASELINE_VERSION = 1;
 
+  /** Venue keys for separate dish books. Default / omitted = Eight Bells. */
+  var VENUE_EIGHTBELLS = 'eightbells';
+  var VENUE_WINDMILL = 'windmill';
+  var MENUS_PROP_BY_VENUE = {
+    eightbells: 'MENUS',
+    windmill: 'MENUS_WINDMILL'
+  };
+  var MENUS_BACKUP_PREFIX_BY_VENUE = {
+    eightbells: 'MENUS_BAK_',
+    windmill: 'MENUS_WINDMILL_BAK_'
+  };
+
+  /**
+   * Normalize a venue query/body value. Unknown → eightbells (live EB book).
+   * Accepts short aliases used on manager portals.
+   */
+  function normalizeVenue(venue) {
+    var v = String(venue == null ? '' : venue).toLowerCase().trim();
+    if (v === 'windmill' || v === 'wm' || v === 'windmillinn' || v === 'thewindmill') {
+      return VENUE_WINDMILL;
+    }
+    return VENUE_EIGHTBELLS;
+  }
+
+  function menusPropKey(venue) {
+    return MENUS_PROP_BY_VENUE[normalizeVenue(venue)] || MENUS_PROP_BY_VENUE.eightbells;
+  }
+
+  function menusBackupPrefix(venue) {
+    return MENUS_BACKUP_PREFIX_BY_VENUE[normalizeVenue(venue)] ||
+      MENUS_BACKUP_PREFIX_BY_VENUE.eightbells;
+  }
+
+  /**
+   * Empty Windmill book — Specials only for now. Never copy Eight Bells dishes.
+   * Used when MENUS_WINDMILL is missing so clients do not fall back to EB cache.
+   */
+  function emptyWindmillState() {
+    return {
+      venue: VENUE_WINDMILL,
+      updatedAt: 0,
+      book: { specials: [] },
+      metaBook: {},
+      includes: {},
+      promoBank: [],
+      promoTicks: {},
+      promoDeck: { order: [], used: [] },
+      sectionLayout: {},
+      dishCatalogue: [],
+      extraMenus: [],
+      extraSections: [],
+      menuVersions: { specials: 1 }
+    };
+  }
+
+  function stampVenue(state, venue) {
+    state = state && typeof state === 'object' ? state : {};
+    state.venue = normalizeVenue(venue);
+    return state;
+  }
+
   function dishCount_(list) {
     return Array.isArray(list) ? list.length : 0;
   }
@@ -513,6 +574,14 @@
     FULL_MENU_MIN: FULL_MENU_MIN,
     MENUS_BACKUP_SLOTS: MENUS_BACKUP_SLOTS,
     LEGACY_BASELINE_VERSION: LEGACY_BASELINE_VERSION,
+    VENUE_EIGHTBELLS: VENUE_EIGHTBELLS,
+    VENUE_WINDMILL: VENUE_WINDMILL,
+    MENUS_PROP_BY_VENUE: MENUS_PROP_BY_VENUE,
+    normalizeVenue: normalizeVenue,
+    menusPropKey: menusPropKey,
+    menusBackupPrefix: menusBackupPrefix,
+    emptyWindmillState: emptyWindmillState,
+    stampVenue: stampVenue,
     isNearEmptyOrSeedMenu: isNearEmptyOrSeedMenu,
     isNearEmptyOrSeedMain: isNearEmptyOrSeedMain,
     seedGuardMenu: seedGuardMenu,

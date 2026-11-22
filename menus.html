@@ -448,7 +448,7 @@
   <header class="ps-header">
     <div class="ps-header-inner">
       <div>
-        <div class="ps-venue-eyebrow">The Eight Bells · Bolney</div>
+        <div class="ps-venue-eyebrow" id="psVenueEyebrow">The Eight Bells · Bolney</div>
         <div class="ps-venue-name">Menus</div>
       </div>
     </div>
@@ -478,30 +478,68 @@
     <div id="publishNote" class="publish-note no-print" hidden role="status"></div>
     <div id="editor"></div>
   </main>
-  <script src="apps-script/menu-ai/MenuPublish.js?v=20261121-flow225"></script>
-  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261121-flow225"></script>
-  <script src="menus.js?v=20261121-flow225"></script>
-  <script src="menus-print.js?v=20261121-flow225"></script>
-  <script src="menus-ingest.js?v=20261121-flow225"></script>
+  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-flow226"></script>
+  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-flow226"></script>
+  <script src="menus.js?v=20261122-flow226"></script>
+  <script src="menus-print.js?v=20261122-flow226"></script>
+  <script src="menus-ingest.js?v=20261122-flow226"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
     // Staff / manager entry: menus-staff.html (stable URL) → menus.html?mode=staff&v=<flow from these tags>.
     // Eight Bells manager hub opens staff mode — same cloud book, shorter UI.
+    // Windmill: ?venue=windmill → separate Menu AI book (MENUS_WINDMILL), Specials only.
     var isStaffMode = /(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''));
     if (isStaffMode) document.documentElement.classList.add('staff-mode');
 
-    var STORAGE = 'eb-menus-v2';
-    var META_STORAGE = 'eb-menus-meta-v1';
-    var PROMO_STORAGE = 'eb-menu-promo-bank-v1';
-    var PROMO_TICKS = 'eb-menu-promo-ticks-v1';
-    var PROMO_DECK = 'eb-menu-promo-deck-v1';
-    var LAYOUT_STORAGE = 'eb-menu-section-layout-v2';
-    var LAYOUT_STORAGE_LEGACY = 'eb-menu-section-layout-v1';
-    var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1';
-    var EXTRAS_STORAGE = 'eb-menus-extras-v1';
-    var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at';
-    var MENU_VERSIONS_KEY = 'eb-menus-cloud-versions';
+    var menuVenue = (function () {
+      var m = String(location.search || '').match(/(?:\?|&)venue=([^&]*)/i);
+      var raw = m ? decodeURIComponent(m[1] || '') : '';
+      if (window.EBMenusSyncLogic && typeof EBMenusSyncLogic.normalizeVenue === 'function') {
+        return EBMenusSyncLogic.normalizeVenue(raw);
+      }
+      var v = String(raw || '').toLowerCase().trim();
+      return (v === 'windmill' || v === 'wm') ? 'windmill' : 'eightbells';
+    })();
+    var isWindmillVenue = menuVenue === 'windmill';
+    if (isWindmillVenue) document.documentElement.classList.add('venue-windmill');
+    if (window.EBMenuIngest && typeof EBMenuIngest.setCloudVenue === 'function') {
+      EBMenuIngest.setCloudVenue(menuVenue);
+    }
+    // When live Menu AI still lacks venue support, never push Windmill edits into MENUS.
+    var windmillCloudReady = !isWindmillVenue;
+    var windmillPreviewOnly = false;
+
+    (function brandVenueHeader_() {
+      var eye = document.getElementById('psVenueEyebrow');
+      if (eye) {
+        eye.textContent = isWindmillVenue
+          ? 'The Windmill Inn · Littleworth'
+          : 'The Eight Bells · Bolney';
+      }
+      if (isWindmillVenue) {
+        var lede = document.getElementById('pageLede');
+        if (lede) {
+          lede.textContent = isStaffMode
+            ? 'Windmill Specials — separate from Eight Bells. Upload or edit, then generate.'
+            : 'Windmill Specials live in their own Menu AI book. Eight Bells menus are unchanged.';
+        }
+      }
+    })();
+
+    // Venue-scoped local cache so Windmill never reads Eight Bells dishes from storage.
+    var storageSuffix = isWindmillVenue ? '-wm' : '';
+    var STORAGE = 'eb-menus-v2' + storageSuffix;
+    var META_STORAGE = 'eb-menus-meta-v1' + storageSuffix;
+    var PROMO_STORAGE = 'eb-menu-promo-bank-v1' + storageSuffix;
+    var PROMO_TICKS = 'eb-menu-promo-ticks-v1' + storageSuffix;
+    var PROMO_DECK = 'eb-menu-promo-deck-v1' + storageSuffix;
+    var LAYOUT_STORAGE = 'eb-menu-section-layout-v2' + storageSuffix;
+    var LAYOUT_STORAGE_LEGACY = 'eb-menu-section-layout-v1' + storageSuffix;
+    var CATALOGUE_STORAGE = 'eb-dish-catalogue-v1' + storageSuffix;
+    var EXTRAS_STORAGE = 'eb-menus-extras-v1' + storageSuffix;
+    var CLOUD_AT_KEY = 'eb-menus-cloud-updated-at' + storageSuffix;
+    var MENU_VERSIONS_KEY = 'eb-menus-cloud-versions' + storageSuffix;
     applyExtrasFromStorage();
     var book = load();
     var metaBook = loadMeta();
@@ -510,7 +548,16 @@
     var promoDeck = loadPromoDeck();
     var layoutBook = loadSectionLayoutBook();
     var dishCatalogue = loadDishCatalogue();
-    var menuId = isStaffMode ? 'specials' : 'main';
+    // Windmill entry always opens on Specials (its own book). EB staff too; EB owner → main.
+    var menuId = (isStaffMode || isWindmillVenue) ? 'specials' : 'main';
+    if (isWindmillVenue) {
+      if (!book || typeof book !== 'object') book = {};
+      if (!Array.isArray(book.specials)) book.specials = [];
+      // Drop any accidental EB menus from a mis-keyed cache — Windmill Specials only.
+      Object.keys(book).forEach(function (k) {
+        if (k !== 'specials') delete book[k];
+      });
+    }
     var mode = 'complete';
     var dishId = '';
     var includes = loadIncludes();
@@ -581,7 +628,10 @@
 
     // Manager: day-to-day printables (owner keeps Party / Lunch club).
     // Little Bells is included so Sunday/Main can tick the kids menu onto the sheet.
-    var STAFF_MENU_IDS = ['specials', 'main', 'main-next', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
+    // Windmill Specials are a separate book — only the Specials tab for now.
+    var STAFF_MENU_IDS = isWindmillVenue
+      ? ['specials']
+      : ['specials', 'main', 'main-next', 'sunday', 'sandwiches', 'desserts', 'little-bells'];
 
     var FLOW_STEPS = isStaffMode
       ? [
@@ -597,6 +647,7 @@
 
     function visibleMenus() {
       return EBMenus.MENUS.filter(function (m) {
+        if (isWindmillVenue) return m.id === 'specials';
         if (!isStaffMode) return true;
         if (STAFF_MENU_IDS.indexOf(m.id) !== -1) return true;
         return !!(m.custom && m.kind !== 'party' && m.staff !== false);
@@ -778,13 +829,24 @@
     }
     function load() {
       try {
-        var saved = JSON.parse(localStorage.getItem(STORAGE) || localStorage.getItem('eb-menus-v1') || 'null');
+        // Windmill: never fall back to the Eight Bells eb-menus-v1 / seed book.
+        var rawKey = isWindmillVenue
+          ? localStorage.getItem(STORAGE)
+          : (localStorage.getItem(STORAGE) || localStorage.getItem('eb-menus-v1'));
+        var saved = JSON.parse(rawKey || 'null');
+        if (isWindmillVenue) {
+          if (saved && typeof saved === 'object') {
+            return { specials: Array.isArray(saved.specials) ? saved.specials : [] };
+          }
+          return { specials: [] };
+        }
         if (saved && saved.main) {
           var seeded = EBMenus.seed();
           if (!saved.party) saved.party = seeded.party;
           return EBMenus.tidyBook ? EBMenus.tidyBook(saved) : saved;
         }
       } catch (e) {}
+      if (isWindmillVenue) return { specials: [] };
       return EBMenus.seed();
     }
     function loadMeta() {
@@ -847,13 +909,15 @@
       saveLocalOnly();
       queueMenuCloudSave(targetId);
     }
-    function applyCloudState(state) {
+    function applyCloudState(state, opts) {
+      opts = opts || {};
       if (!state || !state.book || typeof state.book !== 'object') return false;
       var hasDish = false;
       Object.keys(state.book).forEach(function (k) {
         if (Array.isArray(state.book[k]) && state.book[k].length) hasDish = true;
       });
-      if (!hasDish) return false;
+      // Windmill empty Specials are intentional — apply so EB dishes never linger.
+      if (!hasDish && !(isWindmillVenue || opts.allowEmpty)) return false;
       // Apply extras when either list is present. Missing arrays must not wipe
       // the other side (older cloud payloads may omit extraMenus).
       if (EBMenus.applyExtras && (Array.isArray(state.extraMenus) || Array.isArray(state.extraSections))) {
@@ -913,6 +977,7 @@
       var extras = currentExtrasState();
       return {
         action: 'saveMenuState',
+        venue: menuVenue,
         menuId: targetId,
         expectedVersion: Number(menuVersions[targetId]) || 0,
         dishes: book[targetId] || [],
@@ -950,6 +1015,14 @@
     function pushMenuToCloud(targetId) {
       targetId = targetId || menuId;
       if (!window.EBMenuIngest || typeof EBMenuIngest.cloudPost !== 'function') {
+        return Promise.resolve(false);
+      }
+      // Until Menu AI is redeployed with venue support, never write Windmill into MENUS.
+      if (isWindmillVenue && !windmillCloudReady) {
+        cloudSyncNote = windmillPreviewOnly
+          ? 'Preview only — Windmill Specials are separate; not saving to the live Eight Bells book'
+          : 'Windmill cloud save waiting for Menu AI venue deploy';
+        saveLocalOnly();
         return Promise.resolve(false);
       }
       cloudSyncNote = 'Saving ' + targetId + ' to cloud…';
@@ -1015,8 +1088,37 @@
         return Promise.resolve(false);
       }
       cloudSyncNote = 'Loading shared menus…';
-      return EBMenuIngest.cloudPost({ action: 'getMenusState' }).then(function (data) {
+      return EBMenuIngest.cloudPost({ action: 'getMenusState', venue: menuVenue }).then(function (data) {
         var remote = data && data.state;
+        var gotVenue = String((data && data.venue) || (remote && remote.venue) || '');
+        if (isWindmillVenue) {
+          // Old Menu AI (no venue key) would return the Eight Bells book — do not apply it.
+          if (gotVenue !== 'windmill') {
+            windmillCloudReady = false;
+            windmillPreviewOnly = true;
+            book = { specials: [] };
+            metaBook = {};
+            menuVersions = { specials: 1 };
+            cloudUpdatedAt = 0;
+            saveLocalOnly();
+            cloudSyncNote = 'Preview: Windmill Specials are separate from Eight Bells (Menu AI venue deploy still pending — not writing the live book)';
+            cloudPullDone = true;
+            render();
+            return true;
+          }
+          windmillCloudReady = true;
+          windmillPreviewOnly = false;
+          if (applyCloudState(remote || { book: { specials: [] }, venue: 'windmill' }, { allowEmpty: true })) {
+            cloudSyncNote = data && data.empty
+              ? 'Windmill Specials — empty book ready (separate from Eight Bells)'
+              : 'Windmill Specials synced';
+            cloudPullDone = true;
+            render();
+            return true;
+          }
+          cloudPullDone = true;
+          return false;
+        }
         if (remote) {
           if (applyCloudState(remote)) {
             cloudSyncNote = 'Menus synced across devices';
@@ -1029,7 +1131,14 @@
         cloudPullDone = true;
         return false;
       }).catch(function () {
-        cloudSyncNote = 'Using menus on this device (cloud unreachable)';
+        if (isWindmillVenue) {
+          // Offline / unreachable: keep venue-scoped cache only (never EB keys).
+          windmillPreviewOnly = true;
+          windmillCloudReady = false;
+          cloudSyncNote = 'Windmill Specials on this device only (cloud unreachable)';
+        } else {
+          cloudSyncNote = 'Using menus on this device (cloud unreachable)';
+        }
         cloudPullDone = true;
         return false;
       });

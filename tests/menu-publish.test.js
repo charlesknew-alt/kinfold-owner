@@ -158,9 +158,9 @@ assert(typeof pub.isCardTwoUpHtml === 'function' && typeof pub.prepareWebsitePdf
   var saveFn = aiGs.split('function savePrintHistory_')[1].split('function hasPrintHistory_')[0];
   assert(saveFn.indexOf('publishSavedMenu_') === -1 && saveFn.indexOf('UrlFetchApp') === -1,
     'print-history save does not publish (retries stay in-house)');
-  var stateFn = aiGs.split('function getMenusState_')[1].split('function saveMenusState_')[0];
-  assert(stateFn.indexOf('MENU_PUBLISH') === -1 && stateFn.indexOf('publish') === -1,
-    'getMenusState is unchanged');
+  var stateFn = aiGs.split('function getMenusState_')[1].split('function saveMenuState_')[0];
+  assert(stateFn.indexOf('MENU_PUBLISH') === -1 && stateFn.indexOf('publishSavedMenu') === -1,
+    'getMenusState does not publish');
 })();
 assert(aiGs.indexOf("action === 'publishSavedMenu'") !== -1 &&
   aiGs.indexOf("action === 'publishMenuStatus'") !== -1,
