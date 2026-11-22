@@ -2095,8 +2095,11 @@
         );
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
-      add = tryAdd(left1, COST.footLogo + 6);
-      if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
+      // Windmill already carries the official mark top-right — skip a second logo.
+      if (!isWindmillPrint()) {
+        add = tryAdd(left1, COST.footLogo + 6);
+        if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
+      }
       layout.leftover.p1 = Math.max(0, left1);
       // Foot feature pairs only with real spare room — never jam at min type.
       layout.p1.footPromos = canFitFootPromos(layout.leftover.p1);
@@ -2484,9 +2487,13 @@
 
       // Foot logo is optional chrome — only keep it when page 2 still has generous
       // leftover after mains/desserts. Readable shared type beats a second logo.
+      // Windmill keeps a single logo top-right on page 1 (no mid-page repeat).
       var logoCost = COST.footLogo + (tightBack ? 12 : 8);
       var addLogo = tryAdd(p2left, logoCost);
-      if (addLogo.ok && p2left > (tightBack ? 24 : 18)) {
+      if (isWindmillPrint()) {
+        layout.p2.footLogo = false;
+        layout.fillers.push('No page-2 logo (Windmill — single mark on page 1)');
+      } else if (addLogo.ok && p2left > (tightBack ? 24 : 18)) {
         layout.p2.footLogo = true;
         p2left = addLogo.left;
         layout.fillers.push('Logo (page 2)');
@@ -4959,7 +4966,16 @@
             'font-style:italic;color:#538135!important;font-size:10pt}' +
           '.sec-note{font-family:var(--sans);font-weight:300;color:#5a534a}' +
           '.dish{margin-bottom:calc(max(var(--dish-gap-min),var(--dish-gap)) + 3px)}' +
-          '.scallop-box,.scallop-wide{box-shadow:0 1px 0 rgba(36,54,44,.06)}' +
+          /* Feature panels: charcoal/forest tasteful frames like EB scallops. */
+          '.scallop-box,.scallop-wide{box-shadow:0 1px 0 rgba(36,54,44,.08)}' +
+          '.col-events .scallop,.col-promo .scallop,.col-feature .scallop,' +
+          '.foot-promos .scallop,.sandwich-aligned .scallop{' +
+            'filter:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+          '.promo .sec-title,.col-events .sec-title,.col-promo .sec-title{' +
+            'color:#24362c!important;border-bottom-color:rgba(83,129,53,.35)}' +
+          '.sandwich-promo .desc,.promo .desc{color:#5a534a!important}' +
+          '.dish-line{align-items:baseline}' +
+          '.price{letter-spacing:.02em}' +
         ''
         : '') +
       '.promo{text-align:left}' +

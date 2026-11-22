@@ -144,8 +144,9 @@ assert(printJs.indexOf('logo-tr-wm') !== -1 &&
   printJs.indexOf('logo-tr-frame') === -1 &&
   printJs.indexOf('Mains (page 1 — balance)') !== -1 &&
   printJs.indexOf('mainsTake') !== -1 &&
-  printJs.indexOf('Mains (continued)') !== -1,
-  'Windmill print uses unframed official logo block and can split Mains across pages');
+  printJs.indexOf('Mains (continued)') !== -1 &&
+  printJs.indexOf('No page-2 logo (Windmill — single mark on page 1)') !== -1,
+  'Windmill print uses unframed official logo, splits Mains, and skips page-2 foot logo');
 assert(printJs.indexOf('venuePending') !== -1 &&
   printJs.indexOf('eb-menu-prints-wm') !== -1,
   'Windmill print history refuses unscoped EB cloud list and uses -wm local store');
