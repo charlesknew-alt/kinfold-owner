@@ -19,14 +19,36 @@
       --serif: 'Fraunces', Georgia, serif;
       --sans: 'Source Sans 3', sans-serif;
     }
-    /* Windmill brand from www.windmilllittleworth.com — Cormorant Garamond + Outfit, forest/brass. */
+    /* Windmill brand — match hub / Paperwork sage-forest (manager-portals + index.html).
+       Forest header + sage wash; brass only as a deep accent. Logo + Cormorant/Outfit stay. */
     html.venue-windmill {
-      --paint: #d8e0d4; --paint-deep: #8d6824; --paint-wash: #eef2ea;
-      --ink: #1c1610; --ink-soft: #3d3429; --line: #d8cfc0;
-      --white-warm: #f6f0e6; --green: #24362c;
+      --paint: #24362c;           /* forest — hub theme-color / login / buttons */
+      --paint-deep: #2f4a3b;      /* forest-mid */
+      --paint-wash: #e4ebe3;      /* soft sage wash (cards, soft buttons) */
+      --ink: #1c1610;
+      --ink-soft: #3d3429;
+      --line: #c9d4c6;            /* sage-tinted rule */
+      --white-warm: #f6f0e6;      /* cream paper */
+      --green: #24362c;
+      --brass: #b68a3a;
+      --brass-deep: #8d6824;
       --serif: 'Cormorant Garamond', Georgia, serif;
       --sans: 'Outfit', 'Segoe UI', sans-serif;
     }
+    /* Dark forest header needs cream type (EB keeps paint-as-tan on dark ink). */
+    html.venue-windmill .ps-header { color: #f6f0e6; border-bottom-color: var(--paint-deep); }
+    html.venue-windmill .ps-venue-eyebrow { color: rgba(246, 240, 230, 0.72); }
+    html.venue-windmill .ps-venue-name { color: #f6f0e6; }
+    html.venue-windmill .menus button.on,
+    html.venue-windmill button.go,
+    html.venue-windmill .view-toggle button.on,
+    html.venue-windmill .flow-pill.on .num {
+      background: var(--green);
+      color: #f6f0e6;
+      border-color: var(--green);
+    }
+    html.venue-windmill .flow-pill.done .num { background: var(--paint-deep); color: #f6f0e6; }
+    html.venue-windmill button.soft { background: var(--paint-wash); color: var(--ink); }
     body { font-family: var(--sans); background: var(--white-warm); color: var(--ink); line-height: 1.45; }
     .ps-header { background: var(--paint); border-bottom: 1px solid var(--paint-deep); padding: 14px 20px; }
     .ps-header-inner { max-width: 960px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
