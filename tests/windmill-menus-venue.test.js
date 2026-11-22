@@ -145,6 +145,14 @@ assert(printJs.indexOf("asset('eight-bells-logo.png')") === -1,
 assert(printJs.indexOf('(?:venue|pub)=windmill') !== -1 ||
   printJs.indexOf('pub)=windmill') !== -1,
   'printVenueId treats ?pub=windmill the same as ?venue=windmill');
+assert(page.indexOf('function menuTabLabel') !== -1 &&
+  page.indexOf("return 'Little Ones'") !== -1,
+  'Windmill kids tab display label is Little Ones');
+assert(page.indexOf("menu.id === 'little-bells' && isWindmillVenue") !== -1,
+  'Little Ones label is Windmill-only (id stays little-bells)');
+assert(fs.readFileSync(path.join(root, 'menus.js'), 'utf8')
+  .indexOf("{ id: 'little-bells', name: 'Little Bells'") !== -1,
+  'menus.js keeps little-bells id and Little Bells built-in name for Eight Bells');
 
 var wmEntry = fs.readFileSync(path.join(root, 'menus-windmill.html'), 'utf8');
 assert(wmEntry.indexOf('venue=windmill') !== -1 && wmEntry.indexOf('mode=staff') !== -1,
