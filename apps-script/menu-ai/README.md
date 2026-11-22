@@ -34,7 +34,7 @@ Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix i
 The same web app stores staff data for PC ↔ phone:
 
 - `MENUS` (Script Properties) — **Eight Bells** live dishes, party blurbs, promo bank, layout, dish catalogue
-- `MENUS_WINDMILL` — **Windmill** dish book (Specials for now). Separate from Eight Bells; never copied from `MENUS`
+- `MENUS_WINDMILL` — **Windmill** full dish book + catalogue (every menu type). Separate from Eight Bells; never copied from `MENUS`
 - `getMenusState` / `saveMenuState` accept optional `venue=eightbells|windmill` (default `eightbells`). Response includes `venue` + `venues`
 - `HISTIDX` — print history index (metadata only)
 - Print HTML — **Google Drive** folder `Eight Bells Menu Print History` (preferred). If Drive is not authorised yet, sheets are stored **gzip’d in Script Properties** (`HISTGZ_{id}_*`) so owner/manager still share one list. Run `AUTHORIZE_DRIVE_PRINT_HISTORY` once for the full archive.

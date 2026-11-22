@@ -2400,7 +2400,8 @@ function menusBackupBeforeWrite_(currentRawText, venue) {
  * Shared live menu book for one venue.
  * Response always includes `venue` and `venues` so clients can tell Windmill
  * apart from Eight Bells. Windmill with no MENUS_WINDMILL yet returns an empty
- * Specials book (not null) so the UI never falls back to Eight Bells dishes.
+ * full book (all menu types + empty catalogue, not null) so the UI never falls
+ * back to Eight Bells dishes.
  */
 function getMenusState_(venue) {
   venue = normalizeMenusVenue_(venue);
@@ -2413,7 +2414,10 @@ function getMenusState_(venue) {
           : {
               venue: 'windmill',
               updatedAt: 0,
-              book: { specials: [] },
+              book: {
+                main: [], 'main-next': [], sunday: [], party: [], sandwiches: [],
+                specials: [], desserts: [], 'little-bells': [], 'lunch-club': []
+              },
               metaBook: {},
               includes: {},
               promoBank: [],
@@ -2423,7 +2427,10 @@ function getMenusState_(venue) {
               dishCatalogue: [],
               extraMenus: [],
               extraSections: [],
-              menuVersions: { specials: 1 }
+              menuVersions: {
+                main: 1, 'main-next': 1, sunday: 1, party: 1, sandwiches: 1,
+                specials: 1, desserts: 1, 'little-bells': 1, 'lunch-club': 1
+              }
             };
         return {
           ok: true,

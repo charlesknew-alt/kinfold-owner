@@ -52,14 +52,36 @@
   }
 
   /**
-   * Empty Windmill book — Specials only for now. Never copy Eight Bells dishes.
-   * Used when MENUS_WINDMILL is missing so clients do not fall back to EB cache.
+   * Empty Windmill book — every menu type, empty catalogue.
+   * Never copy Eight Bells dishes. Used when MENUS_WINDMILL is missing so
+   * clients do not fall back to the Eight Bells cache.
    */
+  function emptyWindmillBook_() {
+    return {
+      main: [],
+      'main-next': [],
+      sunday: [],
+      party: [],
+      sandwiches: [],
+      specials: [],
+      desserts: [],
+      'little-bells': [],
+      'lunch-club': []
+    };
+  }
+
+  function emptyWindmillMenuVersions_() {
+    var book = emptyWindmillBook_();
+    var versions = {};
+    Object.keys(book).forEach(function (id) { versions[id] = 1; });
+    return versions;
+  }
+
   function emptyWindmillState() {
     return {
       venue: VENUE_WINDMILL,
       updatedAt: 0,
-      book: { specials: [] },
+      book: emptyWindmillBook_(),
       metaBook: {},
       includes: {},
       promoBank: [],
@@ -69,7 +91,7 @@
       dishCatalogue: [],
       extraMenus: [],
       extraSections: [],
-      menuVersions: { specials: 1 }
+      menuVersions: emptyWindmillMenuVersions_()
     };
   }
 
