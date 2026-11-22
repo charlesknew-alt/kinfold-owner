@@ -64,14 +64,18 @@
   }
 
   function venueLogoImg(cls) {
-    // Windmill mark is landscape (~2:1); Eight Bells is square. Same CSS width
-    // made Windmill look tiny — bump the block class so the printed mark reads
-    // as big as the Eight Bells logo block (dark windmill-logo.png, not header).
+    // Windmill print uses the official vertical mark (illustration + wordmark).
+    // Top-right sits in a thick framed block sized to match the Eight Bells
+    // hanging-sign mass; foot logos stay unframed.
     var classes = [];
     if (cls) classes.push(cls);
     if (isWindmillPrint() && cls === 'logo-tr') classes.push('logo-tr-wm');
     var c = classes.length ? (' class="' + classes.join(' ') + '"') : '';
-    return '<img' + c + ' src="' + esc(asset(venueLogoFile())) + '" alt="' + esc(venueLogoAlt()) + '">';
+    var img = '<img' + c + ' src="' + esc(asset(venueLogoFile())) + '" alt="' + esc(venueLogoAlt()) + '">';
+    if (isWindmillPrint() && cls === 'logo-tr') {
+      return '<div class="logo-tr-frame">' + img + '</div>';
+    }
+    return img;
   }
 
   function toRoman(n) {
@@ -4716,8 +4720,8 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) ' + (wm ? '290px' : '190px') + ';gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
-      '.top-band-logo{grid-template-columns:1fr ' + (wm ? '290px' : '190px') + ';min-height:0}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) ' + (wm ? '210px' : '190px') + ';gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
+      '.top-band-logo{grid-template-columns:1fr ' + (wm ? '210px' : '190px') + ';min-height:0}' +
       '.top-left{min-width:0;overflow:hidden;align-self:start}' +
       '.top-left .sec-title{text-align:left;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
@@ -4725,12 +4729,18 @@
       '.top-left .dish{margin-bottom:calc(max(var(--dish-gap-min),var(--dish-gap)) + 2px)}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
-      '.logo-tr.logo-tr-wm{width:280px!important;max-width:100%}' +
+      /* Windmill official vertical mark in a thick framed block — EB hanging-sign mass. */
+      '.logo-tr-frame{display:block;margin-left:auto;width:196px;max-width:100%;box-sizing:border-box;' +
+        'padding:16px 14px 14px;background:#f6f0e6;border:4px solid ' + WM_GREEN + ';' +
+        '-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      '.logo-tr-frame .logo-tr.logo-tr-wm{width:100%!important;max-width:100%;margin:0;height:auto;display:block;' +
+        'opacity:.92}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:96px;height:auto}' +
-      (wm ? '.foot-logo img{width:140px}' : '') +
-      '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:240px!important}' +
+      (wm ? '.foot-logo img{width:110px;opacity:.92}' : '') +
+      '.cols-balanced .col-logo .logo-tr-frame{width:170px}' +
+      '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:100%!important}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
       /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
@@ -4978,6 +4988,8 @@
       '.a5-face.fill-tight{--dish-gap:10px;--sec-gap:11px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
       '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .logo-tr-frame{width:118px;padding:10px 9px 9px;border-width:3px}' +
+      '.a5-face .logo-tr-frame .logo-tr.logo-tr-wm{width:100%!important}' +
       '.a5-face .party-logo{width:72px}' +
       '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
       '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 120px;gap:8px;min-height:0}' +
