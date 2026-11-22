@@ -14,6 +14,46 @@
     'https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec';
 
   /**
+   * Active dish-book venue for Menu AI cloud calls.
+   * eightbells (default) → MENUS. windmill → MENUS_WINDMILL.
+   * Set from menus.html ?venue= before any getMenusState / saveMenuState.
+   */
+  var cloudVenue_ = 'eightbells';
+
+  function normalizeCloudVenue_(venue) {
+    if (root.EBMenusSyncLogic && typeof root.EBMenusSyncLogic.normalizeVenue === 'function') {
+      return root.EBMenusSyncLogic.normalizeVenue(venue);
+    }
+    var v = String(venue == null ? '' : venue).toLowerCase().trim();
+    if (v === 'windmill' || v === 'wm') return 'windmill';
+    return 'eightbells';
+  }
+
+  function setCloudVenue(venue) {
+    cloudVenue_ = normalizeCloudVenue_(venue);
+    return cloudVenue_;
+  }
+
+  function getCloudVenue() {
+    return cloudVenue_ || 'eightbells';
+  }
+
+  /** Attach venue to menu-book cloud bodies (never invent a venue on print/history). */
+  function withCloudVenue_(body) {
+    body = body && typeof body === 'object' ? body : {};
+    var action = String(body.action || '');
+    if (action === 'getMenusState' || action === 'saveMenuState' || action === 'saveMenusState' ||
+        action === 'publishSavedMenu') {
+      if (!body.venue) body.venue = getCloudVenue();
+      // Nested legacy whole-book payload.
+      if (action === 'saveMenusState' && body.state && typeof body.state === 'object' && !body.state.venue) {
+        body.state.venue = body.venue;
+      }
+    }
+    return body;
+  }
+
+  /**
    * Shared menus + print history MUST use one URL on every phone/PC.
    * Do not use a per-device custom AI URL here — that splits the cloud store.
    */
@@ -158,9 +198,15 @@
 
   /** Fast GET path — works with Apps Script CORS. Retry once (Script can 302/flake). */
   function cloudGet(action, params) {
+    params = params && typeof params === 'object' ? params : {};
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
-    if (params && params.id) url += '&id=' + encodeURIComponent(params.id);
-    if (params && params.to) url += '&to=' + encodeURIComponent(params.to);
+    if (params.id) url += '&id=' + encodeURIComponent(params.id);
+    if (params.to) url += '&to=' + encodeURIComponent(params.to);
+    // Dish-book reads are venue-scoped (eightbells | windmill).
+    if (action === 'getMenusState') {
+      var venue = params.venue || getCloudVenue();
+      if (venue) url += '&venue=' + encodeURIComponent(venue);
+    }
     // Bust intermediaries; Apps Script already no-stores, but some WebViews cache 302.
     url += '&_=' + Date.now().toString(36);
     if (!url || typeof fetch !== 'function') {
@@ -268,7 +314,7 @@
     if (!url || typeof fetch !== 'function') {
       return Promise.reject(new Error('no_cloud'));
     }
-    var payload = JSON.stringify(body || {});
+    var payload = JSON.stringify(withCloudVenue_(body || {}));
     var headers = { 'Content-Type': 'text/plain;charset=utf-8' };
     var inBrowser = typeof document !== 'undefined';
 
@@ -418,7 +464,7 @@
    * "Missing sheet HTML to email"). Other writes use form/no-cors + verify.
    */
   function cloudPost(body) {
-    body = body || {};
+    body = withCloudVenue_(body || {});
     var action = String(body.action || '');
     if (!action) return Promise.reject(new Error('missing_action'));
     if (action === 'getMenusState' || action === 'listPrintHistory') {
@@ -1011,6 +1057,8 @@
     getAiUrl: getAiUrl,
     setAiUrl: setAiUrl,
     getCloudUrl: getCloudUrl,
+    setCloudVenue: setCloudVenue,
+    getCloudVenue: getCloudVenue,
     cloudPost: cloudPost,
     reviewLayout: reviewLayout,
     reviewSpelling: reviewSpelling,

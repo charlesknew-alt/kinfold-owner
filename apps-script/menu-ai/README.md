@@ -33,7 +33,9 @@ Gemini must return a `spellingFixes` list (from → to) for every typo/OCR fix i
 
 The same web app stores staff data for PC ↔ phone:
 
-- `MENUS_*` (Script Properties) — live dishes, party blurbs, promo bank, layout, **dish catalogue**
+- `MENUS` (Script Properties) — **Eight Bells** live dishes, party blurbs, promo bank, layout, dish catalogue
+- `MENUS_WINDMILL` — **Windmill** dish book (Specials for now). Separate from Eight Bells; never copied from `MENUS`
+- `getMenusState` / `saveMenuState` accept optional `venue=eightbells|windmill` (default `eightbells`). Response includes `venue` + `venues`
 - `HISTIDX` — print history index (metadata only)
 - Print HTML — **Google Drive** folder `Eight Bells Menu Print History` (preferred). If Drive is not authorised yet, sheets are stored **gzip’d in Script Properties** (`HISTGZ_{id}_*`) so owner/manager still share one list. Run `AUTHORIZE_DRIVE_PRINT_HISTORY` once for the full archive.
 - `?action=driveStatus` — diagnose Drive auth (`canWrite: true` when OK)
@@ -80,7 +82,13 @@ clasp push
 clasp deploy -i AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw -d "Publish saved menus to the website"
 ```
 
-Access stays **Anyone**. `getMenusState` is unchanged. No new OAuth scope (`script.external_request` is already on the manifest). Set the script properties before relying on the tick. Until that deploy, a ticked Save still saves and tells Kate that website publishing is not live on Menu AI yet.
+Access stays **Anyone**. No new OAuth scope (`script.external_request` is already on the manifest). Set the script properties before relying on the tick. Until that deploy, a ticked Save still saves and tells Kate that website publishing is not live on Menu AI yet.
+
+### Windmill Specials (separate book)
+
+Windmill manager Menus opens `menus.html?mode=staff&venue=windmill`. That page loads/saves `MENUS_WINDMILL` only. Eight Bells stays on `MENUS`. Windmill does **not** publish to `eightbellsbolney.com` (publish is skipped until a Windmill website endpoint exists).
+
+Preview-first: ship the owner/Menus UI + this Apps Script code on a PR, but do **not** `clasp push` / redeploy the live `/exec` until Charles says so. Until that deploy, the Windmill Menus page shows an empty Specials book and refuses cloud writes so it cannot overwrite the live Eight Bells `MENUS` property.
 
 ### One-time Drive authorisation (phone Download / Print PDF)
 

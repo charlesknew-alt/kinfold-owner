@@ -522,7 +522,8 @@ assert(ingestJs.indexOf('getCloudUrl') !== -1 && ingestJs.indexOf('cloudPost') !
 assert(aiGs.indexOf('listPrintHistory_') !== -1 && aiGs.indexOf('historyWriteHtmlDrive_') !== -1 &&
   aiGs.indexOf('historyWriteHtmlPropsGzip_') !== -1,
   'Menu AI Apps Script stores print HTML in Drive (gzip props fallback)');
-assert(aiGs.indexOf('getMenusState_') !== -1 && aiGs.indexOf("propRead_('MENUS')") !== -1,
+assert(aiGs.indexOf('getMenusState_') !== -1 &&
+  (aiGs.indexOf("propRead_('MENUS')") !== -1 || aiGs.indexOf('menusPropKey_') !== -1),
   'Menu AI Apps Script stores live menus state in Script Properties');
 assert(aiGs.indexOf('drive.file') !== -1 || fs.readFileSync(path.join(root, 'apps-script/menu-ai/appsscript.json'), 'utf8').indexOf('drive.file') !== -1,
   'Drive scope is script-owner drive.file (no per-device OAuth)');

@@ -5128,8 +5128,17 @@
     var websiteMenu = '';
     var publishDishes = [];
     var publishTitle = '';
+    // Windmill Specials must not offer “Publish to website” (that POSTs to Eight Bells).
+    var printVenue = 'eightbells';
     try {
-      if (root.EBMenusPublish && root.EBMenusPublish.websiteMenuId) {
+      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
+        printVenue = root.EBMenuIngest.getCloudVenue() || 'eightbells';
+      } else if (typeof location !== 'undefined' && /(?:\?|&)venue=windmill(?:&|$)/i.test(String(location.search || ''))) {
+        printVenue = 'windmill';
+      }
+    } catch (eVen) { printVenue = 'eightbells'; }
+    try {
+      if (printVenue !== 'windmill' && root.EBMenusPublish && root.EBMenusPublish.websiteMenuId) {
         websiteMenu = root.EBMenusPublish.websiteMenuId({
           id: menu && menu.id,
           name: menu && menu.name,
@@ -7129,8 +7138,23 @@
       return Promise.reject(new Error(
         'Saved in Print history. Could not reach Menu AI to publish.'));
     }
+    var pubVenue = 'eightbells';
+    try {
+      if (typeof root.EBMenuIngest.getCloudVenue === 'function') {
+        pubVenue = root.EBMenuIngest.getCloudVenue() || 'eightbells';
+      }
+    } catch (eV) { pubVenue = 'eightbells'; }
+    if (pubVenue === 'windmill' || req.venue === 'windmill') {
+      return Promise.resolve({
+        ok: true,
+        published: false,
+        skipped: true,
+        message: 'Windmill website publish is not wired yet. The sheet stayed in Print history.'
+      });
+    }
     return root.EBMenuIngest.cloudPost({
       action: 'publishSavedMenu',
+      venue: pubVenue,
       id: req.id,
       menuId: req.menuId,
       menuName: req.menuName || '',
