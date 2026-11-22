@@ -6,8 +6,61 @@
 
   var GREEN = '#538135';
   var INK = '#1c1610';
+
   /** Windmill print accent — forest from windmill-manager / live site. */
   var WM_GREEN = '#24362c';
+
+  /** Active print venue — mirrors EBMenuIngest / ?pub= / ?venue= / dataset. */
+  function printVenueId() {
+    try {
+      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
+        var cv = root.EBMenuIngest.getCloudVenue();
+        if (cv === 'windmill') return 'windmill';
+        if (cv === 'eightbells' || cv === 'eight-bells') return 'eightbells';
+      }
+    } catch (e) {}
+    try {
+      if (root.EBMenusVenue && typeof root.EBMenusVenue.currentPub === 'function') {
+        if (root.EBMenusVenue.currentPub() === 'windmill') return 'windmill';
+      }
+    } catch (eV) {}
+    try {
+      var ds = root.document && root.document.documentElement && root.document.documentElement.dataset;
+      if (ds && (ds.previewPub === 'windmill' || ds.menusVenue === 'windmill')) return 'windmill';
+    } catch (eD) {}
+    try {
+      if (typeof location !== 'undefined') {
+        var q = String(location.search || '');
+        if (/(?:\?|&)(?:venue|pub)=windmill(?:&|$)/i.test(q)) return 'windmill';
+        if (/(?:\?|&)pub=eight-bells(?:&|$)/i.test(q)) return 'eightbells';
+      }
+    } catch (e2) {}
+    return 'eightbells';
+  }
+
+  function isWindmillPrint() {
+    return printVenueId() === 'windmill';
+  }
+
+  function venueLogoFile() {
+    return isWindmillPrint() ? 'windmill-logo.png' : 'eight-bells-logo.png';
+  }
+
+  function venueLogoAlt() {
+    return isWindmillPrint() ? 'The Windmill Inn' : 'The Eight Bells';
+  }
+
+  function venueLogoImg(cls) {
+    // Windmill print uses the official vertical mark (illustration + wordmark),
+    // unframed like the Eight Bells hanging-sign: same top-right placement and
+    // similar mass. Asset is solid black (#000) — no green tint, no opacity soften.
+    var classes = [];
+    if (cls) classes.push(cls);
+    if (isWindmillPrint() && cls === 'logo-tr') classes.push('logo-tr-wm');
+    var c = classes.length ? (' class="' + classes.join(' ') + '"') : '';
+    return '<img' + c + ' src="' + esc(asset(venueLogoFile())) + '" alt="' + esc(venueLogoAlt()) + '">';
+  }
+
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -22,56 +75,6 @@
     } catch (e) {
       return 'images/' + name;
     }
-  }
-
-  /** Active print venue — mirrors EBMenuIngest cloud venue / ?venue= / ?pub=. */
-  function printVenueId() {
-    try {
-      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
-        var cv = root.EBMenuIngest.getCloudVenue();
-        if (cv === 'windmill') return 'windmill';
-        if (cv === 'eightbells' || cv === 'eight-bells') return 'eightbells';
-      }
-    } catch (e) {}
-    try {
-      if (typeof location !== 'undefined') {
-        var q = String(location.search || '');
-        if (/(?:\?|&)(?:venue|pub)=windmill(?:&|$)/i.test(q)) return 'windmill';
-        if (/(?:\?|&)pub=eight-bells(?:&|$)/i.test(q)) return 'eightbells';
-      }
-    } catch (e2) {}
-    try {
-      var ds = root.document && root.document.documentElement && root.document.documentElement.dataset;
-      if (ds && (ds.previewPub === 'windmill' || ds.menusVenue === 'windmill')) return 'windmill';
-    } catch (e3) {}
-    return 'eightbells';
-  }
-
-  function isWindmillPrint() {
-    return printVenueId() === 'windmill';
-  }
-
-  /**
-   * Real Windmill logo from www.windmilllittleworth.com/images/logo-dark.png
-   * (Organization schema logo). Eight Bells keeps eight-bells-logo.png.
-   */
-  function venueLogoFile() {
-    return isWindmillPrint() ? 'windmill-logo.png' : 'eight-bells-logo.png';
-  }
-
-  function venueLogoAlt() {
-    return isWindmillPrint() ? 'The Windmill Inn' : 'The Eight Bells';
-  }
-
-  function venueLogoImg(cls) {
-    // Windmill mark is landscape (~2:1); Eight Bells is square. Same CSS width
-    // made Windmill look tiny — bump the block class so the printed mark reads
-    // as big as the Eight Bells logo block (dark windmill-logo.png, not header).
-    var classes = [];
-    if (cls) classes.push(cls);
-    if (isWindmillPrint() && cls === 'logo-tr') classes.push('logo-tr-wm');
-    var c = classes.length ? (' class="' + classes.join(' ') + '"') : '';
-    return '<img' + c + ' src="' + esc(asset(venueLogoFile())) + '" alt="' + esc(venueLogoAlt()) + '">';
   }
 
   function toRoman(n) {
@@ -1038,7 +1041,8 @@
       var dessRuleM = null;
       var sideRuleM = null;
       if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
-        littleRuleM = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout);
+        littleRuleM = kidsRuleForPrint_(
+          root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout));
         dessRuleM = root.EBMenus.sectionLayoutFor('Desserts', plan && plan.sectionLayout);
         sideRuleM = root.EBMenus.sectionLayoutFor('Sides', plan && plan.sectionLayout);
       }
@@ -1068,7 +1072,7 @@
         rightFood: Math.round(right2 * 10) / 10,
         gap: Math.round(gap2 * 10) / 10,
         shorter: Math.abs(gap2) <= 2.5 ? 'even' : (gap2 > 0 ? 'left' : 'right'),
-        leftLabel: kidsCol ? 'Little Bells / Sides' : 'Sides / sauces',
+        leftLabel: kidsCol ? (kidsPrintTitle() + ' / Sides') : 'Sides / sauces',
         rightLabel: layout.p2.sandwiches ? 'Sandwiches' : (kidsCol ? 'Desserts / Sides / events' : 'Events')
       };
     }
@@ -1530,7 +1534,40 @@
     return /sunday\s*roasts?|^roasts?$/i.test(String(name || '').trim());
   }
   function isLittleBells(name) {
-    return /little\s*bells|kids?\s*menu|children.?s/i.test(String(name || '').trim());
+    // Id stays little-bells; Windmill display name is Little Ones.
+    return /little\s*(bells|ones)|kids?\s*menu|children.?s/i.test(String(name || '').trim());
+  }
+
+  /** Printed kids heading — Windmill never shows the Eight Bells “Little Bells” name. */
+  function kidsPrintTitle() {
+    return isWindmillPrint() ? 'Little Ones' : 'Little Bells';
+  }
+
+  /**
+   * Scrub Eight Bells kids chrome from a section-layout rule when printing Windmill.
+   * Keeps Windmill-book wording; drops stock EB “Little Bells on Sunday…” / £9.50 spiel
+   * unless the book set its own non-EB text.
+   */
+  function kidsRuleForPrint_(rule) {
+    rule = rule && typeof rule === 'object' ? Object.assign({}, rule) : {};
+    if (!isWindmillPrint()) return rule;
+    function scrub(t) {
+      t = String(t == null ? '' : t).replace(/\r\n/g, '\n').trim();
+      if (!t) return '';
+      // Stock Eight Bells Sunday kids line — never print on Windmill.
+      if (/little\s*bells/i.test(t) && /on\s+sunday|half\s+(the\s+)?price/i.test(t)) return '';
+      if (/on\s+sundays?,?\s*little\s*bells/i.test(t)) return '';
+      // Stock Eight Bells £9.50 kids offer (with or without scoop spiel).
+      if (/all\s*£\s*9\.50/i.test(t)) return '';
+      t = t.replace(/little\s*bells/gi, 'Little Ones');
+      return t.trim();
+    }
+    rule.above = scrub(rule.above);
+    rule.below = scrub(rule.below);
+    rule.note = scrub(rule.note);
+    // If cardOutsideSlots later re-splits note, keep note empty when slots cleared.
+    if (!rule.above && !rule.below) rule.note = '';
+    return rule;
   }
   /** Sides / Sauces / Little Bells — compact stack, not classical 13px dish breath. */
   function isTightListSection(name) {
@@ -1638,6 +1675,10 @@
     if (d.description) {
       u += 1.0 + Math.floor(String(d.description).length / 50) * 0.6;
     }
+    // Windmill country-pub type (Crimson dish names) reads taller than the
+    // Eight Bells Roboto model the unit tally was tuned for. Stay pessimistic
+    // so a Mains prefix never clips the allergy footer.
+    if (isWindmillPrint()) u *= 1.42;
     return u;
   }
 
@@ -1720,7 +1761,7 @@
         bag.sundayRoasts = { name: 'Sunday Roasts', dishes: (s.dishes || []).slice() };
       } else if (isMains(s.name) && !bag.mains) bag.mains = s;
       else if (isLittleBells(s.name) && !bag.littleBells) {
-        bag.littleBells = { name: 'Little Bells', dishes: (s.dishes || []).slice() };
+        bag.littleBells = { name: kidsPrintTitle(), dishes: (s.dishes || []).slice() };
       } else if (isDessert(s.name) && !bag.desserts) bag.desserts = s;
       else if (isSides(s.name) && !bag.sides) bag.sides = s;
       else if (isSandwich(s.name) && !bag.sandwiches) bag.sandwiches = s;
@@ -1755,10 +1796,16 @@
   }
 
   function layoutRule_(name, sl) {
+    var rule;
     if (root.EBMenus && typeof root.EBMenus.sectionLayoutFor === 'function') {
-      return root.EBMenus.sectionLayoutFor(name, sl) || {};
+      rule = root.EBMenus.sectionLayoutFor(name, sl) || {};
+    } else {
+      rule = (sl && sl[name]) || {};
     }
-    return (sl && sl[name]) || {};
+    if (name === 'Little Bells' || isLittleBells(name)) {
+      rule = kidsRuleForPrint_(rule);
+    }
+    return rule;
   }
 
   /** Above/below boxes (Little Bells on Sunday) or a single Blocks note. */
@@ -1926,20 +1973,42 @@
     }
     // Main (and similar): when page 1 is only Starters (+ chrome) and Mains sit
     // alone on page 2, pull Mains onto page 1 so the sheet is not half-empty.
+    // Never put more dishes on page 1 than fit wholly — remainder continue on
+    // page 2 (same heading / "Mains (continued)") so nothing clips the footer.
+    // Eight Bells sheets with Sharing / Burgers / Classics already fill page 1.
     var mainsOnP1 = false;
+    var mainsP1Take = 0;
     var mainCost = bag.mains ? sectionUnits(bag.mains, false) : 0;
     if (!roastsOnP1 && bag.mains && mainCost > 0 && !bag.sundayRoasts) {
-      var frontWithMains = front + mainCost;
-      var backWithoutMains = back - mainCost;
-      var mainsFitP1 = frontWithMains <= PAGE - 8;
       var mainsP1Sparse = front < PAGE * 0.52;
-      var mainsP2Heavier = backWithoutMains >= frontWithMains - 8 ||
-        back > PAGE - 10;
       var noClassicsBand = !(bag.classics || bag.burgers || bag.sharing);
-      if (mainsFitP1 && mainsP1Sparse && (mainsP2Heavier || noClassicsBand)) {
-        mainsOnP1 = true;
-        front = frontWithMains;
-        back = Math.max(0, backWithoutMains);
+      var backWithoutMainsAll = back - mainCost;
+      var mainsP2Heavier = backWithoutMainsAll >= (front + mainCost) - 8 ||
+        back > PAGE - 10;
+      if (mainsP1Sparse && (mainsP2Heavier || noClassicsBand)) {
+        // Extra Windmill safety: allergy footer + Crimson line-height under-count.
+        var roomForMains = Math.max(0, PAGE - (isWindmillPrint() ? 18 : 10) - front);
+        var headU = COST.sectionHead;
+        var usedM = headU;
+        var take = 0;
+        var dishesM = bag.mains.dishes || [];
+        for (var mi = 0; mi < dishesM.length; mi++) {
+          var du = dishUnits(dishesM[mi]);
+          if (usedM + du > roomForMains) break;
+          usedM += du;
+          take += 1;
+        }
+        // Need at least one main on page 1 and leave the rest for page 2 when
+        // the full section would overflow — never clip or drop a dish.
+        if (take > 0) {
+          mainsOnP1 = true;
+          mainsP1Take = take;
+          front += usedM;
+          var restCost = 0;
+          for (var mj = take; mj < dishesM.length; mj++) restCost += dishUnits(dishesM[mj]);
+          if (restCost > 0) restCost += COST.sectionHead;
+          back = Math.max(0, back - mainCost + restCost);
+        }
       }
     }
     // Named fillings always print. Empty tip+hours when Sandwiches is ticked and
@@ -1996,7 +2065,8 @@
         classicsSplit: 0,
         sidesOnP1: false,
         sundayRoasts: !!roastsOnP1,
-        mains: !!mainsOnP1
+        mains: !!mainsOnP1,
+        mainsTake: mainsOnP1 ? mainsP1Take : 0
       },
       p2: null,
       leftover: { p1: 0, p2: 0 },
@@ -2012,7 +2082,16 @@
     // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
     if (bag.sundayRoasts && !roastsOnP1) oneNeed += roastCost;
-    if (bag.mains && !mainsOnP1) oneNeed += sectionUnits(bag.mains, false);
+    if (bag.mains && !mainsOnP1) {
+      oneNeed += sectionUnits(bag.mains, false);
+    } else if (bag.mains && mainsOnP1 && mainsP1Take < (bag.mains.dishes || []).length) {
+      // Partial mains on page 1 — remainder (+ continued heading) still needs room.
+      var restNeed = COST.sectionHead;
+      for (var rn = mainsP1Take; rn < bag.mains.dishes.length; rn++) {
+        restNeed += dishUnits(bag.mains.dishes[rn]);
+      }
+      oneNeed += restNeed;
+    }
     if (bag.specialMains) oneNeed += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
     if (bag.desserts) oneNeed += sectionUnits(bag.desserts, false);
@@ -2056,8 +2135,11 @@
         );
       }
       if (bag.sides && layout.p1.sandwiches) layout.p1.sidesOnP1 = true;
-      add = tryAdd(left1, COST.footLogo + 6);
-      if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
+      // Windmill already carries the official mark top-right — skip a second logo.
+      if (!isWindmillPrint()) {
+        add = tryAdd(left1, COST.footLogo + 6);
+        if (add.ok) { layout.p1.footLogo = true; left1 = add.left; layout.fillers.push('Logo'); }
+      }
       layout.leftover.p1 = Math.max(0, left1);
       // Foot feature pairs only with real spare room — never jam at min type.
       layout.p1.footPromos = canFitFootPromos(layout.leftover.p1);
@@ -2445,9 +2527,13 @@
 
       // Foot logo is optional chrome — only keep it when page 2 still has generous
       // leftover after mains/desserts. Readable shared type beats a second logo.
+      // Windmill keeps a single logo top-right on page 1 (no mid-page repeat).
       var logoCost = COST.footLogo + (tightBack ? 12 : 8);
       var addLogo = tryAdd(p2left, logoCost);
-      if (addLogo.ok && p2left > (tightBack ? 24 : 18)) {
+      if (isWindmillPrint()) {
+        layout.p2.footLogo = false;
+        layout.fillers.push('No page-2 logo (Windmill — single mark on page 1)');
+      } else if (addLogo.ok && p2left > (tightBack ? 24 : 18)) {
         layout.p2.footLogo = true;
         p2left = addLogo.left;
         layout.fillers.push('Logo (page 2)');
@@ -2484,9 +2570,10 @@
       // tax. Above/below notes still pack leftover so Gatherings is omitted.
       var littleRulePlan = { width: 'column', frame: true };
       if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
-        littleRulePlan = root.EBMenus.sectionLayoutFor('Little Bells', opts.sectionLayout) || littleRulePlan;
+        littleRulePlan = kidsRuleForPrint_(
+          root.EBMenus.sectionLayoutFor('Little Bells', opts.sectionLayout) || littleRulePlan);
       } else if (opts.sectionLayout && opts.sectionLayout['Little Bells']) {
-        littleRulePlan = opts.sectionLayout['Little Bells'];
+        littleRulePlan = kidsRuleForPrint_(opts.sectionLayout['Little Bells']);
       }
       var kidsSidesPair = !!(bag.littleBells && bag.littleBells.dishes && bag.littleBells.dishes.length &&
         layout.p2.sidesOnP2 && bag.sides && bag.sides.dishes && bag.sides.dishes.length &&
@@ -3111,6 +3198,9 @@
     if (overrides && overrides[key]) {
       rule = Object.assign({}, rule, { width: overrides[key] });
     }
+    if (key === 'Little Bells' || isLittleBells(key)) {
+      rule = kidsRuleForPrint_(rule);
+    }
     return rule;
   }
 
@@ -3652,12 +3742,19 @@
     if (kidsFromBurgers.length) {
       if (bag.littleBells && bag.littleBells.dishes) {
         bag.littleBells = {
-          name: 'Little Bells',
+          name: kidsPrintTitle(),
           dishes: bag.littleBells.dishes.concat(kidsFromBurgers)
         };
       } else {
-        bag.littleBells = { name: 'Little Bells', dishes: kidsFromBurgers };
+        bag.littleBells = { name: kidsPrintTitle(), dishes: kidsFromBurgers };
       }
+    }
+    // Always re-title kids for the active venue (never leave EB wording on Windmill).
+    if (bag.littleBells) {
+      bag.littleBells = {
+        name: kidsPrintTitle(),
+        dishes: (bag.littleBells.dishes || []).slice()
+      };
     }
     if (split.sandwiches.length) {
       if (bag.sandwiches && bag.sandwiches.dishes) {
@@ -3861,15 +3958,26 @@
       p1 += roastOut1.html;
     }
     // Mains on page 1 only when the planner pulled them up to fill a sparse
-    // two-page front. Single-page sheets still place Mains later.
+    // two-page front (typical Windmill Main: Starters only → empty half page).
+    // May be a PREFIX of the section — remainder continue on page 2.
+    // Single-page sheets still place Mains later via the pages===1 path.
     var mainsOnPage1 = !!(bag.mains && p1opts.mains);
+    var mainsTakeP1 = Math.max(0, parseInt(p1opts.mainsTake, 10) || 0);
+    var mainsRestDishes = null;
     if (mainsOnPage1 && bag.mains && !mainsPairedInCol) {
-      var mainOut1Early = renderUnpairedSection(bag.mains.name, bag.mains.dishes, mainRule, {
+      var allMainDishes = bag.mains.dishes || [];
+      if (!mainsTakeP1 || mainsTakeP1 >= allMainDishes.length) {
+        mainsTakeP1 = allMainDishes.length;
+      }
+      var mainsP1Dishes = allMainDishes.slice(0, mainsTakeP1);
+      mainsRestDishes = allMainDishes.slice(mainsTakeP1);
+      var mainOut1Early = renderUnpairedSection(bag.mains.name, mainsP1Dishes, mainRule, {
         promos: promos, excludeTitles: usedPromoTitles
       });
       usedPromoTitles = usedPromoTitles.concat(mainOut1Early.usedPromoTitles || []);
       p1 += mainOut1Early.html;
-      mainsPairedInCol = true;
+      // Only mark fully placed when nothing remains for page 2.
+      if (!mainsRestDishes.length) mainsPairedInCol = true;
     }
     if (deferShareAfterRoasts) {
       flushColumnPending();
@@ -4230,6 +4338,7 @@
       ));
     if (bag.mains && !mainsPairedInCol && p2opts.sandwiches && canSitInColumn(mainRule) &&
         bag.mains.dishes && bag.mains.dishes.length &&
+        !(mainsRestDishes && mainsRestDishes.length) &&
         !(p2opts.sidesOnP2 && sidesPrint && sidesPrint.dishes && sidesPrint.dishes.length) &&
         !canPairSpecialsWithSandwiches(
           bag.specialMains && bag.specialMains.dishes, plan, true
@@ -4237,6 +4346,8 @@
       // Column Mains sit opposite Sandwiches only when Sides are not also on page 2
       // and Specials are not taking that column (Specials + Sandwiches saves a row).
       // Food map: Sides beside Sandwiches. Best-fit Mains may fill the hole if Sides are elsewhere.
+      // Skip this pair when page 1 already took a Mains prefix — remainder must print
+      // as "Mains (continued)" full-width so dishes are not duplicated.
       var sandU2 = sandwichesPackCost(bag, sandRule);
       var mainU2 = sectionUnits(bag.mains, false);
       var pair2 = levelOppositeColumns(
@@ -4266,11 +4377,18 @@
       p2opts.sandwiches = false;
     }
     if (bag.mains && !mainsPairedInCol) {
-      var mainSolo2 = renderUnpairedSection(bag.mains.name, bag.mains.dishes, mainRule, {
+      var mainsForP2 = (mainsRestDishes && mainsRestDishes.length)
+        ? mainsRestDishes
+        : bag.mains.dishes;
+      var mainsP2Title = (mainsRestDishes && mainsRestDishes.length)
+        ? ((bag.mains.name || 'Mains') + ' (continued)')
+        : bag.mains.name;
+      var mainSolo2 = renderUnpairedSection(mainsP2Title, mainsForP2, mainRule, {
         promos: promos, excludeTitles: usedPromoTitles
       });
       usedPromoTitles = usedPromoTitles.concat(mainSolo2.usedPromoTitles || []);
       p2 += mainSolo2.html;
+      mainsPairedInCol = true;
     }
     // Column / Best-fit Specials sit opposite Sandwiches instead of a full-bleed
     // box above Sides|Sandwiches — that stack is what pushed fillings off the page.
@@ -4509,16 +4627,25 @@
             );
           }).join('');
       } else if (menu.id === 'little-bells') {
+        title = kidsPrintTitle();
         var lbRule = { note: '', sell: '', above: '', below: '' };
         if (root.EBMenus && root.EBMenus.sectionLayoutFor) {
           lbRule = root.EBMenus.sectionLayoutFor('Little Bells', plan && plan.sectionLayout) || lbRule;
         } else if (plan && plan.sectionLayout && plan.sectionLayout['Little Bells']) {
           lbRule = plan.sectionLayout['Little Bells'];
         }
+        lbRule = kidsRuleForPrint_(lbRule);
         var lbSlots = (root.EBMenus && root.EBMenus.cardOutsideSlots)
           ? root.EBMenus.cardOutsideSlots(lbRule)
           : { above: lbRule.above || '', aboveKind: lbRule.aboveKind || 'heading',
               below: lbRule.below || '', belowKind: lbRule.belowKind || 'text' };
+        // Scrub again after cardOutsideSlots in case EB defaults were re-joined.
+        lbSlots = {
+          above: kidsRuleForPrint_({ above: lbSlots.above }).above,
+          aboveKind: lbSlots.aboveKind || 'heading',
+          below: kidsRuleForPrint_({ below: lbSlots.below }).below,
+          belowKind: lbSlots.belowKind || 'text'
+        };
         offerAbove = cardBlurbHtml(lbSlots.above, lbSlots.aboveKind, 'above');
         outsideBelow = cardBlurbHtml(lbSlots.below, lbSlots.belowKind, 'below');
         inner = scallop(dishes.map(function (d) { return dishCentered(d, { hidePrice: true, hideLunch: true }); }).join(''));
@@ -4611,26 +4738,29 @@
     var guillotine = !!opts.guillotine;
     var wm = isWindmillPrint();
     // Eight Bells Canva PDFs: Roboto dishes, Trajan-like Cinzel titles, Crimson Text allergy.
-    // Windmill (live site): Outfit dishes, Cormorant Garamond titles.
+    // Windmill smart country-pub: Crimson Text SemiBold dishes/tags, Roboto Light
+    // section titles / prices / descriptions; dietary green #538135.
     // Fonts are loaded via <link> in build() — @import often fails before print.
     var serifStack = wm
-      ? '"Cormorant Garamond",Georgia,"Times New Roman",serif'
+      ? '"Crimson Text",Georgia,"Times New Roman",serif'
       : '"Cinzel",Georgia,"Times New Roman",serif';
-    var sansStack = wm
-      ? '"Outfit",Helvetica,Arial,sans-serif'
-      : '"Roboto",Helvetica,Arial,sans-serif';
-    var allergyStack = wm
-      ? '"Cormorant Garamond",Georgia,"Times New Roman",serif'
-      : '"Crimson Text",Georgia,"Times New Roman",serif';
-    var accent = wm ? WM_GREEN : GREEN;
+    var sansStack = '"Roboto",Helvetica,Arial,sans-serif';
+    var allergyStack = '"Crimson Text",Georgia,"Times New Roman",serif';
+    // Tags/footer green matches the Word sample (#538135) for both pubs.
+    var accent = GREEN;
     var toolbarBg = wm ? '#24362c' : '#1c1610';
     var toolbarFg = wm ? '#f6f0e6' : '#f4eae3';
     var toolbarBtnBg = wm ? '#f6f0e6' : '#f4eae3';
+    var typeRoot = wm
+      ? '--dish-gap:13px;--sec-gap:15px;--name:12.5pt;--desc:10pt;--title:18pt;--promo:11.5pt;' +
+        '--name-min:11.5pt;--name-max:13pt;--desc-min:9.5pt;--desc-max:10.5pt;--title-min:15pt;--title-max:18pt;' +
+        '--dish-gap-min:8px;--dish-gap-max:16px'
+      : '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
+        '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
+        '--dish-gap-min:9px;--dish-gap-max:18px';
     return (
       ':root{--ink:' + INK + ';--green:' + accent + ';--serif:' + serifStack + ';--sans:' + sansStack + ';--allergy:' + allergyStack + ';' +
-        '--dish-gap:15px;--sec-gap:16px;--name:11.5pt;--desc:10pt;--title:22pt;--promo:11.5pt;' +
-        '--name-min:11pt;--name-max:11.5pt;--desc-min:10pt;--desc-max:10pt;--title-min:16pt;--title-max:22pt;' +
-        '--dish-gap-min:9px;--dish-gap-max:18px}' +
+        typeRoot + '}' +
       'body.make-fit{--dish-gap-min:5px}' +
       '*{box-sizing:border-box} html,body{margin:0;max-width:100%;overflow-x:hidden} body{background:' + (wm ? '#cfc8bb' : '#d9d3c8') + ';color:var(--ink);font-family:var(--sans)}' +
       '.toolbar{position:sticky;top:0;z-index:50;background:' + toolbarBg + ';color:' + toolbarFg + ';padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;max-width:100vw;box-sizing:border-box}' +
@@ -4716,8 +4846,8 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) ' + (wm ? '290px' : '190px') + ';gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
-      '.top-band-logo{grid-template-columns:1fr ' + (wm ? '290px' : '190px') + ';min-height:0}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
+      '.top-band-logo{grid-template-columns:1fr 190px;min-height:0}' +
       '.top-left{min-width:0;overflow:hidden;align-self:start}' +
       '.top-left .sec-title{text-align:left;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
@@ -4725,12 +4855,14 @@
       '.top-left .dish{margin-bottom:calc(max(var(--dish-gap-min),var(--dish-gap)) + 2px)}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
-      '.logo-tr.logo-tr-wm{width:280px!important;max-width:100%}' +
+      /* Official vertical Windmill mark — sharp black, same slot as EB, no frame. */
+      '.logo-tr.logo-tr-wm{width:180px!important;max-width:100%;opacity:1;' +
+        'image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:96px;height:auto}' +
-      (wm ? '.foot-logo img{width:140px}' : '') +
-      '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:240px!important}' +
+      (wm ? '.foot-logo img{width:110px;opacity:1}' : '') +
+      '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:160px!important}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
       /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
@@ -4864,6 +4996,48 @@
       '.foot-promos .scallop{width:100%}' +
       '.bottom-cols .sec-title{text-align:left}' +
       '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:3mm;padding-top:2mm;flex:0 0 auto;flex-shrink:0}' +
+      /* Windmill smart country-pub type — Crimson display + Roboto Light body.
+         Matches Eight Bells polish (letter-spaced heads, muted desc, fine leaders)
+         while keeping Windmill identity (#538135 tags, Crimson/Roboto). */
+      (wm
+        ? '.sec-title,.sec-title.soft,.sec-title.soft-left,.sec-title.under,.scallop .sec-title,' +
+          '.top-left .sec-title,.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,' +
+          '.col-promo .sec-title,.bottom-cols .sec-title,.specials-beside .sec-title.specials-beside-title{' +
+            'font-family:var(--serif)!important;font-weight:600!important;' +
+            'font-size:min(18pt,var(--title-max))!important;letter-spacing:.14em;' +
+            'text-transform:uppercase;text-decoration:none;' +
+            'border-bottom:1px solid rgba(36,54,44,.45);padding-bottom:4px;' +
+            'color:#1c1610;text-align:center!important;line-height:1.2;margin-bottom:calc(var(--sec-gap) + 2px)}' +
+          '.scallop .sec-title,.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,' +
+          '.col-promo .sec-title,.bottom-cols .sec-title{text-align:left!important;' +
+            'border-bottom-color:rgba(36,54,44,.35);font-size:min(15pt,var(--title-max))!important;' +
+            'letter-spacing:.12em}' +
+          '.dish-name,.dish-c .dish-name{font-family:var(--serif)!important;font-weight:600!important;' +
+            'font-size:clamp(11.5pt,var(--name),13pt)!important;color:#1c1610;letter-spacing:.01em}' +
+          '.price{font-family:var(--sans)!important;font-weight:300!important;' +
+            'font-size:clamp(10.5pt,var(--name),12pt)!important;color:#1c1610}' +
+          '.dish-leader{border-bottom:1px dotted #c4bcb2;margin:0 8px;transform:translateY(0.4em)}' +
+          '.desc,.dish .desc,.promo .desc,.sandwich-promo .desc{font-family:var(--sans)!important;' +
+            'font-weight:300!important;font-size:clamp(9.5pt,var(--desc),10.5pt)!important;' +
+            'color:#5a534a!important;line-height:1.4}' +
+          '.tags{font-family:var(--serif)!important;font-weight:600!important;font-style:italic;' +
+            'font-size:10.5pt!important;color:#538135}' +
+          '.allergy,.allergy-lc{font-family:var(--allergy)!important;font-weight:600!important;' +
+            'font-style:italic;color:#538135!important;font-size:10pt}' +
+          '.sec-note{font-family:var(--sans);font-weight:300;color:#5a534a}' +
+          '.dish{margin-bottom:calc(max(var(--dish-gap-min),var(--dish-gap)) + 3px)}' +
+          /* Feature panels: charcoal/forest tasteful frames like EB scallops. */
+          '.scallop-box,.scallop-wide{box-shadow:0 1px 0 rgba(36,54,44,.08)}' +
+          '.col-events .scallop,.col-promo .scallop,.col-feature .scallop,' +
+          '.foot-promos .scallop,.sandwich-aligned .scallop{' +
+            'filter:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+          '.promo .sec-title,.col-events .sec-title,.col-promo .sec-title{' +
+            'color:#24362c!important;border-bottom-color:rgba(83,129,53,.35)}' +
+          '.sandwich-promo .desc,.promo .desc{color:#5a534a!important}' +
+          '.dish-line{align-items:baseline}' +
+          '.price{letter-spacing:.02em}' +
+        ''
+        : '') +
       '.promo{text-align:left}' +
       '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px}' +
       '.promo .promo-title:first-child{margin-top:0}' +
@@ -4978,6 +5152,7 @@
       '.a5-face.fill-tight{--dish-gap:10px;--sec-gap:11px;--name:11.1pt;--desc:10pt;--title:16pt;--promo:11.1pt}' +
       '.a5-face.fill-compact,.a5-face.fill-dense{--dish-gap:9px;--sec-gap:10px;--name:11pt;--desc:10pt;--title:16pt;--promo:11pt}' +
       '.a5-face .logo-tr{width:110px!important}' +
+      '.a5-face .logo-tr.logo-tr-wm{width:110px!important}' +
       '.a5-face .party-logo{width:72px}' +
       '.a5-face .party-title{font-size:min(var(--title),20pt)}' +
       '.a5-face .top-band,.a5-face .top-band-logo{grid-template-columns:1fr 120px;gap:8px;min-height:0}' +
@@ -5227,9 +5402,9 @@
     var websiteMenu = '';
     var publishDishes = [];
     var publishTitle = '';
-    // Windmill must not offer “Publish to website” (that POSTs to Eight Bells).
     var printVenue = printVenueId();
     try {
+      // Windmill must not offer “Publish to website” (that POSTs to Eight Bells).
       if (printVenue !== 'windmill' && root.EBMenusPublish && root.EBMenusPublish.websiteMenuId) {
         websiteMenu = root.EBMenusPublish.websiteMenuId({
           id: menu && menu.id,
@@ -5271,7 +5446,7 @@
       '<link rel="preconnect" href="https://fonts.googleapis.com">' +
       '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
       (printVenue === 'windmill'
-        ? '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">'
+        ? '<link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,600;1,600&family=Roboto:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">'
         : '<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">') +
       '<style>' + css({ landscape: landscape, guillotine: guillotine || defaultPaper === 'a5' }) + partyCss() +
       'body.paper-a5 .mode-a4{display:none}body.paper-a5 .mode-a5{display:block}' +
@@ -5693,8 +5868,20 @@
             '}' +
           '});' +
         '}' +
+        // opener (new tab) or parent (same-page iframe fallback) — Save needs EBMenuPrint.
+        'function previewHost(){' +
+          'try{if(window.opener&&window.opener.EBMenuPrint)return window.opener;}catch(e0){}' +
+          'try{if(window.parent&&window.parent!==window&&window.parent.EBMenuPrint)return window.parent;}catch(e1){}' +
+          'return null;' +
+        '}' +
+        'function closePreviewSheet(){' +
+          'try{var h=previewHost();' +
+            'if(h&&typeof h.EBMenuPrintCloseInPagePreview==="function"){h.EBMenuPrintCloseInPagePreview();return;}' +
+          '}catch(e2){}' +
+          'try{window.close();}catch(e3){}' +
+        '}' +
         'var db=document.getElementById("discardPreview");' +
-        'if(db){db.onclick=function(){window.close();};}' +
+        'if(db){db.onclick=function(){closePreviewSheet();};}' +
         // Stamp Roman, save into Print history, return parent to history, close preview.
         'var sb=document.getElementById("saveToMenus");' +
         'if(sb){sb.onclick=function(){' +
@@ -5702,9 +5889,10 @@
           'if(document.body.getAttribute("data-clipped")==="1"){' +
             'alert("This sheet still clips outside the printable area. Discard and untick a drop-in, then Generate again.");' +
             'return;}' +
-          'if(!window.opener||!window.opener.EBMenuPrint||!window.opener.EBMenuPrint.commitPrintVersion){' +
+          'var host=previewHost();' +
+          'if(!host||!host.EBMenuPrint||!host.EBMenuPrint.commitPrintVersion){' +
             'alert("Keep the Menus tab open, then click Save again.");return;}' +
-          'var api=window.opener.EBMenuPrint;' +
+          'var api=host.EBMenuPrint;' +
           'sb.disabled=true;sb.textContent="Saving…";' +
           'var disc=document.getElementById("discardPreview");if(disc)disc.disabled=true;' +
           // Read the tick before the toolbar is replaced. Absent = this menu never publishes.
@@ -5739,10 +5927,10 @@
               'menuKind:SAVE_META.menuKind||"",title:SAVE_META.title||SAVE_META.menuName,' +
               'roman:ver.roman,savedAt:new Date(saveAt).toISOString(),dishes:SAVE_DISHES' +
             '}:null;' +
-            'try{if(typeof window.opener.EBMenusOnPrintSaved==="function"){' +
-              'window.opener.EBMenusOnPrintSaved(savedInfo);' +
+            'try{if(typeof host.EBMenusOnPrintSaved==="function"){' +
+              'host.EBMenusOnPrintSaved(savedInfo);' +
             '}}catch(e2){}' +
-            'window.close();' +
+            'closePreviewSheet();' +
           '}).catch(function(){sb.disabled=false;sb.textContent="Save";' +
             'if(disc)disc.disabled=false;' +
             'alert("Could not save this sheet. Try again.");});' +
@@ -5779,8 +5967,7 @@
   var HISTORY_LS_HTML = 'eb-menu-print-html-' + (HISTORY_LS_SUFFIX ? 'wm-' : '');
   var HISTORY_MAX = 60;
   /** Live Menu AI web app — also stores shared print history in Drive. */
-  var HISTORY_CLOUD_DEFAULT =
-    'https://script.google.com/macros/s/AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw/exec';
+  var HISTORY_CLOUD_DEFAULT = '/api/manager/menus-cloud';
   /** Default To: address when Emailing a saved sheet from Print history. */
   var HISTORY_EMAIL_DEFAULT = 'pub@eightbellsbolney.com';
 
@@ -5807,6 +5994,7 @@
     }
     return fetch(url, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body || {})
     }).then(function (res) {
@@ -6232,7 +6420,8 @@
   }
 
   /**
-   * Sync now: repair gaps → upload local → prune orphans → pull shared list.
+   * Sync now: repair gaps → upload local → pull shared list.
+   * Orphan prune runs in the background (can take ~50s) so paint is not blocked.
    * Bounded so Print history never sticks on “Updating shared list…”.
    */
   function syncPrintHistoryToCloud() {
@@ -6260,16 +6449,17 @@
         });
       });
     }).then(function (stats) {
-      return pruneOrphanCloudIndex().then(function (prune) {
-        return listPrintHistory().then(function (rows) {
-          finished = true;
-          return {
-            rows: rows,
-            uploaded: (stats && stats.uploaded) || 0,
-            repaired: (stats && stats.repaired) || 0,
-            orphansDropped: (prune && prune.dropped) || 0
-          };
-        });
+      // pruneOrphanPrintHistory can take ~50s against live Script — never block
+      // the shared list paint on it. Fire-and-forget; Sync still returns the list.
+      pruneOrphanCloudIndex().catch(function () {});
+      return listPrintHistory().then(function (rows) {
+        finished = true;
+        return {
+          rows: rows,
+          uploaded: (stats && stats.uploaded) || 0,
+          repaired: (stats && stats.repaired) || 0,
+          orphansDropped: 0
+        };
       });
     }).catch(function () {
       return localListOnly().then(function (rows) {
@@ -6659,6 +6849,7 @@
       var wantWm = printVenueId() === 'windmill';
       var gotVenue = String((data && data.venue) || '');
       // Windmill must never display the shared Eight Bells HISTIDX list.
+      // Until Menu AI returns venue=windmill, keep this device on local WM drafts only.
       if (wantWm && gotVenue !== 'windmill') {
         return localListOnly().then(function (localItems) {
           var rows = sortHistoryNewest((localItems || []).map(function (r) {
@@ -6705,6 +6896,7 @@
           pendingLocal = true;
           byId[r.id] = asRow(r, 'local');
         });
+        // Do not upload Windmill drafts into the Eight Bells HISTIDX.
         if ((pendingLocal || needsStampRepair) && !(wantWm && gotVenue !== 'windmill')) {
           schedulePendingPrintUploads();
         }
@@ -7131,12 +7323,239 @@
     });
   }
 
-  function openPrintHtml(html) {
-    if (!html) return false;
-    html = sanitizePrintHtml(html) || html;
-    // Phone Chrome in the Varlo iframe often opens a tab that stays about:blank
-    // (blob: and opener/sessionStorage both fail). Store HTML under a key and
-    // open same-origin print-preview.html?k=… so the new tab can read it.
+  /**
+   * Mobile Chrome blocks window.open after async arrange/layout (no longer a
+   * user gesture). Call reservePrintWindow() synchronously on Generate / Print
+   * tap, then openPrintHtml fills that window. If the tap could not open a
+   * window, openPrintHtml shows a same-page iframe so Save/Discard still works
+   * via parent.EBMenuPrint (see previewHost in the sheet toolbar).
+   */
+  var reservedPrintWin = null;
+  var inPagePreviewRoot = null;
+
+  function closeInPagePreview() {
+    if (inPagePreviewRoot && inPagePreviewRoot.parentNode) {
+      inPagePreviewRoot.parentNode.removeChild(inPagePreviewRoot);
+    }
+    inPagePreviewRoot = null;
+    try { delete root.EBMenuPrintCloseInPagePreview; } catch (eClose) {
+      try { root.EBMenuPrintCloseInPagePreview = null; } catch (eNull) {}
+    }
+  }
+
+  function releaseReservedPrintWindow() {
+    var w = reservedPrintWin;
+    reservedPrintWin = null;
+    if (!w) return;
+    try {
+      if (!w.closed) w.close();
+    } catch (eRel) {}
+  }
+
+  /**
+   * Step labels shown while Generate runs. Phone users land on the reserved
+   * print tab — this list must tick there (not only on the opener overlay).
+   */
+  var ARRANGE_PROGRESS_STEPS = [
+    'Preparing dishes',
+    'Ordering sections',
+    'Building layout',
+    'Keeping drop-ins you ticked',
+    'Checking leftover space',
+    'Measuring printable area',
+    'Ready — opening preview'
+  ];
+
+  function arrangeProgressSteps() {
+    return ARRANGE_PROGRESS_STEPS.slice();
+  }
+
+  /** Venue-branded waiting HTML for the reserved print tab (or reuse elsewhere). */
+  function buildArrangeProgressHtml(opts) {
+    opts = opts || {};
+    var wm = opts.windmill != null ? !!opts.windmill : isWindmillPrint();
+    var steps = Array.isArray(opts.steps) && opts.steps.length
+      ? opts.steps
+      : ARRANGE_PROGRESS_STEPS;
+    var active = Math.max(0, Math.min(steps.length - 1, opts.active | 0));
+    var paint = wm ? '#24362c' : '#DFC2AF';
+    var paintDeep = wm ? '#2f4a3b' : '#A79283';
+    var wash = wm ? '#e4ebe3' : '#F4EAE3';
+    var paper = wm ? '#f3f6f2' : '#fffaf4';
+    var ink = '#1c1610';
+    var inkSoft = wm ? '#3a4a40' : '#5a534a';
+    // Dark green Windmill header needs the light mark (white on transparent).
+    // Print sheets still use windmill-logo.png (dark). Eight Bells unchanged.
+    var logoFile = wm ? 'windmill-logo-header.png' : 'eight-bells-logo.png';
+    var logoAlt = wm ? 'The Windmill Inn' : 'The Eight Bells';
+    var venueName = wm ? 'The Windmill Inn · Littleworth' : 'The Eight Bells · Bolney';
+    var logoUrl = '';
+    try { logoUrl = asset(logoFile); } catch (eA) { logoUrl = 'images/' + logoFile; }
+    var logoFilter = '';
+    var liHtml = '';
+    for (var i = 0; i < steps.length; i++) {
+      var state = i < active ? 'done' : (i === active ? 'active' : 'todo');
+      var mark = i < active ? '✓' : (i === active ? '●' : '○');
+      liHtml +=
+        '<li data-step="' + i + '" data-state="' + state + '" class="ap-step ap-' + state + '">' +
+        '<span class="ap-mark" aria-hidden="true">' + mark + '</span>' +
+        '<span class="ap-label">' + esc(steps[i]) + '</span></li>';
+    }
+    return (
+      '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
+      '<meta name="color-scheme" content="light">' +
+      '<title>Arranging menu…</title>' +
+      '<style>' +
+      'html,body{margin:0;padding:0;background:' + paper + ';color:' + ink + ';' +
+      'font-family:"Source Sans 3",system-ui,-apple-system,sans-serif;' +
+      '-webkit-text-size-adjust:100%;text-size-adjust:100%}' +
+      'body{min-height:100vh;min-height:100dvh;box-sizing:border-box;' +
+      'padding:max(16px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom));' +
+      'display:flex;align-items:flex-start;justify-content:center}' +
+      '.ap-card{width:100%;max-width:26rem;margin:12px auto 0;background:#fff;' +
+      'border-radius:18px;overflow:hidden;box-shadow:0 16px 36px rgba(28,22,16,.14);' +
+      'border:1px solid ' + paintDeep + '33}' +
+      '.ap-head{background:' + paint + ';color:' + (wm ? '#f6f0e6' : ink) + ';' +
+      'padding:16px 18px 14px;display:flex;gap:12px;align-items:center}' +
+      '.ap-logo{width:72px;height:32px;object-fit:contain;flex:0 0 auto;' + logoFilter + '}' +
+      '.ap-eye{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.78;margin:0 0 4px}' +
+      '.ap-title{font-family:Georgia,"Times New Roman",serif;font-size:22px;line-height:1.2;' +
+      'font-weight:600;margin:0}' +
+      '.ap-body{padding:16px 18px 18px;background:' + wash + '55}' +
+      '.ap-lede{margin:0 0 14px;font-size:15px;line-height:1.45;color:' + inkSoft + '}' +
+      '.ap-steps{list-style:none;margin:0;padding:0}' +
+      '.ap-step{display:flex;gap:10px;align-items:flex-start;margin:0 0 10px;' +
+      'font-size:16px;line-height:1.35;color:' + inkSoft + ';opacity:.42}' +
+      '.ap-step.ap-active{opacity:1;color:' + ink + ';font-weight:650}' +
+      '.ap-step.ap-done{opacity:.92;color:' + ink + '}' +
+      '.ap-mark{flex:0 0 1.25rem;width:1.25rem;text-align:center;font-size:15px;' +
+      'line-height:1.35;color:' + paintDeep + '}' +
+      '.ap-step.ap-done .ap-mark{color:' + (wm ? paint : paintDeep) + '}' +
+      '.ap-label{flex:1;min-width:0}' +
+      '.ap-foot{margin:14px 0 0;font-size:13px;line-height:1.4;color:' + inkSoft + '}' +
+      '@media (min-width:720px){.ap-title{font-size:24px}.ap-step{font-size:17px}}' +
+      '</style></head><body data-venue="' + (wm ? 'windmill' : 'eightbells') + '">' +
+      '<div class="ap-card" role="status" aria-live="polite" aria-atomic="false">' +
+      '<div class="ap-head">' +
+      '<img class="ap-logo" src="' + esc(logoUrl) + '" alt="' + esc(logoAlt) + '">' +
+      '<div><p class="ap-eye">' + esc(venueName) + '</p>' +
+      '<h1 class="ap-title">Arranging your menu</h1></div></div>' +
+      '<div class="ap-body">' +
+      '<p class="ap-lede">Each step ticks through below. Keep this tab open — Save / Discard opens here when ready.</p>' +
+      '<ol class="ap-steps" id="arrangeSteps">' + liHtml + '</ol>' +
+      '<p class="ap-foot" id="arrangeSummary">Working…</p>' +
+      '</div></div></body></html>'
+    );
+  }
+
+  function writeReservedWaiting_(w) {
+    if (!w) return;
+    try {
+      w.document.open();
+      w.document.write(buildArrangeProgressHtml({ windmill: isWindmillPrint(), active: 0 }));
+      w.document.close();
+    } catch (eWait) {}
+  }
+
+  /**
+   * Tick a step on the reserved print tab (phone focus) and/or any listener.
+   * index: 0-based step; optional label overrides that step’s text.
+   */
+  function setArrangeProgress(index, opts) {
+    opts = opts || {};
+    var steps = ARRANGE_PROGRESS_STEPS;
+    var i = index | 0;
+    if (i < 0) i = 0;
+    if (i >= steps.length) i = steps.length - 1;
+    var label = opts.label != null ? String(opts.label) : '';
+    var summary = opts.summary != null ? String(opts.summary) : '';
+    var done = !!opts.done;
+
+    function paintDoc(doc) {
+      if (!doc) return;
+      var list = doc.getElementById('arrangeSteps') || doc.querySelector('.ap-steps');
+      if (!list) return;
+      var items = list.querySelectorAll('[data-step]');
+      for (var n = 0; n < items.length; n++) {
+        var li = items[n];
+        var step = parseInt(li.getAttribute('data-step'), 10);
+        if (isNaN(step)) step = n;
+        var state = step < i ? 'done' : (step === i ? (done && step === i ? 'done' : 'active') : 'todo');
+        if (done && step <= i) state = 'done';
+        li.setAttribute('data-state', state);
+        li.className = (li.className || '').replace(/\bap-(todo|active|done)\b/g, '').trim();
+        li.className = (li.className ? li.className + ' ' : '') + 'ap-step ap-' + state;
+        try {
+          li.style.opacity = state === 'todo' ? '0.42' : '1';
+          li.style.fontWeight = state === 'active' ? '650' : '';
+          li.style.color = state === 'todo' ? '' : '#1c1610';
+        } catch (eSt) {}
+        var mark = li.querySelector('.ap-mark');
+        if (mark) {
+          mark.textContent = state === 'done' ? '✓' : (state === 'active' ? '●' : '○');
+        }
+        if (step === i && label) {
+          var lab = li.querySelector('.ap-label');
+          if (lab) lab.textContent = label;
+          else if (!mark) li.textContent = label;
+        }
+      }
+      if (summary) {
+        var sum = doc.getElementById('arrangeSummary');
+        if (sum) {
+          sum.style.display = 'block';
+          sum.textContent = summary;
+        }
+      }
+    }
+
+    try {
+      if (reservedPrintWin && !reservedPrintWin.closed) {
+        paintDoc(reservedPrintWin.document);
+      }
+    } catch (eRes) {}
+
+    try {
+      var overlay = root.document && root.document.getElementById('arrangeOverlay');
+      if (overlay) paintDoc(overlay);
+    } catch (eOv) {}
+
+    return { index: i, label: label || steps[i], done: done };
+  }
+
+  /**
+   * Must run in the same turn as the Generate / Print / PDF tap (or Make it fit /
+   * history Open). Returns true when a real window was reserved.
+   */
+  function reservePrintWindow() {
+    closeInPagePreview();
+    if (reservedPrintWin) {
+      try {
+        if (!reservedPrintWin.closed) {
+          writeReservedWaiting_(reservedPrintWin);
+          return true;
+        }
+      } catch (eAlive) {}
+      reservedPrintWin = null;
+    }
+    var w = null;
+    try {
+      // Named target reuses one sheet tab instead of stacking blanks on retries.
+      w = window.open('', 'EB_MENU_PRINT_PREVIEW');
+    } catch (eOpen) {
+      w = null;
+    }
+    if (!w) {
+      reservedPrintWin = null;
+      return false;
+    }
+    reservedPrintWin = w;
+    writeReservedWaiting_(w);
+    return true;
+  }
+
+  function storePrintPreviewPayload_(html) {
     var key = 'EB_PRINT_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     try {
       window.__EB_PRINT_PREVIEW_HTML = html;
@@ -7154,9 +7573,87 @@
     } catch (e2) {
       previewUrl = 'print-preview.html?t=' + Date.now() + '&k=' + encodeURIComponent(key);
     }
+    return { key: key, previewUrl: previewUrl };
+  }
+
+  function fillWindowWithPreview_(w, html, previewUrl) {
+    if (!w) return false;
+    try {
+      w.location.href = previewUrl;
+      return true;
+    } catch (eNav) {}
+    try {
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      return true;
+    } catch (eWrite) {}
+    return false;
+  }
+
+  /** Same-tab fallback when pop-ups are blocked (typical after async arrange). */
+  function openPrintHtmlInPage(html) {
+    if (!html) return false;
+    html = sanitizePrintHtml(html) || html;
+    closeInPagePreview();
+    releaseReservedPrintWindow();
+    var rootEl = document.createElement('div');
+    rootEl.id = 'ebInPagePrintPreview';
+    rootEl.setAttribute(
+      'style',
+      'position:fixed;inset:0;z-index:10000;background:#1c1610;'
+    );
+    var iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'Menu preview');
+    iframe.setAttribute(
+      'style',
+      'border:0;width:100%;height:100%;background:#fff;display:block;'
+    );
+    rootEl.appendChild(iframe);
+    document.body.appendChild(rootEl);
+    inPagePreviewRoot = rootEl;
+    root.EBMenuPrintCloseInPagePreview = closeInPagePreview;
+    try {
+      var doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+      if (!doc) throw new Error('no iframe document');
+      doc.open();
+      doc.write(html);
+      doc.close();
+      return true;
+    } catch (eDoc) {
+      // srcdoc keeps parent accessible for Save when contentDocument write fails.
+      try {
+        iframe.srcdoc = html;
+        return true;
+      } catch (eSrc) {
+        closeInPagePreview();
+        return false;
+      }
+    }
+  }
+
+  function openPrintHtml(html) {
+    if (!html) return false;
+    html = sanitizePrintHtml(html) || html;
+    // Phone Chrome often blocks delayed window.open after arrange/Gemini/DOM measure.
+    // Prefer a window reserved on the tap; else try a fresh open; else same-page iframe.
+    // Never treat a programmatic <a target=_blank> click as success — mobile Chrome
+    // can swallow it with no window and no error (Kate’s stuck-after-layout report).
+    var stored = storePrintPreviewPayload_(html);
+    var previewUrl = stored.previewUrl;
+
+    var reserved = reservedPrintWin;
+    reservedPrintWin = null;
+    if (reserved) {
+      try {
+        if (!reserved.closed && fillWindowWithPreview_(reserved, html, previewUrl)) {
+          return true;
+        }
+      } catch (eRes) {}
+      try { if (reserved && !reserved.closed) reserved.close(); } catch (eCloseRes) {}
+    }
+
     // Open exactly one tab and keep window.opener (Save needs EBMenuPrint).
-    // Do not click <a rel=noopener> AND window.open — that left Sunday/Main
-    // previews stacked and looked like Save opened the wrong PDF.
     var w = null;
     try { w = window.open(previewUrl, '_blank'); } catch (e4) {}
     if (w) {
@@ -7168,20 +7665,9 @@
       } catch (e5) {}
       return true;
     }
-    // Iframe popup blockers: one <a target=_blank> with opener preserved.
-    try {
-      var a = document.createElement('a');
-      a.href = previewUrl;
-      a.target = '_blank';
-      a.rel = 'opener';
-      document.body.appendChild(a);
-      a.click();
-      if (a.parentNode) a.parentNode.removeChild(a);
-      return true;
-    } catch (e3) {}
     var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     var url = URL.createObjectURL(blob);
-    w = window.open(url, '_blank');
+    try { w = window.open(url, '_blank'); } catch (eBlob) { w = null; }
     if (w) {
       setTimeout(function () {
         try { URL.revokeObjectURL(url); } catch (e6) {}
@@ -7189,12 +7675,9 @@
       return true;
     }
     try { URL.revokeObjectURL(url); } catch (e7) {}
-    w = window.open('', '_blank');
-    if (!w) return false;
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-    return true;
+    // Same-page preview — works when Chrome blocks all pop-ups after async layout.
+    if (openPrintHtmlInPage(html)) return true;
+    return false;
   }
 
   function downloadPrintHtml(entry) {
@@ -7259,7 +7742,7 @@
         pubVenue = root.EBMenuIngest.getCloudVenue() || 'eightbells';
       }
     } catch (eV) { pubVenue = 'eightbells'; }
-    if (pubVenue === 'windmill' || req.venue === 'windmill') {
+    if (pubVenue === 'windmill' || req.venue === 'windmill' || printVenueId() === 'windmill') {
       return Promise.resolve({
         ok: true,
         published: false,
@@ -7543,6 +8026,8 @@
   }
 
   root.EBMenuPrint = {
+    printVenueId: printVenueId,
+    isWindmillPrint: isWindmillPrint,
     build: build,
     planFluidLayout: planFluidLayout,
     typeRange: TYPE_RANGE,
@@ -7577,6 +8062,13 @@
     dayLabelFromMs: dayLabelFromMs,
     timeLabelFromMs: timeLabelFromMs,
     openPrintHtml: openPrintHtml,
+    openPrintHtmlInPage: openPrintHtmlInPage,
+    reservePrintWindow: reservePrintWindow,
+    releaseReservedPrintWindow: releaseReservedPrintWindow,
+    closeInPagePreview: closeInPagePreview,
+    arrangeProgressSteps: arrangeProgressSteps,
+    buildArrangeProgressHtml: buildArrangeProgressHtml,
+    setArrangeProgress: setArrangeProgress,
     measurePrintFit: measurePrintFit,
     sanitizePrintHtml: sanitizePrintHtml,
     downloadPrintHtml: downloadPrintHtml,
