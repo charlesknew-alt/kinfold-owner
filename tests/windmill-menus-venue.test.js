@@ -127,8 +127,25 @@ assert(ingest.indexOf('setCloudVenue') !== -1 && ingest.indexOf('getCloudVenue')
 assert(ingest.indexOf("action === 'getMenusState'") !== -1 &&
   ingest.indexOf('&venue=') !== -1,
   'cloudGet appends venue for getMenusState');
+assert(ingest.indexOf("action === 'listPrintHistory'") !== -1 &&
+  ingest.indexOf('listPrintHistory') !== -1,
+  'cloudGet / withCloudVenue also scope listPrintHistory');
 assert(ingest.indexOf('withCloudVenue_') !== -1,
   'menu-book cloud writes attach venue');
+assert(ingest.indexOf("action === 'savePrintHistory'") !== -1,
+  'print-history cloud writes attach venue');
+assert(aiGs.indexOf('HISTIDX_WINDMILL') !== -1 &&
+  aiGs.indexOf('historySetVenueCtx_') !== -1,
+  'Code.gs scopes print history index by venue');
+assert(aiGs.indexOf("venue: historyVenueCtx_") !== -1 ||
+  aiGs.indexOf('venue: historyVenueCtx_') !== -1,
+  'listPrintHistory response includes venue');
+assert(printJs.indexOf('logo-tr-wm') !== -1 &&
+  printJs.indexOf('Mains (page 1 — balance)') !== -1,
+  'Windmill print uses bigger logo block and can pull Mains onto page 1');
+assert(printJs.indexOf('venuePending') !== -1 &&
+  printJs.indexOf('eb-menu-prints-wm') !== -1,
+  'Windmill print history refuses unscoped EB cloud list and uses -wm local store');
 
 assert(printJs.indexOf('function venueLogoFile') !== -1 &&
   printJs.indexOf('windmill-logo.png') !== -1,

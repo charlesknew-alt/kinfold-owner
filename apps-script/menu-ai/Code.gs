@@ -133,20 +133,22 @@ function driveAuthHelp_(rawErr, authUrl) {
  */
 function historyHtmlFolderCreateOrOpen_() {
   var props = PropertiesService.getScriptProperties();
-  var id = String(props.getProperty('HIST_FOLDER_ID') || '');
+  var folderKey = historyFolderPropKey_();
+  var folderName = historyFolderName_();
+  var id = String(props.getProperty(folderKey) || '');
   if (id) {
     try { return DriveApp.getFolderById(id); } catch (e) {
-      try { props.deleteProperty('HIST_FOLDER_ID'); } catch (e0) {}
+      try { props.deleteProperty(folderKey); } catch (e0) {}
     }
   }
-  var existing = DriveApp.getFoldersByName('Eight Bells Menu Print History');
+  var existing = DriveApp.getFoldersByName(folderName);
   if (existing.hasNext()) {
     var found = existing.next();
-    try { props.setProperty('HIST_FOLDER_ID', found.getId()); } catch (e1) {}
+    try { props.setProperty(folderKey, found.getId()); } catch (e1) {}
     return found;
   }
-  var folder = DriveApp.createFolder('Eight Bells Menu Print History');
-  try { props.setProperty('HIST_FOLDER_ID', folder.getId()); } catch (e2) {}
+  var folder = DriveApp.createFolder(folderName);
+  try { props.setProperty(folderKey, folder.getId()); } catch (e2) {}
   return folder;
 }
 
@@ -209,7 +211,9 @@ function doPost(e) {
     var raw = readPostBody_(e);
     var body = JSON.parse(raw || '{}');
     var action = body && body.action ? String(body.action) : '';
-    // Shared print history (Drive) — same web app URL, works on PC and phone.
+    // Shared print history (Drive) — venue-scoped like the dish book.
+    // body.venue: eightbells (default) | windmill → separate HISTIDX / Drive folder.
+    historySetVenueCtx_(body && body.venue);
     if (action === 'listPrintHistory') {
       return json_(listPrintHistory_());
     }
@@ -278,6 +282,7 @@ function doGet(e) {
   }
   // GET reads (fast, CORS-friendly) — same actions as POST.
   var action = String(p.action || '');
+  historySetVenueCtx_(p.venue);
   if (action === 'listPrintHistory') return json_(listPrintHistory_());
   if (action === 'pruneOrphanPrintHistory') return json_(pruneOrphanPrintHistory_());
   if (action === 'getPrintHistory') return json_(getPrintHistory_(p.id));
@@ -318,6 +323,7 @@ function bridgeApi(action, body) {
   action = String(action || '');
   body = body && typeof body === 'object' ? body : {};
   try {
+    historySetVenueCtx_(body.venue);
     if (action === 'listPrintHistory') return listPrintHistory_();
     if (action === 'pruneOrphanPrintHistory') return pruneOrphanPrintHistory_();
     if (action === 'savePrintHistory') return savePrintHistory_(body.entry || body);
@@ -841,7 +847,8 @@ function freeHistoryHtmlBlobs_() {
   var removed = 0;
   Object.keys(all).forEach(function (k) {
     if (k === 'HIST_FOLDER_ID') return;
-    if (k.indexOf('HISTIDX') === 0 || k.indexOf('HISTDEL') === 0) return;
+    if (k.indexOf('HISTIDX') === 0 || k.indexOf('HISTDEL') === 0 ||
+        k.indexOf('HISTIDX_WINDMILL') === 0 || k.indexOf('HISTDEL_WINDMILL') === 0) return;
     // Plain HIST_* and gzip HISTGZ_* blobs — never the index/tombstones.
     if (/^HISTGZ_/i.test(k) || /^HIST_/i.test(k)) {
       try { props.deleteProperty(k); removed++; } catch (e) {}
@@ -870,8 +877,9 @@ function propWrite_(prefix, text) {
     // That race created zombie Print history rows (id in list, HTML gone) —
     // owner saw “shared” sheets manager could not open, and Save verify
     // false-passed on list membership alone.
-    if (prefix === 'HISTIDX' || prefix === 'HISTDEL') {
-      if (prefix === 'HISTIDX') {
+    if (prefix === 'HISTIDX' || prefix === 'HISTDEL' ||
+        prefix === 'HISTIDX_WINDMILL' || prefix === 'HISTDEL_WINDMILL') {
+      if (prefix === 'HISTIDX' || prefix === 'HISTIDX_WINDMILL') {
         try {
           var parsed = JSON.parse(text || '[]');
           if (Array.isArray(parsed) && parsed.length > HISTORY_PROPS_HTML_MAX_) {
@@ -914,6 +922,36 @@ function historySafeId_(id) {
   return String(id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
 }
 
+/**
+ * Active print-history venue for this request.
+ * eightbells → HISTIDX / Eight Bells folder (unchanged).
+ * windmill → HISTIDX_WINDMILL / Windmill folder — never cross-reads.
+ */
+var historyVenueCtx_ = 'eightbells';
+
+function historySetVenueCtx_(venue) {
+  historyVenueCtx_ = normalizeMenusVenue_(venue);
+  return historyVenueCtx_;
+}
+
+function historyIdxKey_() {
+  return historyVenueCtx_ === 'windmill' ? 'HISTIDX_WINDMILL' : 'HISTIDX';
+}
+
+function historyDelKey_() {
+  return historyVenueCtx_ === 'windmill' ? 'HISTDEL_WINDMILL' : 'HISTDEL';
+}
+
+function historyFolderPropKey_() {
+  return historyVenueCtx_ === 'windmill' ? 'HIST_FOLDER_ID_WINDMILL' : 'HIST_FOLDER_ID';
+}
+
+function historyFolderName_() {
+  return historyVenueCtx_ === 'windmill'
+    ? 'Windmill Menu Print History'
+    : 'Eight Bells Menu Print History';
+}
+
 function historySortNewest_(list) {
   return (list || []).slice().sort(function (a, b) {
     return (b.generatedAt || 0) - (a.generatedAt || 0);
@@ -922,7 +960,7 @@ function historySortNewest_(list) {
 
 function historyReadIndex_() {
   try {
-    var parsed = JSON.parse(propRead_('HISTIDX') || '[]');
+    var parsed = JSON.parse(propRead_(historyIdxKey_()) || '[]');
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     return [];
@@ -930,7 +968,7 @@ function historyReadIndex_() {
 }
 
 function historyWriteIndex_(list) {
-  propWrite_('HISTIDX', JSON.stringify(list || []));
+  propWrite_(historyIdxKey_(), JSON.stringify(list || []));
 }
 
 /**
@@ -1463,7 +1501,7 @@ function historyPreserveGeneratedAt_(existing, incoming) {
 
 function historyReadDeleted_() {
   try {
-    var parsed = JSON.parse(propRead_('HISTDEL') || '[]');
+    var parsed = JSON.parse(propRead_(historyDelKey_()) || '[]');
     return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch (e) {
     return [];
@@ -1482,7 +1520,7 @@ function historyWriteDeleted_(ids) {
   if (list.length > HISTORY_DELETED_MAX_) {
     list = list.slice(-HISTORY_DELETED_MAX_);
   }
-  propWrite_('HISTDEL', JSON.stringify(list));
+  propWrite_(historyDelKey_(), JSON.stringify(list));
 }
 
 function historyMarkDeleted_(id) {
@@ -1501,7 +1539,7 @@ function historyUnmarkDeleted_(id) {
 
 function rebuildPrintHistoryIndex_() {
   // Force a rebuild even when HISTIDX is a non-empty stale list.
-  try { propDelete_('HISTIDX'); } catch (e0) {}
+  try { propDelete_(historyIdxKey_()); } catch (e0) {}
   var deleted = {};
   historyReadDeleted_().forEach(function (id) { deleted[String(id)] = true; });
   var candidates = historyDiscoverStoredIds_();
@@ -1589,6 +1627,8 @@ function listPrintHistory_() {
   return {
     ok: true,
     source: 'props',
+    venue: historyVenueCtx_,
+    venues: ['eightbells', 'windmill'],
     items: list,
     deletedIds: historyReadDeleted_(),
     orphansDropped: 0
@@ -1693,6 +1733,7 @@ function savePrintHistory_(raw) {
         (driveErr ? ' (' + driveErr + ')' : '')
     };
   }
+  meta.venue = historyVenueCtx_;
   var list = historyReadIndex_().filter(function (r) { return r.id !== meta.id; });
   list.unshift(meta);
   list = historyPrune_(list);

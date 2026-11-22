@@ -517,11 +517,11 @@
     <div id="publishNote" class="publish-note no-print" hidden role="status"></div>
     <div id="editor"></div>
   </main>
-  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-flow227"></script>
-  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-flow227"></script>
-  <script src="menus.js?v=20261122-flow227"></script>
-  <script src="menus-print.js?v=20261122-flow227"></script>
-  <script src="menus-ingest.js?v=20261122-flow227"></script>
+  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-wm-venue-sync"></script>
+  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-wm-venue-sync"></script>
+  <script src="menus.js?v=20261122-wm-venue-sync"></script>
+  <script src="menus-print.js?v=20261122-wm-venue-sync"></script>
+  <script src="menus-ingest.js?v=20261122-wm-venue-sync"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -532,13 +532,21 @@
     if (isStaffMode) document.documentElement.classList.add('staff-mode');
 
     var menuVenue = (function () {
-      var m = String(location.search || '').match(/(?:\?|&)venue=([^&]*)/i);
-      var raw = m ? decodeURIComponent(m[1] || '') : '';
+      var q = String(location.search || '');
+      var venueM = q.match(/(?:\?|&)venue=([^&]*)/i);
+      var pubM = q.match(/(?:\?|&)pub=([^&]*)/i);
+      var raw = '';
+      try {
+        raw = decodeURIComponent((venueM && venueM[1]) || (pubM && pubM[1]) || '');
+      } catch (e) {
+        raw = (venueM && venueM[1]) || (pubM && pubM[1]) || '';
+      }
       if (window.EBMenusSyncLogic && typeof EBMenusSyncLogic.normalizeVenue === 'function') {
         return EBMenusSyncLogic.normalizeVenue(raw);
       }
       var v = String(raw || '').toLowerCase().trim();
-      return (v === 'windmill' || v === 'wm') ? 'windmill' : 'eightbells';
+      return (v === 'windmill' || v === 'wm' || v === 'windmillinn' || v === 'thewindmill')
+        ? 'windmill' : 'eightbells';
     })();
     var isWindmillVenue = menuVenue === 'windmill';
     if (isWindmillVenue) document.documentElement.classList.add('venue-windmill');
