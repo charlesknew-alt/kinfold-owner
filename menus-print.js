@@ -1642,8 +1642,9 @@
       u += 1.0 + Math.floor(String(d.description).length / 50) * 0.6;
     }
     // Windmill country-pub type (Crimson dish names) reads taller than the
-    // Eight Bells Roboto model the unit tally was tuned for.
-    if (isWindmillPrint()) u *= 1.28;
+    // Eight Bells Roboto model the unit tally was tuned for. Stay pessimistic
+    // so a Mains prefix never clips the allergy footer.
+    if (isWindmillPrint()) u *= 1.42;
     return u;
   }
 
@@ -1945,7 +1946,8 @@
       var mainsP2Heavier = backWithoutMainsAll >= (front + mainCost) - 8 ||
         back > PAGE - 10;
       if (mainsP1Sparse && (mainsP2Heavier || noClassicsBand)) {
-        var roomForMains = Math.max(0, PAGE - 10 - front);
+        // Extra Windmill safety: allergy footer + Crimson line-height under-count.
+        var roomForMains = Math.max(0, PAGE - (isWindmillPrint() ? 18 : 10) - front);
         var headU = COST.sectionHead;
         var usedM = headU;
         var take = 0;
