@@ -10,32 +10,66 @@
   /** Windmill print accent — forest from windmill-manager / live site. */
   var WM_GREEN = '#24362c';
 
-  /** Active print venue — mirrors EBMenuIngest / ?pub= / ?venue= / dataset. */
+  /** Normalize venue aliases the same way as MenusSyncLogic / menus.html. */
+  function normalizePrintVenue_(raw) {
+    if (root.EBMenusSyncLogic && typeof root.EBMenusSyncLogic.normalizeVenue === 'function') {
+      return root.EBMenusSyncLogic.normalizeVenue(raw);
+    }
+    var v = String(raw == null ? '' : raw).toLowerCase().trim();
+    if (v === 'windmill' || v === 'wm' || v === 'windmillinn' || v === 'thewindmill') {
+      return 'windmill';
+    }
+    return 'eightbells';
+  }
+
+  /**
+   * Active print venue — URL / data-menus-venue win over in-memory cloud venue
+   * so a stale session cannot keep the previous pub after ?venue= changes.
+   * (Keeps #158 EBMenusVenue / getCloudVenue as later fallbacks only.)
+   */
   function printVenueId() {
-    try {
-      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
-        var cv = root.EBMenuIngest.getCloudVenue();
-        if (cv === 'windmill') return 'windmill';
-        if (cv === 'eightbells' || cv === 'eight-bells') return 'eightbells';
-      }
-    } catch (e) {}
-    try {
-      if (root.EBMenusVenue && typeof root.EBMenusVenue.currentPub === 'function') {
-        if (root.EBMenusVenue.currentPub() === 'windmill') return 'windmill';
-      }
-    } catch (eV) {}
-    try {
-      var ds = root.document && root.document.documentElement && root.document.documentElement.dataset;
-      if (ds && (ds.previewPub === 'windmill' || ds.menusVenue === 'windmill')) return 'windmill';
-    } catch (eD) {}
     try {
       if (typeof location !== 'undefined') {
         var q = String(location.search || '');
-        if (/(?:\?|&)(?:venue|pub)=windmill(?:&|$)/i.test(q)) return 'windmill';
-        if (/(?:\?|&)pub=eight-bells(?:&|$)/i.test(q)) return 'eightbells';
+        var m = q.match(/(?:\?|&)(?:venue|pub)=([^&]*)/i);
+        if (m) {
+          var raw = '';
+          try { raw = decodeURIComponent(m[1] || ''); }
+          catch (eDec) { raw = m[1] || ''; }
+          if (String(raw).trim()) return normalizePrintVenue_(raw);
+        }
       }
-    } catch (e2) {}
+    } catch (eUrl) {}
+    try {
+      var ds = root.document && root.document.documentElement && root.document.documentElement.dataset;
+      if (ds && ds.menusVenue) return normalizePrintVenue_(ds.menusVenue);
+      if (ds && ds.previewPub === 'windmill') return 'windmill';
+    } catch (eDs) {}
+    try {
+      if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
+        var cv = root.EBMenuIngest.getCloudVenue();
+        if (cv) return normalizePrintVenue_(cv);
+      }
+    } catch (eCv) {}
+    try {
+      if (root.EBMenusVenue && typeof root.EBMenusVenue.currentPub === 'function') {
+        var pub = root.EBMenusVenue.currentPub();
+        if (pub) return normalizePrintVenue_(pub);
+      }
+    } catch (eV) {}
     return 'eightbells';
+  }
+
+  /** Sync may only upload sheets tagged for the active pub (never untagged / other-pub). */
+  function printHistoryBelongsToVenue_(entry, venue) {
+    if (root.EBMenusSyncLogic &&
+        typeof root.EBMenusSyncLogic.printHistoryBelongsToVenue === 'function') {
+      return root.EBMenusSyncLogic.printHistoryBelongsToVenue(entry, venue || printVenueId());
+    }
+    if (!entry || typeof entry !== 'object') return false;
+    var tagged = entry.venue;
+    if (tagged == null || String(tagged).trim() === '') return false;
+    return normalizePrintVenue_(tagged) === normalizePrintVenue_(venue || printVenueId());
   }
 
   function isWindmillPrint() {
@@ -5956,15 +5990,24 @@
   }
 
   var lastBuildMeta = null;
-  /** Venue-scoped IndexedDB so Windmill never shares Eight Bells print drafts. */
+  /**
+   * Venue-scoped local print stores — resolved on each call from printVenueId()
+   * so a Windmill Sync never reads the Eight Bells IndexedDB / localStorage keys
+   * (and the reverse). Do not freeze these at module load (ingest/venue boot later).
+   */
   function historyDbName_() {
     return printVenueId() === 'windmill' ? 'eb-menu-prints-wm' : 'eb-menu-prints';
   }
-  var HISTORY_DB = historyDbName_();
+  function historyLsSuffix_() {
+    return printVenueId() === 'windmill' ? '-wm' : '';
+  }
+  function historyLsIndexKey_() {
+    return 'eb-menu-print-history-v1' + historyLsSuffix_();
+  }
+  function historyLsHtmlKey_(id) {
+    return 'eb-menu-print-html-' + (historyLsSuffix_() ? 'wm-' : '') + String(id || '');
+  }
   var HISTORY_STORE = 'prints';
-  var HISTORY_LS_SUFFIX = printVenueId() === 'windmill' ? '-wm' : '';
-  var HISTORY_LS_INDEX = 'eb-menu-print-history-v1' + HISTORY_LS_SUFFIX;
-  var HISTORY_LS_HTML = 'eb-menu-print-html-' + (HISTORY_LS_SUFFIX ? 'wm-' : '');
   var HISTORY_MAX = 60;
   /** Live Menu AI web app — also stores shared print history in Drive. */
   var HISTORY_CLOUD_DEFAULT = '/api/manager/menus-cloud';
@@ -6104,7 +6147,8 @@
                 weekKey: r.weekKey,
                 hideDate: r.hideDate,
                 generatedAt: r.generatedAt,
-                dayKey: r.dayKey
+                dayKey: r.dayKey,
+                venue: r.venue
               };
             })));
           };
@@ -6129,7 +6173,8 @@
             weekKey: r.weekKey,
             hideDate: r.hideDate,
             generatedAt: r.generatedAt,
-            dayKey: r.dayKey
+            dayKey: r.dayKey,
+            venue: r.venue
           });
           cursor.continue();
         };
@@ -6187,10 +6232,16 @@
 
   function uploadHistoryEntry_(full) {
     if (!full || !full.html || !full.id) return Promise.resolve(false);
+    var activeVenue = printVenueId();
+    // Never push untagged / other-pub drafts into this pub's cloud history.
+    if (!printHistoryBelongsToVenue_(full, activeVenue)) {
+      return Promise.resolve(false);
+    }
     // Always send the frozen original Save time — never stamp Date.now() here.
     var payload = Object.assign({}, full, {
       generatedAt: full.generatedAt,
-      createdAt: full.createdAt || full.generatedAt
+      createdAt: full.createdAt || full.generatedAt,
+      venue: activeVenue
     });
     // Retry — no-cors writes can race Drive visibility on first verify.
     function attempt_(n) {
@@ -6282,17 +6333,22 @@
   function migrateLocalToCloud(cloudIds, deletedIds, cloudItems) {
     var known = cloudIds || {};
     var gone = deletedIds || {};
+    var activeVenue = printVenueId();
     var cloudById = {};
     (cloudItems || []).forEach(function (r) {
       if (r && r.id) cloudById[r.id] = r;
     });
     return localListOnly().then(function (rows) {
-      var missing = (rows || []).filter(function (r) {
-        return r && r.id && !known[r.id] && !gone[r.id];
+      // Same-pub tagged sheets only — untagged / other-pub locals never upload.
+      var eligible = (rows || []).filter(function (r) {
+        return r && r.id && printHistoryBelongsToVenue_(r, activeVenue);
+      });
+      var missing = eligible.filter(function (r) {
+        return !known[r.id] && !gone[r.id];
       });
       // Same id on cloud with a newer (polluted) stamp — push the older local time.
-      var stampRepair = (rows || []).filter(function (r) {
-        if (!r || !r.id || gone[r.id] || !known[r.id]) return false;
+      var stampRepair = eligible.filter(function (r) {
+        if (gone[r.id] || !known[r.id]) return false;
         var cloud = cloudById[r.id];
         if (!cloud) return false;
         var localTs = Number(r.generatedAt || r.createdAt || 0) || 0;
@@ -6348,6 +6404,7 @@
   function repairCloudHtmlGaps(cloudItems) {
     var repaired = 0;
     var checked = 0;
+    var activeVenue = printVenueId();
     var chain = Promise.resolve();
     // Tiny hasPrintHistory check — never fetch full HTML just to see if it exists.
     (cloudItems || []).slice(0, 8).forEach(function (meta) {
@@ -6361,6 +6418,7 @@
           if (data && data.exists) return;
           return localGetOnly(meta.id).then(function (full) {
             if (!full || !full.html) return;
+            if (!printHistoryBelongsToVenue_(full, activeVenue)) return;
             return uploadHistoryEntry_(full).then(function (ok) {
               if (ok) repaired += 1;
             });
@@ -6368,6 +6426,7 @@
         }).catch(function () {
           return localGetOnly(meta.id).then(function (full) {
             if (!full || !full.html) return;
+            if (!printHistoryBelongsToVenue_(full, activeVenue)) return;
             return uploadHistoryEntry_(full).then(function (ok) {
               if (ok) repaired += 1;
             });
@@ -6427,6 +6486,16 @@
   function syncPrintHistoryToCloud() {
     var finished = false;
     var work = historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
+      var activeVenue = printVenueId();
+      var gotVenue = String((data && data.venue) || '');
+      // Wrong-pub cloud index — do not migrate local drafts into it.
+      if ((activeVenue === 'windmill' && gotVenue !== 'windmill') ||
+          (activeVenue !== 'windmill' && gotVenue === 'windmill')) {
+        return listPrintHistory().then(function (rows) {
+          finished = true;
+          return { rows: rows, uploaded: 0, repaired: 0, orphansDropped: 0, venuePending: true };
+        });
+      }
       var known = {};
       var deleted = {};
       var items = Array.isArray(data.items) ? data.items : [];
@@ -6449,6 +6518,11 @@
         });
       });
     }).then(function (stats) {
+      // Venue-mismatch path already returned the safe list — do not prune/migrate.
+      if (stats && stats.venuePending && stats.rows) {
+        finished = true;
+        return stats;
+      }
       // pruneOrphanPrintHistory can take ~50s against live Script — never block
       // the shared list paint on it. Fire-and-forget; Sync still returns the list.
       pruneOrphanCloudIndex().catch(function () {});
@@ -6462,9 +6536,12 @@
         };
       });
     }).catch(function () {
+      var activeVenue = printVenueId();
       return localListOnly().then(function (rows) {
         finished = true;
-        var out = (rows || []).map(function (r) {
+        var out = (rows || []).filter(function (r) {
+          return printHistoryBelongsToVenue_(r, activeVenue);
+        }).map(function (r) {
           return Object.assign({}, r, { source: 'local', cloudUnreachable: true });
         });
         out.cloudOk = false;
@@ -6645,7 +6722,7 @@
         reject(new Error('no_idb'));
         return;
       }
-      var req = indexedDB.open(HISTORY_DB, 1);
+      var req = indexedDB.open(historyDbName_(), 1);
       req.onupgradeneeded = function () {
         var db = req.result;
         if (!db.objectStoreNames.contains(HISTORY_STORE)) {
@@ -6667,7 +6744,7 @@
 
   function lsLoadIndex() {
     try {
-      var raw = JSON.parse(localStorage.getItem(HISTORY_LS_INDEX) || '[]');
+      var raw = JSON.parse(localStorage.getItem(historyLsIndexKey_()) || '[]');
       return Array.isArray(raw) ? raw : [];
     } catch (e) {
       return [];
@@ -6675,7 +6752,7 @@
   }
 
   function lsSaveIndex(list) {
-    localStorage.setItem(HISTORY_LS_INDEX, JSON.stringify(list));
+    localStorage.setItem(historyLsIndexKey_(), JSON.stringify(list));
   }
 
   function lsSavePrint(entry) {
@@ -6695,20 +6772,21 @@
       hideDate: !!frozen.hideDate,
       generatedAt: frozen.generatedAt,
       createdAt: frozen.createdAt || frozen.generatedAt,
-      dayKey: frozen.dayKey || venueDayKeyFromMs(frozen.generatedAt)
+      dayKey: frozen.dayKey || venueDayKeyFromMs(frozen.generatedAt),
+      venue: frozen.venue || printVenueId()
     };
     entry = frozen;
     try {
-      localStorage.setItem(HISTORY_LS_HTML + entry.id, entry.html || '');
+      localStorage.setItem(historyLsHtmlKey_(entry.id), entry.html || '');
     } catch (e) {
       // Quota — drop oldest html blobs then retry once
       var idx = pruneHistoryList(lsLoadIndex());
       while (idx.length > 10) {
         var drop = idx.pop();
-        try { localStorage.removeItem(HISTORY_LS_HTML + drop.id); } catch (e2) {}
+        try { localStorage.removeItem(historyLsHtmlKey_(drop.id)); } catch (e2) {}
       }
       lsSaveIndex(idx);
-      localStorage.setItem(HISTORY_LS_HTML + entry.id, entry.html || '');
+      localStorage.setItem(historyLsHtmlKey_(entry.id), entry.html || '');
     }
     var next = pruneHistoryList([meta].concat(lsLoadIndex().filter(function (r) { return r.id !== meta.id; })));
     // Remove orphaned html for pruned rows
@@ -6716,7 +6794,7 @@
     next.forEach(function (r) { keep[r.id] = true; });
     lsLoadIndex().forEach(function (r) {
       if (!keep[r.id]) {
-        try { localStorage.removeItem(HISTORY_LS_HTML + r.id); } catch (e3) {}
+        try { localStorage.removeItem(historyLsHtmlKey_(r.id)); } catch (e3) {}
       }
     });
     lsSaveIndex(next);
@@ -6732,7 +6810,7 @@
     lsLoadIndex().forEach(function (r) { if (r.id === id) meta = r; });
     if (!meta) return null;
     var html = '';
-    try { html = localStorage.getItem(HISTORY_LS_HTML + id) || ''; } catch (e) {}
+    try { html = localStorage.getItem(historyLsHtmlKey_(id)) || ''; } catch (e) {}
     return {
       id: meta.id,
       menuId: meta.menuId,
@@ -6744,13 +6822,14 @@
       hideDate: meta.hideDate,
       generatedAt: meta.generatedAt,
       dayKey: meta.dayKey,
+      venue: meta.venue,
       html: html
     };
   }
 
   function lsDeletePrint(id) {
     lsSaveIndex(lsLoadIndex().filter(function (r) { return r.id !== id; }));
-    try { localStorage.removeItem(HISTORY_LS_HTML + id); } catch (e) {}
+    try { localStorage.removeItem(historyLsHtmlKey_(id)); } catch (e) {}
   }
 
   function normalizeHistoryEntry(raw) {
@@ -6770,6 +6849,10 @@
       menuId = 'little-bells';
       menuName = 'Little Bells';
     }
+    // New saves always tag the active pub. Preserve an explicit tag on retries.
+    var venue = (raw.venue != null && String(raw.venue).trim() !== '')
+      ? normalizePrintVenue_(raw.venue)
+      : printVenueId();
     return {
       id: raw.id || ('p' + generatedAt.toString(36)),
       menuId: menuId,
@@ -6782,6 +6865,7 @@
       generatedAt: generatedAt,
       createdAt: createdAt,
       dayKey: raw.dayKey || venueDayKeyFromMs(generatedAt),
+      venue: venue,
       html: html
     };
   }
@@ -6835,6 +6919,7 @@
         generatedAt: r.generatedAt,
         createdAt: r.createdAt || r.generatedAt,
         dayKey: r.dayKey,
+        venue: r.venue,
         source: source
       };
     }
@@ -6846,13 +6931,30 @@
      * Phone-only leftovers upload in the background via schedulePendingPrintUploads.
      */
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
-      var wantWm = printVenueId() === 'windmill';
+      var activeVenue = printVenueId();
+      var wantWm = activeVenue === 'windmill';
       var gotVenue = String((data && data.venue) || '');
       // Windmill must never display the shared Eight Bells HISTIDX list.
       // Until Menu AI returns venue=windmill, keep this device on local WM drafts only.
       if (wantWm && gotVenue !== 'windmill') {
         return localListOnly().then(function (localItems) {
-          var rows = sortHistoryNewest((localItems || []).map(function (r) {
+          var rows = sortHistoryNewest((localItems || []).filter(function (r) {
+            return printHistoryBelongsToVenue_(r, activeVenue);
+          }).map(function (r) {
+            return asRow(r, 'local');
+          }));
+          rows.cloudOk = false;
+          rows.venuePending = true;
+          hydratePrintVersionsFromHistory(rows);
+          return rows;
+        });
+      }
+      // Eight Bells must not paint a Windmill-scoped cloud list either.
+      if (!wantWm && gotVenue === 'windmill') {
+        return localListOnly().then(function (localItems) {
+          var rows = sortHistoryNewest((localItems || []).filter(function (r) {
+            return printHistoryBelongsToVenue_(r, activeVenue);
+          }).map(function (r) {
             return asRow(r, 'local');
           }));
           rows.cloudOk = false;
@@ -6882,8 +6984,10 @@
         // Local-only leftovers — mark pending, never as cloud; upload async.
         // Same id on both: keep the older generatedAt (original Save), still cloud.
         // If local is older than cloud, push that stamp back (repair polluted 14:19).
+        // Untagged / other-pub locals are ignored (must not Sync into this pub).
         (localItems || []).forEach(function (r) {
           if (!r || !r.id || deleted[r.id]) return;
+          if (!printHistoryBelongsToVenue_(r, activeVenue)) return;
           if (byId[r.id]) {
             var cloudRow = byId[r.id];
             var merged = preserveHistoryGeneratedAt(r, cloudRow);
@@ -6907,8 +7011,11 @@
       });
     }).catch(function () {
       // Do not pretend phone drafts are the shared cloud list.
+      var activeVenue = printVenueId();
       return localListOnly().then(function (rows) {
-        var out = (rows || []).map(function (r) {
+        var out = (rows || []).filter(function (r) {
+          return printHistoryBelongsToVenue_(r, activeVenue);
+        }).map(function (r) {
           var row = asRow(r, 'local');
           row.cloudUnreachable = true;
           return row;
@@ -8096,6 +8203,8 @@
     featurePanelTitlesFromHtml: featurePanelTitlesFromHtml,
     venueDayKeyFromMs: venueDayKeyFromMs,
     splitHistoryWindow: splitHistoryWindow,
-    isRecentHistoryRow: isRecentHistoryRow
+    isRecentHistoryRow: isRecentHistoryRow,
+    printVenueId: printVenueId,
+    printHistoryBelongsToVenue: printHistoryBelongsToVenue_
   };
 })(typeof window !== 'undefined' ? window : global);

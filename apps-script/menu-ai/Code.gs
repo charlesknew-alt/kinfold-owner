@@ -1651,6 +1651,19 @@ function savePrintHistory_(raw) {
   if (!raw || !raw.html) {
     return { ok: false, error: 'Missing entry.html' };
   }
+  // Preview/server guard: refuse cross-pub uploads (e.g. Eight Bells draft → HISTIDX_WINDMILL).
+  // Untagged entries still stamp as the request venue (legacy clients); tagged mismatches fail.
+  if (raw.venue != null && String(raw.venue).trim() !== '') {
+    var entryVenue = normalizeMenusVenue_(raw.venue);
+    if (entryVenue !== historyVenueCtx_) {
+      return {
+        ok: false,
+        error: 'venue_mismatch',
+        venue: historyVenueCtx_,
+        entryVenue: entryVenue
+      };
+    }
+  }
   var meta = historyMetaOnly_(raw);
   if (!meta.id) {
     meta.id = 'p' + Number(meta.generatedAt || Date.now()).toString(36);

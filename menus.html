@@ -10,6 +10,31 @@
   <!-- Eight Bells UI: Fraunces + Source Sans 3. Windmill UI swaps to Cormorant Garamond + Outfit (live windmilllittleworth.com). -->
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    /* URL venue before first paint — stops a stale Windmill class/header flashing on ?venue=eight-bells. */
+    (function () {
+      var q = String(location.search || '');
+      var venueM = q.match(/(?:\?|&)venue=([^&]*)/i);
+      var pubM = q.match(/(?:\?|&)pub=([^&]*)/i);
+      var raw = '';
+      try {
+        raw = decodeURIComponent((venueM && venueM[1]) || (pubM && pubM[1]) || '');
+      } catch (e) {
+        raw = (venueM && venueM[1]) || (pubM && pubM[1]) || '';
+      }
+      var v = String(raw || '').toLowerCase().trim();
+      var wm = (v === 'windmill' || v === 'wm' || v === 'windmillinn' || v === 'thewindmill');
+      var html = document.documentElement;
+      html.dataset.menusVenue = wm ? 'windmill' : 'eightbells';
+      if (wm) {
+        html.classList.add('venue-windmill');
+        document.title = 'Varlo · The Windmill — Menus';
+      } else {
+        html.classList.remove('venue-windmill');
+        document.title = 'Varlo · Eight Bells — Menus';
+      }
+    })();
+  </script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
@@ -492,6 +517,16 @@
         </div>
     </div>
   </header>
+  <script>
+    /* Immediate header copy from ?venue= / ?pub= (class already set in <head>). */
+    (function () {
+      var wm = document.documentElement.dataset.menusVenue === 'windmill';
+      var eye = document.getElementById('psVenueEyebrow');
+      if (eye) eye.textContent = wm ? 'The Windmill Inn · Littleworth' : 'The Eight Bells · Bolney';
+      var logo = document.getElementById('psVenueLogo');
+      if (logo) logo.hidden = !wm;
+    })();
+  </script>
   <main>
     <h1>Menus</h1>
     <p class="lede" id="pageLede">A short flow: load dishes, set how each section sits on the sheet, pick wording, then generate. One step at a time — like block management on Varlo.</p>
@@ -517,11 +552,11 @@
     <div id="publishNote" class="publish-note no-print" hidden role="status"></div>
     <div id="editor"></div>
   </main>
-  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-wm-venue-sync"></script>
-  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-wm-venue-sync"></script>
-  <script src="menus.js?v=20261122-wm-venue-sync"></script>
-  <script src="menus-print.js?v=20261122-wm-venue-sync"></script>
-  <script src="menus-ingest.js?v=20261122-wm-venue-sync"></script>
+  <script src="apps-script/menu-ai/MenuPublish.js?v=20261122-venue-isolation"></script>
+  <script src="apps-script/menu-ai/MenusSyncLogic.js?v=20261122-venue-isolation"></script>
+  <script src="menus.js?v=20261122-venue-isolation"></script>
+  <script src="menus-print.js?v=20261122-venue-isolation"></script>
+  <script src="menus-ingest.js?v=20261122-venue-isolation"></script>
   <script>
     if (window.parent !== window) document.documentElement.classList.add('iframed');
 
@@ -531,8 +566,8 @@
     var isStaffMode = /(?:\?|&)mode=staff(?:&|$)/.test(String(location.search || ''));
     if (isStaffMode) document.documentElement.classList.add('staff-mode');
 
-    var menuVenue = (function () {
-      var q = String(location.search || '');
+    function venueFromLocationSearch_(search) {
+      var q = String(search == null ? (location.search || '') : search);
       var venueM = q.match(/(?:\?|&)venue=([^&]*)/i);
       var pubM = q.match(/(?:\?|&)pub=([^&]*)/i);
       var raw = '';
@@ -547,12 +582,31 @@
       var v = String(raw || '').toLowerCase().trim();
       return (v === 'windmill' || v === 'wm' || v === 'windmillinn' || v === 'thewindmill')
         ? 'windmill' : 'eightbells';
-    })();
+    }
+
+    var menuVenue = venueFromLocationSearch_();
     var isWindmillVenue = menuVenue === 'windmill';
+    // URL is source of truth — force class/dataset even after bfcache restore of the other pub.
+    document.documentElement.dataset.menusVenue = menuVenue;
     if (isWindmillVenue) document.documentElement.classList.add('venue-windmill');
+    else document.documentElement.classList.remove('venue-windmill');
     if (window.EBMenuIngest && typeof EBMenuIngest.setCloudVenue === 'function') {
       EBMenuIngest.setCloudVenue(menuVenue);
     }
+    // bfcache restore of the other pub: URL venue wins — one guarded hard reload.
+    window.addEventListener('pageshow', function (ev) {
+      if (!(ev && ev.persisted)) return;
+      var urlVenue = venueFromLocationSearch_();
+      if (urlVenue === menuVenue) return;
+      try {
+        if (sessionStorage.getItem('menusVenueReloadGuard') === urlVenue) {
+          sessionStorage.removeItem('menusVenueReloadGuard');
+          return;
+        }
+        sessionStorage.setItem('menusVenueReloadGuard', urlVenue);
+      } catch (eGuard) {}
+      location.reload();
+    });
     // When live Menu AI still lacks venue support, never push Windmill edits into MENUS.
     var windmillCloudReady = !isWindmillVenue;
     var windmillPreviewOnly = false;
@@ -591,6 +645,8 @@
         if (logoOff) logoOff.hidden = true;
       }
     })();
+    // Clear a successful venue boot so a later bfcache mismatch can reload again.
+    try { sessionStorage.removeItem('menusVenueReloadGuard'); } catch (eClear) {}
 
     // Venue-scoped local cache so Windmill never reads Eight Bells dishes from storage.
     var storageSuffix = isWindmillVenue ? '-wm' : '';
@@ -1159,6 +1215,20 @@
       return EBMenuIngest.cloudPost({ action: 'getMenusState', venue: menuVenue }).then(function (data) {
         var remote = data && data.state;
         var gotVenue = String((data && data.venue) || (remote && remote.venue) || '');
+        // Re-check URL on every pull — never keep a stale previous pub after ?venue= changes.
+        var urlVenueNow = venueFromLocationSearch_();
+        if (urlVenueNow !== menuVenue) {
+          try {
+            if (sessionStorage.getItem('menusVenueReloadGuard') !== urlVenueNow) {
+              sessionStorage.setItem('menusVenueReloadGuard', urlVenueNow);
+              location.reload();
+            }
+          } catch (eReload) {
+            location.reload();
+          }
+          cloudPullDone = true;
+          return false;
+        }
         if (isWindmillVenue) {
           // Old Menu AI (no venue key) would return the Eight Bells book — do not apply it.
           if (gotVenue !== 'windmill') {
@@ -1192,6 +1262,13 @@
             return true;
           }
           cloudPullDone = true;
+          return false;
+        }
+        // Eight Bells must never apply a Windmill-scoped book (stale session / wrong venue).
+        if (gotVenue === 'windmill') {
+          cloudSyncNote = 'Waiting for Eight Bells menus (ignored a Windmill cloud response)';
+          cloudPullDone = true;
+          render();
           return false;
         }
         if (remote) {

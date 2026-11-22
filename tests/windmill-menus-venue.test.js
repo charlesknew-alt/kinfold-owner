@@ -167,9 +167,9 @@ assert(printJs.indexOf('Windmill website publish is not wired yet') !== -1,
   'publishSavedSheet skips Windmill → Eight Bells site');
 assert(printJs.indexOf("asset('eight-bells-logo.png')") === -1,
   'print no longer hardcodes eight-bells-logo outside venueLogoFile');
-assert(printJs.indexOf('(?:venue|pub)=windmill') !== -1 ||
-  printJs.indexOf('pub)=windmill') !== -1,
-  'printVenueId treats ?pub=windmill the same as ?venue=windmill');
+assert(printJs.indexOf('(?:venue|pub)=([^&]*)') !== -1 &&
+  printJs.indexOf('normalizePrintVenue_') !== -1,
+  'printVenueId treats ?pub=windmill the same as ?venue=windmill (shared normalize)');
 assert(page.indexOf('function menuTabLabel') !== -1 &&
   page.indexOf("return 'Little Ones'") !== -1,
   'Windmill kids tab display label is Little Ones');
@@ -477,6 +477,57 @@ assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')),
   assert(/Little Bells/i.test(ebBody), 'Eight Bells print still shows Little Bells');
   assert(!/Little Ones/i.test(ebBody), 'Eight Bells print does not show Little Ones');
 })();
+
+// —— 7. Sync isolation: only same-pub tagged sheets migrate ——
+assert(typeof sync.printHistoryBelongsToVenue === 'function',
+  'MenusSyncLogic exports printHistoryBelongsToVenue');
+assert(sync.printHistoryBelongsToVenue({ id: 'a', venue: 'eightbells' }, 'windmill') === false,
+  'Eight Bells-tagged sheet does not belong to Windmill Sync');
+assert(sync.printHistoryBelongsToVenue({ id: 'a', venue: 'windmill' }, 'windmill') === true,
+  'Windmill-tagged sheet belongs to Windmill Sync');
+assert(sync.printHistoryBelongsToVenue({ id: 'a', venue: 'eight-bells' }, 'eightbells') === true,
+  'eight-bells alias tags match eightbells venue');
+assert(sync.printHistoryBelongsToVenue({ id: 'a' }, 'windmill') === false,
+  'untagged local sheet must not migrate into Windmill cloud history');
+assert(sync.printHistoryBelongsToVenue({ id: 'a', venue: '' }, 'eightbells') === false,
+  'empty venue tag must not migrate');
+assert(sync.printHistoryBelongsToVenue(null, 'windmill') === false,
+  'null entry does not belong to any venue');
+
+assert(printJs.indexOf('printHistoryBelongsToVenue_') !== -1 &&
+  printJs.indexOf('migrateLocalToCloud') !== -1,
+  'print module filters migrateLocalToCloud by venue tag');
+assert(printJs.indexOf('Untagged / other-pub locals are ignored') !== -1 ||
+  printJs.indexOf('untagged / other-pub') !== -1,
+  'list/merge documents skipping untagged other-pub locals');
+assert(printJs.indexOf('historyDbName_()') !== -1 &&
+  printJs.indexOf('historyLsIndexKey_()') !== -1 &&
+  printJs.indexOf('var HISTORY_DB =') === -1,
+  'print history store keys resolve dynamically from printVenueId (not frozen at load)');
+assert(printJs.indexOf('Wrong-pub cloud index') !== -1 ||
+  printJs.indexOf('venuePending') !== -1,
+  'syncPrintHistoryToCloud refuses migrate when cloud venue mismatches');
+assert(aiGs.indexOf("error: 'venue_mismatch'") !== -1 ||
+  aiGs.indexOf('venue_mismatch') !== -1,
+  'Apps Script savePrintHistory_ rejects cross-pub entry.venue (preview source; not clasp-deployed)');
+
+// —— 8. Venue-switch: URL param wins on first load / bfcache ——
+assert(page.indexOf('dataset.menusVenue') !== -1 &&
+  page.indexOf('URL venue before first paint') !== -1,
+  'menus.html sets data-menus-venue from URL before first paint');
+assert(page.indexOf('venueFromLocationSearch_') !== -1,
+  'menus.html exposes venueFromLocationSearch_ for URL re-checks');
+assert(page.indexOf("classList.remove('venue-windmill')") !== -1,
+  'Eight Bells URL clears the Windmill venue class');
+assert(page.indexOf('pageshow') !== -1 &&
+  page.indexOf('menusVenueReloadGuard') !== -1,
+  'bfcache pageshow reloads when URL venue disagrees with in-memory pub');
+assert(page.indexOf("gotVenue === 'windmill'") !== -1 &&
+  page.indexOf('ignored a Windmill cloud response') !== -1,
+  'Eight Bells pull refuses to apply a Windmill-scoped cloud book');
+assert(printJs.indexOf('URL / data-menus-venue win over in-memory cloud venue') !== -1 ||
+  printJs.indexOf('normalizePrintVenue_') !== -1,
+  'printVenueId prefers URL / dataset over stale getCloudVenue');
 
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');

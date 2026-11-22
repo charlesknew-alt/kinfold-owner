@@ -565,6 +565,17 @@
   }
 
   /**
+   * Sync / migrate may only move sheets tagged for the active pub.
+   * Untagged (legacy) and other-pub rows stay out of this pub's cloud history.
+   */
+  function printHistoryBelongsToVenue(entry, venue) {
+    if (!entry || typeof entry !== 'object') return false;
+    var tagged = entry.venue;
+    if (tagged == null || String(tagged).trim() === '') return false;
+    return normalizeVenue(tagged) === normalizeVenue(venue);
+  }
+
+  /**
    * Fix menuId/menuName mismatches (e.g. menuId "main" + menuName "Little Bells").
    */
   function coercePrintMenuId(menuId, menuName) {
@@ -612,6 +623,7 @@
     applyMenuSave: applyMenuSave,
     applyWholeBookSave: applyWholeBookSave,
     historyMetaFromHtmlTitle: historyMetaFromHtmlTitle,
+    printHistoryBelongsToVenue: printHistoryBelongsToVenue,
     coercePrintMenuId: coercePrintMenuId
   };
 
