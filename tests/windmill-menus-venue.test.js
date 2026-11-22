@@ -142,8 +142,10 @@ assert(aiGs.indexOf("venue: historyVenueCtx_") !== -1 ||
   'listPrintHistory response includes venue');
 assert(printJs.indexOf('logo-tr-wm') !== -1 &&
   printJs.indexOf('logo-tr-frame') === -1 &&
-  printJs.indexOf('Mains (page 1 — balance)') !== -1,
-  'Windmill print uses unframed official logo block and can pull Mains onto page 1');
+  printJs.indexOf('Mains (page 1 — balance)') !== -1 &&
+  printJs.indexOf('mainsTake') !== -1 &&
+  printJs.indexOf('Mains (continued)') !== -1,
+  'Windmill print uses unframed official logo block and can split Mains across pages');
 assert(printJs.indexOf('venuePending') !== -1 &&
   printJs.indexOf('eb-menu-prints-wm') !== -1,
   'Windmill print history refuses unscoped EB cloud list and uses -wm local store');
@@ -151,9 +153,12 @@ assert(printJs.indexOf('venuePending') !== -1 &&
 assert(printJs.indexOf('function venueLogoFile') !== -1 &&
   printJs.indexOf('windmill-logo.png') !== -1,
   'print uses venueLogoFile → windmill-logo.png');
+assert(/logo-tr\.logo-tr-wm\{[^}]*opacity:1/.test(printJs),
+  'Windmill print logo CSS keeps opacity 1 (no soften)');
 assert(printJs.indexOf('Crimson Text') !== -1 && printJs.indexOf('Roboto') !== -1 &&
-  printJs.indexOf('family=Crimson+Text') !== -1 && printJs.indexOf('family=Roboto') !== -1,
-  'print loads Windmill Word-sample fonts (Crimson Text + Roboto)');
+  printJs.indexOf('family=Crimson+Text') !== -1 && printJs.indexOf('family=Roboto') !== -1 &&
+  printJs.indexOf('Windmill smart country-pub type') !== -1,
+  'print loads Windmill smart country-pub fonts (Crimson Text + Roboto)');
 assert(printJs.indexOf("printVenue !== 'windmill'") !== -1 ||
   printJs.indexOf("printVenue === 'windmill'") !== -1,
   'print preview hides Publish to website for Windmill');
@@ -244,6 +249,137 @@ assert(fs.existsSync(path.join(root, 'images/eight-bells-logo.png')),
     'Windmill main stores Windmill dish');
   assert(JSON.stringify(eb) === ebBefore,
     'Eight Bells fixture untouched by Windmill main save');
+})();
+
+// —— 5. Dish-count / footer: every Windmill dish once, never past allergy ——
+(function windmillDishCountAndFooter() {
+  // Minimal DOM so printVenueId() can see Windmill.
+  global.document = {
+    documentElement: { dataset: { menusVenue: 'windmill', previewPub: 'windmill' } }
+  };
+  global.location = { search: '?venue=windmill', href: 'http://localhost/menus.html?venue=windmill' };
+  // Fresh load of print after venue stubs (menus.js already may be cached).
+  delete require.cache[require.resolve(path.join(root, 'menus.js'))];
+  delete require.cache[require.resolve(path.join(root, 'menus-print.js'))];
+  require(path.join(root, 'menus.js'));
+  require(path.join(root, 'menus-print.js'));
+  var api = global.EBMenus;
+  var print = global.EBMenuPrint;
+  assert(print.isWindmillPrint() === true, 'dish-count fixture runs as Windmill print');
+
+  var starters = [
+    'Soup of the Day', 'Prawn Cocktail', 'Halloumi Fries', 'Chicken Liver Pate',
+    'Whitebait', 'Goats Cheese Tart'
+  ];
+  var mains = [
+    'Beer Battered Cod', 'Steak and Ale Pie', 'Honey Roast Ham', 'Beef Burger',
+    'Chicken Supreme', 'Lamb Shank', 'Vegetable Curry', 'Seabass Fillet',
+    'Wild Mushroom Risotto', 'Pork Belly'
+  ];
+  var sides = ['Chunky Chips', 'Skinny Fries', 'House Salad', 'Seasonal Veg'];
+  var dishes = [];
+  starters.forEach(function (n, i) {
+    dishes.push(api.dish(
+      'Starters',
+      n,
+      'starter description with garnish ' + i + ' and extra words for wrap height',
+      '7.95',
+      i % 2 ? 'v' : ''
+    ));
+  });
+  mains.forEach(function (n, i) {
+    dishes.push(api.dish(
+      'Mains',
+      n,
+      'long main description with mash gravy peas lemon butter sauce ' + i +
+        ' and a little more text to force page height for the risotto overflow case',
+      '16.50',
+      n.indexOf('Risotto') !== -1 ? 'gf, v' : ''
+    ));
+  });
+  sides.forEach(function (n) {
+    dishes.push(api.dish('Sides', n, '', '4.50', 'v'));
+  });
+
+  var layoutMap = api.normalizeSectionLayout({
+    Starters: { width: 'full', frame: false },
+    Mains: { width: 'full', frame: false },
+    Sides: { width: 'column', frame: false },
+    Sandwiches: { tip: true, frame: false, width: 'column', sell: 'Ask the team for today’s sandwiches.' }
+  });
+  var planned = print.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false },
+    promos: []
+  });
+  assert(planned.pages === 2, 'Windmill Main with full Starters+Mains plans two pages');
+  assert(planned.p1 && planned.p1.mains === true, 'planner pulls some Mains onto page 1');
+  assert(planned.p1.mainsTake > 0 && planned.p1.mainsTake < mains.length,
+    'page 1 takes a Mains prefix only (remainder continue on page 2)');
+
+  var sheet = print.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false },
+    layout: planned,
+    promos: []
+  });
+  // Strip styles / scripts so name matches stay in body text.
+  var body = sheet.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<script[\s\S]*?<\/script>/gi, '');
+  var a4 = (body.split('mode-panel mode-a5')[0] || body);
+  var pages = a4.split(/class="page fill-page/);
+  assert(pages.length >= 3, 'print emits at least two A4 pages');
+
+  function dishNameHits(html, name) {
+    // Count only dish-name spans so short names do not match inside others.
+    var re = new RegExp(
+      'class="dish-name"[^>]*>\\s*' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*<',
+      'g'
+    );
+    var m = html.match(re);
+    return m ? m.length : 0;
+  }
+
+  starters.concat(mains).concat(sides).forEach(function (name) {
+    assert(dishNameHits(a4, name) === 1,
+      'Windmill dish "' + name + '" appears exactly once across printed pages');
+  });
+  assert(/Mains \(continued\)/.test(a4), 'overflowing Mains continue with continued heading');
+  assert(dishNameHits(a4, 'Wild Mushroom Risotto') === 1,
+    'Wild Mushroom Risotto is not clipped/lost — prints exactly once');
+
+  // Structural footer guard: within each page, no dish-name after the allergy block.
+  for (var pi = 1; pi < pages.length; pi++) {
+    var pageHtml = pages[pi];
+    var allergyAt = pageHtml.search(/class="allergy"/i);
+    if (allergyAt < 0) continue;
+    var afterAllergy = pageHtml.slice(allergyAt);
+    assert(!/class="dish-name"/.test(afterAllergy),
+      'page ' + pi + ' has no dish-name after the allergy footer');
+  }
+
+  // Eight Bells print path: restore venue and confirm no Windmill logo class on <img>.
+  global.document.documentElement.dataset = {};
+  global.location = { search: '', href: 'http://localhost/menus.html' };
+  delete require.cache[require.resolve(path.join(root, 'menus-print.js'))];
+  require(path.join(root, 'menus-print.js'));
+  var printEb = global.EBMenuPrint;
+  assert(printEb.isWindmillPrint() === false, 'Eight Bells venue restores after Windmill fixture');
+  var ebPlan = printEb.planFluidLayout(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false },
+    promos: []
+  });
+  var ebSheet = printEb.build(api.menuById('main'), dishes, {
+    sectionLayout: layoutMap,
+    includes: { sandwiches: false, specials: false },
+    layout: ebPlan,
+    promos: []
+  });
+  var ebBody = ebSheet.replace(/<style[\s\S]*?<\/style>/gi, '');
+  assert(!/<img[^>]*logo-tr-wm/.test(ebBody),
+    'Eight Bells print <img> does not use Windmill logo class');
+  assert(!/windmill-logo\.png/.test(ebBody),
+    'Eight Bells print does not reference windmill-logo.png');
 })();
 
 if (failed) {
