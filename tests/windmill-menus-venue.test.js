@@ -142,6 +142,9 @@ assert(printJs.indexOf('Windmill website publish is not wired yet') !== -1,
   'publishSavedSheet skips Windmill → Eight Bells site');
 assert(printJs.indexOf("asset('eight-bells-logo.png')") === -1,
   'print no longer hardcodes eight-bells-logo outside venueLogoFile');
+assert(printJs.indexOf('(?:venue|pub)=windmill') !== -1 ||
+  printJs.indexOf('pub)=windmill') !== -1,
+  'printVenueId treats ?pub=windmill the same as ?venue=windmill');
 
 var wmEntry = fs.readFileSync(path.join(root, 'menus-windmill.html'), 'utf8');
 assert(wmEntry.indexOf('venue=windmill') !== -1 && wmEntry.indexOf('mode=staff') !== -1,
