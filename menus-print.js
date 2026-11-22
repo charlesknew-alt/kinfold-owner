@@ -4735,26 +4735,6 @@
       '.foot-logo img{width:96px;height:auto}' +
       (wm ? '.foot-logo img{width:110px;opacity:.9}' : '') +
       '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:160px!important}' +
-      /* Windmill Word-sample type — Crimson SemiBold dishes/tags, Roboto Light chrome. */
-      (wm
-        ? '.sec-title,.sec-title.soft,.sec-title.soft-left,.sec-title.under,.scallop .sec-title,' +
-          '.top-left .sec-title,.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,' +
-          '.col-promo .sec-title,.specials-beside .sec-title.specials-beside-title{' +
-            'font-family:var(--sans)!important;font-weight:300!important;font-size:16pt!important;' +
-            'letter-spacing:normal;text-transform:none;text-decoration:underline;text-underline-offset:3px;' +
-            'color:#000;text-align:center!important;line-height:1.2}' +
-          '.dish-name,.dish-c .dish-name{font-family:var(--serif)!important;font-weight:600!important;' +
-            'font-size:16pt!important;color:#000;letter-spacing:normal}' +
-          '.price{font-family:var(--sans)!important;font-weight:300!important;font-size:12pt!important;color:#000}' +
-          '.desc,.dish .desc,.promo .desc,.sandwich-promo .desc{font-family:var(--sans)!important;' +
-            'font-weight:300!important;font-size:12pt!important;color:#000}' +
-          '.tags{font-family:var(--serif)!important;font-weight:600!important;font-style:italic;' +
-            'font-size:14pt!important;color:#538135}' +
-          '.allergy,.allergy-lc{font-family:var(--allergy)!important;font-weight:600!important;' +
-            'font-style:italic;color:#538135;font-size:11pt}' +
-          '.sec-note{font-family:var(--sans);font-weight:300;color:#000}' +
-        ''
-        : '') +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
       /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
@@ -4888,6 +4868,26 @@
       '.foot-promos .scallop{width:100%}' +
       '.bottom-cols .sec-title{text-align:left}' +
       '.allergy{font-family:var(--allergy);color:var(--green);font-style:italic;font-size:9.5pt;text-align:center;line-height:1.35;margin-top:3mm;padding-top:2mm;flex:0 0 auto;flex-shrink:0}' +
+      /* Windmill Word-sample type — after shared rules so Crimson/Roboto Light wins. */
+      (wm
+        ? '.sec-title,.sec-title.soft,.sec-title.soft-left,.sec-title.under,.scallop .sec-title,' +
+          '.top-left .sec-title,.col-events .sec-title,.col-food .sec-title,.col-dishes .sec-title,' +
+          '.col-promo .sec-title,.bottom-cols .sec-title,.specials-beside .sec-title.specials-beside-title{' +
+            'font-family:var(--sans)!important;font-weight:300!important;font-size:16pt!important;' +
+            'letter-spacing:normal;text-transform:none;text-decoration:underline;text-underline-offset:3px;' +
+            'color:#000;text-align:center!important;line-height:1.2}' +
+          '.dish-name,.dish-c .dish-name{font-family:var(--serif)!important;font-weight:600!important;' +
+            'font-size:16pt!important;color:#000;letter-spacing:normal}' +
+          '.price{font-family:var(--sans)!important;font-weight:300!important;font-size:12pt!important;color:#000}' +
+          '.desc,.dish .desc,.promo .desc,.sandwich-promo .desc{font-family:var(--sans)!important;' +
+            'font-weight:300!important;font-size:12pt!important;color:#000!important}' +
+          '.tags{font-family:var(--serif)!important;font-weight:600!important;font-style:italic;' +
+            'font-size:14pt!important;color:#538135}' +
+          '.allergy,.allergy-lc{font-family:var(--allergy)!important;font-weight:600!important;' +
+            'font-style:italic;color:#538135!important;font-size:11pt}' +
+          '.sec-note{font-family:var(--sans);font-weight:300;color:#000}' +
+        ''
+        : '') +
       '.promo{text-align:left}' +
       '.promo-title{font-family:var(--serif);font-weight:700;font-size:var(--promo);letter-spacing:.1em;text-transform:uppercase;margin:10px 0 4px}' +
       '.promo .promo-title:first-child{margin-top:0}' +
