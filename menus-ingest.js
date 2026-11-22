@@ -38,17 +38,30 @@
     return cloudVenue_ || 'eightbells';
   }
 
-  /** Attach venue to menu-book cloud bodies (never invent a venue on print/history). */
+  /**
+   * Attach venue to dish-book AND print/history cloud bodies.
+   * Eight Bells stays eightbells (explicit). Windmill must never hit the
+   * shared Eight Bells HISTIDX / MENUS book by omitting venue.
+   */
   function withCloudVenue_(body) {
     body = body && typeof body === 'object' ? body : {};
     var action = String(body.action || '');
-    if (action === 'getMenusState' || action === 'saveMenuState' || action === 'saveMenusState' ||
-        action === 'publishSavedMenu') {
-      if (!body.venue) body.venue = getCloudVenue();
-      // Nested legacy whole-book payload.
-      if (action === 'saveMenusState' && body.state && typeof body.state === 'object' && !body.state.venue) {
-        body.state.venue = body.venue;
-      }
+    var venue = getCloudVenue();
+    var needsVenue =
+      action === 'getMenusState' || action === 'saveMenuState' || action === 'saveMenusState' ||
+      action === 'publishSavedMenu' ||
+      action === 'listPrintHistory' || action === 'pruneOrphanPrintHistory' ||
+      action === 'savePrintHistory' || action === 'getPrintHistory' ||
+      action === 'hasPrintHistory' || action === 'deletePrintHistory' ||
+      action === 'emailPrintHistory';
+    if (needsVenue && !body.venue) body.venue = venue || 'eightbells';
+    // Nested legacy whole-book payload.
+    if (action === 'saveMenusState' && body.state && typeof body.state === 'object' && !body.state.venue) {
+      body.state.venue = body.venue;
+    }
+    if (action === 'savePrintHistory' && body.entry && typeof body.entry === 'object' &&
+        !body.entry.venue) {
+      body.entry.venue = body.venue;
     }
     return body;
   }
@@ -202,8 +215,10 @@
     var url = getCloudUrl() + '?action=' + encodeURIComponent(action);
     if (params.id) url += '&id=' + encodeURIComponent(params.id);
     if (params.to) url += '&to=' + encodeURIComponent(params.to);
-    // Dish-book reads are venue-scoped (eightbells | windmill).
-    if (action === 'getMenusState') {
+    // Dish-book + print/history reads are venue-scoped (eightbells | windmill).
+    if (action === 'getMenusState' || action === 'listPrintHistory' ||
+        action === 'getPrintHistory' || action === 'hasPrintHistory' ||
+        action === 'deletePrintHistory' || action === 'pruneOrphanPrintHistory') {
       var venue = params.venue || getCloudVenue();
       if (venue) url += '&venue=' + encodeURIComponent(venue);
     }

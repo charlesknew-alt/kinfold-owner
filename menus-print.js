@@ -64,7 +64,13 @@
   }
 
   function venueLogoImg(cls) {
-    var c = cls ? (' class="' + cls + '"') : '';
+    // Windmill mark is landscape (~2:1); Eight Bells is square. Same CSS width
+    // made Windmill look tiny — bump the block class so the printed mark reads
+    // as big as the Eight Bells logo block (dark windmill-logo.png, not header).
+    var classes = [];
+    if (cls) classes.push(cls);
+    if (isWindmillPrint() && cls === 'logo-tr') classes.push('logo-tr-wm');
+    var c = classes.length ? (' class="' + classes.join(' ') + '"') : '';
     return '<img' + c + ' src="' + esc(asset(venueLogoFile())) + '" alt="' + esc(venueLogoAlt()) + '">';
   }
 
@@ -1918,6 +1924,24 @@
         back = backWithoutRoasts;
       }
     }
+    // Main (and similar): when page 1 is only Starters (+ chrome) and Mains sit
+    // alone on page 2, pull Mains onto page 1 so the sheet is not half-empty.
+    var mainsOnP1 = false;
+    var mainCost = bag.mains ? sectionUnits(bag.mains, false) : 0;
+    if (!roastsOnP1 && bag.mains && mainCost > 0 && !bag.sundayRoasts) {
+      var frontWithMains = front + mainCost;
+      var backWithoutMains = back - mainCost;
+      var mainsFitP1 = frontWithMains <= PAGE - 8;
+      var mainsP1Sparse = front < PAGE * 0.52;
+      var mainsP2Heavier = backWithoutMains >= frontWithMains - 8 ||
+        back > PAGE - 10;
+      var noClassicsBand = !(bag.classics || bag.burgers || bag.sharing);
+      if (mainsFitP1 && mainsP1Sparse && (mainsP2Heavier || noClassicsBand)) {
+        mainsOnP1 = true;
+        front = frontWithMains;
+        back = Math.max(0, backWithoutMains);
+      }
+    }
     // Named fillings always print. Empty tip+hours when Sandwiches is ticked and
     // Tip is on. On Main / Main (upcoming), Tip=Yes also places a sell-only tip
     // when Sandwiches is unticked — compulsory chrome, never silent when spare room.
@@ -1971,7 +1995,8 @@
         footPromos: false,
         classicsSplit: 0,
         sidesOnP1: false,
-        sundayRoasts: !!roastsOnP1
+        sundayRoasts: !!roastsOnP1,
+        mains: !!mainsOnP1
       },
       p2: null,
       leftover: { p1: 0, p2: 0 },
@@ -1981,12 +2006,13 @@
       sandwichTipOnly: !!sandwichTipOnly
     };
     if (roastsOnP1) layout.fillers.push('Sunday Roasts (page 1 — balance)');
+    if (mainsOnP1) layout.fillers.push('Mains (page 1 — balance)');
     if (bag.hasLunch) layout.fillers.push('Lunch club in allergy footer');
 
     // —— Food load vs type range: one page when it fits at max→min sizes ——
     var oneNeed = front;
     if (bag.sundayRoasts && !roastsOnP1) oneNeed += roastCost;
-    if (bag.mains) oneNeed += sectionUnits(bag.mains, false);
+    if (bag.mains && !mainsOnP1) oneNeed += sectionUnits(bag.mains, false);
     if (bag.specialMains) oneNeed += sectionUnits(bag.specialMains, true);
     if (bag.littleBells) oneNeed += sectionUnits(bag.littleBells, true);
     if (bag.desserts) oneNeed += sectionUnits(bag.desserts, false);
@@ -3834,6 +3860,17 @@
       usedPromoTitles = usedPromoTitles.concat(roastOut1.usedPromoTitles || []);
       p1 += roastOut1.html;
     }
+    // Mains on page 1 only when the planner pulled them up to fill a sparse
+    // two-page front. Single-page sheets still place Mains later.
+    var mainsOnPage1 = !!(bag.mains && p1opts.mains);
+    if (mainsOnPage1 && bag.mains && !mainsPairedInCol) {
+      var mainOut1Early = renderUnpairedSection(bag.mains.name, bag.mains.dishes, mainRule, {
+        promos: promos, excludeTitles: usedPromoTitles
+      });
+      usedPromoTitles = usedPromoTitles.concat(mainOut1Early.usedPromoTitles || []);
+      p1 += mainOut1Early.html;
+      mainsPairedInCol = true;
+    }
     if (deferShareAfterRoasts) {
       flushColumnPending();
       var shareAfterRoastsSplit = canBalancedSplit(shareDishes.length);
@@ -4077,7 +4114,7 @@
     }
 
     if (layout.pages === 1) {
-      if (bag.mains && !mainsPairedInCol) {
+      if (bag.mains && !mainsPairedInCol && !mainsOnPage1) {
         var mainSolo1 = renderUnpairedSection(bag.mains.name, bag.mains.dishes, mainRule, {
           promos: promos, excludeTitles: usedPromoTitles
         });
@@ -4679,8 +4716,8 @@
       '.tracker-roman-only{justify-content:flex-end;margin-bottom:0}' +
       '.sec-plain{margin:0 0 10px}' +
       '.scallop .sec-title,.sec-plain .sec-title{text-align:left}' +
-      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
-      '.top-band-logo{grid-template-columns:1fr 190px;min-height:0}' +
+      '.top-band{display:grid;grid-template-columns:minmax(0,1fr) ' + (wm ? '290px' : '190px') + ';gap:10px;align-items:start;margin:0 0 10px;overflow:hidden}' +
+      '.top-band-logo{grid-template-columns:1fr ' + (wm ? '290px' : '190px') + ';min-height:0}' +
       '.top-left{min-width:0;overflow:hidden;align-self:start}' +
       '.top-left .sec-title{text-align:left;margin-bottom:calc(var(--sec-gap) - 2px)}' +
       '.top-left .scallop{margin:0 0 6px;max-width:100%;height:auto;align-self:start}' +
@@ -4688,9 +4725,12 @@
       '.top-left .dish{margin-bottom:calc(max(var(--dish-gap-min),var(--dish-gap)) + 2px)}' +
       '.top-right{display:flex;align-items:flex-start;justify-content:flex-end;padding-top:0}' +
       '.logo-tr{width:180px!important;height:auto;display:block;margin-left:auto;max-width:100%}' +
+      '.logo-tr.logo-tr-wm{width:280px!important;max-width:100%}' +
       '.logo{display:block;width:54px;margin:0 auto 4px}' +
       '.foot-logo{text-align:center;margin:10px 0 4px}' +
       '.foot-logo img{width:96px;height:auto}' +
+      (wm ? '.foot-logo img{width:140px}' : '') +
+      '.cols-balanced .col-logo .logo-tr.logo-tr-wm{width:240px!important}' +
       'h1{font-family:var(--serif);font-weight:700;font-size:17px;letter-spacing:.06em;text-align:center;text-transform:uppercase;margin:2px 0 8px}' +
       '.sec{margin:0 0 var(--sec-gap)}' +
       /* Titles clearly larger than dishes; gap tracks density ladder so fit can shrink */
@@ -5728,10 +5768,15 @@
   }
 
   var lastBuildMeta = null;
-  var HISTORY_DB = 'eb-menu-prints';
+  /** Venue-scoped IndexedDB so Windmill never shares Eight Bells print drafts. */
+  function historyDbName_() {
+    return printVenueId() === 'windmill' ? 'eb-menu-prints-wm' : 'eb-menu-prints';
+  }
+  var HISTORY_DB = historyDbName_();
   var HISTORY_STORE = 'prints';
-  var HISTORY_LS_INDEX = 'eb-menu-print-history-v1';
-  var HISTORY_LS_HTML = 'eb-menu-print-html-';
+  var HISTORY_LS_SUFFIX = printVenueId() === 'windmill' ? '-wm' : '';
+  var HISTORY_LS_INDEX = 'eb-menu-print-history-v1' + HISTORY_LS_SUFFIX;
+  var HISTORY_LS_HTML = 'eb-menu-print-html-' + (HISTORY_LS_SUFFIX ? 'wm-' : '');
   var HISTORY_MAX = 60;
   /** Live Menu AI web app — also stores shared print history in Drive. */
   var HISTORY_CLOUD_DEFAULT =
@@ -6611,6 +6656,20 @@
      * Phone-only leftovers upload in the background via schedulePendingPrintUploads.
      */
     return historyCloudPost({ action: 'listPrintHistory' }).then(function (data) {
+      var wantWm = printVenueId() === 'windmill';
+      var gotVenue = String((data && data.venue) || '');
+      // Windmill must never display the shared Eight Bells HISTIDX list.
+      if (wantWm && gotVenue !== 'windmill') {
+        return localListOnly().then(function (localItems) {
+          var rows = sortHistoryNewest((localItems || []).map(function (r) {
+            return asRow(r, 'local');
+          }));
+          rows.cloudOk = false;
+          rows.venuePending = true;
+          hydratePrintVersionsFromHistory(rows);
+          return rows;
+        });
+      }
       var cloudItems = Array.isArray(data.items) ? data.items : [];
       var known = {};
       var deleted = {};
@@ -6646,7 +6705,9 @@
           pendingLocal = true;
           byId[r.id] = asRow(r, 'local');
         });
-        if (pendingLocal || needsStampRepair) schedulePendingPrintUploads();
+        if ((pendingLocal || needsStampRepair) && !(wantWm && gotVenue !== 'windmill')) {
+          schedulePendingPrintUploads();
+        }
         var rows = sortHistoryNewest(Object.keys(byId).map(function (k) { return byId[k]; }));
         rows.cloudOk = true;
         hydratePrintVersionsFromHistory(rows);
