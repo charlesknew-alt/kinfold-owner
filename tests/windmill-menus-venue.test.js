@@ -141,9 +141,9 @@ assert(aiGs.indexOf("venue: historyVenueCtx_") !== -1 ||
   aiGs.indexOf('venue: historyVenueCtx_') !== -1,
   'listPrintHistory response includes venue');
 assert(printJs.indexOf('logo-tr-wm') !== -1 &&
-  printJs.indexOf('logo-tr-frame') !== -1 &&
+  printJs.indexOf('logo-tr-frame') === -1 &&
   printJs.indexOf('Mains (page 1 — balance)') !== -1,
-  'Windmill print uses framed official logo block and can pull Mains onto page 1');
+  'Windmill print uses unframed official logo block and can pull Mains onto page 1');
 assert(printJs.indexOf('venuePending') !== -1 &&
   printJs.indexOf('eb-menu-prints-wm') !== -1,
   'Windmill print history refuses unscoped EB cloud list and uses -wm local store');
