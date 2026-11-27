@@ -14,7 +14,15 @@
   var SEED_STEAK_RE = /10oz\s+Sirloin\s+Steak/i;
   var NEAR_EMPTY_MAX = 2;
   var FULL_MENU_MIN = 8;
-  var MENUS_BACKUP_SLOTS = 5;
+  /**
+   * Chunked Script Property backups are expensive (each slot ≈ full MENUS size).
+   * Two slots keep restore safety without hammering the 500KB quota on every tweak.
+   */
+  var MENUS_BACKUP_SLOTS = 2;
+  /** At most one full backup rotation every 15 minutes unless content changed. */
+  var MENUS_BACKUP_THROTTLE_MS = 15 * 60 * 1000;
+  var MENU_EMAIL_DEFAULT_EIGHTBELLS = 'pub@eightbellsbolney.com';
+  var MENU_EMAIL_DEFAULT_WINDMILL = 'info@windmilllittleworth.com';
   /** After ensureMenuVersions, untouched menus sit at 1. Versioned saves go to 2+. */
   var LEGACY_BASELINE_VERSION = 1;
 
@@ -184,6 +192,124 @@
     } catch (e) {
       return false;
     }
+  }
+
+  function jsonEqual_(a, b) {
+    try {
+      return JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * True when dishes + shared catalogue/banks are unchanged — only layout /
+   * small per-menu metadata (sectionLayout, meta, includes, promoTicks) moved.
+   * Used to skip expensive chunked backup rotation on column-width tweaks.
+   */
+  function isLayoutOrMetaOnlyChange(before, after, menuId) {
+    if (!after || typeof after !== 'object') return false;
+    if (!before || typeof before !== 'object') return false;
+    var id = String(menuId || '').trim();
+    if (!id) return false;
+    var beforeBook = before.book && typeof before.book === 'object' ? before.book : {};
+    var afterBook = after.book && typeof after.book === 'object' ? after.book : {};
+    if (!dishesEqual_(beforeBook[id], afterBook[id])) return false;
+    if (!jsonEqual_(before.dishCatalogue, after.dishCatalogue)) return false;
+    if (!jsonEqual_(before.promoBank, after.promoBank)) return false;
+    if (!jsonEqual_(before.promoDeck, after.promoDeck)) return false;
+    if (!jsonEqual_(before.extraMenus, after.extraMenus)) return false;
+    if (!jsonEqual_(before.extraSections, after.extraSections)) return false;
+    return true;
+  }
+
+  /**
+   * Major content: dishes for this menu and/or shared catalogue / extras changed.
+   * These always warrant a fresh backup (bypass throttle).
+   */
+  function isMajorMenuContentChange(before, after, menuId) {
+    if (!after || typeof after !== 'object') return true;
+    if (!before || typeof before !== 'object') return true;
+    var id = String(menuId || '').trim();
+    var beforeBook = before.book && typeof before.book === 'object' ? before.book : {};
+    var afterBook = after.book && typeof after.book === 'object' ? after.book : {};
+    if (id && !dishesEqual_(beforeBook[id], afterBook[id])) return true;
+    if (!jsonEqual_(before.dishCatalogue, after.dishCatalogue)) return true;
+    if (!jsonEqual_(before.extraMenus, after.extraMenus)) return true;
+    if (!jsonEqual_(before.extraSections, after.extraSections)) return true;
+    return false;
+  }
+
+  /**
+   * Decide whether to rotate MENUS_BAK_* / MENUS_WINDMILL_BAK_* before a write.
+   * - No existing backup → always rotate
+   * - Layout/metadata-only → skip (keeps sectionLayout saves fast)
+   * - Major dish/menu content → rotate (restore safety)
+   * - Otherwise throttle to at most once per MENUS_BACKUP_THROTTLE_MS
+   */
+  function shouldRotateMenusBackup(opts) {
+    opts = opts && typeof opts === 'object' ? opts : {};
+    var now = Number(opts.now) || Date.now();
+    var lastAt = Number(opts.lastBackupAt) || 0;
+    var throttleMs = opts.throttleMs != null
+      ? Number(opts.throttleMs)
+      : MENUS_BACKUP_THROTTLE_MS;
+    if (!isFinite(throttleMs) || throttleMs < 0) throttleMs = MENUS_BACKUP_THROTTLE_MS;
+    var hasBackup = !!opts.hasExistingBackup || lastAt > 0;
+
+    if (opts.force) return { rotate: true, reason: 'force' };
+    if (!hasBackup) return { rotate: true, reason: 'no_backup' };
+    if (opts.layoutOnly) return { rotate: false, reason: 'layout_only' };
+    if (opts.majorContentChange) return { rotate: true, reason: 'major_content' };
+    if (!lastAt || (now - lastAt) >= throttleMs) {
+      return { rotate: true, reason: 'interval' };
+    }
+    return { rotate: false, reason: 'throttled' };
+  }
+
+  /**
+   * Venue-aware menu email defaults (recipient + body/from wording).
+   * Eight Bells copy stays exactly "Eight Bells menu: …".
+   */
+  function menuEmailCopy(venue) {
+    if (normalizeVenue(venue) === VENUE_WINDMILL) {
+      return {
+        venue: VENUE_WINDMILL,
+        defaultTo: MENU_EMAIL_DEFAULT_WINDMILL,
+        toProp: 'MENU_EMAIL_TO_WINDMILL',
+        label: 'The Windmill menu',
+        fromName: 'The Windmill Menus'
+      };
+    }
+    return {
+      venue: VENUE_EIGHTBELLS,
+      defaultTo: MENU_EMAIL_DEFAULT_EIGHTBELLS,
+      toProp: 'MENU_EMAIL_TO',
+      label: 'Eight Bells menu',
+      fromName: 'Eight Bells Menus'
+    };
+  }
+
+  /**
+   * Resolve To: for emailPrintHistory.
+   * Explicit `to` wins unless it is the other venue's hardcoded default
+   * (client historically always sent the Eight Bells address).
+   */
+  function resolveMenuEmailTo(venue, opts) {
+    opts = opts && typeof opts === 'object' ? opts : {};
+    var copy = menuEmailCopy(venue);
+    var explicit = String(opts.to || '').trim();
+    var propVal = String(opts.propValue || '').trim();
+    if (explicit) {
+      var otherDefault = copy.venue === VENUE_WINDMILL
+        ? MENU_EMAIL_DEFAULT_EIGHTBELLS
+        : MENU_EMAIL_DEFAULT_WINDMILL;
+      if (explicit.toLowerCase() !== otherDefault.toLowerCase()) {
+        return { to: explicit, copy: copy, source: 'explicit' };
+      }
+    }
+    if (propVal) return { to: propVal, copy: copy, source: 'property' };
+    return { to: copy.defaultTo, copy: copy, source: 'default' };
   }
 
   /**
@@ -606,6 +732,9 @@
     NEAR_EMPTY_MAX: NEAR_EMPTY_MAX,
     FULL_MENU_MIN: FULL_MENU_MIN,
     MENUS_BACKUP_SLOTS: MENUS_BACKUP_SLOTS,
+    MENUS_BACKUP_THROTTLE_MS: MENUS_BACKUP_THROTTLE_MS,
+    MENU_EMAIL_DEFAULT_EIGHTBELLS: MENU_EMAIL_DEFAULT_EIGHTBELLS,
+    MENU_EMAIL_DEFAULT_WINDMILL: MENU_EMAIL_DEFAULT_WINDMILL,
     LEGACY_BASELINE_VERSION: LEGACY_BASELINE_VERSION,
     VENUE_EIGHTBELLS: VENUE_EIGHTBELLS,
     VENUE_WINDMILL: VENUE_WINDMILL,
@@ -624,7 +753,12 @@
     applyWholeBookSave: applyWholeBookSave,
     historyMetaFromHtmlTitle: historyMetaFromHtmlTitle,
     printHistoryBelongsToVenue: printHistoryBelongsToVenue,
-    coercePrintMenuId: coercePrintMenuId
+    coercePrintMenuId: coercePrintMenuId,
+    isLayoutOrMetaOnlyChange: isLayoutOrMetaOnlyChange,
+    isMajorMenuContentChange: isMajorMenuContentChange,
+    shouldRotateMenusBackup: shouldRotateMenusBackup,
+    menuEmailCopy: menuEmailCopy,
+    resolveMenuEmailTo: resolveMenuEmailTo
   };
 
   if (typeof module !== 'undefined' && module.exports) {

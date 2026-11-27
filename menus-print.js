@@ -8063,7 +8063,19 @@
   function emailPrintHtml(entry, opts) {
     opts = opts || {};
     if (!entry || !entry.html) return Promise.reject(new Error('missing_html'));
-    var to = String(opts.to || HISTORY_EMAIL_DEFAULT || '').trim();
+    var venue = 'eightbells';
+    try {
+      if (entry.venue) venue = String(entry.venue);
+      else if (typeof printVenueId === 'function') venue = printVenueId() || venue;
+      else if (root.EBMenuIngest && typeof root.EBMenuIngest.getCloudVenue === 'function') {
+        venue = root.EBMenuIngest.getCloudVenue() || venue;
+      }
+    } catch (eV) { venue = 'eightbells'; }
+    if (venue === 'wm' || venue === 'windmillinn') venue = 'windmill';
+    var defaultTo = venue === 'windmill'
+      ? 'info@windmilllittleworth.com'
+      : (HISTORY_EMAIL_DEFAULT || 'pub@eightbellsbolney.com');
+    var to = String(opts.to || defaultTo || '').trim();
     var meta = {
       id: entry.id,
       menuId: entry.menuId,
@@ -8075,11 +8087,13 @@
       hideDate: entry.hideDate,
       generatedAt: entry.generatedAt,
       dayKey: entry.dayKey,
+      venue: venue,
       html: entry.html
     };
     // POST the HTML with the email action (no separate upload race).
     return historyCloudPost({
       action: 'emailPrintHistory',
+      venue: venue,
       to: to,
       entry: meta
     }).then(function (data) {

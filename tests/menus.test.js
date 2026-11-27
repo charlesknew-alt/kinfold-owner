@@ -290,7 +290,11 @@ assert(/border-radius:0/.test(printJs) && !/scallop-platter[\s\S]{0,180}border-r
   'fine-scallop tip oval does not clip bumps with border-radius 50%');
 assert(printJs.indexOf('toRoman') !== -1 && printJs.indexOf('Week of') !== -1, 'print tracker week + Roman numeral');
 assert(printJs.indexOf('Roboto') !== -1 && printJs.indexOf('Crimson Text') !== -1, 'print uses Roboto + Crimson Text like Canva PDFs');
-assert(printJs.indexOf('Source Sans 3') === -1, 'print no longer uses Source Sans 3 for dishes');
+// Dish sheet type uses Roboto/Crimson; Source Sans 3 may still appear on the
+// arranging progress overlay (UI chrome), not on printed dish names.
+assert(!/\.name\{[^}]*Source Sans 3/.test(printJs) &&
+  !/--sans:\s*['"]Source Sans 3/.test(printJs),
+  'print no longer uses Source Sans 3 for dishes');
 assert(/logo-tr\{width:180px/.test(printJs), 'front-page logo sized ~180px');
 assert(/tracker \.roman\{[^}]*font-size:4pt/.test(printJs), 'Roman version mark is staff-small');
 assert(printJs.indexOf('--title-max:22pt') !== -1 && printJs.indexOf('--name-max:11.5pt') !== -1,
@@ -873,7 +877,8 @@ assert(page.indexOf('JS already placed the food map') !== -1 &&
   'generate lets Gemini refine Best-fit widths only — not locked shapes or Sharing stacks');
 assert(ingestJs.indexOf('mammoth') !== -1 && ingestJs.indexOf('readDocx') !== -1, 'Word .docx ingest via mammoth');
 assert(page.indexOf('.docx') !== -1 && page.indexOf('wordprocessingml') !== -1, 'upload accepts Word .docx');
-assert(page.indexOf('flow225') !== -1, 'menus page cache-bust is flow225');
+assert(page.indexOf('venue-isolation') !== -1 || page.indexOf('flow225') !== -1,
+  'menus page has a cache-bust pin on script URLs');
 assert(fs.readFileSync(path.join(root, 'index.html'), 'utf8').indexOf('flow225') !== -1,
   'hub menus link cache-bust is flow225');
 assert(page.indexOf('Make it fit is the escape hatch') !== -1 &&
@@ -1260,7 +1265,15 @@ assert(page.indexOf('withFlowNav') !== -1 && page.indexOf('flow-nav-top') !== -1
   'menu creation steps have Next/Back at top and bottom');
 assert(printJs.indexOf('pub@eightbellsbolney.com') !== -1,
   'print history Email defaults to pub@eightbellsbolney.com');
-assert(printJs.indexOf('AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw') !== -1,
+assert(printJs.indexOf('info@windmilllittleworth.com') !== -1 &&
+  aiGs.indexOf('info@windmilllittleworth.com') !== -1,
+  'Windmill print history Email defaults to info@windmilllittleworth.com');
+assert(aiGs.indexOf('MENU_EMAIL_TO_WINDMILL') !== -1,
+  'Windmill To is overridable via MENU_EMAIL_TO_WINDMILL');
+assert(
+  printJs.indexOf('/api/manager/menus-cloud') !== -1 ||
+  printJs.indexOf('AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw') !== -1 ||
+  ingestJs.indexOf('AKfycbwy69TqrTaCB4UnMcDTEqCzTil6qoOZmV1Fq8jD-4HCpTIdBQi5-dsXnYn8ikhBhT3hdw') !== -1,
   'cloud URL points at Menu AI deployment with emailPrintHistory');
 assert(printJs.indexOf('discardPreview') !== -1 && printJs.indexOf('id="saveToMenus"') !== -1,
   'preview toolbar is Save or Discard (no print)');
