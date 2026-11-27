@@ -529,6 +529,27 @@ assert(printJs.indexOf('URL / data-menus-venue win over in-memory cloud venue') 
   printJs.indexOf('normalizePrintVenue_') !== -1,
   'printVenueId prefers URL / dataset over stale getCloudVenue');
 
+// —— 9. Windmill print-history email recipient + copy ——
+assert(sync.menuEmailCopy('windmill').defaultTo === 'info@windmilllittleworth.com',
+  'Windmill email default is info@windmilllittleworth.com');
+assert(sync.menuEmailCopy('eightbells').defaultTo === 'pub@eightbellsbolney.com',
+  'Eight Bells email default stays pub@eightbellsbolney.com');
+assert(aiGs.indexOf('MENU_EMAIL_TO_WINDMILL') !== -1 &&
+  aiGs.indexOf('info@windmilllittleworth.com') !== -1,
+  'Code.gs supports MENU_EMAIL_TO_WINDMILL / Windmill default To');
+assert(aiGs.indexOf('The Windmill menu') !== -1,
+  'Code.gs has Windmill menu email body wording');
+assert(printJs.indexOf('info@windmilllittleworth.com') !== -1,
+  'client emailPrintHtml knows the Windmill default To');
+(function () {
+  var emailFn = printJs.split('function emailPrintHtml')[1] || '';
+  emailFn = emailFn.split('function partyCss')[0] || emailFn;
+  assert(emailFn.indexOf('info@windmilllittleworth.com') !== -1,
+    'emailPrintHtml picks Windmill To when venue is windmill');
+  assert(emailFn.indexOf('venue: venue') !== -1 || emailFn.indexOf('venue:') !== -1,
+    'emailPrintHtml posts venue with the email action');
+})();
+
 if (failed) {
   console.error('\n' + failed + ' check(s) failed');
   process.exit(1);

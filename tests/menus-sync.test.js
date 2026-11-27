@@ -332,6 +332,193 @@ assert(aiGs.indexOf('driveAuthUrl_') !== -1 &&
   aiGs.indexOf('authUrl: driveAuthUrl_()') !== -1,
   'v114 Drive auth help behaviour kept');
 
+// —— 4b. Backup throttle / layout-only fast path (no 5-slot churn on tweaks) ——
+assert(typeof sync.shouldRotateMenusBackup === 'function' &&
+  typeof sync.isLayoutOrMetaOnlyChange === 'function' &&
+  typeof sync.isMajorMenuContentChange === 'function',
+  'backup throttle helpers exported from MenusSyncLogic');
+assert(sync.MENUS_BACKUP_SLOTS <= 3,
+  'backup slot count stays small (≤3) for Script Properties quota');
+assert(sync.MENUS_BACKUP_THROTTLE_MS >= 10 * 60 * 1000,
+  'backup throttle is at least 10 minutes');
+
+(function () {
+  var current = baseState();
+  current.sectionLayout = {
+    main: { Mains: { width: 'full', frame: false } }
+  };
+  // Layout-only save: same dishes, new column width.
+  var layoutPatch = {
+    menuId: 'main',
+    expectedVersion: 5,
+    dishes: current.book.main.slice(),
+    sectionLayout: { Mains: { width: 'column', frame: false } },
+    promoBank: current.promoBank,
+    promoDeck: current.promoDeck,
+    dishCatalogue: current.dishCatalogue,
+    extraMenus: current.extraMenus,
+    extraSections: current.extraSections
+  };
+  var saved = sync.applyMenuSave(current, layoutPatch);
+  assert(saved.ok === true, 'layout-only applyMenuSave succeeds');
+  assert(saved.state.sectionLayout.main.Mains.width === 'column',
+    'sectionLayout is preserved on layout-only save');
+  assert(sync.isLayoutOrMetaOnlyChange(current, saved.state, 'main') === true,
+    'column tweak is detected as layout/meta-only');
+  assert(sync.isMajorMenuContentChange(current, saved.state, 'main') === false,
+    'column tweak is not a major content change');
+
+  var now = 1700000000000;
+  var throttle = sync.MENUS_BACKUP_THROTTLE_MS;
+  var noBackup = sync.shouldRotateMenusBackup({
+    lastBackupAt: 0,
+    now: now,
+    layoutOnly: true,
+    majorContentChange: false,
+    hasExistingBackup: false
+  });
+  assert(noBackup.rotate === true && noBackup.reason === 'no_backup',
+    'layout-only still takes a backup when none exists');
+
+  var skipLayout = sync.shouldRotateMenusBackup({
+    lastBackupAt: now - 60000,
+    now: now,
+    layoutOnly: true,
+    majorContentChange: false,
+    hasExistingBackup: true
+  });
+  assert(skipLayout.rotate === false && skipLayout.reason === 'layout_only',
+    'consecutive layout-only saves do not rotate backups');
+
+  var throttled = sync.shouldRotateMenusBackup({
+    lastBackupAt: now - 60000,
+    now: now,
+    layoutOnly: false,
+    majorContentChange: false,
+    hasExistingBackup: true,
+    throttleMs: throttle
+  });
+  assert(throttled.rotate === false && throttled.reason === 'throttled',
+    'non-major saves inside the throttle window skip backup rotation');
+
+  var afterInterval = sync.shouldRotateMenusBackup({
+    lastBackupAt: now - throttle - 1,
+    now: now,
+    layoutOnly: false,
+    majorContentChange: false,
+    hasExistingBackup: true,
+    throttleMs: throttle
+  });
+  assert(afterInterval.rotate === true && afterInterval.reason === 'interval',
+    'backup rotates once the throttle interval has elapsed');
+
+  var dishPatch = {
+    menuId: 'main',
+    expectedVersion: 5,
+    dishes: fullMain().concat([dish('Mains', 'Brand New Pie')]),
+    sectionLayout: current.sectionLayout.main,
+    promoBank: current.promoBank,
+    promoDeck: current.promoDeck,
+    dishCatalogue: current.dishCatalogue,
+    extraMenus: current.extraMenus,
+    extraSections: current.extraSections
+  };
+  var dishSaved = sync.applyMenuSave(current, dishPatch);
+  assert(sync.isLayoutOrMetaOnlyChange(current, dishSaved.state, 'main') === false,
+    'dish edit is not layout-only');
+  assert(sync.isMajorMenuContentChange(current, dishSaved.state, 'main') === true,
+    'dish edit is a major content change');
+  var majorBak = sync.shouldRotateMenusBackup({
+    lastBackupAt: now - 60000,
+    now: now,
+    layoutOnly: false,
+    majorContentChange: true,
+    hasExistingBackup: true
+  });
+  assert(majorBak.rotate === true && majorBak.reason === 'major_content',
+    'major dish/menu content changes still take a backup inside the throttle window');
+})();
+
+assert(aiGs.indexOf('menusShouldBackupBeforeWrite_') !== -1,
+  'Code.gs gates backup rotation via menusShouldBackupBeforeWrite_');
+assert(aiGs.indexOf('menusAcquireWriteLock_') !== -1 &&
+  aiGs.indexOf('tryLock(15000)') !== -1,
+  'saveMenuState_ acquires LockService script lock with tryLock(15000)');
+(function () {
+  var saveFn = aiGs.split('function saveMenuState_')[1].split('function saveMenusState_')[0];
+  assert(saveFn.indexOf('menusAcquireWriteLock_') !== -1,
+    'saveMenuState_ uses the write lock');
+  assert(saveFn.indexOf('menusShouldBackupBeforeWrite_') !== -1,
+    'saveMenuState_ consults backup throttle before rotating');
+  assert(saveFn.indexOf('busy: true') !== -1 || saveFn.indexOf("error: 'busy'") !== -1 ||
+    saveFn.indexOf('acquired.busy') !== -1,
+    'saveMenuState_ returns a clean busy response when lock contended');
+})();
+
+// —— 4c. emailPrintHistory venue recipient + copy ——
+assert(typeof sync.menuEmailCopy === 'function' &&
+  typeof sync.resolveMenuEmailTo === 'function',
+  'menu email venue helpers exported');
+(function () {
+  var eb = sync.menuEmailCopy('eightbells');
+  assert(eb.defaultTo === 'pub@eightbellsbolney.com',
+    'Eight Bells default email is pub@eightbellsbolney.com');
+  assert(eb.label === 'Eight Bells menu',
+    'Eight Bells email body uses "Eight Bells menu" wording');
+  assert(eb.toProp === 'MENU_EMAIL_TO',
+    'Eight Bells uses MENU_EMAIL_TO script property');
+
+  var wm = sync.menuEmailCopy('windmill');
+  assert(wm.defaultTo === 'info@windmilllittleworth.com',
+    'Windmill default email is info@windmilllittleworth.com');
+  assert(/Windmill/i.test(wm.label) && !/Eight Bells/i.test(wm.label),
+    'Windmill email body uses Windmill wording (not Eight Bells)');
+  assert(wm.toProp === 'MENU_EMAIL_TO_WINDMILL',
+    'Windmill uses MENU_EMAIL_TO_WINDMILL script property');
+
+  var ebTo = sync.resolveMenuEmailTo('eightbells', {});
+  assert(ebTo.to === 'pub@eightbellsbolney.com', 'EB resolve defaults to pub@');
+  var ebProp = sync.resolveMenuEmailTo('eightbells', {
+    propValue: 'custom-eb@example.com'
+  });
+  assert(ebProp.to === 'custom-eb@example.com', 'MENU_EMAIL_TO overrides EB default');
+
+  var wmTo = sync.resolveMenuEmailTo('windmill', {});
+  assert(wmTo.to === 'info@windmilllittleworth.com', 'WM resolve defaults to info@');
+  var wmProp = sync.resolveMenuEmailTo('windmill', {
+    propValue: 'wm-custom@example.com'
+  });
+  assert(wmProp.to === 'wm-custom@example.com',
+    'MENU_EMAIL_TO_WINDMILL overrides Windmill default');
+  var wmExplicit = sync.resolveMenuEmailTo('windmill', {
+    to: 'chef@windmilllittleworth.com'
+  });
+  assert(wmExplicit.to === 'chef@windmilllittleworth.com',
+    'explicit to wins for Windmill');
+  // Client historically always posted the Eight Bells default — treat as unset for WM.
+  var wmIgnoreEbDefault = sync.resolveMenuEmailTo('windmill', {
+    to: 'pub@eightbellsbolney.com',
+    propValue: ''
+  });
+  assert(wmIgnoreEbDefault.to === 'info@windmilllittleworth.com',
+    'Windmill ignores Eight Bells hardcoded client default To');
+})();
+
+assert(aiGs.indexOf('resolveMenuEmailContext_') !== -1 &&
+  aiGs.indexOf('MENU_EMAIL_TO_WINDMILL') !== -1 &&
+  aiGs.indexOf('info@windmilllittleworth.com') !== -1,
+  'Code.gs wires Windmill menu email recipient');
+(function () {
+  var emailFn = aiGs.split('function emailPrintHistory_')[1]
+    .split('function menuHtmlPdfParts_')[0];
+  assert(emailFn.indexOf('resolveMenuEmailContext_') !== -1,
+    'emailPrintHistory_ uses venue-aware email context');
+  assert(emailFn.indexOf('mailCtx.label') !== -1 || emailFn.indexOf('label +') !== -1,
+    'emailPrintHistory_ uses venue label in the body (not hard-coded Eight Bells only)');
+  assert(emailFn.indexOf('menuHtmlToPdfBlob_') !== -1,
+    'emailPrintHistory_ still attaches via menuHtmlToPdfBlob_');
+})();
+
 // —— 5. Little Bells history/print uses the correct menu id ——
 (function () {
   var meta = sync.historyMetaFromHtmlTitle('pmwqantg6',
